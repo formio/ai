@@ -1,0 +1,8 @@
+{
+  "enabledPlugins": {
+    "mcp-server-dev@claude-plugins-official": true,
+    "code-simplifier@claude-plugins-official": true,
+    "skill-creator@claude-plugins-official": true
+  },
+  "deny": ["Read(*.env*)", "Read(**/.env*)", "Edit(*.env*)", "Edit(**/.env*)", ".mcp.json"]
+}

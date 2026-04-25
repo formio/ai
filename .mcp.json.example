@@ -1,0 +1,13 @@
+{
+  "mcpServers": {
+    "formio-mcp": {
+      "command": "pnpm",
+      "args": ["--filter", "@formio/mcp", "exec", "tsx", "src/stdio.ts"],
+      "env": {
+        "FORMIO_PROJECT_URL": "--- YOUR PROJECT ENDPOINT ---",
+        "FORMIO_API_KEY": "--- YOUR PROJECT API KEY ---",
+        "FORMIO_LOGIN_FORM": "--- login form for user auth ---"
+      }
+    }
+  }
+}

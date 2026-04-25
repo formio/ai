@@ -1,0 +1,36 @@
+{
+  "name": "@formio/ai",
+  "version": "0.1.3",
+  "description": "Form.io Claude Code plugin — MCP server and skills library",
+  "type": "module",
+  "license": "MIT",
+  "keywords": [
+    "formio",
+    "form.io",
+    "claude",
+    "claude-code",
+    "mcp",
+    "model-context-protocol",
+    "plugin",
+    "skills"
+  ],
+  "homepage": "https://github.com/formio/ai#readme",
+  "bugs": {
+    "url": "https://github.com/formio/ai/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/formio/ai.git"
+  },
+  "files": [
+    ".claude-plugin",
+    "hooks",
+    "server",
+    "skills",
+    "README.md"
+  ],
+  "publishConfig": {
+    "access": "public",
+    "directory": "../dist/plugin"
+  }
+}

@@ -1,0 +1,33 @@
+{
+  "skill_name": "formio-resource-planner",
+  "evals": [
+    {
+      "id": 0,
+      "name": "task-manager-classic",
+      "prompt": "I want to build a Task Manager application in Form.io. Projects have Tasks assigned to them. I want to assign users to projects, where each user only has access to the Tasks within their Project. Plan the resources for me.",
+      "expected_output": "Phase B writes the artifact pair template.md + template.json (paired basenames, paired collision timestamps). template.md has top-level `# Resource Map` title and sections in order: Resources, Users & Auth, Roles, Access Matrix, ER Diagram, Access Flow Diagram, Companion artifact. Resources include Project, Task, User, and at least one join (ProjectUser) with a Group Assignment action. Access Matrix table includes rows for administrator (all/all/all/all) and authenticated (group-based on Project/Task, own on ProjectUser). ER Diagram and Access Flow Diagram both contain ASCII bodies (not just headings). template.json top-level keys title/name/description/version/roles/resources/forms/actions all present; default roles administrator, authenticated, anonymous all defined. Chat output renders the markdown block first, then the JSON block, then the one-line filename confirmation, then the Next Steps block.",
+      "files": []
+    },
+    {
+      "id": 1,
+      "name": "crm-with-company-scoping",
+      "prompt": "Help me design a simple CRM in Form.io. Sales reps should be able to see Contacts and Deals, but only the ones belonging to Companies they're assigned to. A Contact belongs to one Company. A Deal belongs to one Company and can have multiple Contacts attached. We want self-register for reps with email/password, and an Admin role that sees everything.",
+      "expected_output": "Phase B writes template.md + template.json pair. template.md has all required sections in order. Resources include Company, Contact, Deal, plus at least one join (DealContact for N:N, plus CompanyUser for rep-to-company group access). Access Matrix rows reflect group-via-CompanyUser on Company/Contact/Deal, admin-all, sales rep owns their CompanyUser rows. Access Flow Diagram shows the CompanyUser Group Assignment writing the ACL onto Company, then field-based inheritance onto Contact and Deal. Self-register form carries Role Assignment. template.json defines roles administrator + authenticated + anonymous at minimum.",
+      "files": []
+    },
+    {
+      "id": 2,
+      "name": "minimal-no-auth-feedback",
+      "prompt": "I want a super simple public feedback form for my website. Anyone can submit feedback (name, email, message). I don't want users, accounts, or logins. Can you plan this in Form.io?",
+      "expected_output": "Phase B writes template.md + template.json pair. template.md Users & Auth section states 'None. App is public.' (or equivalent). Resources: a single Feedback resource/form with three fields (name textfield, email email, message textarea). Access Matrix has a single row: anonymous create_all, no read. Access Flow Diagram collapses to the one-line anonymous form. NO Group Assignment / Group Permissions action anywhere in template.json. No join resources. Roles section keeps the default three Form.io roles for completeness.",
+      "files": []
+    },
+    {
+      "id": 3,
+      "name": "complex-crm-transitive",
+      "prompt": "I want to build a full CRM in Form.io. The company uses Teams — each sales rep belongs to one or more Teams, and each Team owns a set of Accounts. Under each Account there are Contacts (people at the company), Deals (sales opportunities), and Activities (calls, emails, meetings, tasks). An Activity can optionally be tied to a specific Deal. Accounts also have a primary contact. Sales reps should only see data (Accounts, Contacts, Deals, Activities) belonging to Teams they are members of. Admins see everything. Self-register with email/password.",
+      "expected_output": "Phase B writes template.md + template.json pair. template.md has all required sections in order. Seven resources: User (default), Team (the group), TeamUser (join with Group Assignment action: group=team, user=user), Account (direct child of Team with 'team' select carrying field-based submissionAccess), Contact (grandchild — account select + hidden calculated 'team' mirror with submissionAccess), Deal (same mirror pattern), Activity (same mirror pattern + optional deal ref). Access Matrix rows distinguish administrator (all/all/all/all everywhere) from salesRep (group/group/group/— on Account/Contact/Deal/Activity). Access Flow Diagram calls out the transitive mirror propagation — TeamUser → Team → Account (direct) → Contact/Deal/Activity (via hidden calc mirror). template.json: every grandchild has at least one hidden component whose calculateValue references `data.<parent>.data.team`. Two forms: userLogin, userRegister. Roles: administrator, salesRep, authenticated, anonymous. Phase B template.json is importable.",
+      "files": []
+    }
+  ]
+}

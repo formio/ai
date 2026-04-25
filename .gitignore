@@ -1,0 +1,25 @@
+node_modules/
+dist/
+.turbo/
+coverage/
+.eval-artifacts/
+*.env
+.env.*
+!.env.example
+.mcp.json
+settings.local.json
+.DS_Store
+.playwright-mcp/
+examples/task-manager/.angular/cache/20.3.23/task-manager/.tsbuildinfo
+examples/task-manager/.angular/cache/20.3.23/task-manager/angular-compiler.db
+examples/task-manager/.angular/cache/20.3.23/task-manager/angular-compiler.db-lock
+examples/task-manager/.angular/cache/20.3.23/task-manager/vite/
+__pycache__/
+
+# Local IDE/editor settings (personal, not project-shared)
+.vscode/
+
+# Local convenience symlinks into plugin/skills/* used during dev
+.claude/skills/formio-angular
+.claude/skills/formio-application
+.claude/skills/formio-resource-planner

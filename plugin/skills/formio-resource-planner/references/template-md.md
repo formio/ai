@@ -1,0 +1,317 @@
+# `template.md` reference
+
+Canonical shape for the Resource Map artifact emitted by `formio-resource-planner` Phase B alongside `template.json`. Downstream skills (`formio-angular/resources`, future `formio-react`, etc.) read `template.md` for architectural intent — what resources exist, how they relate, who can do what — and consult the paired `template.json` for field-level Form.io JSON shapes.
+
+Treat the two files as a pair: same basename, same timestamp on collision (`template-20260423T153000Z.md` + `template-20260423T153000Z.json`).
+
+## Why markdown in addition to JSON
+
+`template.json` is structurally complete but expensively flat. A consumer reading it has to reassemble the story by walking reference selects, decoding action settings, and pattern-matching `submissionAccess` blocks. `template.md` captures the same story in the form the planner already reasoned in — named resources, labelled relationships, access story prose, and two ASCII diagrams — so downstream skills do not re-derive intent from raw JSON.
+
+`template.md` is the seed. `template.json` is the reference.
+
+## Required section order
+
+Sections appear in this exact order. Skills and graders rely on section headings — do not rename them. Every heading listed here is mandatory; omit the body only if the section genuinely has nothing (e.g., `Users & Auth` when the app is anonymous, then write `- None. App is public.` underneath).
+
+```markdown
+# Resource Map — <App Name>
+
+<1–2 sentence app summary in plain language>
+
+## Resources
+
+## Users & Auth
+
+## Roles
+
+## Access Matrix
+
+## ER Diagram
+
+## Access Flow Diagram
+
+## Companion artifact
+```
+
+## Resources section
+
+One block per resource. Terse — one sentence per purpose, one clause per field. Join resources are tagged inline. Transitive group-access mirror fields are called out so consumers know which reference selects are user-facing vs plumbing.
+
+```markdown
+- <ResourceName> (type: resource)
+  Purpose: <1 sentence>
+  Fields:
+    - <key>: <component> — <description>
+    - ...
+  Access: <owner | group-via-<join> | role(<roles>) | public>
+  Actions:
+    - <action name>: <key settings>
+
+- <JoinResourceName> (type: resource, join)
+  Purpose: <which relationship this implements>
+  Fields:
+    - <leftKey>: select (resource=<Left>)
+    - <rightKey>: select (resource=<Right>)
+  Access: <who can read/write the join rows>
+  Actions:
+    - Group Assignment: group=<leftKey>, user=<rightKey>   ← only when this join governs access
+```
+
+For transitive group access, call out the hidden mirror on every grandchild:
+
+```markdown
+  - team: select (resource=Team, hidden, calculated from account.team, field-based access) —
+    **invisible mirror that propagates group access from Account's team**
+```
+
+## Users & Auth section
+
+Bulleted facts only. Keep it parseable.
+
+```markdown
+- User resource: <default `user` | custom `<name>`>
+- Login form: <form machineName> (Login action)
+- Registration: <self-register via <form> with Role Assignment → <role> | admin-invite only | none>
+- SSO: <none | OIDC | SAML>
+```
+
+## Roles section
+
+One bullet per role. Include the three Form.io defaults (`administrator`, `authenticated`, `anonymous`) plus any custom roles.
+
+```markdown
+- administrator: <capability summary>
+- <customRole>: <capability summary>
+- authenticated: <capability summary>
+- anonymous: <capability summary>
+```
+
+## Access Matrix section
+
+A truth table of CRUD capability per resource × actor. Actors are roles and groups (where a group-based rule is in play). Cell values use this vocabulary — keep it small and consistent so consumers can match on exact strings:
+
+| Token       | Meaning                                                             |
+| ----------- | ------------------------------------------------------------------- |
+| `all`       | Unrestricted across every submission of this resource.              |
+| `own`       | Only submissions the actor owns (Form.io Owner rule).               |
+| `group`     | Only submissions whose group the actor belongs to (group-via-join). |
+| `group(<j>)` | Group access specifically through join `<j>` — use when multiple groups apply. |
+| `role(<r>)` | Gated by role `<r>` layered on top of another rule.                 |
+| `—`         | No access.                                                          |
+
+Layout:
+
+```markdown
+| Resource       | Actor           | create | read  | update | delete | Notes                         |
+| -------------- | --------------- | ------ | ----- | ------ | ------ | ----------------------------- |
+| Project        | administrator  | all    | all   | all    | all    | full admin                    |
+| Project        | authenticated  | —      | group | group  | —      | group-via-ProjectUser         |
+| Task           | administrator  | all    | all   | all    | all    |                               |
+| Task           | authenticated  | group  | group | group  | —      | inherits via Task.project     |
+| ProjectUser    | administrator  | all    | all   | all    | all    | admin-managed membership      |
+| ProjectUser    | authenticated  | —      | own   | —      | —      | user sees their own memberships |
+```
+
+One row per (resource, actor) pair with a non-trivial rule. Do not enumerate irrelevant actors — if a resource is admin-only, two rows (administrator + `authenticated: — / — / — / —`) are sufficient.
+
+## ER Diagram section
+
+Mermaid `erDiagram`. Every resource is an entity. Relationships use Mermaid's cardinality syntax:
+
+| Cardinality        | Mermaid syntax |
+| ------------------ | -------------- |
+| 1:1 mandatory      | `||--||`       |
+| 1:N, one required  | `||--o{`       |
+| N:N, via join      | `}o--o{`       |
+| 1:N, child optional | `o|--o{`      |
+
+Every entity declaration gets its key fields listed in the body — at minimum any reference selects and whether they are `reference=true`, `hidden`, or `calculated`. This is what downstream skills parse to know which fields are real vs plumbing.
+
+Join resources appear as their own entity with the two sides wired to it using `}o--||` on each side.
+
+Use a `%%` comment line above each cardinality to name the relationship when it is not obvious (e.g., `%% Group Assignment on ProjectUser writes Project's ACL`).
+
+Example (direct-child group pattern — Task Manager):
+
+````markdown
+```mermaid
+erDiagram
+    User ||--o{ ProjectUser : "member of"
+    Project ||--o{ ProjectUser : "has members"
+    Project ||--o{ Task : "contains"
+
+    Project {
+        string name "required"
+        string description
+    }
+    Task {
+        string title "required"
+        string description
+        select project "ref=Project, field-based access"
+        select assignee "ref=User, optional"
+        select status "open|in-progress|done"
+        datetime dueDate
+    }
+    ProjectUser {
+        select project "ref=Project"
+        select user "ref=User"
+        action GroupAssignment "group=project, user=user"
+    }
+```
+````
+
+Example (transitive group pattern — Complex CRM):
+
+````markdown
+```mermaid
+erDiagram
+    User ||--o{ TeamUser : "member of"
+    Team ||--o{ TeamUser : "has members"
+    Team ||--o{ Account : "owns (direct group)"
+    Account ||--o{ Contact : "has"
+    Account ||--o{ Deal : "has"
+    Account ||--o{ Activity : "has"
+    Deal ||--o{ Activity : "optional back-ref"
+    Account }o--|| Contact : "primaryContact (optional)"
+
+    Team {
+        string name "required"
+    }
+    TeamUser {
+        select team "ref=Team"
+        select user "ref=User"
+        action GroupAssignment "group=team, user=user"
+    }
+    Account {
+        string name "required"
+        select team "ref=Team, field-based access (direct group)"
+        select primaryContact "ref=Contact, optional"
+    }
+    Contact {
+        string firstName
+        select account "ref=Account"
+        select team "ref=Team, HIDDEN calculated mirror: data.account.data.team"
+    }
+    Deal {
+        string title "required"
+        number amount
+        select account "ref=Account"
+        select team "ref=Team, HIDDEN calculated mirror"
+    }
+    Activity {
+        string subject "required"
+        select account "ref=Account"
+        select deal "ref=Deal, optional"
+        select team "ref=Team, HIDDEN calculated mirror"
+    }
+```
+````
+
+## Access Flow Diagram section
+
+Mermaid `flowchart TD`. Shows how access actually propagates at runtime — which role the user starts with, which memberships grant which ACLs, and which field-based rules carry those ACLs onto downstream resources. This is the diagram the `Access Matrix` summarises and the `ER Diagram` does not show.
+
+Conventions:
+
+- Roles are `[[ Role ]]` subroutine-shaped nodes (visually distinct from resources).
+- Resources are plain `[ Resource ]` rectangles.
+- Joins are `[/ Join /]` parallelogram-shaped nodes.
+- Arrow labels name the mechanism: `"Group Assignment group=X user=Y"`, `"field-based access on <field>"`, `"calculated mirror: <expr>"`, `"Role Assignment → <role>"`.
+- Admin bypass ("admin sees everything") is a single edge from the admin role to a `[[ every resource ]]` terminal.
+- Owner-based rules get an edge labelled `"Submission Access: read_own, update_own"` from the role to the resource.
+- When the app is anonymous, the whole diagram collapses to one edge: `Anonymous --> Resource` with `"create_all, no read"`.
+
+Example (Task Manager — direct-child group):
+
+````markdown
+```mermaid
+flowchart TD
+    Admin[[administrator]] --> All[[every resource]]
+    Auth[[authenticated]] -->|membership row| PU[/ProjectUser/]
+    PU -->|Group Assignment<br/>group=project<br/>user=user| P[Project]
+    P -->|field-based submissionAccess<br/>on Task.project| T[Task]
+```
+````
+
+Example (Complex CRM — transitive group):
+
+````markdown
+```mermaid
+flowchart TD
+    Admin[[administrator]] --> All[[every resource]]
+    SR[[salesRep]] -->|"Role Assignment on userRegister"| SR2[[salesRep<br/>granted]]
+    SR2 -->|membership row| TU[/TeamUser/]
+    TU -->|"Group Assignment<br/>group=team<br/>user=user"| Team[Team]
+    Team -->|"field-based access<br/>on Account.team"| Account[Account]
+    Account -->|"hidden calculated mirror<br/>data.account.data.team"| Contact[Contact]
+    Account -->|"hidden calculated mirror"| Deal[Deal]
+    Account -->|"hidden calculated mirror"| Activity[Activity]
+```
+````
+
+Example (owner-only — private notes):
+
+````markdown
+```mermaid
+flowchart TD
+    Auth[[authenticated]] -->|"Submission Access: read_own, update_own"| Note[Note]
+    Admin[[administrator]] --> All[[every resource]]
+```
+````
+
+Example (anonymous feedback — no auth):
+
+````markdown
+```mermaid
+flowchart TD
+    Anon[[anonymous]] -->|"create_all, no read"| Feedback[Feedback]
+```
+````
+
+## Why Mermaid in the file (and ASCII in the chat)
+
+`template.md` is consumed primarily by downstream skills and humans viewing the file in GitHub / IDE preview / Obsidian / any modern Markdown renderer. Mermaid scales beyond what ASCII handles cleanly (7+ resources, transitive mirrors, multiple joins) and gives downstream LLMs deterministic cardinality semantics (`||--o{`, `}o--o{`) instead of free-form ASCII labels.
+
+But the Phase A approval gate happens in the terminal, where the user must review and approve BEFORE Phase B writes any files. Mermaid is unrenderable in a terminal — the user would be approving a wall of code. So Phase A uses the ASCII-diagram shape documented in `SKILL.md`'s "Phase A" section, and Phase B's `template.md` file uses Mermaid. Both diagrams show the same topology — planner generates them from the same internal model in one run, so drift is bounded to a single emission.
+
+When a planner iteration emits Mermaid that is syntactically wrong (e.g., missing closing brace), the companion `## Access Matrix` table is still authoritative — downstream skills can fall back to reading the matrix and the Resources section.
+
+## Companion artifact section
+
+Closing pointer so a consumer who opened `template.md` first knows where to find the structured shape:
+
+```markdown
+## Companion artifact
+
+`template.json` in this directory is the structured Form.io project-export
+companion to this document. Use this `.md` for architectural intent; use the
+`.json` for exact field shapes, component JSON, and action settings.
+```
+
+## File pairing rules
+
+- `template.md` + `template.json` are always written together in Phase B.
+- Default names: `./template.md` and `./template.json` in cwd.
+- Collision: if either file exists, append the SAME sortable UTC timestamp to both (`template-<YYYYMMDDTHHMMSSZ>.md`, `template-<YYYYMMDDTHHMMSSZ>.json`) so the pair stays matched. Report both chosen filenames in the Phase B confirmation.
+- Never write one without the other.
+
+## Chat-output rules
+
+Two surfaces, two rendering strategies:
+
+**Phase A (chat, approval gate):**
+
+1. Full Resource Map with ASCII ER Diagram and ASCII Access Flow Diagram rendered inline. This is what the user visually reviews and approves.
+2. The ASCII shapes used here are documented in `SKILL.md`'s "Phase A — Resource Map for review" section.
+3. No file write yet.
+
+**Phase B (file + chat, after approval):**
+
+1. `template.md` is written to disk containing Mermaid `erDiagram` + Mermaid `flowchart TD` blocks (as specified above) — NOT ASCII. The file is the seed downstream skills read; Mermaid gives them semantic edges and renders natively in GitHub/IDE preview.
+2. The full `template.md` is echoed as a fenced ` ```markdown ` block in the transcript — raw, including the ` ```mermaid ` fences unrendered. User does not re-review the Mermaid; they already approved the Phase A ASCII.
+3. The full `template.json` is echoed as a fenced ` ```json ` block after it.
+4. A one-line confirmation: `Wrote ./template.md and ./template.json.`
+5. The "Next steps" block.
+
+**Drift contract:** Phase A's ASCII and Phase B's Mermaid describe the same topology. Planner generates both from the same internal model in one run. Resource names, join names, cardinalities, and access mechanisms MUST match one-to-one between surfaces. When the grader runs, it cross-checks: every resource declared in `## Resources` must appear both in the Phase A ASCII (when preserved) and as a Mermaid node in Phase B's `template.md`.

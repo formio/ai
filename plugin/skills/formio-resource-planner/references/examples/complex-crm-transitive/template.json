@@ -1,0 +1,1144 @@
+{
+  "title": "Complex CRM",
+  "description": "Multi-team CRM exercising transitive group access: Team is the group, Account is its direct child, and Contact/Deal/Activity are grandchildren whose access propagates through a hidden, calculated team mirror on each sub-resource form.",
+  "version": "2.0.0",
+  "name": "complexCrm",
+  "roles": {
+    "administrator": {
+      "title": "Administrator",
+      "description": "Full access to all resources; manages Teams and TeamUser memberships.",
+      "admin": true,
+      "default": false
+    },
+    "salesRep": {
+      "title": "Sales Rep",
+      "description": "Default role on self-registration. Access to Accounts, Contacts, Deals, and Activities is narrowed by TeamUser membership at runtime.",
+      "admin": false,
+      "default": false
+    },
+    "authenticated": {
+      "title": "Authenticated",
+      "description": "Baseline role issued by Login; salesRep is layered on top.",
+      "admin": false,
+      "default": false
+    },
+    "anonymous": {
+      "title": "Anonymous",
+      "description": "Unauthenticated visitors; may reach only login/register forms.",
+      "admin": false,
+      "default": true
+    }
+  },
+  "forms": {
+    "userRegister": {
+      "title": "User Register",
+      "type": "form",
+      "name": "userRegister",
+      "path": "user/register",
+      "tags": [],
+      "components": [
+        {
+          "type": "email",
+          "key": "email",
+          "label": "Email",
+          "inputType": "email",
+          "placeholder": "Enter your email address",
+          "persistent": true,
+          "unique": false,
+          "protected": false,
+          "input": true,
+          "tableView": true
+        },
+        {
+          "type": "password",
+          "key": "password",
+          "label": "Password",
+          "inputType": "password",
+          "placeholder": "Enter your password.",
+          "persistent": true,
+          "protected": true,
+          "input": true,
+          "tableView": false
+        },
+        {
+          "type": "button",
+          "key": "submit",
+          "label": "Submit",
+          "action": "submit",
+          "theme": "primary",
+          "disableOnInvalid": true,
+          "input": true
+        }
+      ],
+      "access": [
+        {
+          "type": "read_all",
+          "roles": ["administrator", "anonymous", "authenticated"]
+        }
+      ],
+      "submissionAccess": [
+        {
+          "type": "create_own",
+          "roles": ["anonymous"]
+        }
+      ]
+    },
+    "userLogin": {
+      "title": "User Login",
+      "type": "form",
+      "name": "userLogin",
+      "path": "user/login",
+      "tags": [],
+      "components": [
+        {
+          "type": "email",
+          "key": "email",
+          "label": "Email",
+          "inputType": "email",
+          "placeholder": "Enter your email address",
+          "persistent": true,
+          "unique": false,
+          "protected": false,
+          "input": true,
+          "tableView": true
+        },
+        {
+          "type": "password",
+          "key": "password",
+          "label": "Password",
+          "inputType": "password",
+          "placeholder": "Enter your password.",
+          "persistent": true,
+          "protected": true,
+          "input": true,
+          "tableView": false
+        },
+        {
+          "type": "button",
+          "key": "submit",
+          "label": "Submit",
+          "action": "submit",
+          "theme": "primary",
+          "disableOnInvalid": true,
+          "input": true
+        }
+      ],
+      "access": [
+        {
+          "type": "read_all",
+          "roles": ["administrator", "anonymous", "authenticated"]
+        }
+      ],
+      "submissionAccess": [
+        {
+          "type": "create_own",
+          "roles": ["anonymous"]
+        }
+      ]
+    }
+  },
+  "actions": {
+    "user:save": {
+      "title": "Save Submission",
+      "name": "save",
+      "form": "user",
+      "priority": 10,
+      "method": ["create", "update"],
+      "handler": ["before"]
+    },
+    "userRegister:save": {
+      "title": "Save Submission",
+      "name": "save",
+      "form": "userRegister",
+      "priority": 11,
+      "method": ["create", "update"],
+      "handler": ["before"],
+      "settings": {
+        "resource": "user",
+        "fields": {
+          "email": "email",
+          "password": "password"
+        }
+      }
+    },
+    "userRegister:role": {
+      "title": "Role Assignment",
+      "name": "role",
+      "form": "userRegister",
+      "priority": 1,
+      "method": ["create"],
+      "handler": ["after"],
+      "settings": {
+        "association": "new",
+        "type": "add",
+        "role": "salesRep"
+      }
+    },
+    "userRegister:login": {
+      "title": "Login",
+      "name": "login",
+      "form": "userRegister",
+      "priority": 2,
+      "method": ["create"],
+      "handler": ["before"],
+      "settings": {
+        "resources": ["user"],
+        "username": "email",
+        "password": "password"
+      }
+    },
+    "userLogin:save": {
+      "title": "Save Submission",
+      "name": "save",
+      "form": "userLogin",
+      "priority": 10,
+      "method": ["create", "update"],
+      "handler": ["before"]
+    },
+    "userLogin:login": {
+      "title": "Login",
+      "name": "login",
+      "form": "userLogin",
+      "priority": 2,
+      "method": ["create"],
+      "handler": ["before"],
+      "settings": {
+        "resources": ["user"],
+        "username": "email",
+        "password": "password",
+        "allowedAttempts": 5,
+        "attemptWindow": 30,
+        "lockWait": 1800
+      }
+    },
+    "team:save": {
+      "title": "Save Submission",
+      "name": "save",
+      "form": "team",
+      "priority": 10,
+      "method": ["create", "update"],
+      "handler": ["before"]
+    },
+    "teamUser:save": {
+      "title": "Save Submission",
+      "name": "save",
+      "form": "teamUser",
+      "priority": 10,
+      "method": ["create", "update"],
+      "handler": ["before"]
+    },
+    "teamUser:group": {
+      "title": "Group Assignment",
+      "name": "group",
+      "form": "teamUser",
+      "priority": 5,
+      "method": ["create"],
+      "handler": ["after"],
+      "settings": {
+        "group": "team",
+        "user": "user"
+      }
+    },
+    "account:save": {
+      "title": "Save Submission",
+      "name": "save",
+      "form": "account",
+      "priority": 10,
+      "method": ["create", "update"],
+      "handler": ["before"]
+    },
+    "contact:save": {
+      "title": "Save Submission",
+      "name": "save",
+      "form": "contact",
+      "priority": 10,
+      "method": ["create", "update"],
+      "handler": ["before"]
+    },
+    "deal:save": {
+      "title": "Save Submission",
+      "name": "save",
+      "form": "deal",
+      "priority": 10,
+      "method": ["create", "update"],
+      "handler": ["before"]
+    },
+    "activity:save": {
+      "title": "Save Submission",
+      "name": "save",
+      "form": "activity",
+      "priority": 10,
+      "method": ["create", "update"],
+      "handler": ["before"]
+    }
+  },
+  "resources": {
+    "user": {
+      "title": "User",
+      "type": "resource",
+      "name": "user",
+      "path": "user",
+      "tags": [],
+      "components": [
+        {
+          "type": "email",
+          "key": "email",
+          "label": "Email",
+          "inputType": "email",
+          "placeholder": "Enter your email address",
+          "persistent": true,
+          "unique": true,
+          "protected": false,
+          "input": true,
+          "tableView": true
+        },
+        {
+          "type": "password",
+          "key": "password",
+          "label": "Password",
+          "inputType": "password",
+          "placeholder": "Enter your password.",
+          "persistent": true,
+          "protected": true,
+          "input": true,
+          "tableView": false
+        },
+        {
+          "type": "button",
+          "key": "submit",
+          "label": "Submit",
+          "action": "submit",
+          "theme": "primary",
+          "disableOnInvalid": true,
+          "input": true
+        }
+      ],
+      "access": [
+        {
+          "type": "read_all",
+          "roles": ["administrator", "anonymous", "authenticated"]
+        }
+      ],
+      "submissionAccess": [
+        {
+          "type": "create_all",
+          "roles": ["administrator"]
+        },
+        {
+          "type": "read_all",
+          "roles": ["administrator"]
+        },
+        {
+          "type": "update_all",
+          "roles": ["administrator"]
+        },
+        {
+          "type": "delete_all",
+          "roles": ["administrator"]
+        },
+        {
+          "type": "read_own",
+          "roles": ["authenticated"]
+        },
+        {
+          "type": "update_own",
+          "roles": ["authenticated"]
+        }
+      ]
+    },
+    "team": {
+      "title": "Team",
+      "type": "resource",
+      "name": "team",
+      "path": "team",
+      "tags": [],
+      "components": [
+        {
+          "type": "textfield",
+          "key": "name",
+          "label": "Team Name",
+          "validate": {
+            "required": true
+          },
+          "input": true,
+          "tableView": true
+        },
+        {
+          "type": "button",
+          "key": "submit",
+          "label": "Submit",
+          "action": "submit",
+          "theme": "primary",
+          "disableOnInvalid": true,
+          "input": true
+        }
+      ],
+      "access": [
+        {
+          "type": "read_all",
+          "roles": ["administrator", "anonymous", "authenticated"]
+        }
+      ],
+      "submissionAccess": [
+        {
+          "type": "create_all",
+          "roles": ["administrator"]
+        },
+        {
+          "type": "read_all",
+          "roles": ["administrator"]
+        },
+        {
+          "type": "update_all",
+          "roles": ["administrator"]
+        },
+        {
+          "type": "delete_all",
+          "roles": ["administrator"]
+        }
+      ]
+    },
+    "teamUser": {
+      "title": "Team User",
+      "type": "resource",
+      "name": "teamUser",
+      "path": "team-user",
+      "tags": ["join"],
+      "components": [
+        {
+          "type": "select",
+          "key": "team",
+          "label": "Team",
+          "widget": "choicesjs",
+          "placeholder": "Select a team",
+          "dataSrc": "resource",
+          "data": {
+            "resource": "team"
+          },
+          "template": "<span>{{ item.data.name }}</span>",
+          "reference": true,
+          "searchField": "data.name__regex",
+          "validate": {
+            "required": true
+          },
+          "input": true,
+          "tableView": true
+        },
+        {
+          "type": "select",
+          "key": "user",
+          "label": "User",
+          "widget": "choicesjs",
+          "placeholder": "Select a user",
+          "dataSrc": "resource",
+          "data": {
+            "resource": "user"
+          },
+          "template": "<span>{{ item.data.email }}</span>",
+          "reference": true,
+          "searchField": "data.email__regex",
+          "validate": {
+            "required": true
+          },
+          "input": true,
+          "tableView": true
+        },
+        {
+          "type": "button",
+          "key": "submit",
+          "label": "Submit",
+          "action": "submit",
+          "theme": "primary",
+          "disableOnInvalid": true,
+          "input": true
+        }
+      ],
+      "access": [
+        {
+          "type": "read_all",
+          "roles": ["administrator", "anonymous", "authenticated"]
+        }
+      ],
+      "submissionAccess": [
+        {
+          "type": "create_all",
+          "roles": ["administrator"]
+        },
+        {
+          "type": "read_all",
+          "roles": ["administrator"]
+        },
+        {
+          "type": "update_all",
+          "roles": ["administrator"]
+        },
+        {
+          "type": "delete_all",
+          "roles": ["administrator"]
+        }
+      ]
+    },
+    "account": {
+      "title": "Account",
+      "type": "resource",
+      "name": "account",
+      "path": "account",
+      "tags": [],
+      "components": [
+        {
+          "type": "textfield",
+          "key": "name",
+          "label": "Account Name",
+          "validate": {
+            "required": true
+          },
+          "input": true,
+          "tableView": true
+        },
+        {
+          "type": "select",
+          "key": "industry",
+          "label": "Industry",
+          "dataSrc": "values",
+          "data": {
+            "values": [
+              {
+                "label": "Technology",
+                "value": "technology"
+              },
+              {
+                "label": "Finance",
+                "value": "finance"
+              },
+              {
+                "label": "Healthcare",
+                "value": "healthcare"
+              },
+              {
+                "label": "Retail",
+                "value": "retail"
+              },
+              {
+                "label": "Other",
+                "value": "other"
+              }
+            ]
+          },
+          "input": true,
+          "tableView": true
+        },
+        {
+          "type": "textfield",
+          "key": "website",
+          "label": "Website",
+          "input": true,
+          "tableView": true
+        },
+        {
+          "type": "select",
+          "key": "team",
+          "label": "Team",
+          "widget": "choicesjs",
+          "placeholder": "Select the owning team",
+          "dataSrc": "resource",
+          "data": {
+            "resource": "team"
+          },
+          "template": "<span>{{ item.data.name }}</span>",
+          "reference": true,
+          "searchField": "data.name__regex",
+          "validate": {
+            "required": true
+          },
+          "input": true,
+          "tableView": true,
+          "submissionAccess": [
+            {
+              "type": "read",
+              "roles": []
+            },
+            {
+              "type": "create",
+              "roles": []
+            },
+            {
+              "type": "update",
+              "roles": []
+            },
+            {
+              "type": "delete",
+              "roles": []
+            }
+          ]
+        },
+        {
+          "type": "select",
+          "key": "primaryContact",
+          "label": "Primary Contact",
+          "widget": "choicesjs",
+          "placeholder": "Select the primary contact (optional)",
+          "dataSrc": "resource",
+          "data": {
+            "resource": "contact"
+          },
+          "template": "<span>{{ item.data.firstName }} {{ item.data.lastName }}</span>",
+          "reference": true,
+          "searchField": "data.lastName__regex",
+          "input": true,
+          "tableView": true
+        },
+        {
+          "type": "textarea",
+          "key": "notes",
+          "label": "Notes",
+          "autoExpand": false,
+          "input": true,
+          "tableView": false
+        },
+        {
+          "type": "button",
+          "key": "submit",
+          "label": "Submit",
+          "action": "submit",
+          "theme": "primary",
+          "disableOnInvalid": true,
+          "input": true
+        }
+      ],
+      "access": [
+        {
+          "type": "read_all",
+          "roles": ["administrator", "anonymous", "authenticated"]
+        }
+      ],
+      "submissionAccess": [
+        {
+          "type": "create_all",
+          "roles": ["administrator"]
+        },
+        {
+          "type": "read_all",
+          "roles": ["administrator"]
+        },
+        {
+          "type": "update_all",
+          "roles": ["administrator"]
+        },
+        {
+          "type": "delete_all",
+          "roles": ["administrator"]
+        }
+      ]
+    },
+    "contact": {
+      "title": "Contact",
+      "type": "resource",
+      "name": "contact",
+      "path": "contact",
+      "tags": [],
+      "components": [
+        {
+          "type": "textfield",
+          "key": "firstName",
+          "label": "First Name",
+          "validate": {
+            "required": true
+          },
+          "input": true,
+          "tableView": true
+        },
+        {
+          "type": "textfield",
+          "key": "lastName",
+          "label": "Last Name",
+          "validate": {
+            "required": true
+          },
+          "input": true,
+          "tableView": true
+        },
+        {
+          "type": "email",
+          "key": "email",
+          "label": "Email",
+          "inputType": "email",
+          "input": true,
+          "tableView": true
+        },
+        {
+          "type": "phoneNumber",
+          "key": "phone",
+          "label": "Phone",
+          "input": true,
+          "tableView": true
+        },
+        {
+          "type": "select",
+          "key": "account",
+          "label": "Account",
+          "widget": "choicesjs",
+          "placeholder": "Select the parent account",
+          "dataSrc": "resource",
+          "data": {
+            "resource": "account"
+          },
+          "template": "<span>{{ item.data.name }}</span>",
+          "reference": true,
+          "searchField": "data.name__regex",
+          "validate": {
+            "required": true
+          },
+          "input": true,
+          "tableView": true
+        },
+        {
+          "type": "select",
+          "key": "team",
+          "label": "Team",
+          "widget": "choicesjs",
+          "placeholder": "Team (auto-populated from the selected Account)",
+          "dataSrc": "resource",
+          "data": {
+            "resource": "team"
+          },
+          "template": "<span>{{ item.data.name }}</span>",
+          "hidden": true,
+          "calculateValue": "value = data.account.data.team;",
+          "refreshOn": "account",
+          "reference": true,
+          "validate": {
+            "required": true
+          },
+          "input": true,
+          "tableView": true,
+          "submissionAccess": [
+            {
+              "type": "read",
+              "roles": []
+            },
+            {
+              "type": "create",
+              "roles": []
+            },
+            {
+              "type": "update",
+              "roles": []
+            },
+            {
+              "type": "delete",
+              "roles": []
+            }
+          ]
+        },
+        {
+          "type": "textarea",
+          "key": "notes",
+          "label": "Notes",
+          "autoExpand": false,
+          "input": true,
+          "tableView": false
+        },
+        {
+          "type": "button",
+          "key": "submit",
+          "label": "Submit",
+          "action": "submit",
+          "theme": "primary",
+          "disableOnInvalid": true,
+          "input": true
+        }
+      ],
+      "access": [
+        {
+          "type": "read_all",
+          "roles": ["administrator", "anonymous", "authenticated"]
+        }
+      ],
+      "submissionAccess": [
+        {
+          "type": "create_all",
+          "roles": ["administrator"]
+        },
+        {
+          "type": "read_all",
+          "roles": ["administrator"]
+        },
+        {
+          "type": "update_all",
+          "roles": ["administrator"]
+        },
+        {
+          "type": "delete_all",
+          "roles": ["administrator"]
+        }
+      ]
+    },
+    "deal": {
+      "title": "Deal",
+      "type": "resource",
+      "name": "deal",
+      "path": "deal",
+      "tags": [],
+      "components": [
+        {
+          "type": "textfield",
+          "key": "title",
+          "label": "Deal Title",
+          "validate": {
+            "required": true
+          },
+          "input": true,
+          "tableView": true
+        },
+        {
+          "type": "number",
+          "key": "amount",
+          "label": "Amount",
+          "input": true,
+          "tableView": true
+        },
+        {
+          "type": "select",
+          "key": "stage",
+          "label": "Stage",
+          "dataSrc": "values",
+          "data": {
+            "values": [
+              {
+                "label": "Prospect",
+                "value": "prospect"
+              },
+              {
+                "label": "Qualified",
+                "value": "qualified"
+              },
+              {
+                "label": "Proposal",
+                "value": "proposal"
+              },
+              {
+                "label": "Won",
+                "value": "won"
+              },
+              {
+                "label": "Lost",
+                "value": "lost"
+              }
+            ]
+          },
+          "defaultValue": "prospect",
+          "input": true,
+          "tableView": true
+        },
+        {
+          "type": "datetime",
+          "key": "closeDate",
+          "label": "Expected Close Date",
+          "format": "yyyy-MM-dd",
+          "enableDate": true,
+          "enableTime": false,
+          "input": true,
+          "tableView": true
+        },
+        {
+          "type": "select",
+          "key": "account",
+          "label": "Account",
+          "widget": "choicesjs",
+          "placeholder": "Select the parent account",
+          "dataSrc": "resource",
+          "data": {
+            "resource": "account"
+          },
+          "template": "<span>{{ item.data.name }}</span>",
+          "reference": true,
+          "searchField": "data.name__regex",
+          "validate": {
+            "required": true
+          },
+          "input": true,
+          "tableView": true
+        },
+        {
+          "type": "select",
+          "key": "team",
+          "label": "Team",
+          "widget": "choicesjs",
+          "placeholder": "Team (auto-populated from the selected Account)",
+          "dataSrc": "resource",
+          "data": {
+            "resource": "team"
+          },
+          "template": "<span>{{ item.data.name }}</span>",
+          "hidden": true,
+          "calculateValue": "value = data.account.data.team;",
+          "refreshOn": "account",
+          "reference": true,
+          "validate": {
+            "required": true
+          },
+          "input": true,
+          "tableView": true,
+          "submissionAccess": [
+            {
+              "type": "read",
+              "roles": []
+            },
+            {
+              "type": "create",
+              "roles": []
+            },
+            {
+              "type": "update",
+              "roles": []
+            },
+            {
+              "type": "delete",
+              "roles": []
+            }
+          ]
+        },
+        {
+          "type": "textarea",
+          "key": "notes",
+          "label": "Notes",
+          "autoExpand": false,
+          "input": true,
+          "tableView": false
+        },
+        {
+          "type": "button",
+          "key": "submit",
+          "label": "Submit",
+          "action": "submit",
+          "theme": "primary",
+          "disableOnInvalid": true,
+          "input": true
+        }
+      ],
+      "access": [
+        {
+          "type": "read_all",
+          "roles": ["administrator", "anonymous", "authenticated"]
+        }
+      ],
+      "submissionAccess": [
+        {
+          "type": "create_all",
+          "roles": ["administrator"]
+        },
+        {
+          "type": "read_all",
+          "roles": ["administrator"]
+        },
+        {
+          "type": "update_all",
+          "roles": ["administrator"]
+        },
+        {
+          "type": "delete_all",
+          "roles": ["administrator"]
+        }
+      ]
+    },
+    "activity": {
+      "title": "Activity",
+      "type": "resource",
+      "name": "activity",
+      "path": "activity",
+      "tags": [],
+      "components": [
+        {
+          "type": "textfield",
+          "key": "subject",
+          "label": "Subject",
+          "validate": {
+            "required": true
+          },
+          "input": true,
+          "tableView": true
+        },
+        {
+          "type": "select",
+          "key": "type",
+          "label": "Type",
+          "dataSrc": "values",
+          "data": {
+            "values": [
+              {
+                "label": "Call",
+                "value": "call"
+              },
+              {
+                "label": "Email",
+                "value": "email"
+              },
+              {
+                "label": "Meeting",
+                "value": "meeting"
+              },
+              {
+                "label": "Task",
+                "value": "task"
+              }
+            ]
+          },
+          "defaultValue": "task",
+          "input": true,
+          "tableView": true
+        },
+        {
+          "type": "datetime",
+          "key": "dueDate",
+          "label": "Due Date",
+          "format": "yyyy-MM-dd",
+          "enableDate": true,
+          "enableTime": false,
+          "input": true,
+          "tableView": true
+        },
+        {
+          "type": "checkbox",
+          "key": "completed",
+          "label": "Completed",
+          "defaultValue": false,
+          "input": true,
+          "tableView": true
+        },
+        {
+          "type": "select",
+          "key": "account",
+          "label": "Account",
+          "widget": "choicesjs",
+          "placeholder": "Select the parent account",
+          "dataSrc": "resource",
+          "data": {
+            "resource": "account"
+          },
+          "template": "<span>{{ item.data.name }}</span>",
+          "reference": true,
+          "searchField": "data.name__regex",
+          "validate": {
+            "required": true
+          },
+          "input": true,
+          "tableView": true
+        },
+        {
+          "type": "select",
+          "key": "deal",
+          "label": "Deal",
+          "widget": "choicesjs",
+          "placeholder": "Optional \u2014 the specific deal this activity relates to",
+          "dataSrc": "resource",
+          "data": {
+            "resource": "deal"
+          },
+          "template": "<span>{{ item.data.title }}</span>",
+          "reference": true,
+          "searchField": "data.title__regex",
+          "input": true,
+          "tableView": true
+        },
+        {
+          "type": "select",
+          "key": "team",
+          "label": "Team",
+          "widget": "choicesjs",
+          "placeholder": "Team (auto-populated from the selected Account)",
+          "dataSrc": "resource",
+          "data": {
+            "resource": "team"
+          },
+          "template": "<span>{{ item.data.name }}</span>",
+          "hidden": true,
+          "calculateValue": "value = data.account.data.team;",
+          "refreshOn": "account",
+          "reference": true,
+          "validate": {
+            "required": true
+          },
+          "input": true,
+          "tableView": true,
+          "submissionAccess": [
+            {
+              "type": "read",
+              "roles": []
+            },
+            {
+              "type": "create",
+              "roles": []
+            },
+            {
+              "type": "update",
+              "roles": []
+            },
+            {
+              "type": "delete",
+              "roles": []
+            }
+          ]
+        },
+        {
+          "type": "textarea",
+          "key": "notes",
+          "label": "Notes",
+          "autoExpand": false,
+          "input": true,
+          "tableView": false
+        },
+        {
+          "type": "button",
+          "key": "submit",
+          "label": "Submit",
+          "action": "submit",
+          "theme": "primary",
+          "disableOnInvalid": true,
+          "input": true
+        }
+      ],
+      "access": [
+        {
+          "type": "read_all",
+          "roles": ["administrator", "anonymous", "authenticated"]
+        }
+      ],
+      "submissionAccess": [
+        {
+          "type": "create_all",
+          "roles": ["administrator"]
+        },
+        {
+          "type": "read_all",
+          "roles": ["administrator"]
+        },
+        {
+          "type": "update_all",
+          "roles": ["administrator"]
+        },
+        {
+          "type": "delete_all",
+          "roles": ["administrator"]
+        }
+      ]
+    }
+  },
+  "access": [
+    {
+      "type": "create_all",
+      "roles": ["administrator"]
+    },
+    {
+      "type": "read_all",
+      "roles": ["administrator", "authenticated", "anonymous"]
+    },
+    {
+      "type": "update_all",
+      "roles": ["administrator"]
+    },
+    {
+      "type": "delete_all",
+      "roles": ["administrator"]
+    }
+  ]
+}

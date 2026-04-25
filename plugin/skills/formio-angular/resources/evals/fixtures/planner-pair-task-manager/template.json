@@ -1,0 +1,558 @@
+{
+  "title": "Task Manager",
+  "description": "A multi-user task manager where each Project has a set of Tasks and a team of Users, and users only see Tasks inside Projects they belong to.",
+  "version": "2.0.0",
+  "name": "taskManager",
+  "roles": {
+    "administrator": {
+      "title": "Administrator",
+      "description": "A role for Administrative Users.",
+      "admin": true,
+      "default": false
+    },
+    "authenticated": {
+      "title": "Authenticated",
+      "description": "A role for Authenticated Users. Default role granted on registration; access to Projects and Tasks is gated by ProjectUser memberships.",
+      "admin": false,
+      "default": false
+    },
+    "anonymous": {
+      "title": "Anonymous",
+      "description": "A role for Anonymous Users.",
+      "admin": false,
+      "default": true
+    }
+  },
+  "forms": {
+    "userLogin": {
+      "title": "User Login",
+      "type": "form",
+      "name": "userLogin",
+      "path": "user/login",
+      "tags": [],
+      "components": [
+        {
+          "type": "email",
+          "key": "email",
+          "label": "Email",
+          "inputType": "email",
+          "placeholder": "Enter your email address",
+          "persistent": false,
+          "input": true,
+          "tableView": true
+        },
+        {
+          "type": "password",
+          "key": "password",
+          "label": "Password",
+          "inputType": "password",
+          "placeholder": "Enter your password.",
+          "persistent": false,
+          "protected": true,
+          "input": true,
+          "tableView": false
+        },
+        {
+          "type": "button",
+          "key": "submit",
+          "label": "Login",
+          "action": "submit",
+          "theme": "primary",
+          "disableOnInvalid": true,
+          "input": true
+        }
+      ],
+      "access": [
+        {
+          "type": "read_all",
+          "roles": ["administrator", "anonymous", "authenticated"]
+        }
+      ],
+      "submissionAccess": [
+        {
+          "type": "create_own",
+          "roles": ["anonymous"]
+        }
+      ]
+    },
+    "userRegister": {
+      "title": "User Register",
+      "type": "form",
+      "name": "userRegister",
+      "path": "user/register",
+      "tags": [],
+      "components": [
+        {
+          "type": "email",
+          "key": "email",
+          "label": "Email",
+          "inputType": "email",
+          "placeholder": "Enter your email address",
+          "persistent": true,
+          "input": true,
+          "tableView": true
+        },
+        {
+          "type": "password",
+          "key": "password",
+          "label": "Password",
+          "inputType": "password",
+          "placeholder": "Enter your password.",
+          "persistent": true,
+          "protected": true,
+          "input": true,
+          "tableView": false
+        },
+        {
+          "type": "button",
+          "key": "submit",
+          "label": "Register",
+          "action": "submit",
+          "theme": "primary",
+          "disableOnInvalid": true,
+          "input": true
+        }
+      ],
+      "access": [
+        {
+          "type": "read_all",
+          "roles": ["administrator", "anonymous", "authenticated"]
+        }
+      ],
+      "submissionAccess": [
+        {
+          "type": "create_own",
+          "roles": ["anonymous"]
+        }
+      ]
+    }
+  },
+  "actions": {
+    "user:save": {
+      "title": "Save Submission",
+      "name": "save",
+      "form": "user",
+      "priority": 10,
+      "method": ["create", "update"],
+      "handler": ["before"]
+    },
+    "project:save": {
+      "title": "Save Submission",
+      "name": "save",
+      "form": "project",
+      "priority": 10,
+      "method": ["create", "update"],
+      "handler": ["before"]
+    },
+    "task:save": {
+      "title": "Save Submission",
+      "name": "save",
+      "form": "task",
+      "priority": 10,
+      "method": ["create", "update"],
+      "handler": ["before"]
+    },
+    "projectUser:save": {
+      "title": "Save Submission",
+      "name": "save",
+      "form": "projectUser",
+      "priority": 10,
+      "method": ["create", "update"],
+      "handler": ["before"]
+    },
+    "projectUser:group": {
+      "title": "Group Assignment",
+      "name": "group",
+      "form": "projectUser",
+      "priority": 5,
+      "method": ["create"],
+      "handler": ["after"],
+      "settings": {
+        "group": "project",
+        "user": "user"
+      }
+    },
+    "userLogin:login": {
+      "title": "Login",
+      "name": "login",
+      "form": "userLogin",
+      "priority": 2,
+      "method": ["create"],
+      "handler": ["before"],
+      "settings": {
+        "resources": ["user"],
+        "username": "email",
+        "password": "password",
+        "allowedAttempts": 5,
+        "attemptWindow": 30,
+        "lockWait": 1800
+      }
+    },
+    "userRegister:save": {
+      "title": "Save Submission",
+      "name": "save",
+      "form": "userRegister",
+      "priority": 11,
+      "method": ["create", "update"],
+      "handler": ["before"],
+      "settings": {
+        "resource": "user",
+        "fields": {
+          "email": "email",
+          "password": "password"
+        }
+      }
+    },
+    "userRegister:role": {
+      "title": "Role Assignment",
+      "name": "role",
+      "form": "userRegister",
+      "priority": 1,
+      "method": ["create"],
+      "handler": ["after"],
+      "settings": {
+        "association": "new",
+        "type": "add",
+        "role": "authenticated"
+      }
+    },
+    "userRegister:login": {
+      "title": "Login",
+      "name": "login",
+      "form": "userRegister",
+      "priority": 2,
+      "method": ["create"],
+      "handler": ["before"],
+      "settings": {
+        "resources": ["user"],
+        "username": "email",
+        "password": "password",
+        "allowedAttempts": 5,
+        "attemptWindow": 30,
+        "lockWait": 1800
+      }
+    }
+  },
+  "resources": {
+    "user": {
+      "title": "User",
+      "type": "resource",
+      "name": "user",
+      "path": "user",
+      "tags": [],
+      "components": [
+        {
+          "type": "email",
+          "key": "email",
+          "label": "Email",
+          "inputType": "email",
+          "placeholder": "Enter your email address",
+          "persistent": true,
+          "unique": true,
+          "protected": false,
+          "input": true,
+          "tableView": true
+        },
+        {
+          "type": "password",
+          "key": "password",
+          "label": "Password",
+          "inputType": "password",
+          "placeholder": "Enter your password.",
+          "persistent": true,
+          "protected": true,
+          "input": true,
+          "tableView": false
+        },
+        {
+          "type": "button",
+          "key": "submit",
+          "label": "Submit",
+          "action": "submit",
+          "theme": "primary",
+          "disableOnInvalid": true,
+          "input": true
+        }
+      ],
+      "access": [
+        {
+          "type": "read_all",
+          "roles": ["administrator", "anonymous", "authenticated"]
+        }
+      ],
+      "submissionAccess": [
+        {
+          "type": "create_all",
+          "roles": ["administrator"]
+        },
+        {
+          "type": "read_all",
+          "roles": ["administrator"]
+        },
+        {
+          "type": "update_all",
+          "roles": ["administrator"]
+        },
+        {
+          "type": "delete_all",
+          "roles": ["administrator"]
+        },
+        {
+          "type": "read_own",
+          "roles": ["authenticated"]
+        },
+        {
+          "type": "update_own",
+          "roles": ["authenticated"]
+        }
+      ]
+    },
+    "project": {
+      "title": "Project",
+      "type": "resource",
+      "name": "project",
+      "path": "project",
+      "tags": [],
+      "components": [
+        {
+          "type": "textfield",
+          "key": "name",
+          "label": "Project Name",
+          "validate": {
+            "required": true
+          },
+          "input": true,
+          "tableView": true
+        },
+        {
+          "type": "button",
+          "key": "submit",
+          "label": "Submit",
+          "action": "submit",
+          "theme": "primary",
+          "disableOnInvalid": true,
+          "input": true
+        }
+      ],
+      "access": [
+        {
+          "type": "read_all",
+          "roles": ["administrator", "anonymous", "authenticated"]
+        }
+      ],
+      "submissionAccess": [
+        {
+          "type": "create_all",
+          "roles": ["administrator"]
+        },
+        {
+          "type": "read_all",
+          "roles": ["administrator"]
+        },
+        {
+          "type": "update_all",
+          "roles": ["administrator"]
+        },
+        {
+          "type": "delete_all",
+          "roles": ["administrator"]
+        }
+      ]
+    },
+    "task": {
+      "title": "Task",
+      "type": "resource",
+      "name": "task",
+      "path": "task",
+      "tags": [],
+      "components": [
+        {
+          "type": "textfield",
+          "key": "description",
+          "label": "Description",
+          "validate": {
+            "required": true
+          },
+          "input": true,
+          "tableView": true
+        },
+        {
+          "type": "select",
+          "key": "project",
+          "label": "Project",
+          "widget": "choicesjs",
+          "placeholder": "Select a project",
+          "dataSrc": "resource",
+          "data": {
+            "resource": "project"
+          },
+          "template": "<span>{{ item.data.name }}</span>",
+          "reference": true,
+          "searchField": "data.name__regex",
+          "validate": {
+            "required": true
+          },
+          "input": true,
+          "tableView": true,
+          "submissionAccess": [
+            {
+              "type": "read",
+              "roles": []
+            },
+            {
+              "type": "create",
+              "roles": []
+            },
+            {
+              "type": "update",
+              "roles": []
+            },
+            {
+              "type": "delete",
+              "roles": []
+            }
+          ]
+        },
+        {
+          "type": "button",
+          "key": "submit",
+          "label": "Submit",
+          "action": "submit",
+          "theme": "primary",
+          "disableOnInvalid": true,
+          "input": true
+        }
+      ],
+      "access": [
+        {
+          "type": "read_all",
+          "roles": ["administrator", "anonymous", "authenticated"]
+        }
+      ],
+      "submissionAccess": [
+        {
+          "type": "create_all",
+          "roles": ["administrator"]
+        },
+        {
+          "type": "read_all",
+          "roles": ["administrator"]
+        },
+        {
+          "type": "update_all",
+          "roles": ["administrator"]
+        },
+        {
+          "type": "delete_all",
+          "roles": ["administrator"]
+        },
+        {
+          "type": "create_own",
+          "roles": ["authenticated"]
+        }
+      ]
+    },
+    "projectUser": {
+      "title": "Project User",
+      "type": "resource",
+      "name": "projectUser",
+      "path": "project-user",
+      "tags": ["join"],
+      "components": [
+        {
+          "type": "select",
+          "key": "project",
+          "label": "Project",
+          "widget": "choicesjs",
+          "placeholder": "Select a project",
+          "dataSrc": "resource",
+          "data": {
+            "resource": "project"
+          },
+          "template": "<span>{{ item.data.name }}</span>",
+          "reference": true,
+          "searchField": "data.name__regex",
+          "validate": {
+            "required": true
+          },
+          "input": true,
+          "tableView": true
+        },
+        {
+          "type": "select",
+          "key": "user",
+          "label": "User",
+          "widget": "choicesjs",
+          "placeholder": "Select a user",
+          "dataSrc": "resource",
+          "data": {
+            "resource": "user"
+          },
+          "template": "<span>{{ item.data.email }}</span>",
+          "reference": true,
+          "searchField": "data.email__regex",
+          "validate": {
+            "required": true
+          },
+          "input": true,
+          "tableView": true
+        },
+        {
+          "type": "button",
+          "key": "submit",
+          "label": "Submit",
+          "action": "submit",
+          "theme": "primary",
+          "disableOnInvalid": true,
+          "input": true
+        }
+      ],
+      "access": [
+        {
+          "type": "read_all",
+          "roles": ["administrator", "anonymous", "authenticated"]
+        }
+      ],
+      "submissionAccess": [
+        {
+          "type": "create_all",
+          "roles": ["administrator"]
+        },
+        {
+          "type": "read_all",
+          "roles": ["administrator"]
+        },
+        {
+          "type": "update_all",
+          "roles": ["administrator"]
+        },
+        {
+          "type": "delete_all",
+          "roles": ["administrator"]
+        },
+        {
+          "type": "read_own",
+          "roles": ["authenticated"]
+        }
+      ]
+    }
+  },
+  "access": [
+    {
+      "type": "create_all",
+      "roles": ["administrator"]
+    },
+    {
+      "type": "read_all",
+      "roles": ["administrator", "authenticated", "anonymous"]
+    },
+    {
+      "type": "update_all",
+      "roles": ["administrator"]
+    },
+    {
+      "type": "delete_all",
+      "roles": ["administrator"]
+    }
+  ]
+}
