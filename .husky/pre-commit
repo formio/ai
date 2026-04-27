@@ -1,3 +1,4 @@
 pnpm -r lint
+pnpm -r typecheck
 pnpm format
 git add -u
