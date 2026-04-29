@@ -5,5 +5,5 @@
     "@formio/mcp": "0.1.0",
     "@formio/ai": "0.1.0"
   },
-  "changesets": []
+  "changesets": ["tender-tires-wink", "wacky-pigs-try", "warm-rabbits-rescue"]
 }
