@@ -1,16 +1,32 @@
-# Form.io AI
+# Form.io Agentic Coding Toolset
 
-> **Form.io concepts, fluent in your AI agent.** `@formio/ai` is a Claude Code plugin, a [Model Context Protocol](https://modelcontextprotocol.io/) server (`@formio/mcp`), and a multi-skill library that teach an AI agent every primitive of the [Form.io](https://form.io) platform — resources, forms, submissions, role-based access control, group permissions, field-based ACLs, server-side actions, project templates, and renderer wiring — so the agent designs, builds, and extends enterprise-grade business-process applications correctly the first time.
+**Build compliance-ready apps with Form.io, in your agentic coding environment.**
 
-The library is built around a simple thesis: **Form.io is a deep platform, and an agent that does not understand it will produce shallow, insecure apps.** Out of the box, an LLM does not know what a Group Assignment action is, when to mirror a `team` select onto a grandchild resource for transitive access, or why a missing Save Submission action silently breaks a resource. `@formio/ai` closes that gap. With it loaded, your agent reasons in Form.io primitives the same way it reasons about React components or SQL tables.
+With Form.io, define a data model once and leverage it in multiple ways at runtime. A singular data model can be rendered as a form for humans to fill out, leveraged as the auto-generated API a system calls, or provide context for AI agents to execute workflows. One model, every surface.
 
-The result: every app your agent builds with this library — whether scaffolded soup-to-nuts from one prompt, extended with a single new resource, or surgically modified by editing a single component — incorporates **robust RBAC, role-and-group-based permissions, and field-level access controls by default.** Security is not a follow-up task; it is what the planner and the orchestrator emit on every run.
+That's what makes Form.io the data standardization layer for enterprises in regulated industries around the world. Form.io enables developers and AI coding agents to build applications using forms as infrastructure for compliance-ready solutions in any industry.
 
-| Layer | Package / Path | Purpose |
-| --- | --- | --- |
-| **Claude Code plugin** | `@formio/ai` ([`plugin/`](./plugin/)) | One-command install. Bundles the MCP server + the entire skill library and registers them with Claude Code. |
-| **MCP server** | `@formio/mcp` ([`packages/mcp-server/`](./packages/mcp-server/)) | First-party Form.io operations exposed as MCP tools (`form_*`, `role_*`, `action_*`, `project_*`). Usable from any MCP-aware client (Claude Code, Claude Desktop, VS Copilot, etc.) — not Claude-only. |
-| **Skills library** | [`plugin/skills/`](./plugin/skills/) | Seven activatable skills covering app orchestration, resource planning, framework scaffolding, form-JSON authoring, action configuration, and the full Form.io REST surface. |
+`@formio/ai` is what brings Form.io into your agentic coding environment. A Claude Code plugin, an MCP server (`@formio/mcp`), and a skill library so your agent works in Form.io primitives: forms, resources, nested data structures, role-based access, group permissions, server-side actions.
+
+The result: every app your agent builds inherits the model, the governance, RBAC, and the audit trail by default.
+
+> **Note on scope.** This repo is for AI coding agents while writing code. Form.io also provides a Universal Agent Gateway (UAG) for governing agentic workflows running in production. [More on Form.io UAG here.](https://form.io/uag)
+
+## What you get
+
+- **Claude Code plugin: `@formio/ai`.** One-command install. Bundles the MCP server and skill library, registers them with Claude Code.
+- **MCP server: `@formio/mcp`.** Form.io operations (`form_*`, `role_*`, `action_*`, `project_*`) as MCP tools. Works with any MCP-aware client: Claude Code, Claude Desktop, VS Copilot, and whatever comes next.
+- **Skills library:** Skills covering app orchestration, resource planning, framework scaffolding, form authoring, action configuration, and the full Form.io REST surface.
+
+## Why this exists
+
+Form.io has been the data standardization layer for enterprise data for a decade. With the proliferation of AI coding agents, that standardization matters more, not less.
+
+**Build on the Form.io platform, not from scratch.** The agent builds complete applications including the data models, forms, workflows, and business logic. Form.io is the platform it builds on. The APIs, data patterns, RBAC, audit infrastructure, and form management capabilities are production-grade and already there. The agent uses them as tools to build applications better.
+
+**Standardization across every AI-built app.** One model, one set of rules, one audit trail, regardless of which team or which agent built it. With a standardization layer, multiple teams ship multiple applications, all with defensible, reconcilable data layers across the enterprise.
+
+**Governance built in.** RBAC, group permissions, change history, audit trails — all emitted on the first pass. Every app lands inside the same compliance envelope the enterprise already runs on.
 
 ---
 
@@ -51,73 +67,39 @@ The result: every app your agent builds with this library — whether scaffolded
 
 Agents loaded with `@formio/ai` produce enterprise-grade applications: every resource ships with a Save Submission action so submissions actually persist; every authenticated role inherits its access through documented Group / Field-based / Role mechanics; every front-end component is scaffolded against `@formio/angular` with `FormioAuthConfig` and `FormioResourceConfig` derived directly from the planner's `template.json`.
 
-## Use cases
+## Use Cases
 
-A Form.io developer working with an `@formio/ai`-equipped agent can drive any of the following from a single conversation. Each example is a real prompt — paste it into Claude Code with the plugin installed.
+What you can do with these tools: Five real prompts, paste-ready in Claude Code. Each one shows a different shape of work the agent handles natively.
 
-### 1. Plan a data model from plain language
-
-> "Plan the resource structure for a multi-tenant booking system where customers book services from providers, providers belong to one or more locations, and admins manage everything."
-
-The `formio-resource-planner` skill activates, runs its five-round interview, and emits a `template.md` (architectural intent — Resources, Users & Auth, Roles, Access Matrix, ER diagram, Access Flow diagram) plus a paired `template.json` ready for `project_import`.
-
-### 2. Build a complete app soup-to-nuts from one prompt
+### Build a complete app from one prompt
 
 > "Build me a CRM where sales reps only see accounts owned by the teams they belong to."
 
-The `formio-application` orchestrator runs the full six-step pipeline (Intent → Plan → Deployment → MCP Config → Import → Framework). At the end you have a Form.io project loaded with resources, roles, and actions plus an Angular workspace wired to it.
+The agent plans the data model, imports it into Form.io, and scaffolds an Angular front-end wired to the project. Approval gate at every step. At the end you have a running application — not a prototype.
 
-### 3. Extend a running app with a new feature
-
-In an existing workspace already wired to a Form.io project:
+### Extend a running app
 
 > "Also let customers leave reviews on each completed booking, and let providers reply to them."
 
-The orchestrator switches to **modify-existing** mode, plans a delta `template.json` (only the new resources/fields/actions), additively imports it, and hands off to the framework's extend sub-skill to scaffold modules for exactly the new resources. The existing project content is preserved.
+In a workspace that's already wired to a Form.io project, the agent plans only what's new and adds it without touching what works. Existing project content stays intact.
 
-### 4. Generate a single form JSON definition
+### Plan a data model from plain language
 
-> "Using the formio-form skill, generate a JSON schema for a wizard-style insurance claim form with personal info on page 1, incident details on page 2, and supporting documents on page 3."
+> "Plan the resource structure for a multi-tenant booking system where customers book services from providers, providers belong to one or more locations, and admins manage everything."
 
-`formio-form` + `formio-schema` produce a full Form.io form definition — components, validation, conditional logic, page panels — that you can post via `form_create` or paste into the form builder.
+The agent runs a structured interview, produces an ER diagram and access matrix for review, and emits a project template ready to import. You see the architectural shape before any code or schema gets written.
 
-### 5. Add server-side behavior to an existing form
-
-> "On the contractRequest form, send an email to legal@example.com whenever status changes to 'pending review', and save a copy of the submission to the auditLog resource."
-
-`formio-actions` chooses the right action types (Email + Save Submission), recommends handler/method/priority, and the agent attaches them via `action_create`.
-
-### 6. Tighten access controls on an existing resource
+### Tighten access controls on an existing resource
 
 > "Currently anyone authenticated can read every Account. Lock it down so reps only see Accounts owned by their Team."
 
-The agent reads the resource via `form_get`, modifies `submissionAccess` to use a field-based ACL on `Account.team`, and ensures the join resource has a Group Assignment action — emitting the diff for your review before calling `form_update`.
+The agent reads the resource, modifies the access rules, and ensures the supporting role assignments are in place. The diff lands for your review before anything ships.
 
-### 7. Generate a CRUD UI module against an existing resource
+### Inspect and operate a live project
 
-> "Generate the Angular module for the Invoice resource — list view, view-edit-create routes, and a form component using `<formio>`."
+> "List every form in this project that doesn't have a Save Submission action attached."
 
-`formio-angular` + its `resources` sub-skill scaffold the NgModule, `FormioResourceConfig`, `FormioResourceRoutes()`, list-view template, and per-component HTML/SCSS — all `standalone: false` to match the official `@formio/angular` demo, with Bootstrap 5 styling.
-
-### 8. Inspect and operate a live project
-
-> "List every form in this project that does NOT have a Save Submission action attached."
-
-The agent calls `form_list` + `action_list` per form via the MCP server, surfaces the orphans, and offers to attach the missing action with `action_create`.
-
-### 9. Snapshot, diff, and migrate between projects
-
-> "Export the staging project, diff it against production, and tell me what's drifted."
-
-`project_export` produces a portable template; the agent diffs and reports drift. A subsequent `project_import` against production additively merges the agreed changes.
-
-### 10. Look up any Form.io REST endpoint
-
-> "How do I PATCH a single field on a submission with revisions enabled?"
-
-The `formio-api` router activates, navigates into `runtime-submissions.md`, and returns the exact endpoint, headers, body shape, and the preferred MCP tool when one exists.
-
----
+The agent queries the live project through the MCP server, surfaces what's missing, and offers to fix it. This is operational work — not building from scratch, but keeping a running system clean.
 
 ---
 
