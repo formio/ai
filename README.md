@@ -67,6 +67,8 @@ Form.io has been the data standardization layer for enterprise data for a decade
 
 Agents loaded with `@formio/ai` produce enterprise-grade applications: every resource ships with a Save Submission action so submissions actually persist; every authenticated role inherits its access through documented Group / Field-based / Role mechanics; every front-end component is scaffolded against `@formio/angular` with `FormioAuthConfig` and `FormioResourceConfig` derived directly from the planner's `template.json`.
 
+---
+
 ## Use Cases
 
 What you can do with these tools: Five real prompts, paste-ready in Claude Code. Each one shows a different shape of work the agent handles natively.
