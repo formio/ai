@@ -3,19 +3,41 @@
   "version": "0.1.0",
   "description": "Form.io MCP Server",
   "type": "module",
+  "license": "MIT",
+  "homepage": "https://github.com/formio/ai#readme",
+  "bugs": {
+    "url": "https://github.com/formio/ai/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/formio/ai.git",
+    "directory": "packages/mcp-server"
+  },
   "main": "./dist/server.js",
   "bin": {
     "formio-mcp": "./dist/stdio.js"
   },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
   "scripts": {
-    "build": "tsc",
+    "build": "tsc -p tsconfig.build.json",
+    "build:dev": "tsc",
     "dev": "tsx watch src/index.ts",
     "start": "node dist/index.js",
     "test": "vitest run",
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit",
     "lint": "eslint src && tsc --noEmit",
-    "clean": "rm -rf dist coverage"
+    "clean": "rm -rf dist coverage",
+    "prepublishOnly": "pnpm test && pnpm build"
+  },
+  "engines": {
+    "node": ">=20"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.10.2",

@@ -16,7 +16,8 @@
     "prepare": "husky",
     "changeset": "changeset",
     "changeset:version": "changeset version",
-    "release:plugin": "pnpm --filter @formio/ai publish --no-git-checks"
+    "release:get-tag": "node -p \"require('fs').existsSync('.changeset/pre.json')?require('./.changeset/pre.json').tag:'latest'\"",
+    "release": "pnpm -r publish --tag $(pnpm -s release:get-tag)"
   },
   "devDependencies": {
     "@changesets/cli": "^2.30.0",
