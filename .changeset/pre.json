@@ -1,9 +1,0 @@
-{
-  "mode": "pre",
-  "tag": "rc",
-  "initialVersions": {
-    "@formio/mcp": "0.1.0",
-    "@formio/ai": "0.1.0"
-  },
-  "changesets": []
-}
