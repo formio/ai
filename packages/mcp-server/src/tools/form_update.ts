@@ -8,7 +8,7 @@ import { cwdSchema, resolveProjectConfig } from '../project-resolver.js';
 export function registerFormUpdateTool(server: McpServer, config: FormioConfig) {
   server.tool(
     'form_update',
-    "Update an existing form in the Form.io project mapped to the user's current working directory. IMPORTANT: Before calling this tool, first use form_get to fetch the current form definition, then use the formio-form skill to apply the requested modifications (add, remove, or modify fields and settings), and finally call this tool with the complete updated form JSON.",
+    'Update an existing form in the Form.io project mapped to the user\'s current working directory. IMPORTANT: Before calling this tool, first use form_get to fetch the current form definition, then use the formio-form skill to apply the requested modifications (add, remove, or modify fields and settings), and finally call this tool with the complete updated form JSON. DO NOT use for adding a revision: if the form has `revisions: "current"` or `"original"`, use `form_draft_create` then `form_draft_publish` instead. NEVER use as a fallback when `form_draft_create` or `form_draft_publish` fails — surface those errors to the user.',
     {
       cwd: cwdSchema,
       formId: z

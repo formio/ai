@@ -27,6 +27,26 @@ describe('form_update tool', () => {
     expect(tool!.description).toContain('formio-form');
   });
 
+  it('description routes revision-enabled forms to draft+publish tools', async () => {
+    mockFormioFetch.mockResolvedValue({});
+    const { client } = await createTestClient(registerFormUpdateTool);
+    const { tools } = await client.listTools();
+    const tool = tools.find((t) => t.name === 'form_update');
+    expect(tool!.description).toMatch(/form_draft_create/);
+    expect(tool!.description).toMatch(/form_draft_publish/);
+    expect(tool!.description).toMatch(/revisions/i);
+  });
+
+  it('description forbids being used as fallback for failed draft/publish', async () => {
+    mockFormioFetch.mockResolvedValue({});
+    const { client } = await createTestClient(registerFormUpdateTool);
+    const { tools } = await client.listTools();
+    const tool = tools.find((t) => t.name === 'form_update');
+    expect(tool!.description).toMatch(/never.*fallback|never.*fall.?back/i);
+    expect(tool!.description).toMatch(/form_draft_create|form_draft_publish/);
+    expect(tool!.description).toMatch(/surface/i);
+  });
+
   it('sends PUT to /form/{formId} with form body', async () => {
     const formId = '67890abcdef012345678abcd';
     const updated = { _id: formId, title: 'Updated', components: [] };
