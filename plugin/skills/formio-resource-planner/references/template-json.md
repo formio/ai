@@ -4,6 +4,8 @@ Canonical shape for a Form.io project export. Same document you get from `GET /{
 
 When emitting Phase B of the `formio-resource-planner` skill, follow this reference verbatim. The shapes, defaults, and ordering are not negotiable — Form.io parses strictly.
 
+This file is the schema. For the workflow-oriented playbook on configuring custom authentication (custom user resources, login form, register form, role assignment) and group-level permissions (Group Assignment action, the four-empty-roles field-based access block, transitive hidden calculated mirrors) — including the rationale, verification checklist, and end-to-end flow trace — see the **`formio-auth-permissions`** skill. The two are complementary: this file says what the JSON looks like; `formio-auth-permissions` says when to use which pattern and why.
+
 ## Top-level
 
 ```jsonc

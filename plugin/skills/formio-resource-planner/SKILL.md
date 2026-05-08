@@ -80,31 +80,18 @@ Emit the Phase A Resource Map (see "Phase A — Resource Map for review" below) 
 
 When a child resource's access flows from a group, the plan must include both:
 
-1. **The Group Assignment action on the join resource** (e.g., `projectUser:group` with `settings: { group: "project", user: "user" }`). This registers user-to-group memberships.
-2. **A field-based `submissionAccess` block on the child's group-reference select component** (e.g., on `Task.project`, on `Contact.company`). The block has four entries — `read`, `create`, `update`, `delete` — each with `roles: []`. The empty roles are intentional: permissions are resolved at runtime from the group submission's ACL, not from static role lists.
+1. **The Group Assignment action on the join resource** (e.g., `projectUser:group` with `settings: { group: "project", user: "user" }`) — registers user-to-group memberships.
+2. **A field-based `submissionAccess` block on the child's group-reference select component** (four entries: `read`, `create`, `update`, `delete`, each with `roles: []`) — propagates the group's ACL onto the child at runtime.
 
-## Gotcha
+Missing half 2 is a silent bug — the user can see the parent group but not its children. Always call out both halves in the Phase A map, and always emit both halves in Phase B.
 
-Missing half 2 is a silent bug. The user can log in and see the Project they're a member of, but they cannot see the Tasks attached to it because Task's access never inherits. Always call out both halves in the Phase A map, and always emit both halves in Phase B.
-
-See `references/template-json.md` for the exact JSON shape of the field-based submissionAccess block.
+For the conceptual rationale, the four-empty-roles rule, the `reference: true` requirement, the transitive case (hidden calculated mirrors for grandchildren), the `calculateValue` pattern, and the verification flow, see the **`formio-auth-permissions`** skill — it is the canonical home for both halves of group access. The exact JSON shape of the field-based `submissionAccess` block also lives in `references/template-json.md` for direct schema reference.
 
 ### Transitive group access — 2+ levels below the group
 
-Half 2 above covers **direct children** of the group. When the hierarchy goes deeper — e.g., `Team` is the group on `Account`, and `Contact`, `Deal`, `Activity` sit under `Account` — the grandchildren have no direct relationship with the group, so a plain group-reference select won't work. Use this pattern instead:
+When the hierarchy goes deeper than direct children — e.g., `Team` is the group on `Account`, and `Contact`, `Deal`, `Activity` sit under `Account` — the grandchildren have no direct relationship to the group. Each sub-resource carries **two** reference selects: a normal parent reference (e.g., `account` on `Contact`, user-visible) AND a hidden calculated mirror of the group field (e.g., `team` on `Contact`, auto-populated from `data.account.data.team`). Every level of the hierarchy below the direct child repeats the mirror so group access flows all the way down.
 
-Each sub-resource (grandchild or deeper) carries **two** reference selects:
-
-1. A **normal parent reference** pointing at the immediate parent (e.g., `account` on `Contact`). Standard shape: `reference: true`, no `submissionAccess`. This is the field the user actually fills.
-2. A **hidden, calculated mirror of the group field** (e.g., `team` on `Contact`). This is what actually propagates group access. Only three properties distinguish it from a normal group-reference select:
-   - `hidden: true` — invisible to the user
-   - `calculateValue: "value = data.<parent>.data.<group>;"` — auto-populated from the parent's resolved group reference (e.g., `value = data.account.data.team;`)
-   - `refreshOn: "<parent>"` — recalculate when the parent selection changes
-   - Everything else is the same: `reference: true`, `validate.required: true`, and the four-entry `submissionAccess` block
-
-Every level of the hierarchy below the direct child repeats this mirror, so group access flows all the way down. A Contact, a Deal, an Activity-under-Deal — each one gets its own `team` mirror on the form.
-
-In the Phase A Resource Map, call out the mirror explicitly on every sub-resource. Example annotation:
+Call out the mirror explicitly on every sub-resource in the Phase A map. Example annotation:
 
 ```
 - Contact (type: resource)
@@ -117,7 +104,7 @@ In the Phase A Resource Map, call out the mirror explicitly on every sub-resourc
   Access: group-via-TeamUser, inherited transitively through account.team
 ```
 
-See `references/template-json.md` → "select — transitive group-access mirror" for the exact JSON. A complete worked example (`Team → Account → Contact/Deal/Activity`) is registered as eval-3 ("complex-crm-transitive") in `evals/evals.json`, with the Phase A map and importable Phase B template checked in at the eval workspace (`evals/iteration-1/eval-3-complex-crm-transitive/with_skill/outputs/`). When the user describes a hierarchy with a group at the top and grandchildren below, refer to this eval's output as the structural reference.
+For the JSON shape, the `calculateValue` rules, and when (not) to add a mirror, see the **`formio-auth-permissions`** skill. The exact JSON also lives at `references/template-json.md` → "select — transitive group-access mirror". A complete worked example (`Team → Account → Contact/Deal/Activity`) is checked in at `references/examples/complex-crm-transitive/` — refer to it as the structural reference when the user describes a hierarchy with a group at the top and grandchildren below.
 
 ### Two different access arrays (don't conflate)
 
@@ -126,7 +113,7 @@ Every resource and form carries two access arrays. Keep them separate in your pl
 - **`access`** — who can _load the form/resource definition itself_ (the metadata, component tree). Default for every resource: `read_all` granted to **all three base roles** (`administrator`, `anonymous`, `authenticated`). The form definition is public metadata — locking it down here is rarely what the user wants.
 - **`submissionAccess`** — who can _create/read/update/delete submissions_ (the actual data rows). This is where the real access-control story lives: `create_all`/`read_all`/... for administrators, `read_own`/`update_own` for owner-level access, and so on.
 
-When the user describes access ("reps only see their company's deals"), they almost always mean `submissionAccess`. Say so explicitly in the output. The `access` default stays wide-open on every resource.
+When the user describes access ("reps only see their company's deals"), they almost always mean `submissionAccess`. Say so explicitly in the output. The `access` default stays wide-open on every resource. For the canonical default shapes per pattern (admin-only, owner-level, public submit, etc.), see the **`formio-auth-permissions`** skill.
 
 ### Component cheat sheet
 
@@ -147,11 +134,13 @@ Full component reference: see the `formio-form` skill when you need exact JSON s
 
 ### Action cheat sheet
 
-- **Login** — on a form collecting email/password; issues a JWT on submit. The action's `settings.resources` lists which user-type resources the form authenticates against. Always emit `["user"]`. Do NOT add `"admin"` — it breaks project import. Admin-only work (seeding reference data, assigning groups, inviting users, reviewing submissions) is performed by the administrator signing in to the Form.io portal for the project; see "Admin operations" in the emitted `template.md`.
+- **Login** — on a form collecting email/password; issues a JWT on submit. `settings.resources` is always `["user"]`; never add `"admin"` (rejected on import). Admin-only work goes through the Form.io project portal, not the app login form.
 - **Role Assignment** — on a resource form (typically a signup form); assigns a role to the submitter.
 - **Group Permissions** — on a join resource; names which field identifies the group and which names the user. Platform then enforces ACLs.
 - **Save Submission** — on by default; turn off for pure-trigger forms.
 - **Email / Webhook** — side effects; call them out when the user mentions notifications or integrations.
+
+For the full JSON shape of Login, Role Assignment, and Group Assignment — including settings keys, priority rules, the register-form Save → Role → Login chain, and the rationale for `["user"]`-only — see the **`formio-auth-permissions`** skill. For generic action anatomy (handler, method, priority, conditions), see `formio-actions`.
 
 ## Phase A — Resource Map for review
 
@@ -274,10 +263,8 @@ Emission algorithm (run this exactly once per template.json, right before writin
 2. **Walk every `forms` entry.** For each form `<name>`, add an action keyed `"<name>:save"`. Pure-trigger forms (no storage) are the only exception — and they are vanishingly rare; if you think you have one, ask the user first. When a form writes into a different resource than itself (e.g., a `userRegister` form writes into the `user` resource), set the Save action's `settings.resource` to the target resource's machine name. See [`references/template-json.md`](references/template-json.md) → "Save Submission (on a register form — writes into `user` resource)" for the exact shape.
 3. **Auth-form actions.** For the login form, add a Login action (`"<form>:login"`). For the register form, add a Role Assignment action (`"<form>:role"`) that assigns the default authenticated role, AND a Login action so the user is signed in immediately on successful registration. Order: Save → Role Assignment → Login — all three live under the same register form's action keys.
 
-   **Login action `settings.resources` — always `["user"]`.** The Login action's `settings.resources` is an array of user-type resource machine names the login form will authenticate against. Emit `["user"]` verbatim and do NOT add any other resource names (notably NOT `"admin"`) — the Form.io project importer rejects the template when the array references a built-in user-type resource that the template does not itself declare, and the single-resource form is what every default Form.io project expects.
-
-   **Admin-only work goes through the Form.io portal, not the app login form.** If the plan has administrator-only responsibilities (seeding reference data, creating group-membership rows, assigning roles to users, reviewing submissions, moderating content), those are performed by an administrator signing in to the Form.io **project portal** for this project — the same portal URL the developer uses to manage the project's forms, resources, and submissions. Do NOT design the app's in-app login surface around administrator access. Instead, capture the admin-only operations in `template.md`'s `## Users & Auth → Admin operations` line so downstream skills and the end user see which tasks need the portal.
-4. **Join resources with group-based access.** Every join resource that implements group-level access (e.g., `ProjectUser`, `TeamUser`, `CompanyUser`) needs a Group Assignment action keyed `"<join>:group"`. The action's `settings.group` MUST match the field key on the join whose `select` points at the group resource; `settings.user` MUST match the field key whose `select` points at the user resource. A join without Group Assignment stores rows but never grants access — the whole group-access model is dead.
+   `settings.resources` on every Login action is exactly `["user"]` — never `"admin"` or anything else the template does not declare. Admin-only work is performed via the Form.io project portal, not the app login form; capture admin-only operations in `template.md`'s `## Users & Auth → Admin operations` line. For the full Login/Role/Save shapes, the `settings.fields` map on the register form's Save action, and the rationale for `["user"]`-only, see the **`formio-auth-permissions`** skill.
+4. **Join resources with group-based access.** Every join resource that implements group-level access (e.g., `ProjectUser`, `TeamUser`, `CompanyUser`) needs a Group Assignment action keyed `"<join>:group"`. `settings.group` MUST match the field key on the join whose `select` points at the group resource; `settings.user` MUST match the field key whose `select` points at the user resource. A join without Group Assignment stores rows but never grants access. See **`formio-auth-permissions`** for the full Group Assignment shape and the field-based `submissionAccess` block half of the pattern.
 5. **Side-effect actions (email, webhook).** Add these only when the user's description explicitly mentions the behavior (e.g., "email the assignee when a task is created"). Do not invent side effects.
 
 Minimum viable action set per resource type:
@@ -462,4 +449,5 @@ Consult these when the user's requirements touch an edge case this skill doesn't
 - **Does not emit one artifact without the other.** Phase B ALWAYS writes both `template.md` and `template.json`. If something prevents both, stop and explain.
 - **Does not look up endpoints.** The `formio-api` skill handle endpoint reference.
 - **Does not deep-dive a single form's component schema.** For exhaustive component options (conditional logic, calculated values, custom validation), see `formio-form`. This skill's template.json uses the minimum viable component shape for each field.
+- **Does not own the auth/permissions playbook.** The conceptual rationale, full JSON shapes, verification checklist, and end-to-end flow trace for custom user resources, login/register/role assignment, and group-level permissions (including transitive hidden mirrors) live in **`formio-auth-permissions`**. This skill links out for those details rather than restating them — the planner decides WHICH access pattern applies and emits a faithful template; `formio-auth-permissions` is where someone with an existing app learns HOW the wiring actually works.
 - **Does not make the plan "complete" beyond what the user described.** If they didn't mention reporting, don't add a report resource.
