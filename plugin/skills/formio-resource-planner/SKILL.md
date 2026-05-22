@@ -1,7 +1,7 @@
 ---
 name: formio-resource-planner
 description: >-
-  Plan the Resource structure, field configurations, and access/permission model for a Form.io application from a user's high-level requirements, then emit a ready-to-import Form.io project `template.json`. Use this skill whenever the user wants to design, architect, model, or plan a Form.io app, project, portal, or data model — phrases like "build a <kind> app in Form.io", "model <domain> in Form.io", "design the resources for...", "plan the schema for...", "I want to build a task manager / CRM / inventory / booking system in Form.io". Two-phase output — (Phase A) a human-readable Resource Map for the user to review and approve; (Phase B) after explicit approval, a full `template.json` containing roles, resources, forms, and actions that can be POSTed to `/{projectName}/import`, handed to `form_create`, or passed to the formio-api skill. Interview-driven — infers resources from the description and asks about relationships, auth, and access before committing. Not for looking up an endpoint (see the formio-api skill). Trigger even if the user does not say the word "Form.io" — if they describe an app and you are in a Form.io project, plan the resources.
+  Plan the Resource structure, field configurations, and access/permission model for a Form.io application from a user's high-level requirements, then emit a ready-to-import Form.io project `template.json`. Use this skill whenever the user wants to design, architect, model, or plan a Form.io app, project, portal, or data model — phrases like "build a <kind> app in Form.io", "model <domain> in Form.io", "design the resources for...", "plan the schema for...", "I want to build a task manager / CRM / inventory / booking system in Form.io". Two-phase output — (Phase A) a human-readable Resource Map for the user to review and approve; (Phase B) after explicit approval, a full `template.json` containing roles, resources, forms, and actions that can be POSTed to `/{projectName}/import`, handed to `form_create`, or passed to the formio-api skill. Interview-driven — infers resources from the description and asks about relationships, auth, and access before committing. Not for looking up an endpoint (see the formio-api skill). Not for configuring SSO (OIDC, SAML, LDAP), Token Swap, Custom JWT signed with `JWT_SECRET`, email-token (passwordless) authentication, JWT/session mechanics, 2FA, or RBAC tuning beyond default roles and group permissions — those hand off to `formio-auth`. Trigger even if the user does not say the word "Form.io" — if they describe an app and you are in a Form.io project, plan the resources.
 ---
 
 # Form.io Resource Planner
@@ -191,7 +191,9 @@ When the interview has enough signal, emit the resource map as a single fenced m
 - Login resources: `user`
 - Admin operations: <if any admin-only workflow in this plan, list each one in one line — e.g., "Seed initial Project rows; create ProjectUser membership rows; assign `administrator` role to specific users." — and note they are performed via the Form.io portal for this project, not via the app's login form.>
 - Registration: <self-register via form `<name>` with Role Assignment action | admin-invite only>
-- SSO: <none | OIDC | SAML>
+- SSO: <none | OIDC | SAML | LDAP>
+- Custom JWT: <yes | no>
+- Next steps for auth: when `SSO` is anything other than `none`, or `Custom JWT` is `yes`, or the plan calls for Token Swap, email-token auth, 2FA, reCAPTCHA, or RBAC tuning beyond default roles and group permissions, hand off to the `formio-auth` skill after this Resource Map is approved.
 
 ## Roles
 

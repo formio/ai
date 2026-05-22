@@ -1,0 +1,83 @@
+# SSO — OAuth / OIDC
+
+## Overview
+
+Form.io integrates with any OAuth 2.0 / OpenID Connect (OIDC) Identity Provider. The user authenticates against the IdP, the provider returns standard OAuth/OIDC claims, and Form.io exchanges those claims for a first-party Form.io JWT. Provider roles are mapped onto Form.io Roles via **OAuth Role Mapping**, so SSO users land with the same role-keyed `access` / `submissionAccess` evaluation that resource-backed users get.
+
+## When to use this
+
+Reach for OIDC SSO when:
+
+- The organization runs an IdP like Okta, Auth0, Azure AD (Entra ID), Keycloak, or Google Workspace.
+- Users should authenticate against the IdP, not against a Form.io `user` Resource.
+- Provider role claims should govern Form.io Role assignment.
+- A "Sign in with..." button on the Form.io login form is acceptable.
+
+Not for:
+
+- SAML-only providers → see [`sso-saml.md`](./sso-saml.md).
+- LDAP directories → see [`sso-ldap.md`](./sso-ldap.md).
+- Already-issued OIDC bearer tokens you want to swap for a Form.io JWT without re-authenticating → see [`token-swap.md`](./token-swap.md).
+- Forging a JWT yourself in your backend → see [`custom-jwt.md`](./custom-jwt.md).
+
+## Configuration
+
+### Provider registration
+
+OAuth/OIDC providers are configured on the Project's OAuth settings page in the Form.io portal. For each provider you supply:
+
+- **Client ID** and **Client Secret** from the IdP.
+- **Authorization URL**, **Token URL**, and **User Info URL** (or the OIDC discovery document, e.g. `https://<issuer>/.well-known/openid-configuration`).
+- **Scopes** — typically `openid profile email` plus any custom scopes that carry the role claim.
+- **Redirect URI** — the Form.io endpoint that completes the handshake. The portal generates the canonical value.
+
+Refer to the per-provider sub-pages linked from `https://help.form.io/developers/auth` for the exact field names and any provider-specific quirks (Azure AD tenant ID, Google hosted-domain filter, etc.).
+
+### Login form integration
+
+Attach an OAuth Action (one per provider) to the project's login form. Each OAuth Action renders a "Sign in with X" button that drives the user through the IdP handshake. On a successful return, Form.io:
+
+1. Calls the IdP's User Info endpoint with the OAuth access token.
+2. Locates or creates a corresponding `user` submission (configurable — auto-create vs require-pre-existing).
+3. Applies OAuth Role Mapping (see below) to attach Form.io Roles.
+4. Issues a Form.io JWT and returns it via the `x-jwt-token` response header. From this point on the user is indistinguishable from a Resource-authenticated user.
+
+### OAuth Role Mapping
+
+OAuth Role Mapping is the bridge between an IdP role claim (e.g. `groups`, `roles`, `https://my-app/roles`) and Form.io Roles. The Project's OAuth settings page exposes a mapping table:
+
+- Pick the claim path (e.g. `roles`) the IdP returns.
+- For each claim value (e.g. `admin`, `marketing`, `external`), choose the Form.io Role it maps to.
+- A user may match multiple rows; the resulting `roles` array is the union.
+
+Users without any matching claim row fall back to the configured default Role (typically Authenticated).
+
+### Auto-create vs require-pre-existing user
+
+Two common settings on the OAuth Action:
+
+- **Auto-create user submission** — on first login, Form.io creates a `user` Resource submission seeded from the IdP claims (`email`, optional profile fields). Best for self-service onboarding.
+- **Require existing user** — Form.io will only complete login if a `user` submission already matches the IdP claim (typically by `email`). Best for invite-only or admin-provisioned access.
+
+Pick one per provider. They are mutually exclusive.
+
+### MFA and provider-level controls
+
+When MFA is enforced at the IdP, Form.io receives the post-MFA token automatically — there is nothing to wire on the Form.io side. To layer Form.io-side controls (rate-limiting at the project boundary, brute-force on a fallback Resource login form, reCAPTCHA on a non-IdP path), see [`jwt-and-sessions.md`](./jwt-and-sessions.md).
+
+## MCP Tool Preference
+
+OAuth provider configuration MUST be performed via the Form.io project portal — no MCP tool covers IdP credentials, scope tables, or Role Mapping at the time of writing. After the provider is configured:
+
+- Use `role_list` / `role_create` in the MCP server to ensure the Form.io Roles that the OAuth mapping table targets actually exist.
+- Use `form_create` / `form_update` to scaffold the login form that hosts the OAuth Actions.
+- Use `action_list` to confirm an OAuth Action has been attached to that form (typically managed in the portal, not via `action_create`).
+
+For documentation of the runtime endpoints the renderer uses to complete the OAuth handshake, see the `runtime-auth` reference in the `formio-api` skill.
+
+## See also
+
+- [`token-swap.md`](./token-swap.md) — exchanging an externally-issued OIDC bearer token for a Form.io JWT without rendering an OAuth Action button.
+- [`roles-and-permissions.md`](./roles-and-permissions.md) — the Form.io Roles your OAuth mapping targets.
+- [`jwt-and-sessions.md`](./jwt-and-sessions.md) — the Form.io JWT the OAuth flow returns, the `jti` Session ID, and logout semantics that invalidate the session even if the IdP session is still alive.
+- [`sso-saml.md`](./sso-saml.md), [`sso-ldap.md`](./sso-ldap.md) — sibling SSO references for other provider types.

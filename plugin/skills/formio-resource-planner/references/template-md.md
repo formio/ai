@@ -73,8 +73,11 @@ Bulleted facts only. Keep it parseable.
 - User resource: <default `user` | custom `<name>`>
 - Login form: <form machineName> (Login action)
 - Registration: <self-register via <form> with Role Assignment → <role> | admin-invite only | none>
-- SSO: <none | OIDC | SAML>
+- SSO: <none | OIDC | SAML | LDAP>
+- Custom JWT: <yes | no>
 ```
+
+When `SSO` is anything other than `none`, or `Custom JWT` is `yes`, downstream auth configuration (OAuth/SAML/LDAP Role Mapping, Token Swap, `JWT_SECRET`-signed Custom JWT, email-token auth, 2FA, reCAPTCHA) is owned by the `formio-auth` skill — hand off there after this Resource Map is approved.
 
 ## Roles section
 
