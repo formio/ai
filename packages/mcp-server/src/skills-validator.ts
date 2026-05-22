@@ -472,5 +472,451 @@ export function validateLibrary(libraryDir: string): ValidationIssue[] {
     const rel = path.relative(libraryDir, full);
     issues.push(...validateReferenceContent(rel, source, group));
   }
+
+  issues.push(...validateFormioSdkSkill(libraryDir));
+  return issues;
+}
+
+// =============================================================================
+// formio-sdk skill validation
+// =============================================================================
+
+export const SDK_SKILL_DIR = 'formio-sdk';
+
+export const SDK_REQUIRED_REFERENCES = [
+  'setup.md',
+  'auth.md',
+  'forms.md',
+  'submissions.md',
+  'projects.md',
+  'roles.md',
+  'files.md',
+  'plugins.md',
+  'rendering.md',
+  'utils-evaluator.md',
+  'utils-form-traversal.md',
+  'utils-conditions.md',
+  'utils-logic.md',
+  'utils-jsonlogic.md',
+  'utils-mask-sanitize.md',
+  'utils-misc.md',
+] as const;
+
+export type SdkReference = (typeof SDK_REQUIRED_REFERENCES)[number];
+
+export const SDK_SIBLING_SKILLS = [
+  'formio-api',
+  'formio-application',
+  'formio-resource-planner',
+  'formio-angular',
+] as const;
+
+export const SDK_REQUIRED_HEADINGS = [
+  '## Overview',
+  '## Imports',
+  '## API',
+  '## Examples',
+] as const;
+
+export const SDK_CANONICAL_SDK_IMPORT = "import { Formio } from '@formio/js'";
+export const SDK_CANONICAL_UTILS_IMPORT = "import { Utils } from '@formio/js/utils'";
+
+export const SDK_HOSTED_BASE_URL_LITERAL = "setBaseUrl('https://forms.mysite.com')";
+export const SDK_HOSTED_PROJECT_URL_LITERAL = "setProjectUrl('https://forms.mysite.com/myproject')";
+export const SDK_SAAS_BASE_URL_LITERAL = "setBaseUrl('https://api.form.io')";
+export const SDK_SAAS_PROJECT_URL_LITERAL = "setProjectUrl('https://myproject.form.io')";
+
+function isUtilsReference(name: string): boolean {
+  return name.startsWith('utils-');
+}
+
+interface CodeBlock {
+  lang: string;
+  body: string;
+}
+
+function extractFencedBlocks(source: string): CodeBlock[] {
+  const blocks: CodeBlock[] = [];
+  const regex = /```([a-zA-Z0-9_-]*)\n([\s\S]*?)```/g;
+  let match: RegExpExecArray | null;
+  while ((match = regex.exec(source)) !== null) {
+    blocks.push({ lang: match[1] || '', body: match[2] });
+  }
+  return blocks;
+}
+
+export function validateFormioSdkFrontmatter(file: string, data: unknown): ValidationIssue[] {
+  if (!isRecord(data) || Object.keys(data).length === 0) {
+    return [
+      {
+        file,
+        rule: 'formio_sdk.frontmatter_missing',
+        message: `${file}: formio-sdk SKILL.md must declare YAML frontmatter (name + description)`,
+      },
+    ];
+  }
+  const issues: ValidationIssue[] = [];
+  if (typeof data.name !== 'string' || data.name !== SDK_SKILL_DIR) {
+    issues.push({
+      file,
+      rule: 'formio_sdk.frontmatter_missing',
+      message: `${file}: formio-sdk frontmatter.name must equal "${SDK_SKILL_DIR}"`,
+    });
+  }
+  if (typeof data.description !== 'string' || data.description === '') {
+    issues.push({
+      file,
+      rule: 'formio_sdk.frontmatter_missing',
+      message: `${file}: formio-sdk frontmatter.description must be a non-empty string`,
+    });
+  }
+  return issues;
+}
+
+export function validateFormioSdkDescription(file: string, data: unknown): ValidationIssue[] {
+  if (!isRecord(data) || typeof data.description !== 'string') return [];
+  const description = data.description;
+  const issues: ValidationIssue[] = [];
+
+  const mentionsSdk = description.includes('@formio/js');
+  const mentionsUtils = description.includes('@formio/js/utils');
+  if (!mentionsSdk || !mentionsUtils) {
+    issues.push({
+      file,
+      rule: 'formio_sdk.description_clause',
+      message: `${file}: clause: "capability" — description must name both @formio/js and @formio/js/utils`,
+    });
+  }
+
+  if (!description.includes('Use when the user asks to')) {
+    issues.push({
+      file,
+      rule: 'formio_sdk.description_clause',
+      message: `${file}: clause: "trigger" — description must contain "Use when the user asks to …"`,
+    });
+  }
+
+  if (!description.includes('Not for:')) {
+    issues.push({
+      file,
+      rule: 'formio_sdk.description_clause',
+      message: `${file}: clause: "negative" — description must contain a "Not for: …" clause naming sibling skills`,
+    });
+  } else {
+    const missingSiblings = SDK_SIBLING_SKILLS.filter((s) => !description.includes(s));
+    if (missingSiblings.length > 0) {
+      issues.push({
+        file,
+        rule: 'formio_sdk.description_clause',
+        message: `${file}: clause: "negative" — "Not for:" clause must name sibling skills [${missingSiblings.join(', ')}]`,
+      });
+    }
+  }
+
+  return issues;
+}
+
+export function validateFormioSdkCanonicalImports(file: string, source: string): ValidationIssue[] {
+  const issues: ValidationIssue[] = [];
+  if (!source.includes(SDK_CANONICAL_SDK_IMPORT)) {
+    issues.push({
+      file,
+      rule: 'formio_sdk.canonical_import_missing',
+      message: `${file}: which: "sdk" — must contain canonical import \`${SDK_CANONICAL_SDK_IMPORT}\``,
+    });
+  }
+  if (!source.includes(SDK_CANONICAL_UTILS_IMPORT)) {
+    issues.push({
+      file,
+      rule: 'formio_sdk.canonical_import_missing',
+      message: `${file}: which: "utils" — must contain canonical import \`${SDK_CANONICAL_UTILS_IMPORT}\``,
+    });
+  }
+  return issues;
+}
+
+const FORBIDDEN_IMPORT_PATTERNS: { regex: RegExp; pathFn: (m: RegExpMatchArray) => string }[] = [
+  { regex: /from\s+['"](@formio\/core)['"]/g, pathFn: () => '@formio/core' },
+  { regex: /from\s+['"](@formio\/js\/lib\/[^'"]+)['"]/g, pathFn: (m) => m[1] },
+  { regex: /require\(\s*['"](@formio\/js(?:\/utils)?)['"]\s*\)/g, pathFn: (m) => m[1] },
+];
+
+export function validateFormioSdkForbiddenImports(file: string, source: string): ValidationIssue[] {
+  const issues: ValidationIssue[] = [];
+  const blocks = extractFencedBlocks(source);
+  for (const block of blocks) {
+    for (const pattern of FORBIDDEN_IMPORT_PATTERNS) {
+      pattern.regex.lastIndex = 0;
+      let m: RegExpExecArray | null;
+      while ((m = pattern.regex.exec(block.body)) !== null) {
+        const importPath = pattern.pathFn(m);
+        issues.push({
+          file,
+          rule: 'formio_sdk.forbidden_import',
+          message: `${file}: import_path: "${importPath}" — forbidden import; use canonical \`${SDK_CANONICAL_SDK_IMPORT}\` or \`${SDK_CANONICAL_UTILS_IMPORT}\` only`,
+        });
+      }
+    }
+  }
+  return issues;
+}
+
+export function validateFormioSdkScriptTags(file: string, source: string): ValidationIssue[] {
+  const issues: ValidationIssue[] = [];
+  const blocks = extractFencedBlocks(source);
+  for (const block of blocks) {
+    if (/<script\b[^>]*\bsrc\s*=/i.test(block.body)) {
+      issues.push({
+        file,
+        rule: 'formio_sdk.forbidden_script_tag',
+        message: `${file}: rendering examples must use ESM \`import\`, not <script src="..."> tags`,
+      });
+    }
+  }
+  return issues;
+}
+
+export function validateFormioSdkUrlConfigSkill(file: string, source: string): ValidationIssue[] {
+  const issues: ValidationIssue[] = [];
+  const hostedOk =
+    source.includes(SDK_HOSTED_BASE_URL_LITERAL) && source.includes(SDK_HOSTED_PROJECT_URL_LITERAL);
+  if (!hostedOk) {
+    issues.push({
+      file,
+      rule: 'formio_sdk.url_config_missing',
+      message: `${file}: environment: "hosted" — SKILL.md must show Hosted block calling \`${SDK_HOSTED_BASE_URL_LITERAL}\` and \`${SDK_HOSTED_PROJECT_URL_LITERAL}\``,
+    });
+  }
+  const saasOk =
+    source.includes(SDK_SAAS_BASE_URL_LITERAL) && source.includes(SDK_SAAS_PROJECT_URL_LITERAL);
+  if (!saasOk) {
+    issues.push({
+      file,
+      rule: 'formio_sdk.url_config_missing',
+      message: `${file}: environment: "saas" — SKILL.md must show SaaS block calling \`${SDK_SAAS_BASE_URL_LITERAL}\` and \`${SDK_SAAS_PROJECT_URL_LITERAL}\``,
+    });
+  }
+  return issues;
+}
+
+function extractSection(body: string, heading: string): string | null {
+  const lines = body.split('\n');
+  const startIdx = lines.findIndex((l) => l.trimStart() === heading);
+  if (startIdx === -1) return null;
+  let endIdx = lines.length;
+  for (let i = startIdx + 1; i < lines.length; i++) {
+    if (/^##\s/.test(lines[i].trimStart())) {
+      endIdx = i;
+      break;
+    }
+  }
+  return lines.slice(startIdx, endIdx).join('\n');
+}
+
+export function validateFormioSdkUrlConfigReference(
+  file: string,
+  source: string,
+  name: SdkReference
+): ValidationIssue[] {
+  if (isUtilsReference(name)) return [];
+  const section = extractSection(source, '## URL Configuration');
+  if (section === null) {
+    return [
+      {
+        file,
+        rule: 'formio_sdk.url_config_missing',
+        message: `${file}: environment: "hosted+saas" — SDK reference must include a \`## URL Configuration\` section`,
+      },
+    ];
+  }
+  const issues: ValidationIssue[] = [];
+  const hostedOk =
+    section.includes(SDK_HOSTED_BASE_URL_LITERAL) &&
+    section.includes(SDK_HOSTED_PROJECT_URL_LITERAL);
+  if (!hostedOk) {
+    issues.push({
+      file,
+      rule: 'formio_sdk.url_config_missing',
+      message: `${file}: environment: "hosted" — \`## URL Configuration\` must include the Hosted example`,
+    });
+  }
+  const saasOk =
+    section.includes(SDK_SAAS_BASE_URL_LITERAL) && section.includes(SDK_SAAS_PROJECT_URL_LITERAL);
+  if (!saasOk) {
+    issues.push({
+      file,
+      rule: 'formio_sdk.url_config_missing',
+      message: `${file}: environment: "saas" — \`## URL Configuration\` must include the SaaS example`,
+    });
+  }
+  return issues;
+}
+
+export function validateFormioSdkReferenceLayout(
+  file: string,
+  body: string,
+  name: SdkReference
+): ValidationIssue[] {
+  const issues: ValidationIssue[] = [];
+  const required: string[] = ['## Overview', '## Imports'];
+  if (!isUtilsReference(name)) required.push('## URL Configuration');
+  required.push('## API', '## Examples');
+
+  const lines = body.split('\n');
+  const positions = required.map((h) => lines.findIndex((l) => l.trimStart() === h));
+  for (let i = 0; i < required.length; i++) {
+    if (positions[i] === -1) {
+      issues.push({
+        file,
+        rule: 'formio_sdk.reference_layout',
+        message: `${file}: rule: "missing" — missing required heading \`${required[i]}\``,
+      });
+    }
+  }
+  for (let i = 1; i < required.length; i++) {
+    const prev = positions[i - 1];
+    const cur = positions[i];
+    if (prev !== -1 && cur !== -1 && cur < prev) {
+      issues.push({
+        file,
+        rule: 'formio_sdk.reference_layout',
+        message: `${file}: rule: "order" — \`${required[i]}\` appears before \`${required[i - 1]}\``,
+      });
+    }
+  }
+
+  const overview = extractSection(body, '## Overview');
+  if (overview !== null && !/Sourced from\s+`packages\//.test(overview)) {
+    issues.push({
+      file,
+      rule: 'formio_sdk.reference_layout',
+      message: `${file}: rule: "missing_source_attribution" — \`## Overview\` must include \`Sourced from \\\`packages/...\\\`\` attribution`,
+    });
+  }
+
+  return issues;
+}
+
+export function validateFormioSdkNavigationTable(file: string, source: string): ValidationIssue[] {
+  const issues: ValidationIssue[] = [];
+  const lines = source.split('\n');
+  let headerIdx = -1;
+  for (let i = 0; i < lines.length; i++) {
+    const l = lines[i];
+    if (l.includes('|') && l.includes('Intent') && l.includes('Reference')) {
+      const next = lines[i + 1];
+      if (next && /\|\s*[-:]+\s*\|/.test(next)) {
+        headerIdx = i;
+        break;
+      }
+    }
+  }
+  if (headerIdx === -1) {
+    issues.push({
+      file,
+      rule: 'formio_sdk.navigation_table_missing',
+      message: `${file}: SKILL.md must include a Markdown table with \`Intent\` and \`Reference\` columns linking to each required reference`,
+    });
+    return issues;
+  }
+  const tableBody = lines.slice(headerIdx).join('\n');
+  for (const ref of SDK_REQUIRED_REFERENCES) {
+    const linkPattern = new RegExp(`\\]\\(\\.?/?references/${ref.replace('.', '\\.')}\\)`);
+    if (!linkPattern.test(tableBody)) {
+      issues.push({
+        file,
+        rule: 'formio_sdk.navigation_table_missing',
+        message: `${file}: navigation table must link to \`references/${ref}\``,
+      });
+    }
+  }
+  return issues;
+}
+
+export function validateFormioSdkRenderingReference(
+  file: string,
+  source: string
+): ValidationIssue[] {
+  const issues: ValidationIssue[] = [];
+  const blocks = extractFencedBlocks(source);
+  const hasCreateForm = blocks.some((b) => b.body.includes('Formio.createForm('));
+  if (!hasCreateForm) {
+    issues.push({
+      file,
+      rule: 'formio_sdk.rendering_entry_missing',
+      message: `${file}: rendering.md must include a fenced code block calling \`Formio.createForm(\``,
+    });
+  }
+  return issues;
+}
+
+export function validateFormioSdkReferences(libraryDir: string): ValidationIssue[] {
+  const issues: ValidationIssue[] = [];
+  const refsDir = path.join(libraryDir, SDK_SKILL_DIR, REFERENCES_DIRNAME);
+  for (const ref of SDK_REQUIRED_REFERENCES) {
+    const full = path.join(refsDir, ref);
+    const rel = path.join(SDK_SKILL_DIR, REFERENCES_DIRNAME, ref);
+    if (!fs.existsSync(full)) {
+      issues.push({
+        file: rel,
+        rule: 'formio_sdk.reference_missing',
+        message: `${rel}: required formio-sdk reference is missing`,
+      });
+      continue;
+    }
+    if (fs.statSync(full).size === 0) {
+      issues.push({
+        file: rel,
+        rule: 'formio_sdk.reference_missing',
+        message: `${rel}: required formio-sdk reference is empty`,
+      });
+      continue;
+    }
+    const source = fs.readFileSync(full, 'utf8');
+    issues.push(...validateFormioSdkReferenceLayout(rel, source, ref));
+    issues.push(...validateFormioSdkUrlConfigReference(rel, source, ref));
+    issues.push(...validateFormioSdkForbiddenImports(rel, source));
+    issues.push(...validateFormioSdkScriptTags(rel, source));
+    if (ref === 'rendering.md') {
+      issues.push(...validateFormioSdkRenderingReference(rel, source));
+    }
+  }
+  return issues;
+}
+
+export function validateFormioSdkSkillContent(file: string, source: string): ValidationIssue[] {
+  const issues: ValidationIssue[] = [];
+  const { data, body: _body } = parseSkillFile(source);
+  void _body;
+  issues.push(...validateFormioSdkFrontmatter(file, data));
+  issues.push(...validateFormioSdkDescription(file, data));
+  issues.push(...validateFormioSdkCanonicalImports(file, source));
+  issues.push(...validateFormioSdkForbiddenImports(file, source));
+  issues.push(...validateFormioSdkScriptTags(file, source));
+  issues.push(...validateFormioSdkUrlConfigSkill(file, source));
+  issues.push(...validateFormioSdkNavigationTable(file, source));
+  return issues;
+}
+
+export function validateFormioSdkSkill(libraryDir: string): ValidationIssue[] {
+  const skillDir = path.join(libraryDir, SDK_SKILL_DIR);
+  if (!fs.existsSync(skillDir)) return [];
+
+  const issues: ValidationIssue[] = [];
+  const skillFile = path.join(skillDir, SKILL_FILENAME);
+  const skillRel = path.join(SDK_SKILL_DIR, SKILL_FILENAME);
+
+  if (!fs.existsSync(skillFile)) {
+    issues.push({
+      file: skillRel,
+      rule: 'formio_sdk.skill_missing',
+      message: `${skillRel}: formio-sdk SKILL.md is missing`,
+    });
+  } else {
+    const source = fs.readFileSync(skillFile, 'utf8');
+    issues.push(...validateFormioSdkSkillContent(skillRel, source));
+  }
+
+  issues.push(...validateFormioSdkReferences(libraryDir));
   return issues;
 }
