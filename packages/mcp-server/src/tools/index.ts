@@ -10,6 +10,8 @@ import { registerActionUpdateTool } from './action_update.js';
 import { registerFormCreateTool } from './form_create.js';
 import { registerFormGetTool } from './form_get.js';
 import { registerFormListTool } from './form_list.js';
+import { registerFormRevisionGetTool } from './form_revision_get.js';
+import { registerFormRevisionsListTool } from './form_revisions_list.js';
 import { registerFormUpdateTool } from './form_update.js';
 import { registerHelloTool } from './hello.js';
 import { registerProjectExportTool } from './project_export.js';
@@ -32,6 +34,8 @@ export function registerAllTools(
   registerFormCreateTool(server, config);
   registerFormGetTool(server, config);
   registerFormListTool(server, config);
+  registerFormRevisionGetTool(server, config);
+  registerFormRevisionsListTool(server, config);
   registerFormUpdateTool(server, config);
   registerProjectExportTool(server, config);
   registerProjectImportTool(server, config);
