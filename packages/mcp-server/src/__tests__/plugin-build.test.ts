@@ -64,11 +64,12 @@ describe('pnpm build:plugin', () => {
     ).not.toThrow();
   });
 
-  it('1.3 includes formio-api/ and formio-form/ but excludes openspec-* and tdd-* skills', () => {
+  it('1.3 includes formio-api/ and formio-schema/ but excludes formio-form/ and openspec-* and tdd-* skills', () => {
     expect(fs.existsSync(SKILLS_DIR)).toBe(true);
     const entries = fs.readdirSync(SKILLS_DIR);
     expect(entries).toContain('formio-api');
-    expect(entries).toContain('formio-form');
+    expect(entries).toContain('formio-schema');
+    expect(entries).not.toContain('formio-form');
     for (const entry of entries) {
       expect(
         entry.startsWith('openspec-'),
@@ -120,11 +121,12 @@ describe('pnpm test:plugin — smoke test', () => {
       expect(stdout).toMatch(/tools\/list|tools-list|tools list/i);
     }, 60_000);
 
-    it('3.3 confirms formio-api/ and formio-form/ skills are present', () => {
+    it('3.3 confirms formio-api/ and formio-schema/ skills are present and formio-form/ is absent', () => {
       const { status, stdout } = runSmokeTest();
       expect(status).toBe(0);
       expect(stdout).toMatch(/formio-api/);
-      expect(stdout).toMatch(/formio-form/);
+      expect(stdout).toMatch(/formio-schema/);
+      expect(stdout).not.toMatch(/formio-form/);
     }, 60_000);
   });
 

@@ -8,7 +8,7 @@ import { cwdSchema, resolveProjectConfig } from '../project-resolver.js';
 export function registerFormCreateTool(server: McpServer, config: FormioConfig) {
   server.tool(
     'form_create',
-    "Create a new form in the Form.io project mapped to the user's current working directory. IMPORTANT: Before calling this tool, use the formio-form skill to construct a properly structured Form.io form JSON definition based on the user's requirements. The skill documents all component types, validation options, layout patterns, and conditional logic available in Form.io.",
+    "Create a new form in the Form.io project mapped to the user's current working directory. IMPORTANT: Before calling this tool, use the formio-schema skill to construct a properly structured Form.io form JSON definition based on the user's requirements. The skill documents all component types, validation options, layout patterns, and conditional logic available in Form.io.",
     {
       cwd: cwdSchema,
       form: z

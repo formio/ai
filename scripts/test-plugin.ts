@@ -9,7 +9,7 @@ const DIST_PLUGIN = path.join(REPO_ROOT, 'dist/plugin');
 const PLUGIN_JSON = path.join(DIST_PLUGIN, '.claude-plugin/plugin.json');
 const SERVER_BUNDLE = path.join(DIST_PLUGIN, 'server/stdio.mjs');
 const SKILLS_DIR = path.join(DIST_PLUGIN, 'skills');
-const REQUIRED_SKILL_DIRS = ['formio-api', 'formio-form'];
+const REQUIRED_SKILL_DIRS = ['formio-api', 'formio-schema'];
 const REQUIRED_MANIFEST_FIELDS = ['name', 'version', 'description'] as const;
 
 type Manifest = {
