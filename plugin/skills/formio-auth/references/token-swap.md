@@ -2,15 +2,16 @@
 
 ## Overview
 
-Token Swap is the pattern of exchanging an externally-issued OIDC/OAuth bearer token for a first-party Form.io JWT. Unlike the interactive OIDC SSO flow (a "Sign in with..." button), Token Swap happens server-to-server or in a single API call: the caller already has a valid IdP access token, Form.io validates it against the configured provider, locates or creates the matching `user` submission, applies the same OAuth Role Mapping the interactive flow uses, and returns a Form.io JWT in the `x-jwt-token` response header.
+Token Swap exchanges an externally-issued OAuth/OIDC bearer token for a first-party Form.io token. The canonical use case is **embedding Form.io forms inside an existing application that already has its own OAuth authentication**. That host application already holds a Bearer token from the OAuth provider; Token Swap trades that token for a Form.io token so that every subsequent interaction with Form.io is authenticated with the new Form.io token — no separate "Sign in with..." step inside Form.io.
+
+Token Swap is **Remote Authentication**, exactly like interactive OIDC SSO: Form.io does not look up or create a `user` Resource submission. It uses the supplied OAuth token to fetch the user information from the provider, builds an **ephemeral user object**, applies the same OAuth Role Mapping the interactive flow uses, and encodes that user — profile data plus mapped roles — **entirely within the Form.io token**.
 
 ## When to use this
 
 Reach for Token Swap when:
 
-- The user has already authenticated against the IdP elsewhere (e.g. a mobile app shell, a Backend-for-Frontend, a federated portal) and you do not want to re-render an OAuth button inside Form.io.
-- Service-to-service calls need a Form.io JWT minted from an existing OAuth assertion.
-- An identity-aware proxy or API gateway hands a bearer token to your backend, which forwards it to Form.io.
+- Form.io forms are embedded in an existing application that already authenticated the user via OAuth, and you do not want a second "Sign in with..." step inside Form.io.
+- The host app (mobile shell, Backend-for-Frontend, federated portal) already holds a valid OAuth bearer token and wants to reuse it to authenticate Form.io.
 
 Not for:
 
@@ -23,42 +24,72 @@ Not for:
 
 ### Prerequisites
 
-- The OIDC/OAuth provider is already configured in the project portal exactly as for interactive SSO (Client ID/Secret, scopes, User Info URL, OAuth Role Mapping). See [`sso-oidc.md`](./sso-oidc.md) for the provider configuration.
-- The Form.io project has at least one `user` Resource (or whatever Resource the OAuth provider settings point at).
-- The IdP access token you intend to swap is fresh, signed with the same keys the provider settings reference, and carries the scopes / claims that Role Mapping reads.
+- An existing OAuth authorization token (Bearer or other) issued to the user by the OAuth provider. In the embedded use case the host application already holds this token.
+- **OpenID / OpenID Connect settings configured in the Form.io project** (the provider configuration Form.io uses to validate the token and locate the provider's user-info endpoint, plus OAuth Role Mapping). See [`sso-oidc.md`](./sso-oidc.md) for the provider configuration.
+- The provider's **`/userInfo` endpoint must be exposed** — Form.io calls it with the supplied authorization token to retrieve the user information that becomes the ephemeral user.
 
-### The exchange
+### Performing the swap
 
-Token Swap is performed by POSTing the IdP token to Form.io's token-swap endpoint with the provider name in the URL. Form.io:
+The swap is driven by the Form.io JavaScript SDK's `currentUser` call. Instantiate `Formio` against the project URL, attach the OAuth token as an `Authorization` header, and call `currentUser` with `external: true`:
 
-1. Calls the IdP's introspection / User Info endpoint with the supplied access token.
-2. Locates or creates the matching `user` Resource submission (auto-create vs require-pre-existing follows the project's OAuth Action setting).
-3. Applies OAuth Role Mapping to attach Form.io Roles to the user.
-4. Generates and signs a Form.io JWT.
-5. Returns the JWT in the `x-jwt-token` response header. The caller persists it (browser: `localStorage.formioToken`; service: an internal cache keyed by user) and attaches it to subsequent Form.io requests.
+```js
+import { Formio } from '@formio/js';
 
-For the canonical endpoint URL and request shape, see the `runtime-auth` reference in the `formio-api` skill — Token Swap is documented there as the endpoint that consumes a provider bearer token and returns a Form.io JWT.
+// For token swap to work, your application must set the baseUrl and projectUrl.
+const projectUrl = 'https://yourdomain.com/yourproject';
+Formio.setBaseUrl('https://yourdomain.com');
+Formio.setProjectUrl(projectUrl);
+
+// A simple token swap function.
+async function tokenSwap(authToken) {
+    return await (new Formio(projectUrl)).currentUser({
+        external: true,
+        headers: {
+            Authorization: authToken
+        },
+    });
+}
+
+// Swap the bearer token with an authenticated Form.io user with a valid JWT token.
+const user = await tokenSwap('Bearer 2e762950-9498-4079-a699-xxxxxxxxxxxx');
+
+// Any other calls will now use the `x-jwt-token` swapped. In this example, this would be a submission
+// made to the 'myform' using the correct JWT token.
+(new Formio(`${projectUrl}/myform`)).saveSubmission({
+    data: {
+        firstName: user.data.firstName, // This data comes from the OIDC userInfo
+        lastName: user.data.lastName
+    }
+});
+```
+
+`external: true` tells `currentUser` to treat the `Authorization` header as an external OAuth token to swap, rather than an existing Form.io token. On that call Form.io:
+
+1. Takes the bearer token off the `Authorization` header.
+2. Calls the OAuth provider's `/userInfo` endpoint with that token to retrieve the user information.
+3. Builds an ephemeral user from that information and applies OAuth Role Mapping to attach Form.io Roles (Remote Authentication — no `user` submission is created or looked up).
+4. Mints a new Form.io token and passes it back to the Form.io library.
+5. The SDK stores the Form.io token and attaches it as the `x-jwt-token` header on every subsequent Form.io request — the OAuth token is no longer needed for Form.io calls.
 
 ### Caching and rotation
 
-- Cache the Form.io JWT until its `exp` claim approaches; re-swap before it expires. Repeated swaps with the same IdP access token are idempotent for the lifetime of the IdP token.
-- When the IdP rotates the access token, the next Form.io call should drive a new swap with the new IdP token. Do not stockpile multiple Form.io JWTs for the same user.
-- Logout invalidates the Form.io JWT's `jti` Session ID at the Form.io side; it does NOT log the user out of the IdP. See [`jwt-and-sessions.md`](./jwt-and-sessions.md).
+- The SDK holds the minted Form.io token after the swap; subsequent Form.io calls reuse it automatically. No need to re-send the OAuth token on every request.
+- When the host application's OAuth token rotates or expires, re-run the `currentUser({ external: true, header })` swap with the new OAuth token to mint a fresh Form.io token.
+- Logout invalidates the Form.io token's `jti` Session ID on the Form.io side; it does NOT log the user out of the OAuth provider. See [`jwt-and-sessions.md`](./jwt-and-sessions.md).
 
 ### Failure modes
 
-- **Provider not configured** — `404` / configuration error. Configure the provider in the portal first.
-- **IdP token invalid or expired** — `401`. Refresh the IdP token, then swap again.
-- **No matching `user` and auto-create disabled** — `401` / provisioning error. Either enable auto-create or seed the `user` Resource ahead of the swap.
+- **OpenID / OIDC not configured** — Form.io cannot validate the token or find the provider; configure the provider's OpenID settings in the project first.
+- **`/userInfo` endpoint not exposed or unreachable** — Form.io cannot fetch the user information, so no Form.io token is minted. Expose the provider's `/userInfo` endpoint.
+- **OAuth token invalid or expired** — the provider rejects the `/userInfo` call; the swap fails. Refresh the OAuth token in the host app, then swap again.
 - **Role Mapping returns no rows** — the user is granted the default Form.io Role (typically Authenticated) and the swap still succeeds. Tighten Role Mapping if you want a hard fail.
 
 ## MCP Tool Preference
 
-Token Swap provider configuration (Client ID/Secret, User Info URL, Role Mapping) MUST be performed via the Form.io project portal. The exchange call itself is an HTTP endpoint, not an MCP tool. Surrounding workflow:
+Token Swap provider configuration (OpenID / OIDC settings, Role Mapping) MUST be performed via the Form.io project portal. The swap itself is driven client-side by the Form.io JavaScript SDK (`currentUser({ external: true, header })`), not by an MCP tool. Surrounding workflow:
 
 - Use `role_list` / `role_create` to ensure the Form.io Roles your OAuth Role Mapping targets exist.
-- Use `authenticate` once on the MCP server to obtain a portal JWT for project administration calls (the portal JWT is separate from any user JWT produced by Token Swap).
-- For the runtime endpoint reference, navigate the `formio-api` skill's `runtime-auth` reference, which carries the canonical endpoint path and request body for the swap.
+- Use `authenticate` once on the MCP server to obtain a portal JWT for project administration calls (the portal JWT is separate from any user token produced by Token Swap).
 
 ## See also
 

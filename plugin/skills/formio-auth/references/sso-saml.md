@@ -2,7 +2,9 @@
 
 ## Overview
 
-Form.io supports SAML 2.0 SSO with any SAML-compliant Identity Provider (ADFS, Okta SAML, OneLogin, Shibboleth, etc.). The user authenticates against the IdP, the IdP posts a signed SAML assertion back to Form.io, Form.io validates the signature, locates or creates the matching `user` submission, applies **SAML Role Mapping** to attach Form.io Roles, and returns a first-party Form.io JWT. From the application's point of view the user is indistinguishable from a Resource-authenticated user.
+Form.io supports SAML 2.0 SSO with any SAML-compliant Identity Provider (ADFS, Okta SAML, OneLogin, Shibboleth, etc.). The user authenticates against the IdP, the IdP posts a signed SAML assertion back to Form.io, and Form.io validates the signature and returns a first-party Form.io JWT.
+
+Like every SSO method here, SAML uses **Remote Authentication**: Form.io does not look up or create a `user` Resource submission. It reads the attributes from the assertion, builds an **ephemeral user object** from them, applies **SAML Role Mapping** to attach Form.io Roles, and encodes that user — profile data plus mapped roles — **entirely within the Form.io JWT**. From the application's point of view the user is indistinguishable from a Resource-authenticated user; the difference is that the identity lives in the token, not in a database row.
 
 ## When to use this
 
@@ -36,9 +38,10 @@ In the Form.io project portal's SAML settings:
 
 - **Issuer / Metadata URL** — paste the IdP's metadata XML URL, or import the metadata document directly.
 - **Signing certificate** — uploaded from the IdP.
-- **NameID claim → `user` field mapping** — which Form.io `user` Resource field the NameID resolves to (usually `email`).
-- **Attribute mapping** — for each non-role claim you want to populate on the `user` submission, name the source attribute and target Resource field.
-- **Auto-create user submission** vs **require existing user** — same choice as OIDC; see [`sso-oidc.md`](./sso-oidc.md).
+- **NameID claim → user field mapping** — which field on the ephemeral user object the NameID resolves to (usually `email`).
+- **Attribute mapping** — for each non-role attribute you want carried on the user, name the source attribute and the target field. These attributes populate the ephemeral user's `data` that gets encoded into the JWT — they are not written to a Resource submission.
+
+There is no auto-create / require-existing-user setting: SAML SSO never creates or requires a `user` Resource row. See "Remote Authentication" in [`sso-oidc.md`](./sso-oidc.md) for the shared model and [`custom-jwt.md`](./custom-jwt.md) for the in-token user shape.
 
 ### SAML Role Mapping
 

@@ -2,7 +2,9 @@
 
 ## Overview
 
-Form.io supports LDAP authentication against any LDAP-compliant directory (OpenLDAP, Microsoft Active Directory via LDAP, FreeIPA, etc.). The user supplies their LDAP credentials on a Form.io login form, Form.io binds against the directory, on success it locates or creates the matching `user` submission, applies **LDAP Role Mapping** to attach Form.io Roles, and returns a first-party Form.io JWT.
+Form.io supports LDAP authentication against any LDAP-compliant directory (OpenLDAP, Microsoft Active Directory via LDAP, FreeIPA, etc.). The user supplies their LDAP credentials on a Form.io login form, and Form.io binds against the directory and returns a first-party Form.io JWT on success.
+
+Like every SSO method here, LDAP uses **Remote Authentication**: Form.io does not look up or create a `user` Resource submission. After a successful bind it reads the directory entry's attributes, builds an **ephemeral user object** from them, applies **LDAP Role Mapping** to attach Form.io Roles, and encodes that user — profile data plus mapped roles — **entirely within the Form.io JWT**. The identity lives in the token, not in a database row.
 
 ## When to use this
 
@@ -39,11 +41,12 @@ On submit, the LDAP Action attempts a bind with the supplied credentials, then r
 
 ### User mapping
 
-After a successful bind, Form.io maps directory attributes onto the `user` Resource submission:
+After a successful bind, Form.io maps directory attributes onto the ephemeral user object that gets encoded into the JWT (not onto a Resource submission):
 
-- The `email` attribute (or `mail`, depending on the schema) populates `submission.data.email`.
-- Optional profile attributes (`displayName`, `givenName`, `sn`, etc.) populate matching fields on the `user` Resource.
-- **Auto-create user submission** vs **require existing user** — same choice as the other SSO methods; see [`sso-oidc.md`](./sso-oidc.md).
+- The `email` attribute (or `mail`, depending on the schema) populates the user's `email`.
+- Optional profile attributes (`displayName`, `givenName`, `sn`, etc.) populate matching fields on the ephemeral user's `data`.
+
+There is no auto-create / require-existing-user setting: LDAP login never creates or requires a `user` Resource row. See "Remote Authentication" in [`sso-oidc.md`](./sso-oidc.md) for the shared model and [`custom-jwt.md`](./custom-jwt.md) for the in-token user shape.
 
 ### LDAP Role Mapping
 

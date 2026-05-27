@@ -44,13 +44,13 @@ A decoded Form.io JWT looks like this:
 
 Claim semantics:
 
-- `user._id` — MongoDB ID of the user submission (the `user` Resource row, or `"external"` for Custom JWTs).
+- `user._id` — MongoDB ID of the user submission when the identity is backed by a `user` Resource row (Resource login). For SSO (Remote Authentication) and Custom JWTs there is no Resource row — the user is ephemeral and `user._id` is the `"external"` sentinel.
 - `iss` — issuer; the Form.io API base URL.
 - `sub` — subject; same as `user._id`.
 - `jti` — Session ID. Logging out invalidates this; see below.
 - `iat`, `exp` — issued-at and expiry timestamps (unix seconds).
 
-Custom JWTs add `external: true`, `form: { _id: ... }`, `project: { _id: ... }`, `user.data`, and `user.roles` — see [`custom-jwt.md`](./custom-jwt.md) for the full Custom JWT shape.
+SSO (OIDC/OAuth, SAML, LDAP, Token Swap) uses Remote Authentication: the ephemeral user built from the IdP is encoded directly into the JWT, so the token carries `user.data` (the mapped profile) and `user.roles` (from Role Mapping) rather than pointing at a Resource row. This is the same in-token user shape a Custom JWT carries — Custom JWTs additionally set `external: true`, `form: { _id: ... }`, and `project: { _id: ... }`. See [`custom-jwt.md`](./custom-jwt.md) for the full payload.
 
 ### Session ID (`jti`) and logout
 
@@ -79,11 +79,11 @@ Two-Factor Authentication adds a second factor (typically a TOTP from an authent
 
 2FA is configured at the project level in the portal. It layers on top of any of the underlying auth methods in this skill — the user-facing experience changes, but the JWT issued at the end is identical.
 
-### reCAPTCHA
+### CAPTCHA Component
 
-reCAPTCHA gates form submission against bot abuse. It is wired as a premium component on the login or registration form, configured against a Google reCAPTCHA site key. When enabled, the Login Action / Email Authentication action will not run unless the reCAPTCHA token is present and valid.
+The CAPTCHA Component gates form submission against bot abuse. It is wired as a premium component on the login or registration form, configured against a Google reCAPTCHA site key. When enabled, the Login Action / Email Authentication action will not run unless the reCAPTCHA token is present and valid.
 
-Use reCAPTCHA on any user-facing auth form that anonymous users can hit (login, registration, send-magic-link). For SSO buttons (OIDC, SAML, LDAP) reCAPTCHA usually adds little because the bot would also have to defeat the IdP.
+Use a CAPTCHA Component on any user-facing auth form that anonymous users can hit (login, registration, send-magic-link). For SSO buttons (OIDC, SAML, LDAP) CAPTCHA usually adds little because the bot would also have to defeat the IdP.
 
 ### Decoding a JWT for debugging
 

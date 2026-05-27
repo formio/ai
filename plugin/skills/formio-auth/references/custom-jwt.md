@@ -8,13 +8,13 @@ Custom JWT is Form.io Enterprise's escape hatch for on-prem deployments that wan
 
 Reach for Custom JWT when:
 
-- The deployment is Form.io Enterprise (on-prem). Custom JWT requires control over the deployment's `JWT_SECRET`, which Form.io Cloud does not expose.
+- The deployment is Form.io Enterprise (on-prem). Custom JWT requires control over the deployment's `JWT_SECRET`, which Form.io SaaS does not expose.
 - The customer's backend is already the source of truth for sessions and user identity.
 - Embedding Form.io inside an existing app and re-using its session, not federating against an IdP, is the goal.
 
 Not for:
 
-- Form.io Cloud — `JWT_SECRET` is platform-managed and cannot be used to forge tokens.
+- Form.io SaaS — `JWT_SECRET` is platform-managed and cannot be used to forge tokens.
 - Federated identity → see [`sso-oidc.md`](./sso-oidc.md), [`sso-saml.md`](./sso-saml.md), [`sso-ldap.md`](./sso-ldap.md).
 - Swapping an existing OIDC token for a Form.io JWT → see [`token-swap.md`](./token-swap.md).
 - Issuing magic-link emails → see [`email-auth.md`](./email-auth.md).
@@ -25,7 +25,7 @@ Not for:
 
 1. On-prem Form.io Enterprise with a unique `JWT_SECRET` environment variable set in the Docker / Kubernetes deployment. Document the value in a secrets manager — it MUST match between the API server and any worker that issues tokens.
 2. Roles created in the project. Each role you intend to assign has a stable MongoDB ID — note them down (or fetch them via `role_list`).
-3. A `user` Resource (or whichever Form.io Resource you treat as the canonical user record) configured with appropriate `submissionAccess` for the roles you will issue.
+3. A `user` Resource (or whichever Form.io Resource you treat as the canonical user record) to point `form._id` at. This is a **passive association only** — it records where the user conceptually "belongs". The user forged by the Custom JWT is **ephemeral**: it is never written to this Resource and no submission row is ever created or required for it.
 4. Form Access configured so the roles you mint into the JWT actually grant the access you expect — see [`roles-and-permissions.md`](./roles-and-permissions.md).
 
 ### Required JWT payload shape
@@ -48,16 +48,16 @@ The token MUST be signed with `JWT_SECRET` and carry this payload:
 Required claim semantics:
 
 - `external: true` — flags the token as customer-issued so Form.io skips the normal credential lookup.
-- `form._id` — the MongoDB ID of the `user` Resource form (or whichever Resource backs identity).
+- `form._id` — the MongoDB ID of the `user` Resource form. This is a **passive association only** (which Resource the user conceptually belongs to); Form.io does not read a submission from it or write one to it.
 - `project._id` — the MongoDB ID of the Form.io project.
-- `user._id` — `"external"` is the conventional sentinel for "this user has no Form.io submission row". You may also supply a real submission `_id` if the user does exist in Form.io.
+- `user._id` — `"external"` is the sentinel for an **ephemeral user** that has no Form.io submission row and never will. The identity lives entirely in this token.
 - `user.data` — arbitrary profile data the token carries (the renderer's `Formio.user` is hydrated from this).
 - `user.roles` — an array of role MongoDB IDs that gate the user's access.
 
 ### Generating the token (Node example)
 
 ```js
-const jwt = require('jsonwebtoken');
+import jwt from 'jsonwebtoken';
 
 const token = jwt.sign({
   external: true,

@@ -2,7 +2,9 @@
 
 ## Overview
 
-Form.io integrates with any OAuth 2.0 / OpenID Connect (OIDC) Identity Provider. The user authenticates against the IdP, the provider returns standard OAuth/OIDC claims, and Form.io exchanges those claims for a first-party Form.io JWT. Provider roles are mapped onto Form.io Roles via **OAuth Role Mapping**, so SSO users land with the same role-keyed `access` / `submissionAccess` evaluation that resource-backed users get.
+Form.io integrates with any OAuth 2.0 / OpenID Connect (OIDC) Identity Provider. The user authenticates against the IdP, the provider returns standard OAuth/OIDC claims, and Form.io exchanges those claims for a first-party Form.io JWT.
+
+SSO in Form.io is **Remote Authentication**: Form.io does not look up or create a `user` Resource submission. Instead it reads the user information out of the provider's token, dynamically builds an **ephemeral user object** from that information, and encodes that user — profile data plus mapped roles — **entirely within the Form.io JWT**. There is no database row for the user; everything the application needs about the identity travels inside the token. Provider roles are translated onto Form.io Roles via **OAuth Role Mapping**, so an SSO user lands with the same role-keyed `access` / `submissionAccess` evaluation that resource-backed users get.
 
 ## When to use this
 
@@ -27,7 +29,7 @@ Not for:
 OAuth/OIDC providers are configured on the Project's OAuth settings page in the Form.io portal. For each provider you supply:
 
 - **Client ID** and **Client Secret** from the IdP.
-- **Authorization URL**, **Token URL**, and **User Info URL** (or the OIDC discovery document, e.g. `https://<issuer>/.well-known/openid-configuration`).
+- **Authorization URL** (authorization_endpoint), **Token URL** (token_endpoint), and **User Info URL** (userinfo_endpoint): (All three of these can be easily retrieved using the OIDC discovery document, e.g. `https://<issuer>/.well-known/openid-configuration`).
 - **Scopes** — typically `openid profile email` plus any custom scopes that carry the role claim.
 - **Redirect URI** — the Form.io endpoint that completes the handshake. The portal generates the canonical value.
 
@@ -38,9 +40,9 @@ Refer to the per-provider sub-pages linked from `https://help.form.io/developers
 Attach an OAuth Action (one per provider) to the project's login form. Each OAuth Action renders a "Sign in with X" button that drives the user through the IdP handshake. On a successful return, Form.io:
 
 1. Calls the IdP's User Info endpoint with the OAuth access token.
-2. Locates or creates a corresponding `user` submission (configurable — auto-create vs require-pre-existing).
-3. Applies OAuth Role Mapping (see below) to attach Form.io Roles.
-4. Issues a Form.io JWT and returns it via the `x-jwt-token` response header. From this point on the user is indistinguishable from a Resource-authenticated user.
+2. Builds an ephemeral user object from the returned user information (no `user` Resource submission is created or looked up).
+3. Applies OAuth Role Mapping (see below) to attach Form.io Roles to that ephemeral user.
+4. Encodes the ephemeral user (profile data + roles) into a Form.io JWT and returns it via the `x-jwt-token` response header. From this point on the user is indistinguishable from a Resource-authenticated user — except that the identity lives in the token rather than in a Resource row.
 
 ### OAuth Role Mapping
 
@@ -52,14 +54,15 @@ OAuth Role Mapping is the bridge between an IdP role claim (e.g. `groups`, `role
 
 Users without any matching claim row fall back to the configured default Role (typically Authenticated).
 
-### Auto-create vs require-pre-existing user
+### Remote Authentication: the ephemeral user
 
-Two common settings on the OAuth Action:
+SSO does not create or require a `user` Resource submission. On each login Form.io constructs an ephemeral user from the IdP's user information and encodes it in the JWT:
 
-- **Auto-create user submission** — on first login, Form.io creates a `user` Resource submission seeded from the IdP claims (`email`, optional profile fields). Best for self-service onboarding.
-- **Require existing user** — Form.io will only complete login if a `user` submission already matches the IdP claim (typically by `email`). Best for invite-only or admin-provisioned access.
+- The IdP user information (email, name, and any other claims you map) becomes the user's `data`.
+- OAuth Role Mapping (above) determines the user's `roles`.
+- The result is encoded into the Form.io JWT — the same ephemeral, in-token user shape that a Custom JWT carries (`user.data`, `user.roles`, no Resource row). See [`custom-jwt.md`](./custom-jwt.md) for that payload shape and [`jwt-and-sessions.md`](./jwt-and-sessions.md) for how the application reads it.
 
-Pick one per provider. They are mutually exclusive.
+Because the identity lives in the token, the application gets everything it needs about the user from the decoded JWT (`Formio.user`) without a Resource lookup. Nothing is persisted to the database on login, and no "first login" provisioning step exists.
 
 ### MFA and provider-level controls
 
