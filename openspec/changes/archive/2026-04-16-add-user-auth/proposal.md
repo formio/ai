@@ -6,7 +6,7 @@ The MCP server currently authenticates all API requests using a shared admin API
 
 - Add an authentication module that spins up an ephemeral Express server, renders the project's login form via the Form.io SDK, captures the user's JWT on successful login, and shuts down
 - Add token caching to disk (`~/.formio/mcp-tokens.json`) keyed by project URL so users don't re-authenticate on every MCP server restart
-- Add a startup token validation step that hits `GET {projectUrl}/current` to check if a cached or provided token is still valid
+- Add a startup token validation step that hits `GET {baseUrl}/current` to check if a cached or provided token is still valid
 - **BREAKING**: `FORMIO_API_KEY` becomes optional instead of required — if not provided, the server triggers the browser login flow
 - Add `FORMIO_LOGIN_FORM` optional env var to override the default login form URL (`{projectUrl}/user/login`)
 - Modify `formioFetch` to send `x-jwt-token` header when using a user JWT, falling back to `x-token` when using an API key

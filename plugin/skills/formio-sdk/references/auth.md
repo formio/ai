@@ -10,7 +10,7 @@ import { Formio } from '@formio/js';
 
 ## URL Configuration
 
-### Hosted
+### Self-Hosted
 
 ```ts
 import { Formio } from '@formio/js';
@@ -19,7 +19,7 @@ Formio.setBaseUrl('https://forms.mysite.com');
 Formio.setProjectUrl('https://forms.mysite.com/myproject');
 ```
 
-### SaaS
+### Form.io SaaS
 
 ```ts
 import { Formio } from '@formio/js';
@@ -32,7 +32,7 @@ Login is project-scoped: requests post to `${projectUrl}/user/login` (or the pro
 
 ## API
 
-- `Formio.currentUser(formio?: Formio, options?): Promise<object>` — return the currently authenticated user (decodes the JWT, calls `${projectUrl}/current` if the cache is stale). Emits a `user` event on the global `Formio.events`.
+- `Formio.currentUser(formio?: Formio, options?): Promise<object>` — return the currently authenticated user (decodes the JWT, calls `${baseUrl}/current` if the cache is stale). Emits a `user` event on the global `Formio.events`.
 - `Formio.logout(formio?: Formio, options?): Promise<void>` — `POST /logout`, clear stored tokens, clear request cache, emit `user` with `null`.
 - `Formio.setToken(token: string, options?: { namespace?: string }): Promise<void>` — install a JWT; the SDK persists it to `localStorage` under `Formio.namespace`.
 - `Formio.getToken(options?: { decode?: boolean }): string` — read the active JWT; with `{ decode: true }` returns the decoded payload (`{ user, form, project, exp, iat, ... }`).
@@ -54,7 +54,7 @@ const submission = await userForm.saveSubmission({
 // JWT is delivered in the response headers and auto-installed by the SDK.
 ```
 
-The MCP server's `authenticate` tool wraps the portal-login equivalent for platform admins (`${baseUrl}/admin/login`).
+The MCP server's authentication mechanism wraps the portal-login equivalent for platform admins (`${projectUrl}/admin/login`).
 
 ## Examples
 
@@ -128,4 +128,4 @@ const user = await Formio.oAuthCurrentUser(projectFormio, googleBearerToken);
 
 ## MCP Tool Preference
 
-Inside this workspace, prefer the `authenticate` MCP tool — it opens the portal-login flow and installs the JWT into `formioFetch`. The SDK examples above are for consumer applications.
+Inside this workspace, prefer the MCP server for authentication — it opens the portal-login flow and installs the JWT into `formioFetch`. The SDK examples above are for consumer applications.

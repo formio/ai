@@ -77,7 +77,7 @@ curl -X POST -H "Content-Type: application/json" \
   "${FORMIO_PROJECT_URL}/user/login/submission"
 ```
 
-### GET ${FORMIO_PROJECT_URL}/current
+### GET ${FORMIO_BASE_URL}/current
 
 Return the currently authenticated user's submission document. Used to rehydrate user state on app start or to check that a stored JWT is still valid.
 
@@ -89,7 +89,7 @@ Example:
 
 ```bash
 curl -H "x-jwt-token: $FORMIO_JWT" \
-  "${FORMIO_PROJECT_URL}/current"
+  "${FORMIO_BASE_URL}/current"
 ```
 
 ### GET ${FORMIO_PROJECT_URL}/logout
@@ -107,7 +107,7 @@ curl -H "x-jwt-token: $FORMIO_JWT" \
   "${FORMIO_PROJECT_URL}/logout"
 ```
 
-### GET ${FORMIO_PROJECT_URL}/current (session expired)
+### GET ${FORMIO_BASE_URL}/current (session expired)
 
 Same endpoint as `Get Current User`, but documents the expired-session behavior. When the supplied `x-jwt-token` has expired or been revoked (e.g., after calling `logout`), Form.io responds with a plain-text body:
 
@@ -121,7 +121,7 @@ Example:
 
 ```bash
 curl -H "x-jwt-token: $EXPIRED_JWT" \
-  "${FORMIO_PROJECT_URL}/current"
+  "${FORMIO_BASE_URL}/current"
 ```
 
 ## Related Skills

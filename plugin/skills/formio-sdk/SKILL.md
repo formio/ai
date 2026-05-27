@@ -68,7 +68,7 @@ When the operation overlaps an MCP tool, prefer the MCP tool over a direct SDK c
 | Manage roles | `role_create`, `role_update`, `role_list` | `new Formio(roleUrl).saveRole()` / `loadRoles()` |
 | Manage actions | `action_create`, `action_update`, `action_get`, `action_list`, `action_delete` | `new Formio(actionUrl).saveAction()` / `loadActions()` |
 | Project export / import | `project_export`, `project_import` | `new Formio(projectUrl).loadProject()` + manual round-trip |
-| Authenticate | `authenticate` (portal-login flow) | `Formio.login(email, password)` |
+| Authenticate | MCP authentication mechanism (portal-login flow) | `Formio.login(email, password)` |
 
 Reach for the SDK directly when you are authoring code that runs in a consumer application (browser, Node script, plugin) — the MCP tools cover orchestration from inside this repo, not runtime.
 
@@ -84,14 +84,14 @@ Reach for the SDK directly when you are authoring code that runs in a consumer a
 | Role CRUD on a project | [roles.md](./references/roles.md) |
 | Upload, download, delete files via storage providers | [files.md](./references/files.md) |
 | Register / deregister plugins, lifecycle hooks (`preRequest`, `request`, `wrapRequestPromise`, …) | [plugins.md](./references/plugins.md) |
-| Render a form in a VanillaJS / non-Angular consumer via `Formio.createForm`, `Formio.builder`, events, prefill, wizard, PDF, builder, read-only | [rendering.md](./references/rendering.md) |
+| Render a form in a VanillaJS / non-framework (Angular, React, etc) consumer via `Formio.createForm`, `Formio.builder`, events, prefill, wizard, PDF, builder, read-only | [rendering.md](./references/rendering.md) |
 | Evaluate templates and expressions: `Utils.Evaluator`, `interpolate`, `evaluate`, `noeval` | [utils-evaluator.md](./references/utils-evaluator.md) |
 | Traverse and search component trees: `eachComponent`, `eachComponentData`, `getComponent`, `findComponent`, `flattenComponents` | [utils-form-traversal.md](./references/utils-form-traversal.md) |
 | Evaluate conditional logic: simple / JSON / legacy / custom conditionals | [utils-conditions.md](./references/utils-conditions.md) |
-| Run logic actions and triggers (`checkTrigger`, `applyActions`) | [utils-logic.md](./references/utils-logic.md) |
+| Run logic actions and triggers (`checkTrigger`) | [utils-logic.md](./references/utils-logic.md) |
 | JSONLogic operators and Form.io custom operators | [utils-jsonlogic.md](./references/utils-jsonlogic.md) |
 | Input masks, HTML sanitization, DOM helpers | [utils-mask-sanitize.md](./references/utils-mask-sanitize.md) |
-| Misc: date helpers, i18n, `jwtDecode`, `unwind`, `fastCloneDeep`, `override` | [utils-misc.md](./references/utils-misc.md) |
+| Misc: date helpers, i18n, `unwind`, `fastCloneDeep`, `override` | [utils-misc.md](./references/utils-misc.md) |
 
 ## How to use this skill
 
