@@ -6,13 +6,13 @@ Two discriminators sit on the `Project` envelope: `type` distinguishes a regular
 
 | Value       | Meaning                                                                                                                                                                  |
 | ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `'project'` | A regular standalone project. Default value. Used for the portal/primary project and for any project that isn't a derived environment.                                  |
-| `'stage'`   | A Stage of a parent project — a deployment environment (Dev / Staging / etc.) that branches from a primary project. Requires `project` to be set to the parent project's ObjectId. |
+| `'project'` | A regular standalone project. Default value. Used for any project that isn't a derived environment.                                                                     |
+| `'stage'`   | A Stage of a parent project — a deployment environment (Dev / Staging / etc.) that branches from the parent project. Requires `project` to be set to the parent project's ObjectId. |
 | `'tenant'`  | A tenant of the deployment — a multi-tenant child project that inherits its parent's plan at runtime. Tenants are server-keyed differently from stages.                  |
 
 ### Stage creation pattern
 
-A Stage is a project document with `type: 'stage'` and a `project` field pointing at its parent. The parent is typically the portal (primary) project the stage's environment branches from.
+A Stage is a project document with `type: 'stage'` and a `project` field pointing at its parent. `project` refers to the parent project the stage was created in.
 
 ```json
 {
@@ -27,7 +27,7 @@ A Stage is a project document with `type: 'stage'` and a `project` field pointin
 Required minimum for a Stage:
 
 - `type: 'stage'`
-- `project: <parent project ObjectId>` — the `_id` of the parent project (typically the portal / primary project)
+- `project: <parent project ObjectId>` — the `_id` of the parent project
 - `title` and `name` (inherited from the standard Project envelope)
 
 `stageTitle` is the human-readable label shown in the Stage selector UI.

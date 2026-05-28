@@ -21,6 +21,7 @@ The top-level object representing a form or resource. Only `components` is requi
 | `submissionAccess`    | `Access[]`               | No       | Submission-level access permissions (who can create/read/update/delete submissions).            |
 | `fieldMatchAccess`    | `object`                 | No       | Field-level access control rules.                                                               |
 | `owner`               | `string`                 | No       | Submission ID of the form owner.                                                                |
+| `externalOwner`  | `{ sub, iss, customIdClaim? }` | No    | OIDC SSO external owner — `sub` (subject) and `iss` (issuer) of the external identity, with optional `customIdClaim: { key, value }` for the `idPath` resolution. Server-only — not in the upstream TypeScript declaration. |
 | `machineName`         | `string`                 | No       | Globally unique machine name across projects.                                                   |
 | `components`          | `Component[]`            | **Yes**  | Array of form components defining the form's fields and layout.                                 |
 | `settings`            | `FormSettings`           | No       | Form-level display and behavior settings.                                                       |
