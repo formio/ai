@@ -16,14 +16,80 @@ You are a thinking partner that plans before it builds. Two distinct phases with
 - **Batch your questions.** When multiple related questions come up (e.g., all relationship cardinalities), ask them together in one `AskUserQuestion` call. Peppering the user one question at a time burns trust.
 - **Visualize twice, in two formats.** The map is visualised by two diagrams: an ER diagram (who relates to whom) AND an Access Flow diagram (how the runtime ACL reaches each resource). Phase A (chat approval gate) renders both as ASCII so the user can review them in the terminal. Phase B (file on disk) renders both as Mermaid (`erDiagram` + `flowchart TD`) so downstream skills and GitHub/IDE readers get semantic edges + native rendering. Both surfaces describe the same topology — generated from one internal model per run.
 - **Ground in Form.io primitives.** Every output claim must map to a real Form.io construct: resource, form, component, action, role, field-based access, group permission.
+- **Pick the right kind per entity.** Classify every entity as a **Resource** (a stored, reusable data model) or a **Form** (bespoke, purpose-specific data collection) BEFORE modeling its fields. Most entities are Resources, and an app that is all Resources is perfectly valid — just make the call deliberately rather than reflexively, and reach for a Form only when the entity is genuinely bespoke collection. See ["Resources vs. Forms"](#resources-vs-forms--the-core-modeling-decision) below.
 - **Gate on approval.** Phase A (Resource Map) is for review. Do not emit `template.json` / `template.md` until the user has explicitly approved the map. See "The approval gate" below.
 - **Phase B is a pair.** Every Phase B emission writes `template.md` AND `template.json` together — same basename, same timestamp on collision. `template.md` is the architectural-intent artifact downstream skills seed from; `template.json` is its structured companion. Never emit one without the other.
 - **Actions are mandatory, not optional.** Every resource and form in `template.json` MUST have a corresponding entry in the top-level `actions` map — at minimum a Save Submission action so that submissions persist. Additional actions attach per semantics: Login on login forms, Role Assignment on register forms, Group Assignment on join resources. A `template.json` whose `actions` map lacks a `<formMachineName>:save` entry for any resource is **broken by definition** — the resource will accept submissions in the UI but never store them. Treat a missing action as a hard failure and regenerate. See "Actions emission — required per resource" near Phase B, and [`references/template-json.md`](references/template-json.md) for exact shapes.
 - **Don't call the MCP server.** The skill produces plans plus the `template.md` / `template.json` artifact pair. It does not call `form_create` or any other MCP tool — importing is a separate, explicit user action.
 
+## Resources vs. Forms — the core modeling decision
+
+Form.io has two kinds of entries — Resources and Forms. Decide the kind for every entity BEFORE modeling its fields. Resources are the right answer for most entities (and a perfectly valid app can be 100% Resources); the goal here is to recognize the cases that genuinely call for a Form, not to push entities into Forms unnecessarily.
+
+### Resource — the data model (a "noun")
+
+A **Resource** defines, displays, and stores a structured record. Resources are the nouns of the application — `Contact`, `Product`, `Project`, `Task`, `Applicant`. Each Resource auto-generates a REST API (`GET/POST/PUT/DELETE ${FORMIO_PROJECT_URL}/<path>`), so the set of Resources is effectively the application's database — a structured, queryable backend much like Firebase. Reach for a Resource when:
+
+- The data is a persistent record other parts of the app read, reference, or report on.
+- Other entities point at it (it is the target of a reference `select` — a foreign key).
+- It needs its own CRUD management screens (list / create / edit / delete).
+- The same shape recurs (every Contact has the same fields).
+
+A Resource can also be **embedded as a form** in the UI when the app needs CRUD management of that data model — the generated list / create / edit screens are simply how users maintain the resource's rows. "Embedded as a form" here is a UI concern, not a reason to model the data as `type: form`.
+
+### Form — bespoke data collection (a specific "ask")
+
+A **Form** (`type: form`) collects data for one specific purpose. Forms are the interactions — a job application, an onboarding survey, a support request, an event RSVP, a contact-us page. A Form's submission is the captured response, not a reusable record other parts of the data model depend on. Reach for a Form when:
+
+- The fields are specific to this one interaction and would not make sense as columns in a database table ("Why should we hire you?", "Rate your experience 1–5", "Any accessibility needs?").
+- It is survey-like, one-off, or workflow-driven rather than a record other things reference.
+- It references a structured record (a Resource established earlier) AND adds extra, context-specific questions on top.
+
+A Form is not a second-class Resource. It frequently USES Resources two ways:
+
+1. **To populate choices** — a `select` with `dataSrc: resource` fills a dropdown / typeahead from a Resource (pick a Product, pick an Applicant).
+2. **To reference an already-established record** — the Form points at a Resource record that was created earlier in the application flow (onboarding / profile / CRUD), then adds its own bespoke fields. Wire the reference one of two ways: a **disabled, pre-selected Select** (dataSrc=resource, defaulted to the user's record, `disabled: true`) or the submission **`owner`** (when the record is 1:1 with the authenticated user). See `references/template-json.md` → "select — reference an established Resource".
+
+> **Anti-pattern — do NOT create the Resource from inside the Form.** Never embed a Resource via a nested `form` component to create it inline, and never give a bespoke Form a Save action that creates the referenced Resource. Establishing the record and collecting the bespoke response are two separate flow steps. The data model is established first (its own onboarding / CRUD concern); the Form references it. See `formio-application` → "Using Resources within Forms — the right flow (and the anti-pattern to avoid)".
+
+### The litmus test
+
+Ask: *"Is this a record the app stores and reuses, or a response to a specific ask?"*
+
+- A record the app stores and reuses → **Resource**.
+- A response to a specific ask, possibly wrapping a record → **Form**.
+
+When bespoke, survey-like fields are mixed with structured record fields, that is the tell for a **Form that references a Resource** — NOT a Resource with survey fields bolted on. Survey fields do not belong in the canonical data model; they are a supplemental, per-interaction extension of a base record that already exists.
+
+### Worked example — Job Application
+
+A recruiting app needs to capture job applications.
+
+- **`Applicant` (Resource)** — the reusable person record: `firstName`, `lastName`, `email`, `phone`, `resume` (file). A noun the app stores, lists, and references from other resources (`Interview`, `Offer`). It is established FIRST, by its own flow (the applicant onboards / creates a profile), and gets CRUD screens.
+- **`JobApplication` (Form)** — the bespoke intake the applicant fills AFTER onboarding. It **references** the already-established `Applicant` record — via a disabled, pre-selected `applicant` Select (locked to their own record) or via the submission `owner` — and adds interaction-specific questions: "Why should we hire you?", "Earliest start date", "Salary expectation", "How did you hear about us?". These answers are meaningful only for this one application — they are not columns on the canonical `Applicant` record, so they live on the Form's submission, not the Resource.
+
+Two mistakes this guidance prevents:
+
+1. **Modeling both as resources** — pollutes the `Applicant` data model with one-off survey fields and loses the distinction between "a person we track" and "one application they submitted."
+2. **Creating the `Applicant` from inside the `JobApplication` form** (e.g., a nested form, or a Save action that writes a new Applicant) — the anti-pattern. The form's first job becomes bootstrapping a person rather than collecting an application, producing duplicate Applicant records and breaking owner-based access. Establish the Applicant first; reference it from the form. See `formio-application` → "Using Resources within Forms".
+
+### Quick classification table
+
+| Entity / intent                                  | Kind     | Why                                                              |
+| ------------------------------------------------ | -------- | --------------------------------------------------------------- |
+| Contact, Company, Product, Project, Task, User   | Resource | Persistent nouns; referenced by others; need CRUD              |
+| Order with line items                            | Resource | Stored record other things reference (invoices, reports)       |
+| Contact-us / feedback / support request          | Form     | One-off interaction; not referenced; survey-like               |
+| Event RSVP / registration                        | Form     | Captures a response; may reference an established Attendee resource + bespoke Q's |
+| Onboarding / intake questionnaire                | Form     | Survey-like; supplemental to a base record                      |
+| Job application (over an Applicant resource)      | Form     | References an established Applicant (disabled Select / owner) + bespoke survey fields |
+| Customer satisfaction survey                     | Form     | Pure bespoke collection; no reusable record                    |
+
+When in doubt during the interview, ASK — present the entity and the two readings ("a record you manage" vs "a form people fill out") and let the user decide. Do not silently default to Resource.
+
 ## The interview
 
-Work through these five rounds. Compress or expand as the user's description warrants — if they named every entity and relationship explicitly, skip ahead; if they said only a brief phrase like "I want a CRM" or "build me a booking app," start from zero.
+Work through these six rounds. Compress or expand as the user's description warrants — if they named every entity and relationship explicitly, skip ahead; if they said only a brief phrase like "I want a CRM" or "build me a booking app," start from zero.
 
 ### 1. Extract the named entities
 
@@ -31,11 +97,17 @@ Re-read the user's prompt and list the nouns that sound like resources. For "Tas
 
 Confirm the list with the user in one question. They may add or drop entities.
 
-### 2. Determine the relationships
+### 2. Classify each entity — Resource or Form
+
+For every candidate from round 1, decide whether it is a **Resource** (a stored, reusable data model) or a **Form** (bespoke, purpose-specific data collection). Apply the litmus test in ["Resources vs. Forms"](#resources-vs-forms--the-core-modeling-decision) above. Make the call deliberately per entity: most will be Resources (an all-Resource app is fine), so reach for a Form only when an entity is genuinely bespoke collection — don't force one either way.
+
+Batch this with round 1's confirmation when you can: present the entity list already tagged `(Resource)` / `(Form)` and ask the user to correct any you misjudged. Explicitly call out any entity that looks like a bespoke Form referencing a Resource (e.g., a job application over an `Applicant` record, an RSVP over an `Attendee` record) so the user confirms the split between the reusable record (established first) and the per-interaction survey fields.
+
+### 3. Determine the relationships
 
 For every meaningful pair of entities, pin down the cardinality: 1:1, 1:N, or N:N. Ask as a batch. Draw a small ASCII sketch after the user answers.
 
-### 3. Determine the user / auth model
+### 4. Determine the user / auth model
 
 Ask (together):
 
@@ -45,7 +117,7 @@ Ask (together):
 
 If the user has no authentication, say so explicitly and skip access rules — not every app needs login.
 
-### 4. Determine the access / permission model
+### 5. Determine the access / permission model
 
 Ask (together):
 
@@ -55,7 +127,7 @@ Ask (together):
 - **Tenant-level** (strict multi-tenant isolation)?
 - Or some combination — e.g., "admins see everything, members see only their group's data."
 
-### 5. Produce the resource map, then gate on approval
+### 6. Produce the resource map, then gate on approval
 
 Emit the Phase A Resource Map (see "Phase A — Resource Map for review" below) as a single artifact. Then stop and ask the user to approve or revise. Only after approval, produce the Phase B `template.json`.
 
@@ -142,6 +214,7 @@ When the user describes access ("reps only see their company's deals"), they alm
 | Multiple references (1:N embedded) | `select` with `multiple: true` and `data.resource`       |                                     |
 | File attachment                    | `file`                                                   | Requires a storage provider         |
 | Email (for user login)             | `email`                                                  | Always on the `user` resource       |
+| Reference an established Resource record from a Form | `select` (dataSrc=resource), often `disabled: true` + pre-selected | Links the form to a record created earlier in the flow; do NOT use a nested `form` to create the record inline (anti-pattern) |
 
 Full component reference: see the `formio-form` skill when you need exact JSON shapes. This cheat sheet is for planning, not generation.
 
@@ -183,6 +256,20 @@ When the interview has enough signal, emit the resource map as a single fenced m
   Actions:
     - Group Assignment: group=<leftKey>, user=<rightKey>   ← only when the join governs user access
   ...
+
+## Forms
+
+(Include this section ONLY when the app has bespoke data-collection forms — job applications, surveys, RSVPs, intake/feedback forms. Omit the whole section for pure data-model apps. Auth forms — login/register — are described under "Users & Auth", NOT here.)
+
+- <FormName> (type: form)
+  Purpose: <1 sentence — the specific interaction this form captures>
+  References: <ResourceName via disabled pre-selected Select | owner (1:1 with the user) | none>
+  Fields:
+    - <key>: <component> — <bespoke field specific to this form>
+    - ...
+  Access: <who can submit / who can read>
+  Actions:
+    - <action name>: <key settings>   ← Save to its OWN submission only; never a Save that creates the referenced Resource
 
 ## Users & Auth
 
@@ -241,7 +328,7 @@ If the user says "revise" or flags specific issues: update the map, re-show it, 
 
 Only when the user has approved the map, emit the artifact PAIR — always both, always together:
 
-1. **`template.md`** — the approved Resource Map, saved to disk as the architectural-intent document. Same structure as the Phase A map (Resources, Users & Auth, Roles, Access Matrix, ER Diagram, Access Flow Diagram, Companion artifact). See [`references/template-md.md`](references/template-md.md) for the complete spec.
+1. **`template.md`** — the approved Resource Map, saved to disk as the architectural-intent document. Same structure as the Phase A map (Resources, optional Forms, Users & Auth, Roles, Access Matrix, ER Diagram, Access Flow Diagram, Companion artifact). See [`references/template-md.md`](references/template-md.md) for the complete spec.
 2. **`template.json`** — the Form.io project-export JSON. Same shape you get from `GET /{projectName}/export` and can POST to `/{projectName}/import`.
 
 Each file is emitted in TWO forms at the same time:
@@ -258,7 +345,7 @@ Each file is emitted in TWO forms at the same time:
 
 ### Transcript requirements
 
-The markdown block MUST follow the section order in [`references/template-md.md`](references/template-md.md) exactly: `# Resource Map — <App Name>` → `## Resources` → `## Users & Auth` → `## Roles` → `## Access Matrix` → `## ER Diagram` → `## Access Flow Diagram` → `## Companion artifact`. Downstream graders and consumer skills key on these exact headings.
+The markdown block MUST follow the section order in [`references/template-md.md`](references/template-md.md) exactly: `# Resource Map — <App Name>` → `## Resources` → (optional `## Forms`, only when the app has bespoke data-collection forms) → `## Users & Auth` → `## Roles` → `## Access Matrix` → `## ER Diagram` → `## Access Flow Diagram` → `## Companion artifact`. Downstream graders and consumer skills key on these exact headings.
 
 The `## ER Diagram` and `## Access Flow Diagram` sections in `template.md` MUST contain **Mermaid** fenced blocks (` ```mermaid\nerDiagram\n...``` ` and ` ```mermaid\nflowchart TD\n...``` ` respectively) — not ASCII. ASCII is for Phase A's chat-approval gate only. Every resource and join named in `## Resources` must appear as a node in both Mermaid blocks. See [`references/template-md.md`](references/template-md.md) → "ER Diagram section" and "Access Flow Diagram section" for the exact shapes, cardinality vocabulary, and worked examples for the three canonical patterns (owner-only, direct-child group, transitive group).
 
@@ -437,6 +524,8 @@ Use these as structural references when deciding how to shape a new app's output
 
 ## Interview heuristics
 
+- **When an entity carries survey-like or one-off fields** ("why should we hire you?", "rate 1–5", "any special requests?"), it is a **Form**, not a Resource — usually a Form that *references* an established Resource (disabled Select or `owner`) plus those bespoke fields. Do not bolt survey fields onto a data-model Resource, and do not create that Resource from inside the Form. See ["Resources vs. Forms"](#resources-vs-forms--the-core-modeling-decision).
+- **When the user describes a workflow/interaction rather than a thing** ("people apply for a job", "guests RSVP", "customers file a complaint"), reach for a Form. When they describe a thing the app stores and reuses ("we track applicants", "we keep a product catalog"), reach for a Resource. A single feature often needs BOTH (an `Applicant` Resource and a `JobApplication` Form).
 - **When the user names 3+ entities and never mentions users**, stop and ask whether the app has authenticated users. Don't assume.
 - **When a relationship could be 1:N or N:N**, prefer N:N with a join resource if the relationship carries data (assigned-at, role-within-group, etc.). A join is cheap and backward-compatible; an embedded 1:N is not.
 - **When the user says "only see their team's / project's / tenant's data"**, that's group-based access. Reach for the join + Group Permissions pattern automatically and confirm.

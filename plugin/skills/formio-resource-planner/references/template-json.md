@@ -84,8 +84,10 @@ Notes:
 
 `resources` and `forms` are parallel maps; both entries use the same schema except for `type`:
 
-- `type: "resource"` for data resources (Project, Task, User, CompanyUser, etc.)
-- `type: "form"` for user-facing forms that are not persistent data resources (login forms, public submission forms, signup forms)
+- `type: "resource"` — a data model / "noun" the app stores, references, and exposes as a REST API (Project, Task, User, CompanyUser, Applicant, etc.).
+- `type: "form"` — bespoke, purpose-specific data collection (job applications, surveys, RSVPs, feedback / contact forms, and the auth forms login/register). A Form captures a response to one interaction rather than a reusable record. It may reference Resources to populate `select` choices, and it may **reference an already-established Resource record** via a (often disabled, pre-selected) `select` or via the submission `owner`. A Form must NEVER create the referenced Resource on submit — see the anti-pattern callout below.
+
+See `formio-resource-planner/SKILL.md` → "Resources vs. Forms — the core modeling decision" for which entities should be modeled as resources vs forms. Most entities are resources, and an all-resource project is valid; use `type: "form"` for the genuinely bespoke cases (survey-like, one-off intakes) rather than forcing every entity one way or the other.
 
 ```jsonc
 "<machineNameKey>": {
@@ -391,6 +393,65 @@ Because the parent's select uses `reference: true`, Form.io resolves the parent 
 ### select — multiple references (1:N embedded or N:N as attachment)
 
 Add `"multiple": true` to the resource-select above. Use when the relationship carries no data of its own; otherwise model it as a join resource.
+
+### select — reference an established Resource (pre-selected + disabled)
+
+Used inside a `type: "form"` entry to link the form to a Resource record that was **already created earlier in the application flow** (onboarding / profile / CRUD). The user does not create the record here — they fill the bespoke fields, and this select records which existing Resource the submission is about. Pre-select it to the current user's record and `disabled: true` so it cannot be changed.
+
+```jsonc
+{
+  "type": "select",
+  "key": "applicant",
+  "label": "Applicant",
+  "widget": "choicesjs",
+  "dataSrc": "resource",
+  "data": { "resource": "applicant" },        // machineName of the existing Resource
+  "template": "<span>{{ item.data.firstName }} {{ item.data.lastName }}</span>",
+  "reference": true,                            // store a resolvable reference, not a bare _id
+  "disabled": true,                             // locked — the user cannot change it
+  "defaultValue": "",                           // pre-populated at runtime to the user's own Applicant record
+  "validate": { "required": true },
+  "input": true,
+  "tableView": true
+}
+```
+
+The pre-selection (binding the select to the logged-in user's Applicant record) is wired in the UI layer by the framework skill, not in the template — the template's job is to declare the reference select, mark it `disabled`, and require it. When the relationship is strictly 1:1 with the authenticated user, you can omit this select entirely and rely on the submission **`owner`** instead (owner-based `submissionAccess`).
+
+> **Anti-pattern — never create the Resource from the bespoke Form.** Do NOT add a nested `form` component that creates the Resource inline, and do NOT give the Form a Save action whose `settings.resource` writes a new record into the referenced Resource. Creating the data-model record and collecting the bespoke response are two separate flow steps: the record is established first by its own flow; the Form only references it. See `formio-application` → "Using Resources within Forms — the right flow (and the anti-pattern to avoid)".
+
+### Form referencing an established Resource — full shape
+
+A bespoke `type: "form"` entry that references the already-created `applicant` Resource (via a disabled, pre-selected select) and adds interaction-specific questions. The bespoke fields live only on this form's submission; the `applicant` record is untouched.
+
+```jsonc
+"jobApplication": {
+  "title": "Job Application",
+  "type": "form",
+  "name": "jobApplication",
+  "path": "job-application",
+  "tags": [],
+  "components": [
+    { "type": "select", "key": "applicant", "label": "Applicant", "widget": "choicesjs", "dataSrc": "resource", "data": { "resource": "applicant" }, "template": "<span>{{ item.data.firstName }} {{ item.data.lastName }}</span>", "reference": true, "disabled": true, "validate": { "required": true }, "input": true, "tableView": true },
+    { "type": "textarea", "key": "whyHire", "label": "Why should we hire you?", "input": true, "tableView": false },
+    { "type": "datetime", "key": "earliestStart", "label": "Earliest start date", "enableTime": false, "input": true, "tableView": true },
+    { "type": "number", "key": "salaryExpectation", "label": "Salary expectation", "input": true, "tableView": true },
+    { "type": "button", "key": "submit", "label": "Submit", "action": "submit", "theme": "primary", "disableOnInvalid": true, "input": true }
+  ],
+  "access": [
+    { "type": "read_all", "roles": ["administrator", "anonymous", "authenticated"] }
+  ],
+  "submissionAccess": [
+    { "type": "create_own", "roles": ["authenticated"] },
+    { "type": "read_own",   "roles": ["authenticated"] },
+    { "type": "read_all",   "roles": ["administrator"] },
+    { "type": "update_all", "roles": ["administrator"] },
+    { "type": "delete_all", "roles": ["administrator"] }
+  ]
+}
+```
+
+This entry needs a `jobApplication:save` action in `actions` like any other form — a plain Save that writes to its OWN submission (no `settings.resource` pointing at `applicant`). The `applicant` Resource keeps its own `applicant:save` action and is created by its own onboarding flow, long before this form is opened. The bespoke fields (`whyHire`, `earliestStart`, `salaryExpectation`) are intentionally NOT on the `applicant` Resource — they belong to this one interaction.
 
 ### submit button
 
