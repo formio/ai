@@ -1,55 +1,62 @@
 ## Overview
 
-Miscellaneous helpers exported from `@formio/js/utils`: date utilities, i18n, JWT decode, submission unwind/rewind, deep clone, and class override. Sourced from `packages/core/src/utils/date.ts`, `packages/core/src/utils/i18n.ts`, `packages/core/src/utils/jwtDecode.ts`, `packages/core/src/utils/unwind.ts`, `packages/core/src/utils/fastCloneDeep.ts`, `packages/core/src/utils/override.ts`, and `packages/formio.js/src/utils/i18n.js` in the Form.io source code.
+Miscellaneous helpers — date utilities, i18n, JWT decode, submission unwind, deep clone, and class override. Sourced from `packages/core/src/utils/date.ts`, `packages/core/src/utils/i18n.ts`, `packages/core/src/utils/jwtDecode.ts`, `packages/core/src/utils/unwind.ts`, `packages/core/src/utils/fastCloneDeep.ts`, `packages/core/src/utils/override.ts`, and `packages/formio.js/src/utils/i18n.js` in the Form.io source code.
+
+`@formio/js/utils` re-exports the date helpers and `fastCloneDeep` flat on `Utils`. The renderer does **not** re-export `I18n`, `unwind`, or `override` — import those from `@formio/core`. There is no `jwtDecode` helper on either entry point: use `Formio.getToken({ decode: true })` to read the cached SDK JWT, or pull a standalone decoder for arbitrary tokens.
 
 ## Imports
 
 ```ts
-import { Utils } from '@formio/js/utils';
+import { Utils } from '@formio/js/utils'; // date helpers, fastCloneDeep
+import { I18n, unwind, override } from '@formio/core'; // not exposed by @formio/js
+import { Formio } from '@formio/js'; // for JWT decode via getToken({ decode: true })
 ```
 
 ## API
 
-Date (`Utils.date`):
+Date (flat on `Utils`):
 
-- `Utils.date.dayjs` — the `dayjs` instance with `utc`, `timezone`, `advancedFormat`, and `customParseFormat` plugins pre-loaded.
-- `Utils.date.currentTimezone(): string` — browser/Node timezone via `dayjs.tz.guess()`.
-- `Utils.date.convertFormatToMoment(format: string): string` — translate Angular date format tokens (`MM/dd/yyyy`) into moment/dayjs tokens (`MM/DD/YYYY`).
+- `Utils.moment` — the bundled `moment` instance with `moment-timezone` loaded (`.tz()` is available).
+- `Utils.momentDate(date, format?, timezone?): moment.Moment` — convenience constructor that respects a timezone string.
+- `Utils.currentTimezone(): string` — browser/Node timezone via `moment.tz.guess()`.
+- `Utils.convertFormatToMoment(format: string): string` — translate Angular date format tokens (`MM/dd/yyyy`) into moment tokens (`MM/DD/YYYY`).
+- `Utils.formatDate(value, format, timezone?): string` — high-level formatter used by Form.io's Date/Time component.
+- `Utils.isValidDate(value): boolean`, `Utils.offsetDate(date, timezone?)`, `Utils.getLocaleDateFormatInfo(locale?)`, `Utils.getDateSetting(value)` — additional helpers re-exported flat on `Utils`.
 
-i18n (`Utils.i18n`):
+i18n (`I18n` class from `@formio/core`):
 
-- `Utils.i18n.t(key: string, options?): string` — translation marker used by Form.io's translation tooling; in the renderer the live translator is exposed on the `Form` instance as `form.i18next`.
-- `Utils.i18n.i18nConfig` — default i18n configuration (separators, default language, baseline resources).
-- `Utils.i18n.coreEnTranslation` — the English translation dictionary shipped with `@formio/core`.
+- `new I18n(languages?: Record<string, Record<string, string>>)` — manage a language dictionary at runtime.
+- `setLanguages(languages)` — install or replace dictionaries.
+- `changeLanguage(language)` — switch active language.
+- `t(key, defaultValue?)` — translate a key under the active language.
 
-The renderer also exports the `I18n` class (`packages/formio.js/src/utils/i18n.js`):
+In the renderer, the live translator is exposed on the `Form` instance as `form.i18next` (i18next-backed); the `I18n` class is the standalone dictionary helper used outside the renderer.
 
-- `new I18n(languages?: object)` — manage a language dictionary at runtime.
-- `setLanguages(languages)` / `changeLanguage(language)` / `t(key, defaultValue?)`.
+JWT decode:
 
-JWT (`Utils.jwtDecode`):
+- `Formio.getToken({ decode: true })` — read **and** decode the SDK's currently-cached JWT in one call. Returns the decoded payload (`{ user, form, project, exp, iat, … }`).
+- For decoding arbitrary JWTs (not the SDK's cached one), pull a standalone decoder such as the `jwt-decode` npm package. `@formio/core` ships an internal `jwtDecode` but does not re-export it from any public entry point.
 
-- `Utils.jwtDecode(token: string, options?: { header?: boolean }): object` — decode the payload (default) or the header (`{ header: true }`).
+Submission unwind (`unwind` from `@formio/core`):
 
-Submission unwind / rewind (`Utils.unwind`, `Utils.rewind`) — deprecated but still exported:
+- `unwind(form, submission): Submission[]` — explode nested array data into one submission per row. Useful for exporting datagrid/editgrid rows as flat records. `rewind` is **not** part of the public surface; use a manual fold or `lodash.merge` to reassemble.
 
-- `Utils.unwind(form, submission): Submission[]` — explode nested array data into one submission per row.
-- `Utils.rewind(submissions): Submission` — fold rows back into a nested submission.
-
-Cloning and override:
+Cloning and override (mixed):
 
 - `Utils.fastCloneDeep(obj: any): any` — `JSON.parse(JSON.stringify(obj))` with error handling; returns `null` on failure.
-- `Utils.override(classObj: any, extenders: any): void` — replace prototype methods/properties on a class. Each entry in `extenders` is either a function (replaces the method) or a property descriptor.
+- `override(classObj: any, extenders: any): void` (from `@formio/core`) — replace prototype methods/properties on a class. Each entry in `extenders` is either a function (replaces the method) or a property descriptor.
 
 ## Examples
 
-### Decode a JWT payload
+### Decode the SDK's cached JWT
 
 ```ts
-import { Utils } from '@formio/js/utils';
+import { Formio } from '@formio/js';
 
-const claims = Utils.jwtDecode(localStorage.getItem('myapp.jwt') ?? '');
-console.log(claims.user, claims.exp);
+const claims = Formio.getToken({ decode: true });
+if (claims && claims.user) {
+  console.log('logged in as', claims.user._id, 'expires', claims.exp);
+}
 ```
 
 ### Translate an Angular date format
@@ -57,8 +64,8 @@ console.log(claims.user, claims.exp);
 ```ts
 import { Utils } from '@formio/js/utils';
 
-const dayjsFormat = Utils.date.convertFormatToMoment('MM/dd/yyyy h:mm a');
-console.log(dayjsFormat); // "MM/DD/YYYY h:mm a"
+const momentFormat = Utils.convertFormatToMoment('MM/dd/yyyy h:mm a');
+console.log(momentFormat); // "MM/DD/YYYY h:mm A"
 ```
 
 ### Format the current time in the browser's timezone
@@ -66,16 +73,17 @@ console.log(dayjsFormat); // "MM/DD/YYYY h:mm a"
 ```ts
 import { Utils } from '@formio/js/utils';
 
-const now = Utils.date.dayjs().tz(Utils.date.currentTimezone()).format('YYYY-MM-DD HH:mm z');
+const now = Utils.moment().tz(Utils.currentTimezone()).format('YYYY-MM-DD HH:mm');
 console.log(now);
 ```
 
-### Switch language at runtime via the renderer's I18n
+### Switch language at runtime via `I18n` (from `@formio/core`)
 
 ```ts
-import { Utils } from '@formio/js/utils';
+import { I18n } from '@formio/core';
 
-const i18n = new Utils.I18n({
+const i18n = new I18n();
+i18n.setLanguages({
   en: { hello: 'Hello' },
   fr: { hello: 'Bonjour' },
 });
@@ -94,27 +102,48 @@ if (draft) {
 }
 ```
 
-### Override a component class method
+### Override a component class method (`override` from `@formio/core`)
 
 ```ts
-import { Utils } from '@formio/js/utils';
-import { Formio } from '@formio/js';
+import { override } from '@formio/core';
 
-const TextField = Formio.Components.components.textfield;
+class TextFieldStub {
+  rawValue = 'raw  ';
+  getValue() {
+    return this.rawValue;
+  }
+}
 
-Utils.override(TextField, {
-  getValue(this: any) {
-    const v = this._origGetValue();
+override(TextFieldStub, {
+  getValue(this: TextFieldStub) {
+    const v = (this as unknown as { _origGetValue: () => string })._origGetValue();
     return typeof v === 'string' ? v.trim() : v;
   },
-  _origGetValue: TextField.prototype.getValue,
+  _origGetValue: TextFieldStub.prototype.getValue,
 });
+
+console.log(new TextFieldStub().getValue()); // "raw"
 ```
 
-### Unwind a submission with a nested array
+### Unwind a submission with a nested array (`unwind` from `@formio/core`)
 
 ```ts
-import { Utils } from '@formio/js/utils';
+import { unwind } from '@formio/core';
+
+const form = {
+  components: [
+    { type: 'textfield', key: 'customer', input: true },
+    {
+      type: 'datagrid',
+      key: 'items',
+      input: true,
+      components: [
+        { type: 'textfield', key: 'sku', input: true },
+        { type: 'number', key: 'qty', input: true },
+      ],
+    },
+  ],
+};
 
 const submission = {
   data: {
@@ -126,6 +155,6 @@ const submission = {
   },
 };
 
-const rows = Utils.unwind(form, submission);
-console.log(rows.length); // 2 (one per item)
+const rows = unwind(form, submission);
+console.log(rows.length); // one submission per top-level row in the unwound output
 ```

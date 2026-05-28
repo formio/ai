@@ -36,7 +36,7 @@ Login is project-scoped: requests post to `${projectUrl}/user/login` (or the pro
 - `Formio.logout(formio?: Formio, options?): Promise<void>` — `POST /logout`, clear stored tokens, clear request cache, emit `user` with `null`.
 - `Formio.setToken(token: string, options?: { namespace?: string }): Promise<void>` — install a JWT; the SDK persists it to `localStorage` under `Formio.namespace`.
 - `Formio.getToken(options?: { decode?: boolean }): string` — read the active JWT; with `{ decode: true }` returns the decoded payload (`{ user, form, project, exp, iat, ... }`).
-- `Formio.clearTokens(): void` — wipe every cached JWT/user payload.
+- `Formio.setToken(null): Promise<void>` — clear the cached JWT/user payload. The SDK has no `clearTokens()` shortcut; pass `null` to `setToken` (and optionally clear `Formio.tokens` directly) for logout flows that should not hit `POST /logout`.
 - `Formio.ssoInit(type: 'saml' | 'okta', options?): Promise` — start SSO redirect; on return the JWT lands in the URL hash and `Formio.pageQuery()` parses it.
 - `Formio.samlInit(options?): Promise` — direct SAML entry point (equivalent to `ssoInit('saml', options)`).
 - `Formio.oktaInit(options?): Promise` — direct Okta entry point.
@@ -114,7 +114,15 @@ if (query.token) {
 ```ts
 import { Formio } from '@formio/js';
 
-await Formio.logout();
+await Formio.logout(); // POST /logout + clears cached tokens
+```
+
+### Clear the cached JWT without calling /logout
+
+```ts
+import { Formio } from '@formio/js';
+
+await Formio.setToken(null); // empties Formio.tokens and removes the persisted JWT
 ```
 
 ### OAuth bearer-token exchange

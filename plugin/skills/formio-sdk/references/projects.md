@@ -1,6 +1,6 @@
 ## Overview
 
-Project CRUD and access-info lookups via the SDK. A `new Formio(projectUrl)` instance exposes `loadProject`, `saveProject`, `deleteProject`, `accessInfo`, and `projectRoles`. Sourced from `packages/core/src/sdk/Formio.ts` in the Form.io source code.
+Project CRUD and access-info lookups via the SDK. A `new Formio(projectUrl)` instance exposes `loadProject`, `saveProject`, `deleteProject`, and `accessInfo`. Role listing is via the static `Formio.projectRoles()` helper (there is no instance `projectRoles` method). Sourced from `packages/core/src/sdk/Formio.ts` in the Form.io source code.
 
 ## Imports
 
@@ -38,13 +38,12 @@ Instance methods on a project-scoped Formio:
 - `saveProject(data?, opts?): Promise<Project>` — `PUT ${projectUrl}` (update). New-project creation is a platform-scoped operation; see `formio-api`'s `platform-projects.md`.
 - `deleteProject(opts?): Promise<void>` — `DELETE ${projectUrl}` (platform-scoped permission required).
 - `accessInfo(): Promise<{ roles, forms, components }>` — `GET ${projectUrl}/access` — return the roles + per-form access rules visible to the current user.
-- `projectRoles(): Promise<Role[]>` — `GET ${projectUrl}/role`.
 - `getProjectId(): Promise<string>` — resolve the project's Mongo ObjectId.
 
 Static helpers:
 
-- `Formio.accessInfo(formio?): Promise<...>` — static variant; if `formio` is omitted, uses the configured project URL.
-- `Formio.projectRoles(formio?): Promise<Role[]>` — same convenience.
+- `Formio.accessInfo(formio?): Promise<...>` — `GET ${projectUrl}/access`; if `formio` is omitted, uses the configured project URL.
+- `Formio.projectRoles(formio?): Promise<Role[]>` — `GET ${projectUrl}/role`. There is no instance-method equivalent — for role listing on a different project, pass a `new Formio(otherProjectUrl)` as the argument.
 
 ## Examples
 

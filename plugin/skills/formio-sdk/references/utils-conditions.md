@@ -19,28 +19,17 @@ Type discrimination:
 Evaluation:
 
 - `Utils.checkCondition(component, row, data, form, instance): boolean` — high-level helper that picks the right strategy based on the component's `conditional` shape.
-- `Utils.checkSimpleConditional(cond, context): boolean | null` — evaluate a simple conditional (`conjunction: 'all' | 'any'`, `conditions: [{ component, operator, value }]`, optional `show`). Returns `null` when the component referenced by `conditions[i].component` is missing.
-- `Utils.checkJsonConditional(cond, context): boolean | null` — evaluate a JSONLogic conditional (`{ json: { '===': [...] } }`).
-- `Utils.checkLegacyConditional(cond, context): boolean | null` — evaluate the legacy `{ when, eq, show }` shape.
-- `Utils.checkCustomConditional(condition, context, variable?): boolean | null` — evaluate a JS string / function and return the value of `variable` (defaults to `show`).
-- `Utils.convertShowToBoolean(show: any): boolean` — coerce the raw `show` field to a boolean.
-- `Utils.conditionallyHidden(context): boolean` — convenience that returns `true` if the component should be hidden by its conditional.
+- `Utils.checkSimpleConditional(component, condition, row, data, instance): boolean` — evaluate a simple conditional (`conjunction: 'all' | 'any'`, `conditions: [{ component, operator, value }]`, optional `show`). Also handles the legacy `{ when, eq, show }` shape — when `condition.when` is set it routes through the same function.
+- `Utils.checkJsonConditional(component, json, row, data, form, onError): boolean` — evaluate a JSONLogic conditional. `json` is the raw JSONLogic expression (the value of `conditional.json`); `onError` is the value returned if the evaluator throws.
+- `Utils.checkCustomConditional(component, custom, row, data, form, variable, onError, instance): boolean` — evaluate a JS string and return the value of `variable` (commonly `'show'` or `'result'`). When `custom` is a string, the SDK wraps it as `var ${variable} = true; ${custom}; return ${variable};`.
 
-`ConditionsContext` shape (passed by the renderer; assemble it manually when calling these helpers outside the renderer):
-
-```ts
-interface ConditionsContext {
-  component: Component;
-  data: object; // full submission data
-  row: object; // contextual row data (datagrid row, editgrid row, top-level)
-  form?: Form;
-  instance?: Component;
-}
-```
+Call positions are SDK-fixed: every helper takes `component` first, then the per-helper input (the conditional or trigger object), then `row`, then `data`, then `form`/`instance`/`onError`/`variable` as applicable. Pass `{}` for `component` when calling these helpers in isolation (outside a renderer-attached component).
 
 ## Examples
 
 ### Evaluate a simple conditional
+
+`conditions[i].component` is a plain data key — do not prefix with `data.` when calling these helpers outside the renderer. (The renderer normalizes paths internally; standalone callers pass keys directly.) `operator` is one of the registered operators in `Utils.ConditionOperators` — `isEqual`, `isNotEqual`, `isEmpty`, `isNotEmpty`, `lessThan`, `greaterThan`, `lessThanOrEqual`, `greaterThanOrEqual`, `includes`, `notIncludes`, `startsWith`, `endsWith`, `dateGreaterThan`, `dateLessThan`, `dateGreaterThanOrEqual`, `dateLessThanOrEqual`, `isDateEqual`, `isNotDateEqual`.
 
 ```ts
 import { Utils } from '@formio/js/utils';
@@ -48,16 +37,14 @@ import { Utils } from '@formio/js/utils';
 const conditional = {
   conjunction: 'all',
   conditions: [
-    { component: 'data.subscribe', operator: 'isEqual', value: true },
-    { component: 'data.region', operator: 'isEqual', value: 'EU' },
+    { component: 'subscribe', operator: 'isEqual', value: true },
+    { component: 'region', operator: 'isEqual', value: 'EU' },
   ],
   show: true,
 };
 
-const visible = Utils.checkSimpleConditional(conditional, {
-  data: { subscribe: true, region: 'EU' },
-  row: { subscribe: true, region: 'EU' },
-});
+const data = { subscribe: true, region: 'EU' };
+const visible = Utils.checkSimpleConditional({}, conditional, data, data, null);
 console.log(visible); // true
 ```
 
@@ -66,12 +53,9 @@ console.log(visible); // true
 ```ts
 import { Utils } from '@formio/js/utils';
 
-const conditional = { json: { '>': [{ var: 'data.age' }, 17] } };
-
-const eligible = Utils.checkJsonConditional(conditional, {
-  data: { age: 21 },
-  row: { age: 21 },
-});
+const json = { '>': [{ var: 'data.age' }, 17] };
+const data = { age: 21 };
+const eligible = Utils.checkJsonConditional({}, json, data, data, null, false);
 console.log(eligible); // true
 ```
 
@@ -80,12 +64,15 @@ console.log(eligible); // true
 ```ts
 import { Utils } from '@formio/js/utils';
 
+const data = { kind: 'premium', seats: 3 };
 const visible = Utils.checkCustomConditional(
+  {},
   'show = data.kind === "premium" && data.seats > 0;',
-  {
-    data: { kind: 'premium', seats: 3 },
-    row: { kind: 'premium', seats: 3 },
-  },
+  data,
+  data,
+  null,
+  'show',
+  false,
 );
 console.log(visible); // true
 ```
@@ -110,12 +97,18 @@ Utils.eachComponent(form.components, (component) => {
 
 ### Handle a legacy `when` / `eq` / `show` conditional
 
+The legacy shape `{ when, eq, show }` is handled by `checkSimpleConditional` — when `condition.when` is set, the SDK routes through the legacy branch automatically. As with `conditions[i].component`, `when` is a plain data key (no `data.` prefix) when called outside the renderer.
+
 ```ts
 import { Utils } from '@formio/js/utils';
 
-const visible = Utils.checkLegacyConditional(
-  { when: 'data.country', eq: 'US', show: 'true' },
-  { data: { country: 'US' }, row: { country: 'US' } },
+const data = { country: 'US' };
+const visible = Utils.checkSimpleConditional(
+  {},
+  { when: 'country', eq: 'US', show: 'true' },
+  data,
+  data,
+  null,
 );
 console.log(visible); // true
 ```

@@ -1,23 +1,32 @@
 ---
 name: formio-sdk
 description: >-
-  Source-derived reference for the Form.io JavaScript SDK (`@formio/js`) and the Form.io Utilities (`@formio/js/utils`), grounded in the Form.io source code (`packages/core/src/sdk`, `packages/core/src/utils`, `packages/formio.js/src/Formio.js`, `packages/formio.js/src/utils`) — not online docs, which are known to drift. Covers static SDK methods (`setBaseUrl`, `setProjectUrl`, `setToken`, `currentUser`, `login`, `logout`, `ssoInit`, `request`, `makeRequest`, `accessInfo`, `pluginAlter`, `pluginGet`, `pluginWait`), instance SDK methods on `new Formio(url)` (`loadForm`, `saveForm`, `deleteForm`, `loadForms`, `loadSubmission`, `saveSubmission`, `deleteSubmission`, `loadSubmissions`, `availableActions`, `userPermissions`, `getDownloadUrl`, `getTempToken`, `uploadFile`, `downloadFile`, `deleteFile`), VanillaJS form rendering (`Formio.createForm`, `Formio.builder`, `form.on('submit' | 'change' | 'error' | 'nextPage' | 'prevPage' | 'render' | 'attach')`, `form.submission` prefill), the plugin lifecycle (`preRequest`, `request`, `staticRequest`, `wrapRequestPromise`, `wrapStaticRequestPromise`, `requestOptions`, `requestResponse`), and the full `Utils` surface (Evaluator, form traversal, conditions, logic, JSONLogic, mask, sanitize, date, dom, i18n, jwtDecode, unwind, fastCloneDeep, override). Use when the user asks to call any `Formio.*` static method, work with a `new Formio(...)` instance, render a Form.io form in a VanillaJS or non-Angular consumer, invoke a `Utils.*` helper, register a plugin, configure `setBaseUrl`/`setProjectUrl` for a Hosted or SaaS deployment, evaluate a condition or formula, traverse component trees, mask or sanitize input, or decode a JWT. Not for: documenting Form.io REST endpoint shape (see formio-api); orchestrating a full application build (see formio-application); planning Resource schemas (see formio-resource-planner); Angular `@formio/angular` wrappers, `FormioAppConfig`, or `FormioModule` (see formio-angular).
+  Reference for the Form.io JavaScript SDK (`@formio/js`), the Form.io Utilities (`@formio/js/utils`), and the small set of helpers exposed only by `@formio/core` (jsonLogic, dom, I18n, override, unwind, the logic processor). Covers static SDK methods (`setBaseUrl`, `setProjectUrl`, `setToken`, `currentUser`, `logout`, `ssoInit`, `accessInfo`, `pluginAlter`, `pluginGet`, `pluginWait`), instance SDK methods on `new Formio(url)` (`loadForm`, `saveForm`, `deleteForm`, `loadForms`, `loadSubmission`, `saveSubmission`, `deleteSubmission`, `loadSubmissions`, `availableActions`, `userPermissions`, `getDownloadUrl`, `getTempToken`, `uploadFile`, `downloadFile`, `deleteFile`), VanillaJS form rendering (`Formio.createForm`, `Formio.builder`, `form.on(…)`, `form.submission` prefill), the plugin lifecycle (`preRequest`, `request`, `staticRequest`, `wrapRequestPromise`, `wrapStaticRequestPromise`, `requestOptions`, `requestResponse`), the `Utils` surface (Evaluator, form traversal, conditions, mask, sanitize, date helpers, fastCloneDeep), and the @formio/core-only surfaces (`jsonLogic`, `dom`, `I18n`, `override`, `unwind`, `logicProcessSync`/`logicProcessInfo`). Token decoding goes through `Formio.getToken({ decode: true })`; logout and token clearing through `Formio.logout()` or `Formio.setToken(null)`. Use when the user asks to call any `Formio.*` static method, work with a `new Formio(...)` instance, render a Form.io form in a VanillaJS or non-Angular consumer, invoke a `Utils.*` helper, evaluate JSONLogic, run component-logic actions, manipulate the DOM via Form.io's helpers, register a plugin, configure `setBaseUrl`/`setProjectUrl` for a Hosted or SaaS deployment, traverse component trees, mask or sanitize input, or decode the cached JWT. Not for: documenting Form.io REST endpoint shape (see formio-api); orchestrating a full application build (see formio-application); planning Resource schemas (see formio-resource-planner); Angular `@formio/angular` wrappers, `FormioAppConfig`, or `FormioModule` (see formio-angular).
 ---
 
 # Form.io SDK Skills
 
-Source-derived reference for `@formio/js` and `@formio/js/utils`. Every fact in this skill comes from the Form.io source code at the paths called out in each reference's `## Overview` — not from public documentation.
+Reference for `@formio/js`, `@formio/js/utils`, and the helpers exposed only by `@formio/core`. Covers SDK bootstrap, authentication, form / submission / project / role / file CRUD, plugin lifecycle, VanillaJS rendering, and the full `Utils` surface (Evaluator, traversal, conditions, logic actions, JSONLogic, mask, sanitize, date, DOM, i18n, fastCloneDeep, override, unwind).
 
 ## Imports
 
-The only acceptable import paths are:
+Prefer the renderer-extended SDK first; fall back to `@formio/core` only when a surface is not re-exported by `@formio/js` or `@formio/js/utils`:
 
 ```ts
+// Preferred — covers the SDK, rendering, plugins, forms, submissions, projects,
+// roles, files, and the bulk of the Utils surface.
 import { Formio } from '@formio/js';
 import { Utils } from '@formio/js/utils';
+
+// Acceptable fallbacks — only when @formio/js does not expose the surface.
+// Confirmed-needed today: jsonLogic, dom, I18n, override, unwind, the
+// runtime logic processor (logicProcessSync), and the canonical DefaultEvaluator
+// base class.
+import { jsonLogic, dom, I18n, override, unwind, sanitize } from '@formio/core';
+import { logicProcessSync, logicProcessInfo } from '@formio/core/process';
 ```
 
-Never import from `@formio/core` (internal package), `@formio/js/lib/...` (deep import), or via a `<script>` tag (CDN-bundle pattern is not supported by this skill — examples must be ESM-import-only). The renderer extends the core SDK; consumers always go through `@formio/js`.
+Never use `@formio/js/lib/...` deep imports or `<script>` CDN-bundle tags (the skill is ESM-only). The renderer extends the core SDK; consumers should reach `@formio/core` only for surfaces missing from `@formio/js`.
 
 ## URL Configuration
 

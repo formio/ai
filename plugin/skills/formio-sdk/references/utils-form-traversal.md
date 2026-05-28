@@ -59,11 +59,13 @@ Utils.eachComponent(form.components, (component, path) => {
 
 ### Walk components alongside their data
 
+The callback receives `(component, contextualData, row, path)`. `contextualData` is the full submission `data` tree; `row` is the contextual row at the current path (e.g., the datagrid row for nested components). To read the value of the current component, index into `row`, not `contextualData`.
+
 ```ts
 import { Utils } from '@formio/js/utils';
 
-Utils.eachComponentData(form.components, submission.data, (component, contextualData, row, path) => {
-  console.log(path, '=', contextualData[component.key]);
+Utils.eachComponentData(form.components, submission.data, (component, _data, row, path) => {
+  console.log(path, '=', row[component.key]);
 });
 ```
 
@@ -96,10 +98,12 @@ console.log(Object.keys(map));
 
 ### Read a value at a deep path
 
+`getComponentValue` expects the path **without** the leading `data.` prefix — it indexes from the root of the submission's data object.
+
 ```ts
 import { Utils } from '@formio/js/utils';
 
-const value = Utils.getComponentValue(form, submission.data, 'data.address.line1');
+const value = Utils.getComponentValue(form, submission.data, 'address.line1');
 console.log(value);
 ```
 
@@ -117,12 +121,18 @@ await Utils.eachComponentAsync(form.components, async (component, path) => {
 
 ### Stop descent into hidden containers
 
+`eachComponent` skips layout components (`panel`, `fieldset`, `well`, etc.) by default — pass `true` as the third argument (`includeAll`) so the callback fires for layout components and `return true` can actually short-circuit the descent.
+
 ```ts
 import { Utils } from '@formio/js/utils';
 
-Utils.eachComponent(form.components, (component) => {
-  if (component.hidden) {
-    return true; // skip children of hidden containers
-  }
-});
+Utils.eachComponent(
+  form.components,
+  (component) => {
+    if (component.hidden) {
+      return true; // skip children of hidden containers
+    }
+  },
+  true,
+);
 ```

@@ -48,7 +48,7 @@ Static URL / token methods on `Formio`:
 - `setPathType(type: 'Subdirectories' | 'Subdomains'): void` — set how subproject URLs are derived.
 - `setToken(token: string, options?: { namespace?: string }): Promise<void>` — store a JWT in local storage and emit a `user` event.
 - `getToken(options?: { decode?: boolean }): string` — read the JWT from storage; with `{ decode: true }` it returns the decoded payload object.
-- `clearTokens(): void` — purge every cached JWT/user from storage.
+- `setToken(null): Promise<void>` — clear the cached JWT (passing `null` removes it from `Formio.tokens` and `localStorage`). The SDK has no `clearTokens()` shortcut; use `setToken(null)` for logout flows that should not also hit the network.
 - `setUser(user, options?): void` / `getUser(options?): object` — store / read the cached current-user payload.
 
 Lazy-library and CDN helpers:

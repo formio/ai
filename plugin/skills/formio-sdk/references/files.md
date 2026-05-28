@@ -28,7 +28,7 @@ Formio.setBaseUrl('https://api.form.io');
 Formio.setProjectUrl('https://myproject.form.io');
 ```
 
-File uploads are scoped to the form (or submission) the `Formio` instance points at. The form's File component declares which storage provider to use; the SDK reads that and dispatches to `Formio.Providers.storage[<provider>]`.
+File uploads are scoped to the form (or submission) the `Formio` instance points at. The form's File component declares which storage provider to use; the SDK reads that and dispatches to `Formio.Providers.providers.storage[<provider>]`.
 
 ## API
 
@@ -40,7 +40,8 @@ Instance methods (renderer-only, attached in `formio.js/src/Formio.js`):
 
 Static helpers:
 
-- `Formio.Providers.storage` — provider registry; new providers can be registered with `Formio.Providers.addProvider('storage', name, providerFn)`.
+- `Formio.Providers.providers.storage` — provider registry (keyed by provider name → factory function).
+- `Formio.Providers.addProvider('storage', name, providerFn)` — register a new storage provider. This is the supported way to extend the registry; do not mutate `providers.storage` directly.
 
 Provider metadata on the submission: every uploaded file is stored as a JSON descriptor — `{ storage: 's3', name, originalName, url, size, type, hash?, key? }`. The `storage` field determines which provider handles subsequent `downloadFile` / `deleteFile` calls.
 
