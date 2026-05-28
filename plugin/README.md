@@ -38,7 +38,7 @@ Every step has an approval gate before any file is written or any MCP call hits 
 | `formio-application` | Default "build me an app" orchestrator. Six-step pipeline (Intent → Plan → Deployment → MCP Config → Import → Framework). |
 | `formio-resource-planner` | Plans resources, fields, roles, actions, access — emits paired `template.md` + `template.json`. |
 | `formio-angular` | Angular framework implementor. Five-phase scaffold flow over `@formio/angular`. |
-| `formio-schema` | Comprehensive Form.io JSON schema reference — form definitions today, with placeholder slots for submissions, actions, projects, and roles. |
+| `formio-schema` | Comprehensive Form.io JSON schema reference — form, submission and project definitions today, with placeholder slots for actions and roles. |
 | `formio-actions` | Configuration reference for Form.io server-side actions. |
 | `formio-api` | Router into the full Form.io REST API surface (platform, project, runtime, PDF). |
 

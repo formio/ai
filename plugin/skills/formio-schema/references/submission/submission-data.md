@@ -37,7 +37,7 @@ For exact per-component value shapes (e.g., what a `file` component stores, what
 
 ## Address mode (worked example)
 
-The `address` component stores either an autocomplete result or a manually entered address, distinguished by a `mode` discriminator. This is the canonical example of "component type dictates value shape" — useful as a model for reading any other component's nested data.
+The `address` component stores either an autocomplete result or a manually entered address, distinguished by a `mode` discriminator. If the address uses an autocomplete provider, then the value of the address component is the value provided by the provider (Google, Open Street Maps, etc). This is the canonical example of "component type dictates value shape" — useful as a model for reading any other component's nested data.
 
 ```json
 {

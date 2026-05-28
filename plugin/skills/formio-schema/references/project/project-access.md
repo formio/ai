@@ -48,7 +48,7 @@ The `Project` envelope ships with a small family of types that describe project 
 | ------------------ | ----------- | ------------------------------------------------------------------------------------------------------ |
 | `_id`              | `string`    | Form ID.                                                                                               |
 | `title`            | `string`    | Form title.                                                                                            |
-| `name`             | `string`    | Form machine name.                                                                                     |
+| `name`             | `string`    | Form name.                                                                                     |
 | `path`             | `string`    | Form URL path.                                                                                         |
 | `access`           | `Access[]`  | Form-level access entries (who can see/modify the form definition).                                    |
 | `submissionAccess` | `Access[]`  | Submission-level access entries (who can create/read/update/delete submissions against the form).      |
