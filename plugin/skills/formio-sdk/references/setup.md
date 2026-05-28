@@ -74,11 +74,6 @@ import { Formio } from '@formio/js';
 
 Formio.setBaseUrl('https://forms.mysite.com');
 Formio.setProjectUrl('https://forms.mysite.com/myproject');
-
-const token = localStorage.getItem('myapp.jwt');
-if (token) {
-  await Formio.setToken(token);
-}
 ```
 
 ### Bootstrap a SaaS single-page app
@@ -113,4 +108,4 @@ if (claims && claims.user) {
 
 ## MCP Tool Preference
 
-When running inside this MCP-server workspace, prefer the `authenticate` tool over hand-calling `Formio.setToken(...)` — `authenticate` opens the portal-login flow and persists the JWT for `formioFetch`. The SDK methods above are for consumer applications outside this workspace.
+When running inside this MCP-server workspace, prefer the MCP authentication mechanism over hand-calling `Formio.setToken(...)` — the MCP server opens the portal-login flow and persists the JWT for subsequent requests. The SDK methods above are for consumer applications outside this workspace.

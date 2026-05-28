@@ -1,6 +1,6 @@
 ## Overview
 
-Miscellaneous helpers — date utilities, i18n, JWT decode, submission unwind, deep clone, and class override. Sourced from `packages/core/src/utils/date.ts`, `packages/core/src/utils/i18n.ts`, `packages/core/src/utils/jwtDecode.ts`, `packages/core/src/utils/unwind.ts`, `packages/core/src/utils/fastCloneDeep.ts`, `packages/core/src/utils/override.ts`, and `packages/formio.js/src/utils/i18n.js` in the Form.io source code.
+Miscellaneous helpers — date utilities, i18n, JWT decode, submission unwind, deep clone, and class override. Sourced from `packages/core/src/utils/date.ts`, `packages/core/src/utils/i18n.ts`, `packages/core/src/utils/unwind.ts`, `packages/core/src/utils/fastCloneDeep.ts`, and `packages/core/src/utils/override.ts` in the Form.io source code.
 
 `@formio/js/utils` re-exports the date helpers and `fastCloneDeep` flat on `Utils`. The renderer does **not** re-export `I18n`, `unwind`, or `override` — import those from `@formio/core`. There is no `jwtDecode` helper on either entry point: use `Formio.getToken({ decode: true })` to read the cached SDK JWT, or pull a standalone decoder for arbitrary tokens.
 

@@ -66,7 +66,7 @@ import { Formio } from '@formio/js';
 
 const formio = new Formio(Formio.getProjectUrl());
 const project = await formio.loadProject();
-project.settings = { ...project.settings, email: { transport: 'sendgrid' } };
+project.settings = { ...project.settings, email: { sendgrid: { auth: { api_key: 'SG.x...' } } } };
 await formio.saveProject(project);
 ```
 
