@@ -68,14 +68,14 @@ Errors: `400` on duplicate email or missing fields; `401`/`403` if the caller la
 
 Same endpoint as the admin login above, but invoked with a regular platform user's credentials. Form.io does not distinguish admin vs user at the endpoint level — role membership in the response body determines capability.
 
-### GET ${FORMIO_BASE_URL}/formio/current
+### GET ${FORMIO_BASE_URL}/current
 
 Return the submission document for the currently authenticated platform user.
 
 Response: the user's submission document (same shape as login response, minus JWT issuance). `401` if the `x-jwt-token` header is missing or expired.
 
 ```bash
-curl -H "x-jwt-token: $FORMIO_JWT" "${FORMIO_BASE_URL}/formio/current"
+curl -H "x-jwt-token: $FORMIO_JWT" "${FORMIO_BASE_URL}/current"
 ```
 
 ### GET ${FORMIO_BASE_URL}/formio/logout
