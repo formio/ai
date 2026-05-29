@@ -44,7 +44,7 @@ A decoded Form.io JWT looks like this:
 
 Claim semantics:
 
-- `user._id` — MongoDB ID of the user submission when the identity is backed by a `user` Resource row (Resource login). For SSO (Remote Authentication) and Custom JWTs there is no Resource row — the user is ephemeral and `user._id` is either an IDP id (for SSO), or the `"external"` sentinel for Custom JWTs.
+- `user._id` — MongoDB ID of the user submission when the identity is backed by a `user` Resource row (Resource login). For SSO (Remote Authentication) and Custom JWTs there is no Resource row — the user is ephemeral and `user._id` is either an IDP identifier (for SSO), or the `"external"` sentinel for Custom JWTs.
 - `iss` — issuer; the Form.io API base URL.
 - `sub` — subject; same as `user._id`.
 - `jti` — Session ID. Logging out invalidates this; see below.

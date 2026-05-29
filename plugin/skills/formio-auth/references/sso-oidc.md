@@ -54,7 +54,7 @@ Once this button is part of the form, the `OAuth` Action is then added to that f
 - `settings.provider` = "openid"
 - `settings.association` = "remote"
 - `settings.button` = "oidcLogin" <== Must match the key for the OIDC login button component.
-- `settings.redirectURI` = "..." <== The application url to navigate to after the OIDC handshake. 
+- `settings.redirectURI` = "..." <== The application url to navigate to after the OIDC handshake (defaults to `window.location.origin` of the application). 
 - `settings.roles` = [{...}] <== This contains an array of the following object.
 
 OAuth Role Mapping is the bridge between an IdP role claim (e.g. `groups`, `roles`, `https://my-app/roles`) and Form.io Roles. The role map settings should provide the following:

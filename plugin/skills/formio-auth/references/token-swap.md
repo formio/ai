@@ -21,9 +21,9 @@ Not for:
 - Issuing a Form.io JWT entirely from your own backend without an IdP at all → see [`custom-jwt.md`](./custom-jwt.md).
 
 ## Configuration
-In order to perform a token swap, the projects OpenID settings must be configured. See [`sso-oidc.md`](./sso-oidc.md) for instructions on these configurations.
+In order to perform a token swap, the project's OpenID settings must be configured. See [`sso-oidc.md`](./sso-oidc.md) for instructions on these configurations.
 
-**Import: You must also ensure you have the role mappings configured within the project settings to properly map the OIDC claims with the Form.io Roles.**
+**Important: You must also ensure you have the role mappings configured within the project settings to properly map the OIDC claims with the Form.io Roles.**
 
 OAuth Role Mapping is the bridge between an IdP role claim (e.g. `groups`, `roles`, `https://my-app/roles`) and Form.io Roles. The Project's OAuth settings page exposes a mapping table:
 
