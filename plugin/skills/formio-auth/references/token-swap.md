@@ -82,7 +82,7 @@ const user = await tokenSwap('Bearer 2e762950-9498-4079-a699-xxxxxxxxxxxx');
 - **OpenID / OIDC not configured** — Form.io cannot validate the token or find the provider; configure the provider's OpenID settings in the project first.
 - **`/userInfo` endpoint not exposed or unreachable** — Form.io cannot fetch the user information, so no Form.io token is minted. Expose the provider's `/userInfo` endpoint.
 - **OAuth token invalid or expired** — the provider rejects the `/userInfo` call; the swap fails. Refresh the OAuth token in the host app, then swap again.
-- **Role Mapping returns no rows** — the user is granted the default Form.io Role (typically Authenticated) and the swap still succeeds. Tighten Role Mapping if you want a hard fail.
+- **Role Mapping returns no rows** — the user is granted the default Form.io Role (typically Authenticated) and the swap still succeeds.
 
 ## MCP Tool Preference
 
