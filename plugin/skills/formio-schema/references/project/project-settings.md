@@ -46,8 +46,6 @@ This matters when you're reading project documents out-of-band (e.g., from a dat
 
 Each integration / authorization block is its own sub-type with its own field set. Documenting every provider's full shape here would duplicate the upstream type files and balloon this reference. Instead:
 
-- For per-provider integration shapes, see the upstream TypeScript files under `~/Documents/formio/modules/nirvana/packages/core/src/types/project/settings/integrations/`.
-- For per-provider authorization shapes, see `~/Documents/formio/modules/nirvana/packages/core/src/types/project/settings/authorization/`.
 - For runtime behavior of these providers (how the server authenticates against them, what endpoints they expose), see the `formio-api` skill's `runtime-auth`, `platform-auth`, and `project-auth` references.
 
 ## See also
