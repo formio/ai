@@ -54,7 +54,7 @@ Once this button is part of the form, the `OAuth` Action is then added to that f
 - `settings.provider` = "openid"
 - `settings.association` = "remote"
 - `settings.button` = "oidcLogin" <== Must match the key for the OIDC login button component.
-- `settings.redirectURI` = "..." <== The application url to navigate to after the OIDC handshake (defaults to `window.location.origin` of the application). 
+- `settings.redirectURI` = "..." <== The application url to navigate to after the OIDC handshake (this defaults to `window.location.origin` of the application and must also be added to the list of redirect URIs in the OIDC application). 
 - `settings.roles` = [{...}] <== This contains an array of the following object.
 
 OAuth Role Mapping is the bridge between an IdP role claim (e.g. `groups`, `roles`, `https://my-app/roles`) and Form.io Roles. The role map settings should provide the following:
@@ -74,19 +74,21 @@ OAuth Role Mapping is the bridge between an IdP role claim (e.g. `groups`, `role
     {
         "claim": "groups",
         "value": "Admin",
-        "role": "69dfb6dcbb04c38a9102977d". // This would be the 'Administrator' role
+        "role": "69dfb6dcbb04c38a9102977d" // This would be the 'Administrator' role
     }
 ]
 ```
 
 With these settings in place, and saved within the OAuth Action, when a user is using the form (embedded within the application), and clicks on the button, the following occurs.
 
-1. User is redirected to IDP authentication page and logs in.
-2. IDP auth performs a redirect to the login form endpoint with access tokens in query params
-3. OIDC login action calls the IdP's User Info endpoint with the OAuth access token.
-4. Builds an ephemeral user object from the returned user information (no `user` Resource submission is created or looked up).
-5. Applies OAuth Role Mapping (configured in action settings) to attach Form.io Roles to that ephemeral user.
-6. Encodes the ephemeral user (profile data + roles) into a Form.io JWT and returns it via the `x-jwt-token` response header. From this point on the user is indistinguishable from a Resource-authenticated user — except that the identity lives in the token rather than in a Resource row.
+1. User is taken to IDP authentication page and logs in.
+2. IDP auth performs a redirect to the URI defined in `settings.redirectURI` in the OAuth action with the auth code.
+3. Form.io renderer then makes a request to the Form.io API server with the auth code.
+4. Form.io server sends the auth code to the IDP to obtain the ID and access tokens.
+5. Calls the IDP's User Info endpoint with the OAuth access token.
+6. Builds an ephemeral user object from the returned user information (no `user` Resource submission is created or looked up).
+7. Applies OAuth Role Mapping (configured in action settings) to attach Form.io Roles to that ephemeral user.
+8. Encodes the ephemeral user (profile data + roles) into a Form.io JWT and returns it via the `x-jwt-token` response header. From this point on the user is indistinguishable from a Resource-authenticated user — except that the identity lives in the token rather than in a Resource row.
 
 ### Remote Authentication: the ephemeral user
 
