@@ -15,7 +15,7 @@ Two URLs that Step 4 (MCP Config), Step 5 (Import), and the Step 6 framework han
 
 When asking the user, use descriptions that do NOT assume they know "project" vs. "deployment" vocabulary:
 
-- **Base URL** — "The Form.io deployment your project lives on. If you are using the hosted Form.io cloud, this is `https://api.form.io`. If your team self-hosts Form.io, this is the address of your platform (e.g., `https://forms.acme-corp.com`). This is the platform, not the specific project."
+- **Base URL** — "The Form.io deployment your project lives on. If you are using the hosted Form.io SaaS, this is `https://api.form.io`. If your team self-hosts Form.io, this is the address of your platform (e.g., `https://forms.acme-corp.com`). This is the platform, not the specific project."
 - **Project URL** — "The full URL of the specific Form.io project this template will be imported into and the app will talk to. Example: `https://mycompany.form.io` for a hosted project, or `https://forms.acme-corp.com/crm` for a self-hosted project identified by a path. The project must already exist — we do not create it."
 
 ## Run the interview — one batched `AskUserQuestion`
@@ -30,7 +30,7 @@ AskUserQuestion({
       header: "Base URL",
       multiSelect: false,
       options: [
-        { label: "https://api.form.io", description: "Hosted Form.io cloud" },
+        { label: "https://api.form.io", description: "Hosted Form.io SaaS" },
         { label: "https://<your-self-hosted-host>", description: "Your team's self-hosted Form.io deployment" }
       ]
     },

@@ -11,7 +11,7 @@
     "formio_base_url": {
       "type": "string",
       "title": "Form.io base URL",
-      "description": "Base URL of your Form.io deployment (e.g. https://api.form.io for Form.io Cloud, or your self-hosted host). Used as the parent of FORMIO_PROJECT_URL.",
+      "description": "Base URL of your Form.io deployment (e.g. https://api.form.io for Form.io SaaS, or your self-hosted host). Used as the parent of FORMIO_PROJECT_URL.",
       "required": true
     },
     "formio_default_project_url": {
