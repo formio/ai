@@ -4,5 +4,5 @@
     "sourceMap": false,
     "declarationMap": false
   },
-  "exclude": ["node_modules", "dist", "**/*.test.ts", "**/__tests__/**", "src/skills-validator.ts"]
+  "exclude": ["node_modules", "dist", "**/*.test.ts", "**/__tests__/**"]
 }
