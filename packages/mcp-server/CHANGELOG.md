@@ -4,4 +4,4 @@
 
 ### Minor Changes
 
-- d98a326: Added formio-auth, formio-schema, form revision support, and many improvements to the skills.
+- d98a326: Added form revision support.
