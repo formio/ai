@@ -4,7 +4,7 @@
 
 Form.io integrates with any OAuth 2.0 / OpenID Connect (OIDC) Identity Provider. The user authenticates against the IdP, the provider returns standard OAuth/OIDC claims, and Form.io exchanges those claims for a first-party Form.io JWT.
 
-SSO in Form.io is **Remote Authentication**: Form.io does not look up or create a `user` Resource submission. Instead it reads the user information out of the provider's token, dynamically builds an **ephemeral user object** from that information, and encodes that user — profile data plus mapped roles — **entirely within the Form.io JWT**. There is no database row for the user; everything the application needs about the identity travels inside the token. Provider roles are translated onto Form.io Roles via **OAuth Role Mapping**, so an SSO user lands with the same role-keyed `access` / `submissionAccess` evaluation that resource-backed users get.
+SSO in Form.io is **Remote Authentication**: Form.io does not look up or create a `user` Resource submission. Instead it retrieves user data from the IDP (using the `userinfo_endpoint`), dynamically builds an **ephemeral user object** from that information, and encodes that user — profile data plus mapped roles — **entirely within the Form.io JWT**. There is no database row for the user; everything the application needs about the identity travels inside the token. Provider roles are translated onto Form.io Roles via **OAuth Role Mapping**, so an SSO user lands with the same role-keyed `access` / `submissionAccess` evaluation that resource-backed users get.
 
 ## When to use this
 
@@ -31,28 +31,62 @@ OAuth/OIDC providers are configured on the Project's OAuth settings page in the 
 - **Client ID** and **Client Secret** from the IdP.
 - **Authorization URL** (authorization_endpoint), **Token URL** (token_endpoint), and **User Info URL** (userinfo_endpoint): (All three of these can be easily retrieved using the OIDC discovery document, e.g. `https://<issuer>/.well-known/openid-configuration`).
 - **Scopes** — typically `openid profile email` plus any custom scopes that carry the role claim.
-- **Redirect URI** — the Form.io endpoint that completes the handshake. The portal generates the canonical value.
 
-Refer to the per-provider sub-pages linked from `https://help.form.io/developers/auth` for the exact field names and any provider-specific quirks (Azure AD tenant ID, Google hosted-domain filter, etc.).
+Refer to the per-provider sub-pages linked from `https://help.form.io/developers/auth/oauth#openid-connect-oidc` for the exact field names and any provider-specific quirks.
 
 ### Login form integration
 
-Attach an OAuth Action (one per provider) to the project's login form. Each OAuth Action renders a "Sign in with X" button that drives the user through the IdP handshake. On a successful return, Form.io:
+In order to create a Login Form that performs an OIDC authentication, you must first add the following button schema to your Login Form.
 
-1. Calls the IdP's User Info endpoint with the OAuth access token.
-2. Builds an ephemeral user object from the returned user information (no `user` Resource submission is created or looked up).
-3. Applies OAuth Role Mapping (see below) to attach Form.io Roles to that ephemeral user.
-4. Encodes the ephemeral user (profile data + roles) into a Form.io JWT and returns it via the `x-jwt-token` response header. From this point on the user is indistinguishable from a Resource-authenticated user — except that the identity lives in the token rather than in a Resource row.
+```
+{
+  "label": "Sign in with OIDC",
+  "action": "oauth",
+  "key": "oidcLogin",
+  "type": "button",
+  "input": true,
+  "oauthProvider": "openid"
+}
+```
 
-### OAuth Role Mapping
+Once this button is part of the form, the `OAuth` Action is then added to that form with the following configurations.
 
-OAuth Role Mapping is the bridge between an IdP role claim (e.g. `groups`, `roles`, `https://my-app/roles`) and Form.io Roles. The Project's OAuth settings page exposes a mapping table:
+- `settings.provider` = "openid"
+- `settings.association` = "remote"
+- `settings.button` = "oidcLogin" <== Must match the key for the OIDC login button component.
+- `settings.redirectURI` = "..." <== The application url to navigate to after the OIDC handshake. 
+- `settings.roles` = [{...}] <== This contains an array of the following object.
 
-- Pick the claim path (e.g. `roles`) the IdP returns.
+OAuth Role Mapping is the bridge between an IdP role claim (e.g. `groups`, `roles`, `https://my-app/roles`) and Form.io Roles. The role map settings should provide the following:
+
+- Pick the claim path (e.g. `roles`) the IdP returns. Leave empty to mean `any authenticated user`
 - For each claim value (e.g. `admin`, `marketing`, `external`), choose the Form.io Role it maps to.
 - A user may match multiple rows; the resulting `roles` array is the union.
 
-Users without any matching claim row fall back to the configured default Role (typically Authenticated).
+`settings.roles` =
+```
+[
+    {
+        "claim": "",  // Leave empty to mean "any authenticated user"
+        "value": "",
+        "role": "69dfb6dcbb04c38a9102977c"  // This would be the 'Authenticated' role
+    },
+    {
+        "claim": "groups",
+        "value": "Admin",
+        "role": "69dfb6dcbb04c38a9102977d". // This would be the 'Administrator' role
+    }
+]
+```
+
+With these settings in place, and saved within the OAuth Action, when a user is using the form (embedded within the application), and clicks on the button, the following occurs.
+
+1. User is redirected to IDP authentication page and logs in.
+2. IDP auth performs a redirect to the login form endpoint with access tokens in query params
+3. OIDC login action calls the IdP's User Info endpoint with the OAuth access token.
+4. Builds an ephemeral user object from the returned user information (no `user` Resource submission is created or looked up).
+5. Applies OAuth Role Mapping (configured in action settings) to attach Form.io Roles to that ephemeral user.
+6. Encodes the ephemeral user (profile data + roles) into a Form.io JWT and returns it via the `x-jwt-token` response header. From this point on the user is indistinguishable from a Resource-authenticated user — except that the identity lives in the token rather than in a Resource row.
 
 ### Remote Authentication: the ephemeral user
 

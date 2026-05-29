@@ -4,7 +4,7 @@
 
 Token Swap exchanges an externally-issued OAuth/OIDC bearer token for a first-party Form.io token. The canonical use case is **embedding Form.io forms inside an existing application that already has its own OAuth authentication**. That host application already holds a Bearer token from the OAuth provider; Token Swap trades that token for a Form.io token so that every subsequent interaction with Form.io is authenticated with the new Form.io token — no separate "Sign in with..." step inside Form.io.
 
-Token Swap is **Remote Authentication**, exactly like interactive OIDC SSO: Form.io does not look up or create a `user` Resource submission. It uses the supplied OAuth token to fetch the user information from the provider, builds an **ephemeral user object**, applies the same OAuth Role Mapping the interactive flow uses, and encodes that user — profile data plus mapped roles — **entirely within the Form.io token**.
+Token Swap is **Remote Authentication**, exactly like interactive OIDC SSO: Form.io does not look up or create a `user` Resource submission. It uses the supplied OAuth token to fetch the user information from the provider, builds an **ephemeral user object**, applies OAuth Role Mappings (defined in the project settings), and encodes that user — profile data plus mapped roles — **entirely within the Form.io token**.
 
 ## When to use this
 
@@ -21,6 +21,15 @@ Not for:
 - Issuing a Form.io JWT entirely from your own backend without an IdP at all → see [`custom-jwt.md`](./custom-jwt.md).
 
 ## Configuration
+In order to perform a token swap, the projects OpenID settings must be configured. See [`sso-oidc.md`](./sso-oidc.md) for instructions on these configurations.
+
+**Import: You must also ensure you have the role mappings configured within the project settings to properly map the OIDC claims with the Form.io Roles.**
+
+OAuth Role Mapping is the bridge between an IdP role claim (e.g. `groups`, `roles`, `https://my-app/roles`) and Form.io Roles. The Project's OAuth settings page exposes a mapping table:
+
+- Pick the claim path (e.g. `roles`) the IdP returns.
+- For each claim value (e.g. `admin`, `marketing`, `external`), choose the Form.io Role it maps to.
+- A user may match multiple rows; the resulting `roles` array is the union.
 
 ### Prerequisites
 
@@ -93,7 +102,7 @@ Token Swap provider configuration (OpenID / OIDC settings, Role Mapping) MUST be
 
 ## See also
 
-- [`sso-oidc.md`](./sso-oidc.md) — interactive OIDC SSO and OAuth Role Mapping, which Token Swap reuses verbatim.
+- [`sso-oidc.md`](./sso-oidc.md) — interactive OIDC SSO and OAuth Role Mapping. For role mapping, token swap gets its roles from the project settings, whereas standard OIDC SSO gets the mappings from the login form's OAuth action.
 - [`custom-jwt.md`](./custom-jwt.md) — when there is no IdP and the backend signs Form.io JWTs directly with `JWT_SECRET`.
 - [`jwt-and-sessions.md`](./jwt-and-sessions.md) — the Form.io JWT payload that Token Swap returns, the `jti` Session ID, and logout semantics.
 - [`roles-and-permissions.md`](./roles-and-permissions.md) — the role IDs OAuth Role Mapping references.

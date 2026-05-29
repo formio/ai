@@ -97,10 +97,10 @@ For many applications, you may wish to accomplish a typical workflow where anyon
 
  - User lands on an application 'register' page, where they see an embedded form with ONLY an email address.
  - This is a Form.io form that only contains an Email field.
- - This form 'Create All' permission is set to allow 'Anonymous' submissions.
+ - This form 'Create Own' permission is set to allow 'Anonymous' submissions.
  - This form contains two actions:  Save Submission (pointing to User resource) and Email
  - The email action contains the token macro described above, with a callback url navigating to an 'onboarding' page within the application.
- - The user clicks on the lick, and it navigates them to the onboarding page with the `token=...` set within the url.
+ - The user clicks on the link, and it navigates them to the onboarding page with the `token=...` set within the url.
  - The onboarding page has a controller that reads the token (using `Formio.pageQuery()`) and then authenticates the user (which was created with the 'Save Submission' action on the register form). They are authenticated with `Formio.setToken(token)`. 
 
 This onboarding page could then contain whatever content is needed to complete the user registration. This could be to set the 'password' of the user, or complete filling out their profile. This user is now 'verified' since they needed to click on a link within their email in order to complete the registration.

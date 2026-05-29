@@ -44,13 +44,13 @@ A decoded Form.io JWT looks like this:
 
 Claim semantics:
 
-- `user._id` — MongoDB ID of the user submission when the identity is backed by a `user` Resource row (Resource login). For SSO (Remote Authentication) and Custom JWTs there is no Resource row — the user is ephemeral and `user._id` is the `"external"` sentinel.
+- `user._id` — MongoDB ID of the user submission when the identity is backed by a `user` Resource row (Resource login). For SSO (Remote Authentication) and Custom JWTs there is no Resource row — the user is ephemeral and `user._id` is either an IDP id (for SSO), or the `"external"` sentinel for Custom JWTs.
 - `iss` — issuer; the Form.io API base URL.
 - `sub` — subject; same as `user._id`.
 - `jti` — Session ID. Logging out invalidates this; see below.
 - `iat`, `exp` — issued-at and expiry timestamps (unix seconds).
 
-SSO (OIDC/OAuth, SAML, LDAP, Token Swap) uses Remote Authentication: the ephemeral user built from the IdP is encoded directly into the JWT, so the token carries `user.data` (the mapped profile) and `user.roles` (from Role Mapping) rather than pointing at a Resource row. This is the same in-token user shape a Custom JWT carries — Custom JWTs additionally set `external: true`, `form: { _id: ... }`, and `project: { _id: ... }`. See [`custom-jwt.md`](./custom-jwt.md) for the full payload.
+SSO (OIDC/OAuth, SAML, LDAP, Token Swap) uses Remote Authentication: the ephemeral user built from the IdP is encoded directly into the JWT, so the token carries `user.data` (the mapped profile) and `user.roles` (from Role Mapping) rather than pointing at a Resource row. SSO tokens also carry `external: true`, `project: { _id: ... }`, and sometimes `form: { _id: ... }`. This is the same in-token user shape a Custom JWT carries — However, custom JWTs always carry `form: { _id: ... }`. See [`custom-jwt.md`](./custom-jwt.md) for the full payload.
 
 ### Session ID (`jti`) and logout
 
