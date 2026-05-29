@@ -63,6 +63,7 @@ You are the library's default "build me an app" skill. When a user describes an 
 - **Translate, do not interrogate.** Lead with a plain-language restatement of what the app (or the new feature) will DO and let the user confirm or correct. Never open the conversation with Form.io or framework jargon.
 - **One step at a time, left to right.** Intent → Plan → Deployment → MCP Config → Import → Framework. Each step that writes files, calls the MCP server, or imports into a live project ends with an approval gate. A declined gate stops the flow; partial state is never left behind.
 - **Route, do not reimplement.** Planning lives in `formio-resource-planner`. Framework file generation lives in `formio-angular` (today) and in future framework skills. Your job is to orchestrate the handoffs, not to duplicate their logic.
+- **Pick the right kind per entity — Resource or Form.** Most of what users describe is a reusable **data model** (a Resource — Contact, Product, Project), and many apps are entirely Resources — that is correct and common. Some entities are instead **bespoke data collection** (a Form — a job application, a survey, an RSVP, an intake/feedback form). The planner makes this call per entity; do not force everything into Resources, and equally do not force an entity into a Form when a Resource fits. When the user's request is clearly survey-like or one-off (e.g., "a form for people to apply"), say so in your plain-language restatement so the planner can classify it as a Form. See `formio-resource-planner` → "Resources vs. Forms — the core modeling decision".
 - **Modify-existing still plans and imports.** If the user is extending an already-running app, still run the planner (in delta mode — it plans ONLY the new resources/fields/actions for the feature) and still call `project_import` (import is additive — adding new resources to the existing project is safe). What modify-existing skips is Deployment (URLs are already in the workspace) and MCP Config (`.mcp.json` already exists and targets the right project). Then route to the framework's extend sub-skill with the new resources in hand.
 - **Batch your questions.** When input is needed (URLs in Step 3, framework pick in Step 6), use one `AskUserQuestion` per step. Do not pepper.
 - **Expect one restart boundary on build-new.** Step 4 writes `.mcp.json` and halts the invocation — Claude Code only picks up new MCP env at session start, so the user restarts (or runs `/mcp` to reconnect) before Step 5 can run. Modify-existing has no restart boundary — its `.mcp.json` is already in place.
@@ -78,6 +79,43 @@ Anything from a one-sentence domain description up to a fully-modeled workspace:
 | "Also track X in my event app" (existing workspace)                              | Run Intent → Plan (delta — only the new resources for X) → Import (additive merge) → Framework routing to the extend sub-skill. Skip Deployment and MCP Config. |
 | Explicit framework naming ("build it in Angular", "add an Angular module for X") | Do not activate. The user has chosen the framework; `formio-angular` or `formio-angular-resources` will handle it directly.                   |
 
+## Using Resources within Forms — the right flow (and the anti-pattern to avoid)
+
+This is the highest-leverage thing to get right when an app has both a data model and bespoke forms. Hold it firmly and pass it to the planner.
+
+### The anti-pattern: establishing a Resource record inside a Form submission
+
+A common Form.io mistake is trying to solve two problems in one submission — **create the data-model record AND collect bespoke responses at the same moment**. The Job Application is the classic trap: a single "Job Application" form that both creates the `Applicant` record and captures the application answers, often by embedding the `Applicant` resource as a nested form so it is created inline.
+
+Why this is wrong:
+
+- The applicant's very first interaction should NOT be the Job Application form. Form.io forms are meant to be embedded inside an **application flow**, not to bootstrap a person's existence in the system.
+- It conflates two separate concerns — *managing the Applicant record* and *collecting one application* — into a single brittle submission.
+- It produces duplicate / throwaway Applicant records (one per application), defeating the whole point of a reusable data model, and it makes owner-based access and reporting messy.
+
+**Do NOT use a nested `form` component to create a Resource record from inside a bespoke Form.** Nested-form-for-creation is the mechanism that enables this anti-pattern.
+
+### The right flow: establish the Resource first, then reference it from the Form
+
+Separate the two concerns into two steps of the flow:
+
+1. **Establish the Resource record first**, as its own application concern — an onboarding / registration / profile step (e.g., the applicant onboards and an `Applicant` record is created). This is normal CRUD against the resource, managed by its own screens.
+2. **Then the user fills the bespoke Form**, which *references* the already-established record rather than creating it. Two ways to wire the reference:
+   - **Disabled, pre-selected Select** — a `select` (dataSrc=resource) pointing at the resource, defaulted to the current user's record and set `disabled: true` so they cannot change it. The application is unambiguously linked to the right Applicant, and the user can't mis-select.
+   - **Submission `owner`** — when the relationship is 1:1 with the authenticated user (the user IS the subject), rely on the submission's `owner` and owner-based access instead of an explicit reference field. No select needed.
+
+Job Application, done right: the applicant onboards once (Applicant record created) → later opens the `JobApplication` form → the form shows their Applicant locked in a disabled Select (or simply owns the submission) plus the bespoke questions ("Why should we hire you?", "Earliest start date") → one clean submission = one application, linked to the existing Applicant.
+
+### What to tell the planner
+
+When the user's request implies a bespoke form over a data-model record, instruct the planner to:
+
+- Model the data-model record as a **Resource** managed by its **own** flow (onboarding / profile / admin CRUD).
+- Model the bespoke collection as a separate **Form** that **references** the established Resource via a disabled, pre-selected Select OR via the submission `owner` — never via a nested form that creates the record.
+- Never attach a Save action that creates the referenced Resource from the bespoke Form.
+
+See `formio-resource-planner` → "Resources vs. Forms — the core modeling decision" for the field-level shapes the planner emits.
+
 ## The six steps
 
 ### Step 1 — Intent
@@ -91,7 +129,7 @@ Determine whether this is a new app to build or an existing app to extend. See [
 
 Invoke `formio-resource-planner` with the user's plain-language description. The planner runs its own two-phase approval gate (Phase A: Resource Map for review; Phase B: the paired artifacts `template.md` + `template.json` on approval). Do not add a second gate on top.
 
-- **Build-new** → the planner produces a full-project pair: `template.md` (architectural intent, Access Matrix, ER + Access Flow diagrams) and `template.json` (every resource, role, form, and action the new app needs).
+- **Build-new** → the planner produces a full-project pair: `template.md` (architectural intent, Access Matrix, ER + Access Flow diagrams) and `template.json` (every resource, role, form, and action the new app needs). The planner classifies each entity as a Resource (reusable data model) or a bespoke Form (purpose-specific data collection, e.g. a job application that references an already-established Applicant resource plus survey fields) — both land in the template. See "Using Resources within Forms" above: a Form references an established Resource (disabled Select or `owner`), it never creates the Resource inline.
 - **Modify-existing** → the planner produces a delta pair: `template.md` + `template.json` that contain ONLY the new resources, fields, or actions for the requested feature. The planner is told (a) that the project already exists and has resources loaded, (b) to plan only what is new, and (c) that the template will be merged additively on top of the existing project.
 
 The planner writes both files to the working directory as a paired set (same basename; same collision timestamp if either name is taken). Stash BOTH paths — you will pass them both to Step 5 (Import — reads `template.json`) and Step 6 (Framework routing — hands both to the framework skill). On the modify-existing branch, additionally stash a list of the delta resource names for the framework's extend sub-skill in Step 6.

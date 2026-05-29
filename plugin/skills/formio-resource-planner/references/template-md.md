@@ -12,7 +12,7 @@ Treat the two files as a pair: same basename, same timestamp on collision (`temp
 
 ## Required section order
 
-Sections appear in this exact order. Skills and graders rely on section headings — do not rename them. Every heading listed here is mandatory; omit the body only if the section genuinely has nothing (e.g., `Users & Auth` when the app is anonymous, then write `- None. App is public.` underneath).
+Sections appear in this exact order. Skills and graders rely on section headings — do not rename them. Every heading listed here is mandatory EXCEPT `## Forms`, which is **conditional**: include it (immediately after `## Resources`) only when the app has bespoke data-collection forms, and omit the whole heading otherwise. For the remaining mandatory headings, omit only the body when the section genuinely has nothing (e.g., `Users & Auth` when the app is anonymous, then write `- None. App is public.` underneath).
 
 ```markdown
 # Resource Map — <App Name>
@@ -20,6 +20,8 @@ Sections appear in this exact order. Skills and graders rely on section headings
 <1–2 sentence app summary in plain language>
 
 ## Resources
+
+## Forms
 
 ## Users & Auth
 
@@ -64,6 +66,28 @@ For transitive group access, call out the hidden mirror on every grandchild:
   - team: select (resource=Team, hidden, calculated from account.team, field-based access) —
     **invisible mirror that propagates group access from Account's team**
 ```
+
+## Forms section (conditional)
+
+Include this section ONLY when the app has bespoke, purpose-specific data-collection forms — job applications, surveys, RSVPs, intake/feedback forms. A **Form** (`type: form`) captures a response for one interaction rather than a reusable record; see `SKILL.md` → "Resources vs. Forms — the core modeling decision" for the classification rule. Omit the entire `## Forms` heading for pure data-model apps.
+
+Auth forms (login / register) are NOT listed here — they belong under `## Users & Auth`. This section is only for application-level bespoke forms.
+
+One block per form. Call out which Resource (if any) the form **references** (a record established earlier in the flow) and how. A bespoke form references an existing record — it never creates that record on submit; see `SKILL.md` → "Resources vs. Forms" and `formio-application` → "Using Resources within Forms" for the anti-pattern.
+
+```markdown
+- <FormName> (type: form)
+  Purpose: <1 sentence — the specific interaction this form captures>
+  References: <ResourceName via disabled pre-selected Select | owner (1:1 with the user) | none>
+  Fields:
+    - <key>: <component> — <bespoke field specific to this form>
+    - ...
+  Access: <who can submit / who can read>
+  Actions:
+    - <action name>: <key settings>   ← Save to its OWN submission only; never a Save that creates the referenced Resource
+```
+
+Forms may also appear in the ER Diagram (wired to any Resource they reference) and in the Access Flow Diagram when their submission access is non-trivial, but this is optional — the grader does not require forms to appear in either diagram.
 
 ## Users & Auth section
 

@@ -41,7 +41,7 @@ When the user's phrasing is genuinely ambiguous, ask the question.
 
 ### Build-new branch
 
-1. **Step 2 — Plan (full)** — `formio-resource-planner` produces the approved artifact pair `template.md` (architectural intent with Access Matrix + ER and Access Flow diagrams) and `template.json` (full project export with every resource, role, form, and action for the new app). The planner's own Phase A → Phase B gate is the only gate needed.
+1. **Step 2 — Plan (full)** — `formio-resource-planner` produces the approved artifact pair `template.md` (architectural intent with Access Matrix + ER and Access Flow diagrams) and `template.json` (full project export with every resource, role, form, and action for the new app). The planner classifies each entity as a Resource (reusable data model) or a bespoke Form (purpose-specific data collection) — see `formio-resource-planner` → "Resources vs. Forms" — so survey-like / one-off intakes become forms, not resources. The planner's own Phase A → Phase B gate is the only gate needed.
 2. **Step 3 — Deployment** — URL interview for `FORMIO_BASE_URL` + `FORMIO_PROJECT_URL`.
 3. **Step 4 — MCP Config** — writes `./.mcp.json` and halts. User restarts Claude Code (or runs `/mcp` reconnect). Steps 5 & 6 run in the next invocation.
 4. **Step 5 — Import** — `project_import` of the full template into the (empty) project.
