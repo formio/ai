@@ -117,6 +117,37 @@ describe('form_get tool', () => {
       expect.objectContaining({ type: 'text', text: expect.stringContaining('404') }),
     ]);
   });
+
+  it('with draft: true fetches /{base}/draft and returns the body when _vid === "draft"', async () => {
+    const id = '67890abcdef012345678abcd';
+    const draft = { _vid: 'draft', _id: id, components: [{ type: 'staged' }] };
+    mockFormioFetch.mockResolvedValue(draft);
+    const { client } = await createTestClient(registerFormGetTool);
+
+    const result = await client.callTool({
+      name: 'form_get',
+      arguments: { cwd: TEST_CWD, formIdOrPath: id, draft: true },
+    });
+
+    expect(mockFormioFetch).toHaveBeenCalledWith(`form/${id}/draft`, {}, TEST_CONFIG);
+    expect(result.content).toEqual([{ type: 'text', text: JSON.stringify(draft, null, 2) }]);
+  });
+
+  it('with draft: true throws "no draft exists" when _vid is not "draft"', async () => {
+    const id = '67890abcdef012345678abcd';
+    mockFormioFetch.mockResolvedValue({ _vid: 5, components: [] });
+    const { client } = await createTestClient(registerFormGetTool);
+
+    const result = await client.callTool({
+      name: 'form_get',
+      arguments: { cwd: TEST_CWD, formIdOrPath: id, draft: true },
+    });
+
+    expect(result.isError).toBe(true);
+    expect(result.content).toEqual([
+      expect.objectContaining({ text: expect.stringMatching(/No draft exists/) }),
+    ]);
+  });
 });
 
 describe('isMongoId', () => {

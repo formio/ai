@@ -4,11 +4,12 @@ import { FormioConfig } from '../config.js';
 import { formioFetch } from '../formio-client.js';
 import { toMcpTextResult, toMcpError } from '../mcp-responses.js';
 import { cwdSchema, resolveProjectConfig } from '../project-resolver.js';
+import { gateRevisionsLicense, prefixVnote } from '../revisions/index.js';
 
 export function registerFormCreateTool(server: McpServer, config: FormioConfig) {
   server.tool(
     'form_create',
-    "Create a new form in the Form.io project mapped to the user's current working directory. IMPORTANT: Before calling this tool, use the formio-form skill to construct a properly structured Form.io form JSON definition based on the user's requirements. The skill documents all component types, validation options, layout patterns, and conditional logic available in Form.io.",
+    'Create a new form in the Form.io project mapped to the user\'s current working directory. IMPORTANT: Before calling this tool, use the formio-schema skill to construct a properly structured Form.io form JSON definition based on the user\'s requirements. The skill documents all component types, validation options, layout patterns, and conditional logic available in Form.io. New forms default to `revisions: \'original\'` so form change history is preserved. NOT for: creating a draft revision of an existing form. When the user says "create/save a draft", "draft <change>", call form_update with `formId` and `draft: true` instead.',
     {
       cwd: cwdSchema,
       form: z
@@ -25,16 +26,31 @@ export function registerFormCreateTool(server: McpServer, config: FormioConfig) 
             .optional()
             .describe('Display mode (default: "form")'),
           tags: z.array(z.string()).optional().describe('Tags for categorization'),
+          revisions: z
+            .enum(['current', 'original', ''])
+            .optional()
+            .describe('Revision mode (default: "original"). Pass "" to disable'),
         })
         .catchall(z.unknown())
         .describe('Form.io form JSON definition'),
+      note: z.string().optional().describe('Note describing the initial revision'),
     },
-    async ({ cwd, form }) => {
+    async ({ cwd, form: rawForm, note }) => {
       try {
         const cfg = resolveProjectConfig(cwd, config);
+        const { licensed, form } = await gateRevisionsLicense(server, cfg, {
+          actionLabel: 'create this form',
+          requiresRevisions: false,
+          form: rawForm,
+        });
         const created = await formioFetch('form', {}, cfg, {
           method: 'POST',
-          body: form,
+          body: {
+            // gate already stripped `revisions` on unlicensed deployments; on
+            // licensed ones default to 'original' unless the caller overrode.
+            ...(licensed ? { revisions: 'original', ...form } : form),
+            ...(note && { _vnote: prefixVnote(note) }),
+          },
         });
         return toMcpTextResult(created);
       } catch (error) {

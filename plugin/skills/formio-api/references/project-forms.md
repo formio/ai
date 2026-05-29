@@ -91,7 +91,7 @@ Request body (JSON):
 }
 ```
 
-Required fields: `title`, `type` (`form` or `resource`), `name`, `path`, `components`. Optional fields: `tags`, `display`, `settings`, `access`, `submissionAccess`. See the `formio-form` skill for the full component schema.
+Required fields: `title`, `type` (`form` or `resource`), `name`, `path`, `components`. Optional fields: `tags`, `display`, `settings`, `access`, `submissionAccess`. See the `formio-schema` skill for the full component schema.
 
 Response: the created form document with server-assigned `_id`, `machineName`, `created`, and `modified` fields.
 

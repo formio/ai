@@ -283,7 +283,7 @@ The MCP server SHALL register a new tool named `authenticate` at `packages/mcp-s
 - Returns a JSON-serialized text content block whose payload is `{ authenticated: boolean, cached: boolean, projectUrl: string, userEmail?: string }`. The JWT MUST NOT appear in the return payload.
 - Reads the project URL from the server's `FormioConfig`. The agent does NOT pass a URL.
 - `cached: true` when the JWT was already present before the call; `cached: false` when the call triggered a fresh login.
-- `userEmail` is best-effort — populated from a `GET {projectUrl}/current` call when the returned submission has an email field. Any error fetching the current user is swallowed; the field is simply omitted.
+- `userEmail` is best-effort — populated from a `GET {baseUrl}/current` call when the returned submission has an email field. Any error fetching the current user is swallowed; the field is simply omitted.
 - Is the tool Step 4 of `formio-application` calls explicitly to trigger authentication. It is also available to any other skill that wants to pre-authenticate before a sensitive sequence.
 
 #### Scenario: Tool is registered and callable
@@ -306,7 +306,7 @@ The MCP server SHALL register a new tool named `authenticate` at `packages/mcp-s
 
 #### Scenario: Current-user email included when available
 
-- **WHEN** a successful `authenticate` call finishes and `GET {projectUrl}/current` returns a submission with an email field
+- **WHEN** a successful `authenticate` call finishes and `GET {baseUrl}/current` returns a submission with an email field
 - **THEN** the payload contains `userEmail: <the email>`
 
 #### Scenario: Current-user fetch failure is swallowed

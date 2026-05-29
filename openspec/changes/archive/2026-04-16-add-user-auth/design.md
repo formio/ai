@@ -56,7 +56,7 @@ Structure: `{ "<projectUrl>": "<jwt>" }`
 
 **Why `~/.formio/`**: Follows the convention of CLI tools storing config in a dotfile directory in the user's home. Keeps it separate from project-level config.
 
-### 4. Token validation via `GET {projectUrl}/current`
+### 4. Token validation via `GET {baseUrl}/current`
 
 On startup (after reading config and cache), send a request to the `/current` endpoint. If it returns 200, the token is valid. If 401, clear the cached token and trigger the login flow (or fail in API key mode).
 

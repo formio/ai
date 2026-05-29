@@ -69,7 +69,7 @@
 
 ### Green
 
-- [x] 4.5 Create `src/token-validation.ts` with `validateToken(config)` that sends `GET {projectUrl}/current` with the appropriate auth header and returns a boolean
+- [x] 4.5 Create `src/token-validation.ts` with `validateToken(config)` that sends `GET {baseUrl}/current` with the appropriate auth header and returns a boolean
 
 ### Refactor
 

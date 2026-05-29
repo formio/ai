@@ -1,0 +1,26 @@
+{
+  "name": "@formio/skill-tests",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Automated structural tests for code examples shipped in the Form.io skills library.",
+  "type": "module",
+  "license": "MIT",
+  "scripts": {
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "lint": "tsc --noEmit",
+    "typecheck": "tsc --noEmit",
+    "clean": "rm -rf coverage"
+  },
+  "devDependencies": {
+    "@formio/core": "^2.6.6",
+    "@formio/js": "^5.3.6",
+    "@types/node": "^22.19.17",
+    "jsdom": "^25.0.1",
+    "typescript": "^5.8.2",
+    "vitest": "^3.1.1"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
