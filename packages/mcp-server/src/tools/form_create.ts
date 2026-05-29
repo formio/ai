@@ -9,7 +9,7 @@ import { gateRevisionsLicense, prefixVnote } from '../revisions/index.js';
 export function registerFormCreateTool(server: McpServer, config: FormioConfig) {
   server.tool(
     'form_create',
-    'Create a new form in the Form.io project mapped to the user\'s current working directory. IMPORTANT: Before calling this tool, use the formio-form skill to construct a properly structured Form.io form JSON definition based on the user\'s requirements. The skill documents all component types, validation options, layout patterns, and conditional logic available in Form.io. New forms default to `revisions: \'original\'` so form change history is preserved. NOT for: creating a draft revision of an existing form. When the user says "create/save a draft", "draft <change>", call form_update with `formId` and `draft: true` instead.',
+    'Create a new form in the Form.io project mapped to the user\'s current working directory. IMPORTANT: Before calling this tool, use the formio-schema skill to construct a properly structured Form.io form JSON definition based on the user\'s requirements. The skill documents all component types, validation options, layout patterns, and conditional logic available in Form.io. New forms default to `revisions: \'original\'` so form change history is preserved. NOT for: creating a draft revision of an existing form. When the user says "create/save a draft", "draft <change>", call form_update with `formId` and `draft: true` instead.',
     {
       cwd: cwdSchema,
       form: z

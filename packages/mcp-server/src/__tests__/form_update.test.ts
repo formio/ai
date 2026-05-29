@@ -37,7 +37,8 @@ describe('form_update tool', () => {
     const tool = tools.find((t) => t.name === 'form_update');
     expect(tool).toBeDefined();
     expect(tool!.description).toContain('form_get');
-    expect(tool!.description).toContain('formio-form');
+    expect(tool!.description).toContain('formio-schema');
+    expect(tool!.description).not.toContain('formio-form');
   });
 
   it('sends PUT to /form/{formId} with form body and _vnote prefix', async () => {

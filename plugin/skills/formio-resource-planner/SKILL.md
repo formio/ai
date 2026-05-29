@@ -143,7 +143,7 @@ When the user describes access ("reps only see their company's deals"), they alm
 | File attachment                    | `file`                                                   | Requires a storage provider         |
 | Email (for user login)             | `email`                                                  | Always on the `user` resource       |
 
-Full component reference: see the `formio-form` skill when you need exact JSON shapes. This cheat sheet is for planning, not generation.
+Full component reference: see the `formio-schema` skill when you need exact JSON shapes. This cheat sheet is for planning, not generation.
 
 ### Action cheat sheet
 
@@ -461,5 +461,5 @@ Consult these when the user's requirements touch an edge case this skill doesn't
 - **Does not skip the approval gate.** Even if the user's prompt sounds decisive, always emit the map first, ask for approval, and only then produce the `template.md` + `template.json` pair.
 - **Does not emit one artifact without the other.** Phase B ALWAYS writes both `template.md` and `template.json`. If something prevents both, stop and explain.
 - **Does not look up endpoints.** The `formio-api` skill handle endpoint reference.
-- **Does not deep-dive a single form's component schema.** For exhaustive component options (conditional logic, calculated values, custom validation), see `formio-form`. This skill's template.json uses the minimum viable component shape for each field.
+- **Does not deep-dive a single form's component schema.** For exhaustive component options (conditional logic, calculated values, custom validation), see `formio-schema`. This skill's template.json uses the minimum viable component shape for each field.
 - **Does not make the plan "complete" beyond what the user described.** If they didn't mention reporting, don't add a report resource.

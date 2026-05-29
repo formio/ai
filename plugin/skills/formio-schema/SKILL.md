@@ -1,30 +1,54 @@
 ---
 name: formio-schema
-description: Form.io form JSON schema reference. Use this skill whenever constructing, editing, or interpreting a Form.io form definition — including forms returned by MCP tools like `form_list`, `form_get`, `form_create`, and `form_update`, or when the user mentions form components, wizards, resources, submissions, conditional logic, validation rules, or any `type: "..."` component (textfield, select, datagrid, panel, etc.). Trigger even when the user does not explicitly say "Form.io" if the context involves JSON form schemas with `components` arrays, `key`/`input`/`type` fields, or form builder concepts.
+description: >-
+  Form.io JSON schema reference covering the document shapes for projects, forms (and resources), and submissions. Use this skill whenever constructing, editing, or interpreting any Form.io project / form / submission JSON — forms returned by MCP tools like `form_list`, `form_get`, `form_create`, `form_update`; submission bodies returned by `/submission` endpoints (including decoding `data`, reading row-level `access`, distinguishing draft vs submitted state, or inspecting submission `metadata`); or project documents returned by `/project/{projectId}` (including project-level settings, integrations such as email / captcha / SQL connector / file storage, authorization providers such as OAuth / LDAP / SAML, project-level access, the Stage and Tenant creation patterns, and project template envelopes used by `project_import` / `project_export`). Trigger whenever the user mentions form components, wizards, resources, submissions, draft submissions, submission metadata, submission data, project templates, project settings, stages, tenants, OAuth/LDAP/SAML, file storage, project access, conditional logic, validation rules, or any `type` component (textfield, select, datagrid, panel, etc.) — even when the user does not explicitly say "Form.io" if the context involves Form.io JSON schemas. Not for: calling Form.io REST endpoints (see `formio-api`); configuring server-side actions on a form (see `formio-actions`); planning a new app's resource model from scratch (see `formio-resource-planner`); orchestrating an entire app build (see `formio-application`).
 license: MIT
 ---
 
-# Form.io Form Schema
+# Form.io JSON Schema
 
-This skill describes the JSON schema used by [Form.io](https://form.io) forms. Use it to construct new form definitions, interpret existing ones, or modify forms via the MCP server tools.
+This skill describes the JSON schemas for the three Form.io document types whose shape is non-trivial — projects, forms (and resources), and submissions. Action configs live in the `formio-actions` skill; role objects are simple enough to use directly from the `formio-api` reference. Use this skill to construct new JSON payloads, interpret existing ones, or modify them via the MCP server tools.
 
-Detail is split across reference files. Read only the ones you need for the task at hand — the overview below is usually enough to orient yourself; load a reference file when you need a specific property list.
+Detail is split across reference files under `references/<domain>/`. Read only the files you need for the task at hand — the overview below is usually enough to orient yourself; load a reference file when you need a specific property list.
 
 ## When to load which reference
 
-Load the reference file that matches what you're working on:
+References are partitioned by schema domain. Pick a domain first, then pick a reference inside that domain. Adding a new schema domain is purely additive — new subdirectory under `references/`, new row in the appropriate table below.
 
-| Working on…                                                                                    | Load                              |
-| ---------------------------------------------------------------------------------------------- | --------------------------------- |
-| Top-level form properties (`title`, `path`, `display`, `access`, `settings`, etc.)             | `references/form-definition.md`   |
-| Properties shared by all components (`key`, `label`, `validate`, `conditional`, `logic`, etc.) | `references/base-component.md`    |
-| A specific input field (textfield, number, select, checkbox, file, signature, button, …)       | `references/input-components.md`  |
-| Visual layout containers (panel, columns, tabs, table, fieldset, well, content)                | `references/layout-components.md` |
-| Nested or repeatable data (container, datagrid, editgrid, datamap, nested form, address)       | `references/data-components.md`   |
+### Form definitions
 
-You can load multiple references in parallel if a task spans categories (e.g., a wizard with data grids and a signature field touches all the component references plus the form definition).
+| Working on…                                                                                    | Load                                   |
+| ---------------------------------------------------------------------------------------------- | -------------------------------------- |
+| Top-level form properties (`title`, `path`, `display`, `access`, `settings`, etc.)             | `references/form/form-definition.md`   |
+| Properties shared by all components (`key`, `label`, `validate`, `conditional`, `logic`, etc.) | `references/form/base-component.md`    |
+| A specific input field (textfield, number, select, checkbox, file, signature, button, …)       | `references/form/input-components.md`  |
+| Visual layout containers (panel, columns, tabs, table, fieldset, well, content)                | `references/form/layout-components.md` |
+| Nested or repeatable data (container, datagrid, editgrid, datamap, nested form, address)       | `references/form/data-components.md`   |
 
-## Top-level shape
+### Submissions
+
+| Working on…                                                                                | Load                                              |
+| ------------------------------------------------------------------------------------------ | ------------------------------------------------- |
+| Top-level submission envelope (`_id`, `form`, `owner`, `roles`, `state`, `metadata`, etc.) | `references/submission/submission-definition.md`  |
+| Lifecycle state — `draft` vs `submitted`, when each is written                             | `references/submission/submission-state.md`       |
+| The `metadata` bag (timezone, browser, headers, extension keys)                            | `references/submission/submission-metadata.md`    |
+| Row-level `access` overrides and every `AccessType` value                                  | `references/submission/submission-access.md`      |
+| Decoding the `data` envelope — key paths, nesting, address discriminated union             | `references/submission/submission-data.md`        |
+
+### Projects
+
+| Working on…                                                                                      | Load                                                |
+| ------------------------------------------------------------------------------------------------ | --------------------------------------------------- |
+| Top-level project envelope (`title`, `name`, `owner`, `access`, settings, etc.)                  | `references/project/project-definition.md`          |
+| `type` (`project`/`stage`/`tenant`) and `framework` discriminators; Stage / Tenant patterns      | `references/project/project-type-and-framework.md`  |
+| `ProjectSettings` keys, integrations, authorization providers, encryption-at-rest contract       | `references/project/project-settings.md`            |
+| Project-level `access` array, `ProjectRole`, `ProjectFormAccess`, `ProjectAccessInfo`            | `references/project/project-access.md`              |
+
+For action configs, see the dedicated `formio-actions` skill. For role objects, see `formio-api`'s `project-roles` reference directly — role JSON is shallow enough that a separate domain is not warranted.
+
+You can load multiple references in parallel if a task spans categories (e.g., a wizard with data grids and a signature field touches every form reference).
+
+## Top-level shape (form domain)
 
 A form is a JSON object. The only required property is `components`; everything else is optional but commonly set:
 
@@ -45,7 +69,7 @@ A form is a JSON object. The only required property is `components`; everything 
 - `display`: `"form"` (single page), `"wizard"` (each top-level `panel` becomes a page/step), or `"pdf"`.
 - `components`: ordered array of component objects — the body of the form.
 
-For the full list of form-level properties including `access`, `submissionAccess`, `settings`, `revisions`, and `controller`, see `references/form-definition.md`.
+For the full list of form-level properties including `access`, `submissionAccess`, `settings`, `revisions`, and `controller`, see `references/form/form-definition.md`.
 
 ## Components at a glance
 
@@ -60,13 +84,13 @@ Every component has at minimum:
 - `input` — `true` for data-collecting fields, `false` for layout-only components.
 - `label` — displayed above the field.
 
-All other shared properties (validation, conditional display, calculated values, access, logic, etc.) live in `references/base-component.md`.
+All other shared properties (validation, conditional display, calculated values, access, logic, etc.) live in `references/form/base-component.md`.
 
 ### Component catalog
 
 Components fall into three categories. Pick a category, load its reference for full property tables.
 
-**Input components** (`references/input-components.md`) — collect user data:
+**Input components** (`references/form/input-components.md`) — collect user data:
 
 | `type`        | Purpose                                                                                                   |
 | ------------- | --------------------------------------------------------------------------------------------------------- |
@@ -92,7 +116,7 @@ Components fall into three categories. Pick a category, load its reference for f
 | `tags`        | Tag input                                                                                                 |
 | `survey`      | Matrix-style survey grid                                                                                  |
 
-**Layout components** (`references/layout-components.md`) — structure the form visually, set `input: false`:
+**Layout components** (`references/form/layout-components.md`) — structure the form visually, set `input: false`:
 
 | `type`        | Purpose                                      |
 | ------------- | -------------------------------------------- |
@@ -105,7 +129,7 @@ Components fall into three categories. Pick a category, load its reference for f
 | `content`     | Static HTML block                            |
 | `htmlelement` | Custom HTML tag                              |
 
-**Data components** (`references/data-components.md`) — manage nested or repeatable data:
+**Data components** (`references/form/data-components.md`) — manage nested or repeatable data:
 
 | `type`       | Purpose                                                            |
 | ------------ | ------------------------------------------------------------------ |
@@ -123,5 +147,5 @@ Components fall into three categories. Pick a category, load its reference for f
 - **Keys must be unique within a form.** Nested components (inside a `container`, `datagrid`, etc.) namespace their keys under the parent.
 - **Wizards are built from panels.** Set `display: "wizard"` on the form; each top-level `panel` component becomes one step.
 - **Resources vs forms.** Use `type: "resource"` for reusable data objects that can be referenced by `select` components with `dataSrc: "resource"`. Use `type: "form"` for anything that collects submissions.
-- **Conditional visibility.** Three formats exist: simple, JSON Logic, and legacy. An advanced conditional can also be written with custom JS. See `references/base-component.md` for syntax.
+- **Conditional visibility.** Three formats exist: simple, JSON Logic, and legacy. An advanced conditional can also be written with custom JS. See `references/form/base-component.md` for syntax.
 - **Avoid `calculateValue` without `allowCalculateOverride`** unless the field should truly be read-only-by-computation — users cannot edit a calculated field by default.

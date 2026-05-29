@@ -31,7 +31,8 @@ describe('form_create tool', () => {
     const { tools } = await client.listTools();
     const tool = tools.find((t) => t.name === 'form_create');
     expect(tool).toBeDefined();
-    expect(tool!.description).toContain('formio-form');
+    expect(tool!.description).toContain('formio-schema');
+    expect(tool!.description).not.toContain('formio-form');
   });
 
   it('sends form definition via POST to /form', async () => {

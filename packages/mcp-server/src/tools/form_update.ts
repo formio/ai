@@ -17,7 +17,7 @@ export function registerFormUpdateTool(server: McpServer, config: FormioConfig) 
   server.tool(
     'form_update',
     [
-      "Update an existing form in the Form.io project mapped to the user's current working directory. IMPORTANT: Before calling this tool, first use form_get to fetch the current form definition, then use the formio-form skill to apply the requested modifications (add, remove, or modify fields and settings), and finally call this tool with the complete updated form JSON.",
+      "Update an existing form in the Form.io project mapped to the user's current working directory. IMPORTANT: Before calling this tool, first use form_get to fetch the current form definition, then use the formio-schema skill to understand the schema so that you can apply the requested modifications (add, remove, or modify fields and settings), and finally call this tool with the complete updated form JSON.",
       '`draft`, `publish`, and `revert` are mutually exclusive — pass at most one.',
       'If `revisions` in the response differs from the stored value, the per-form revisions-mode gate prompted the USER and they chose.',
     ].join(' '),
