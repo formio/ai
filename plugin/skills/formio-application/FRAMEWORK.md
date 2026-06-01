@@ -78,7 +78,8 @@ What each row's target skill receives when called by Step 6:
   formioBaseUrl: string,               // no trailing slash
   templateMdPath: string,              // absolute, planner's template.md (architectural-intent seed)
   templateJsonPath: string,            // absolute, planner's template.json (structured companion)
-  importStatus: 'succeeded' | 'skipped' | 'failed-user-chose-continue'
+  importStatus: 'succeeded' | 'skipped' | 'failed-user-chose-continue',
+  frontendDesignStatus: 'available' | 'declined'  // from Step 6a's frontend-design pre-check
 }
 ```
 
@@ -92,7 +93,8 @@ The Entry skill uses this to skip its own SETUP (URLs are known), load the templ
   userRequest: string,                 // verbatim plain-language request
   templateMdPath: string,              // absolute, planner's delta template.md
   templateJsonPath: string,            // absolute, planner's delta template.json
-  newResourceNames: string[]           // machine names of the resources added by this delta
+  newResourceNames: string[],          // machine names of the resources added by this delta
+  frontendDesignStatus: 'available' | 'declined'  // from Step 6a's frontend-design pre-check
 }
 ```
 

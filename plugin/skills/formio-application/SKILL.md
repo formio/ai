@@ -67,6 +67,7 @@ You are the library's default "build me an app" skill. When a user describes an 
 - **Modify-existing still plans and imports.** If the user is extending an already-running app, still run the planner (in delta mode — it plans ONLY the new resources/fields/actions for the feature) and still call `project_import` (import is additive — adding new resources to the existing project is safe). What modify-existing skips is Deployment (URLs are already in the workspace) and MCP Config (`.mcp.json` already exists and targets the right project). Then route to the framework's extend sub-skill with the new resources in hand.
 - **Batch your questions.** When input is needed (URLs in Step 3, framework pick in Step 6), use one `AskUserQuestion` per step. Do not pepper.
 - **Expect one restart boundary on build-new.** Step 4 writes `.mcp.json` and halts the invocation — Claude Code only picks up new MCP env at session start, so the user restarts (or runs `/mcp` to reconnect) before Step 5 can run. Modify-existing has no restart boundary — its `.mcp.json` is already in place.
+- **Strongly recommend the `frontend-design` plugin before any UI is generated.** The framework skills you route to (Angular today, more later) produce dramatically better-looking, more polished apps when Claude's `frontend-design` plugin is available to consult on every UI surface — without it, generated UI degrades to generic, unstyled output. The plugin is **strongly recommended but NOT required**. Before handing off to a framework skill in Step 6, detect whether `frontend-design` is loadable; if it is missing, surface a strong recommendation to install it (with the exact command) via one `AskUserQuestion`, and let the user proceed either way. Never let a framework skill silently fall back to plain/unstyled output without the user having first been offered the plugin. Whatever the user decides, pass the result downstream so the framework skill knows whether `frontend-design` is available. See Step 6.
 
 ## Inputs you expect
 
@@ -169,7 +170,31 @@ Authentication is implicit — the first authenticated MCP tool call (typically 
 
 ### Step 6 — Framework routing
 
-Consult the registry in [`FRAMEWORK.md`](./FRAMEWORK.md) and route:
+**6a. `frontend-design` pre-check (runs on BOTH branches, before routing).** Every framework skill authors user-facing UI and is dramatically better at it when Claude's `frontend-design` plugin is loadable. Before routing, check the session's skill registry for `frontend-design` — it registers under the plugin-namespaced name `frontend-design:frontend-design` (the bare name `frontend-design` may also appear; accept either). 
+
+- **If present** → note it ("`frontend-design` is available — the UI will be designed with it") and continue to 6b. Pass `frontendDesignStatus: 'available'` in the handoff.
+- **If missing** → it is strongly recommended but not required. Surface one `AskUserQuestion`:
+
+```
+AskUserQuestion({
+  questions: [
+    {
+      question: "I strongly recommend installing Claude's frontend-design plugin before I build the UI — it produces a far more polished, distinctive interface instead of generic styling. It's optional, but highly recommended. How would you like to proceed?",
+      header: "frontend-design",
+      multiSelect: false,
+      options: [
+        { label: "Install it first (recommended)", description: "I'll guide you to install frontend-design, then you restart Claude Code (or run /plugin) and we resume the build with it active." },
+        { label: "Proceed without it", description: "Continue now. The UI will be generated without frontend-design, and every UI file will be flagged as such so you can review it critically." }
+      ]
+    }
+  ]
+})
+```
+
+  - **Install it first** → tell the user to install the plugin from the official marketplace — interactively via `/plugin` (Browse → `claude-plugins-official` → `frontend-design` → Install) or by running `claude plugin install frontend-design@claude-plugins-official` — followed by a `/reload-plugins`. When they tell you to `continue`, re-run 6a and you should now find the plugin.
+  - **Proceed without it** → continue to 6b with `frontendDesignStatus: 'declined'`. The framework skill is responsible for disclosing on every UI approval gate that the file was generated without `frontend-design` consultation, so the user can review it critically. Do NOT silently emit plain UI.
+
+**6b. Route.** Consult the registry in [`FRAMEWORK.md`](./FRAMEWORK.md) and route:
 
 - **Build-new, single installed framework** → silent routing. Today this is `formio-angular`.
 - **Build-new, multiple installed frameworks** → present them in one `AskUserQuestion`, let the user pick, then route.
@@ -186,6 +211,7 @@ When handing off to a framework's entry skill (build-new), pass:
 - The planner-emitted `template.md` file path (architectural-intent seed).
 - The planner-emitted `template.json` file path (structured companion).
 - A flag indicating that Import ran successfully (so the framework's SETUP can be skipped).
+- `frontendDesignStatus` (`'available'` | `'declined'`) from Step 6a, so the framework skill knows whether to consult `frontend-design` or to disclose UI was generated without it.
 
 When handing off to a framework's extend sub-skill (modify-existing), pass:
 
@@ -195,6 +221,7 @@ When handing off to a framework's extend sub-skill (modify-existing), pass:
 - The planner-emitted delta `template.json` file path.
 - The list of newly-imported resource names (so the extend sub-skill scaffolds modules for exactly those).
 - The user's plain-language feature request verbatim (the sub-skill translates domain terms into framework primitives).
+- `frontendDesignStatus` (`'available'` | `'declined'`) from Step 6a.
 
 ## When a step fails
 
