@@ -43,6 +43,12 @@ function buildLoginPage(loginFormUrl: string): string {
 <script>
 var statusEl = document.getElementById('status');
 Formio.createForm(document.getElementById('formio'), '${loginFormUrl}').then(function(form) {
+  // Suppress only Formio's default success alert (to avoid a UI flash); keep login error alerts intact.
+  const baseSetAlert = form.setAlert.bind(form);
+  form.setAlert = function(type, message, options) {
+    if (type === 'success') return;
+    return baseSetAlert(type, message, options);
+  };
   form.on('submit', function(submission) {
     var token = Formio.getToken();
     statusEl.innerHTML = token ? 'Token captured, completing login...' : 'Error: No token received from Form.io SDK';
@@ -52,7 +58,10 @@ Formio.createForm(document.getElementById('formio'), '${loginFormUrl}').then(fun
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ token: token })
     }).then(function() {
-      statusEl.innerHTML = 'Login successful. You can close this tab.';
+      document.querySelector('.auth-card').innerHTML =
+        '<div class="alert alert-success text-center mb-0" role="alert">' +
+        '<i class="bi bi-check-circle-fill me-2"></i>Login successful. You may close this window.' +
+        '</div>';
     }).catch(function(err) {
       statusEl.innerHTML = 'Error sending token: ' + err.message;
     });
