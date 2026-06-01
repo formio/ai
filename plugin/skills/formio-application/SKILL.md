@@ -191,7 +191,7 @@ AskUserQuestion({
 })
 ```
 
-  - **Install it first** → tell the user to install the plugin from the official marketplace — interactively via `/plugin` (Browse → `claude-plugins-official` → `frontend-design` → Install) or by running `claude plugin install frontend-design@claude-plugins-official` — and that the plugin only loads at session start, so they must **restart Claude Code (or reconnect)** and then re-invoke the build. This is a restart boundary like Step 4; halt here. When they resume, 6a re-runs and should now find the plugin.
+  - **Install it first** → tell the user to install the plugin from the official marketplace — interactively via `/plugin` (Browse → `claude-plugins-official` → `frontend-design` → Install) or by running `claude plugin install frontend-design@claude-plugins-official` — followed by a `/reload-plugins`. When they tell you to `continue`, re-run 6a and you should now find the plugin.
   - **Proceed without it** → continue to 6b with `frontendDesignStatus: 'declined'`. The framework skill is responsible for disclosing on every UI approval gate that the file was generated without `frontend-design` consultation, so the user can review it critically. Do NOT silently emit plain UI.
 
 **6b. Route.** Consult the registry in [`FRAMEWORK.md`](./FRAMEWORK.md) and route:
