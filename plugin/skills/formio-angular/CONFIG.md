@@ -2,14 +2,6 @@
 
 This document is loaded by the parent `formio-angular` skill during Phase 3. It is **not** a standalone skill — no frontmatter, no independent trigger. The parent reads it after BOOTSTRAP has left the workspace in place and before AUTH.
 
-## External references (authoritative)
-
-- https://help.form.io/developers/introduction/application — the canonical explanation of `FormioAppConfig` and how the Angular client resolves the project vs. base URLs at runtime.
-- https://github.com/formio/angular-demo/blob/master/src/app/config.ts — the reference implementation of `src/app/config.ts`. Match this shape.
-- https://github.com/formio/angular-demo/blob/master/src/app/app-module.ts — the reference implementation of `AppModule`, including the `FormioAppConfig` provider registration and the `FormioModule` import.
-
-Read these URLs before generating the files below if you are at all unsure about a detail. The templates here are faithful to the demo at the time of writing, but the demo is the source of truth.
-
 ## Skip-if-already-wired detection
 
 Before generating anything, inspect the target workspace:

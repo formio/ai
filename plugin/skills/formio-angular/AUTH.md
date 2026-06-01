@@ -2,15 +2,6 @@
 
 This document is loaded by the parent `formio-angular` skill during Phase 4. It is **not** a standalone skill — no frontmatter, no independent trigger. The parent reads it after CONFIG has been approved and before delegating to the resource sub-skill.
 
-## External references (authoritative)
-
-- https://help.form.io/developers/introduction/application#user-authentication — the canonical explanation of user authentication in `@formio/angular` applications.
-- https://github.com/formio/angular-demo/blob/master/src/app/auth/auth.module.ts — the reference implementation of `AuthModule`, including `FormioAuthConfig` registration, login/register form names, and the `FormioAuthService` wiring.
-- https://github.com/formio/angular-demo/blob/master/src/app/app-module.ts#L71 — the exact line where the `angular-demo` imports the `AuthModule` into `AppModule`. Match the position in the imports array.
-- https://github.com/formio/angular/wiki/User-Authentication#authentication-events — the canonical list of `FormioAuthService` events (`login`, `logout`, `error`) that the `app.component.ts` edit below subscribes to for post-login / post-logout navigation.
-
-Read these URLs before generating the files below if you are at all unsure about a detail. The templates here are faithful to the demo at the time of writing, but the demo is the source of truth.
-
 ## Skip-if-already-wired detection
 
 Before generating anything, inspect the target workspace:

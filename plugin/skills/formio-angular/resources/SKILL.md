@@ -458,9 +458,6 @@ See `references/resource-module-patterns.md` for the complete worked set (every 
 
 - `references/resource-module-patterns.md` — every concrete code pattern (simple, nested, N:N, transitive, custom view, SSO)
 - `references/app-integration.md` — AppModule, AppRoutingModule, AppConfig, AuthModule, index.html, angular.json
-- `@formio/angular` wiki: <https://github.com/formio/angular/wiki/Resource-Management>
-- angular-demo reference implementation: <https://github.com/formio/angular-demo>
-- FormioResource source: <https://github.com/formio/angular/tree/master/projects/angular-formio/resource>
 
 ## What this skill does NOT do
 
