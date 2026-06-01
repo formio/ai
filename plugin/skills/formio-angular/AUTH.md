@@ -6,7 +6,7 @@ This document is loaded by the parent `formio-angular` skill during Phase 4. It 
 
 - https://help.form.io/developers/introduction/application#user-authentication — the canonical explanation of user authentication in `@formio/angular` applications.
 - https://github.com/formio/angular-demo/blob/master/src/app/auth/auth.module.ts — the reference implementation of `AuthModule`, including `FormioAuthConfig` registration, login/register form names, and the `FormioAuthService` wiring.
-- https://github.com/formio/angular-demo/blob/master/src/app/app.module.ts#L71 — the exact line where the `angular-demo` imports the `AuthModule` into `AppModule`. Match the position in the imports array.
+- https://github.com/formio/angular-demo/blob/master/src/app/app-module.ts#L71 — the exact line where the `angular-demo` imports the `AuthModule` into `AppModule`. Match the position in the imports array.
 - https://github.com/formio/angular/wiki/User-Authentication#authentication-events — the canonical list of `FormioAuthService` events (`login`, `logout`, `error`) that the `app.component.ts` edit below subscribes to for post-login / post-logout navigation.
 
 Read these URLs before generating the files below if you are at all unsure about a detail. The templates here are faithful to the demo at the time of writing, but the demo is the source of truth.
@@ -15,10 +15,10 @@ Read these URLs before generating the files below if you are at all unsure about
 
 Before generating anything, inspect the target workspace:
 
-1. Read `src/app/app.module.ts`. Check for an `import { AuthModule } from './auth/auth.module'` (or equivalent path) and an entry for `AuthModule` inside `@NgModule({ imports: [...] })`.
+1. Read `src/app/app-module.ts`. Check for an `import { AuthModule } from './auth/auth.module'` (or equivalent path) and an entry for `AuthModule` inside `@NgModule({ imports: [...] })`.
 2. Read `src/app/auth/auth.module.ts` if it exists. Check that it (a) configures `FormioAuthConfig` (typically by declaring an `AuthConfig` object and providing it) AND (b) mounts `RouterModule.forChild(FormioAuthRoutes())` so the login/register URLs resolve. A file that configures the provider but does not mount `FormioAuthRoutes()` is half-wired — treat that as "needs regeneration" and run the phase.
-3. Read `src/app/app-routing.module.ts`. Check for a route whose `path` is `'auth'` with a `loadChildren` entry pointing at `./auth/auth.module`. Missing this route means `/auth/login` is a dead URL even when `AuthModule` is correct.
-4. Read `src/app/app.component.ts`. Check for `FormioAuthService` import + `onLogin` + `onLogout` subscriptions + `router.navigate` calls.
+3. Read `src/app/app-routing-module.ts`. Check for a route whose `path` is `'auth'` with a `loadChildren` entry pointing at `./auth/auth.module`. Missing this route means `/auth/login` is a dead URL even when `AuthModule` is correct.
+4. Read `src/app/app.component.ts` (or `app/app.ts`). Check for `FormioAuthService` import + `onLogin` + `onLogout` subscriptions + `router.navigate` calls.
 
 If ALL four conditions hold, **skip this phase**. Tell the user which files triggered the skip:
 
@@ -65,44 +65,73 @@ Write this file when the extraction produced a user resource, login form, and re
 import { NgModule } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterModule } from '@angular/router';
-import { FormioAuthConfig, FormioAuthService, FormioAuthModule } from '@formio/angular/auth';
+import {
+  FormioAuth,
+  FormioAuthConfig,
+  FormioAuthRoutes,
+} from '@formio/angular/auth';
 
 export const AuthConfig: FormioAuthConfig = {
-  app: {
-    appUrl: '{{FORMIO_PROJECT_URL}}', // same value CONFIG wrote into FormioAppConfig.appUrl
-    apiUrl: '{{FORMIO_BASE_URL}}',    // same value CONFIG wrote into FormioAppConfig.apiUrl
-  },
   login: {
-    form: '{{LOGIN_FORM_PATH}}',      // === template.json login form's `path` — typically 'user/login'
+    form: 'user/login' // === template.json login form's `path` — typically 'user/login'
   },
   register: {
-    form: '{{REGISTER_FORM_PATH}}',   // === template.json register form's `path` — typically 'user/register'
+    form: 'user/register' // === template.json register form's `path` — typically 'user/register'
   },
 };
 
 @NgModule({
   imports: [
     CommonModule,
-    FormioAuthModule,
-    RouterModule.forChild(FormioAuthRoutes()), // mounts /login, /register, and /logout (see note below)
+    FormioAuth,
+    RouterModule.forChild(FormioAuthRoutes()), // mounts login / register / logout
   ],
-  providers: [{ provide: FormioAuthConfig, useValue: AuthConfig }, FormioAuthService],
 })
 export class AuthModule {}
 ```
 
-Imports update: pull `FormioAuthRoutes` alongside the other auth symbols — `import { FormioAuthConfig, FormioAuthService, FormioAuthModule, FormioAuthRoutes } from '@formio/angular/auth';`.
+Then within the main `app-module.ts` you will import the `AuthConfig` and use it within the application like the following example illustrates.
 
-**Why `FormioAuthRoutes()` matters.** Without it, the `AuthModule` registers the providers + components but does NOT map any URL to the login/register form — so `router.navigate(['/auth/login'])` from `app.component.ts` resolves to an empty outlet and the user sees a blank page. `FormioAuthRoutes()` returns a pre-built `Routes` array that wires `login` → `FormioAuthLoginComponent`, `register` → `FormioAuthRegisterComponent`, and `logout` → a redirect, which is why mounting it via `RouterModule.forChild(...)` is required, not optional. Customization (override login/register components, tweak the redirect target) is handled by passing an options object to the function — see the optional "Customizing the login and register components" section below.
+```ts
+import { NgModule, provideBrowserGlobalErrorListeners } from '@angular/core';
+import { BrowserModule } from '@angular/platform-browser';
+import { FormioModule, FormioAppConfig } from '@formio/angular';
+import { FormioResources } from '@formio/angular/resource';
+import { FormioAuthConfig, FormioAuthService } from '@formio/angular/auth';
 
-**Worked example** — default user resource with planner-emitted `template.json.forms` containing `{ name: 'userLogin', path: 'user/login' }` and `{ name: 'userRegister', path: 'user/register' }`, against project `https://myproject.form.io` on platform `https://api.form.io`:
+import { AppRoutingModule } from './app-routing-module';
+import { App } from './app';
+import { AppConfig } from './config';
+import { AuthModule, AuthConfig } from './auth/auth.module';
+
+@NgModule({
+  declarations: [
+    App
+  ],
+  imports: [
+    BrowserModule,
+    AppRoutingModule,
+    FormioModule,
+    AuthModule
+  ],
+  providers: [
+    provideBrowserGlobalErrorListeners(),
+    { provide: FormioAppConfig, useValue: AppConfig },
+    { provide: FormioAuthConfig, useValue: AuthConfig },
+    FormioAuthService,
+    FormioResources
+  ],
+  bootstrap: [App]
+})
+export class AppModule { }
+```
+
+**Why `FormioAuthRoutes()` matters.** Without it, the `AuthModule` registers the providers + components but does NOT map any URL to the login/register form — so `router.navigate(['/auth/login'])` from `app.component.ts` (or `app/app.ts`) resolves to an empty outlet and the user sees a blank page. `FormioAuthRoutes()` returns a pre-built `Routes` array that wires `login` → `FormioAuthLoginComponent`, `register` → `FormioAuthRegisterComponent`, and `logout` → a redirect, which is why mounting it via `RouterModule.forChild(...)` is required, not optional. Customization (override login/register components, tweak the redirect target) is handled by passing an options object to the function — see the optional "Customizing the login and register components" section below.
+
+**Worked example** — default user resource with planner-emitted `template.json.forms` containing `{ name: 'userLogin', path: 'user/login' }` and `{ name: 'userRegister', path: 'user/register' }`:
 
 ```ts
 export const AuthConfig: FormioAuthConfig = {
-  app: {
-    appUrl: 'https://myproject.form.io',
-    apiUrl: 'https://api.form.io',
-  },
   login: {
     form: 'user/login',    // === template.json.forms[userLogin].path
   },
@@ -114,36 +143,41 @@ export const AuthConfig: FormioAuthConfig = {
 
 Notes on why this shape:
 
-- `FormioAuthConfig` is imported from `@formio/angular/auth`, not from the top-level `@formio/angular` entry point. This is the import path the `angular-demo` uses.
-- `AuthConfig.app.appUrl` + `AuthConfig.app.apiUrl` mirror the same URL pair CONFIG wrote into `FormioAppConfig` (SETUP captured these as `FORMIO_PROJECT_URL` / `FORMIO_BASE_URL`). `@formio/angular/auth` reads them to scope every auth request to the right project on the right platform — even though `FormioAppConfig` already carries the pair, the auth module is designed to be self-contained, so you MUST copy both values in here rather than relying on the shared provider.
+- `FormioAuthConfig` is imported from `@formio/angular/auth`, not from the top-level `@formio/angular` entry point.
 - `AuthConfig.login.form` and `AuthConfig.register.form` are **URL path segments**, not machine names. The auth module issues requests against `appUrl + '/' + login.form` (and similarly for register), so the value MUST equal the `path` property of the corresponding form inside `template.json`. On a default user-resource setup the planner records `user/login` and `user/register`; on custom setups (e.g., `User resource: member`) the paths follow the custom resource slug. Never substitute the form's `name` / `machineName` (e.g. `userLogin`) — that produces a 404 on sign-in.
-- `FormioAuthService` is a service the rest of the application consumes to read the current user, log out, and gate routes. It must be registered as a provider here.
+- `FormioAuthService` is a service the rest of the application consumes to read the current user, log out, and gate routes. It must be registered as a provider within the base `app` module.
 - The role list from `template.json.roles` does not appear in this file directly — roles are enforced at the API level and by route guards in individual resource modules. The Resources sub-skill (nested at `./resources/SKILL.md` under this skill — load the file, do NOT invoke a top-level skill) consumes the role list when it wires per-resource guards.
 
-## `src/app/app.module.ts` edits
+## `src/app/app-module.ts` edits
 
 Add the `AuthModule` import to `AppModule`:
 
 ```ts
-import { AuthModule } from './auth/auth.module';
+import { FormioAuthConfig, FormioAuthService } from '@formio/angular/auth';
+import { AuthModule, AuthConfig } from './auth/auth.module';
 
 @NgModule({
   imports: [
     // ...existing imports including FormioModule from CONFIG phase
     AuthModule,
   ],
+  providers: [
+    // ...existing providers including `{ provide: FormioAppConfig, useValue: AppConfig }`
+    { provide: FormioAuthConfig, useValue: AuthConfig },
+    FormioAuthService,
+  ]
   // ...
 })
 export class AppModule {}
 ```
 
-Match the position in the imports array used by the `angular-demo` reference (see the `app.module.ts#L71` link above). `AuthModule` goes after `FormioModule` and before any feature/resource modules, because downstream resource modules depend on `FormioAuthService` being available.
+Match the position in the imports array shown above. `AuthModule` goes after `FormioModule` and before any feature/resource modules, because downstream resource modules depend on `FormioAuthService` being available.
 
-## `src/app/app-routing.module.ts` edits — mount `AuthModule` under `/auth`
+## `src/app/app-routing-module.ts` edits — mount `AuthModule` under `/auth`
 
 The `FormioAuthRoutes()` array you attached inside `AuthModule` wires the `login` / `register` / `logout` child paths, but it still needs a parent path to live under. The convention (matching the wiki and the `angular-demo`) is to mount `AuthModule` at `/auth` via lazy loading, so the final URLs are `/auth/login`, `/auth/register`, and `/auth/logout`. Those are the exact URLs the `app.component.ts` subscriptions below redirect to.
 
-Open `src/app/app-routing.module.ts` (generated by `angular-new-app` when routing was enabled) and add the `auth` route to the `Routes` array:
+Open `src/app/app-routing-module.ts` (generated by `angular-new-app` when routing was enabled) and add the `auth` route to the `Routes` array:
 
 ```ts
 const routes: Routes = [
@@ -159,13 +193,13 @@ Notes:
 
 - Use the dynamic `import(...)` form, not the legacy `'./auth/auth.module#AuthModule'` string — the string form was removed in Angular 9+ and `angular-new-app` defaults to the dynamic form on every currently-supported Angular major.
 - Keep `path: 'auth'` exactly. Changing it (e.g. to `path: 'account'`) silently breaks the redirect targets in `app.component.ts` unless you change both together.
-- If the workspace was scaffolded without `app-routing.module.ts` (the user answered "no" to routing during `angular-new-app`'s interview), BOOTSTRAP should have re-prompted them; if you find yourself here with no routing module, stop and tell the user — do NOT synthesize a routing module from scratch.
+- If the workspace was scaffolded without `app-routing-module.ts` (the user answered "no" to routing during `angular-new-app`'s interview), BOOTSTRAP should have re-prompted them; if you find yourself here with no routing module, stop and tell the user — do NOT synthesize a routing module from scratch.
 
-## `src/app/app.component.ts` edits — subscribe to authentication events and redirect
+## `src/app/app.component.ts` (or `src/app/app.ts`) edits — subscribe to authentication events and redirect
 
 ### Why this step exists
 
-Without this edit, a successful login leaves the user stranded on the Login page. `FormioAuthModule` posts the submission, gets a JWT, emits an `onLogin` event on `FormioAuthService` — and that is where its job ends. The view does NOT change on its own because the login route is still the active route. Something in the application shell has to listen for the event and navigate the router. `app.component.ts` is the right place because it is the one component that is instantiated exactly once for the life of the app, so a single subscription there covers every login/logout that ever happens.
+Without this edit, a successful login leaves the user stranded on the Login page. `FormioAuth` module posts the submission, gets a JWT, emits an `onLogin` event on `FormioAuthService` — and that is where its job ends. The view does NOT change on its own because the login route is still the active route. Something in the application shell has to listen for the event and navigate the router. `app.component.ts` is the right place because it is the one component that is instantiated exactly once for the life of the app, so a single subscription there covers every login/logout that ever happens.
 
 The canonical reference for the event surface is the Form.io Angular wiki: https://github.com/formio/angular/wiki/User-Authentication#authentication-events. Read it first if any detail below diverges from upstream — the wiki is the source of truth.
 
@@ -177,12 +211,12 @@ The canonical reference for the event surface is the Form.io Angular wiki: https
 - **`onRegister`** — emitted once per successful self-registration. Most apps treat this the same as `onLogin` (the Form.io registration action chain ends with an automatic login, so a JWT is already present) and navigate to the same landing route. If your template wants a "welcome / onboarding" page after register, route there instead of `/`.
 - **`onLogout`** — emitted once per explicit logout (and also when the JWT is cleared because of a `401`). Treat as "session gone — send the user back to the login form."
 - **`onUser`** — emitted whenever the user object is (re)established from the server. This fires on an interactive login AND on every JWT-restore at app boot, so it is strictly broader than `onLogin`. Use it when you want a single subscription that also covers "returning user with a cached token"; skip it if `onLogin` + `onRegister` already cover your cases.
-- **`onError`** — emitted when the auth request itself fails (bad credentials, network error, form validation failure). Do NOT navigate on `onError`; `FormioAuthModule`'s built-in login component already renders the error alert on-screen. Optionally log it for diagnostics.
+- **`onError`** — emitted when the auth request itself fails (bad credentials, network error, form validation failure). Do NOT navigate on `onError`; `FormioAuth`'s built-in login component already renders the error alert on-screen. Optionally log it for diagnostics.
 - **`ready`** — a Promise (not an EventEmitter) that resolves once every auth subsystem has finished initializing (JWT restore attempt, user fetch). `await auth.ready` in an APP_INITIALIZER or in an auth-guard's `canActivate` to block first render until you know whether the user is authenticated. Prevents the "flash of login form" a returning user sees before the token is restored.
 
 ### Canonical `app.component.ts`
 
-Edit the file `src/app/app.component.ts` the Angular CLI generated. Add the `FormioAuthService` dependency, subscribe in `ngOnInit`, and navigate with Angular's `Router`. Unsubscribe in `ngOnDestroy` so hot-reload / test teardown does not leak the subscription.
+Edit the file `src/app/app.component.ts`  (or `src/app/app.ts`) the Angular CLI generated. Add the `FormioAuthService` dependency, subscribe in `ngOnInit`, and navigate with Angular's `Router`. Unsubscribe in `ngOnDestroy` so hot-reload / test teardown does not leak the subscription.
 
 ```ts
 import { Component, OnDestroy, OnInit } from '@angular/core';
@@ -221,6 +255,13 @@ export class AppComponent implements OnInit, OnDestroy {
         this.router.navigate(['/auth/login']);
       }),
     );
+
+    // Once auth has finished restoring any cached JWT, send anonymous visitors to the login screen
+    this.auth.ready?.then(() => {
+      if (!this.auth.authenticated && !this.router.url.startsWith('/auth')) {
+        this.router.navigate(['/auth/login']);
+      }
+    });
   }
 
   ngOnDestroy(): void {
@@ -242,7 +283,7 @@ Notes:
 
 Before overwriting an existing `app.component.ts`:
 
-1. Read `src/app/app.component.ts`. If it already imports `FormioAuthService` AND calls `.onLogin.subscribe(` AND `.onLogout.subscribe(` AND calls `router.navigate`, the wiring is already in place — skip the edit. Tell the user: "Skipping `app.component.ts` edit — it already subscribes to `FormioAuthService.onLogin` / `onLogout` and navigates on events."
+1. Read `src/app/app.component.ts` (or `src/app/app.ts`). If it already imports `FormioAuthService` AND calls `.onLogin.subscribe(` AND `.onLogout.subscribe(` AND calls `router.navigate`, the wiring is already in place — skip the edit. Tell the user: "Skipping `app.component.ts` edit — it already subscribes to `FormioAuthService.onLogin` / `onLogout` and navigates on events."
 2. If only a subset is present (e.g. `onLogin.subscribe` but no `onLogout.subscribe`, or using the stale `.login` / `.logout` names from older versions of this skill), show a diff and ask whether to merge the missing piece (or rename the stale subscriptions) or leave as-is. Never silently rewrite a file the user has customized.
 3. If the file does not yet subscribe at all, apply the template above and cite the wiki link in a one-line comment above the subscriptions so future readers know where the shape came from.
 
@@ -330,15 +371,18 @@ Auth values derived from template.md (confirmed against template.json)
   roles:               [<ROLE_1>, <ROLE_2>, ...]
 
 Files to create
-  src/app/auth/auth.module.ts  (new file — imports FormioAuthModule + RouterModule.forChild(FormioAuthRoutes()))
+  src/app/auth/auth.module.ts  (new file — imports FormioAuth + RouterModule.forChild(FormioAuthRoutes()))
 
 Files to edit
-  src/app/app.module.ts
-    + import { AuthModule } from './auth/auth.module';
+  src/app/app-module.ts
+    + import { FormioAuthConfig, FormioAuthService } from '@formio/angular/auth';
+    + import { AuthModule, AuthConfig } from './auth/auth.module';
     + AuthModule added to @NgModule imports (after FormioModule)
-  src/app/app-routing.module.ts
+    + AuthConfig added to providers as `{ provide: FormioAuthConfig, useValue: AuthConfig }`
+    + FormioAuthService added to providers
+  src/app/app-routing-module.ts
     + add { path: 'auth', loadChildren: () => import('./auth/auth.module').then(m => m.AuthModule) } to Routes
-  src/app/app.component.ts
+  src/app/app.component.ts (or `src/app/app.ts`)
     + import FormioAuthService from '@formio/angular/auth' and Router from '@angular/router'
     + subscribe to auth.onLogin    → router.navigate(['/'])           (post-login redirect)
     + subscribe to auth.onRegister → router.navigate(['/'])           (post-register redirect)
@@ -354,8 +398,8 @@ Wait for explicit approval. If the user declines, stop — do not write partial 
 
 ## After approval
 
-Write `auth.module.ts` and edit `app.module.ts`. Then tell the user what was written and what the next phase is:
+Write `auth.module.ts` and edit `app-module.ts`. Then tell the user what was written and what the next phase is:
 
-> Wrote `src/app/auth/auth.module.ts` (with `FormioAuthRoutes()` mounted via `RouterModule.forChild`), updated `src/app/app.module.ts`, added the `/auth` lazy-load route to `src/app/app-routing.module.ts`, wired `src/app/app.component.ts` to subscribe to `FormioAuthService.onLogin` / `onRegister` / `onLogout` (redirect to `/` on login/register, to `/auth/login` on logout), and updated `src/app/app.component.html` with auth-aware nav chrome. Loading `./resources/SKILL.md` (the nested Resources sub-skill of this skill) for per-resource NgModule scaffolding.
+> Wrote `src/app/auth/auth.module.ts` (with `FormioAuthRoutes()` mounted via `RouterModule.forChild`), updated `src/app/app-module.ts`, added the `/auth` lazy-load route to `src/app/app-routing-module.ts`, wired `src/app/app.component.ts` (or `src/app/app.ts`) to subscribe to `FormioAuthService.onLogin` / `onRegister` / `onLogout` (redirect to `/` on login/register, to `/auth/login` on logout), and updated `src/app/app.component.html` with auth-aware nav chrome. Loading `./resources/SKILL.md` (the nested Resources sub-skill of this skill) for per-resource NgModule scaffolding.
 
 Hand off to the sub-skill with the context described in the parent `SKILL.md`'s "Handoff contract with the Resources sub-skill (`./resources/SKILL.md`)" section. The sub-skill is a sub-folder of this skill — load that file directly, do NOT attempt to invoke a top-level skill named `formio-angular-resources`.

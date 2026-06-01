@@ -5,7 +5,7 @@ The current skill layout has `formio-resource-angular` as a peer of `formio-reso
 The `@formio/angular` demo (https://github.com/formio/angular-demo) is the canonical pattern:
 
 - `src/app/config.ts` exports `AppConfig: FormioAppConfig` with `appUrl` (project URL) and `apiUrl` (platform/base URL).
-- `src/app/app.module.ts` imports `FormioModule`, `FormioAppConfig`, `FormioAuthService`, and registers `AppConfig` via `{ provide: FormioAppConfig, useValue: AppConfig }`.
+- `src/app/app-module.ts` imports `FormioModule`, `FormioAppConfig`, `FormioAuthService`, and registers `AppConfig` via `{ provide: FormioAppConfig, useValue: AppConfig }`.
 - `src/app/auth/auth.module.ts` configures `FormioAuthConfig` (login/register form names, auth routes) and is imported into `AppModule`.
 - Only after those three pieces are in place do resource modules (`FormioResourceConfig` + `FormioResourceRoutes`) actually work.
 
@@ -62,7 +62,7 @@ Rationale: matches the `formio-api` → `formio-api-<group>` precedent already i
 ### Trigger-surface split
 
 - **Parent `formio-angular`** triggers on: "build the Angular app", "scaffold the Angular side", "generate the Angular CRUD for this plan", "wire up Angular for Form.io", "set up the Angular workspace", "I need an Angular front-end for this template". Explicit handoff phrase from the planner: "Run `formio-angular` next." Fires even when the user doesn't say the word "Form.io."
-- **Sub-skill `formio-angular:resources`** triggers on: "add a Resource module for `<X>`", "regenerate the `<X>` module", "the `<X>` resource module is missing a route", "wire `<X>`'s children to `<Y>`". Triggers only inside a project whose `app.module.ts` already imports `FormioAppConfig` (parent is satisfied).
+- **Sub-skill `formio-angular:resources`** triggers on: "add a Resource module for `<X>`", "regenerate the `<X>` module", "the `<X>` resource module is missing a route", "wire `<X>`'s children to `<Y>`". Triggers only inside a project whose `app-module.ts` already imports `FormioAppConfig` (parent is satisfied).
 
 The parent's `description` explicitly names the sub-skill in a "For adding resources to an already-configured app, see `formio-angular:resources`" clause — mirrors the negative-trigger pattern in `formio-api` skills. The sub-skill's `description` reciprocally says "Not for initial app scaffolding — see parent `formio-angular`."
 
@@ -127,5 +127,5 @@ Rollback: revert the PR. The move is contained, no DB migrations, no runtime sta
 ## Open Questions
 
 - Should SETUP/CONFIG/AUTH eventually get their own eval harnesses (prompts that verify the parent does the interview correctly, generates a valid `config.ts`, and derives `AuthModule` correctly from a given `template.json`)? Out of scope for this change; tracked as follow-up.
-- Does the parent need to handle the "user has an existing Angular workspace that already has `FormioAppConfig` wired" case without running CONFIG/AUTH from scratch? Probably yes — the sub-skill already handles existing-workspace integration for resources. Parent should detect `FormioAppConfig` in the current `app.module.ts` and skip the CONFIG gate if found. Flag for implementation review.
+- Does the parent need to handle the "user has an existing Angular workspace that already has `FormioAppConfig` wired" case without running CONFIG/AUTH from scratch? Probably yes — the sub-skill already handles existing-workspace integration for resources. Parent should detect `FormioAppConfig` in the current `app-module.ts` and skip the CONFIG gate if found. Flag for implementation review.
 - Does the parent's AUTH phase need to support SSO/OIDC/SAML flows from the start, or is built-in user-resource auth enough for v1? The planner's `template.json` can encode SSO settings (via the platform-level identity-provider flow). Recommendation: v1 generates the `FormioAuthConfig` branch and leaves a TODO block for SSO integration, pointing at `formio-api/references/platform-auth`. Revisit if the first real use case needs SSO day one.

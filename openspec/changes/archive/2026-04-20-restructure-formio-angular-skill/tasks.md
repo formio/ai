@@ -75,9 +75,9 @@
 ### Red
 
 - [x] 5.1 Write failing test: `skills/formio-angular/CONFIG.md` exists and has no frontmatter.
-- [x] 5.2 Write failing test: `CONFIG.md` references the external URLs `https://help.form.io/developers/introduction/application`, `https://github.com/formio/angular-demo/blob/master/src/app/config.ts`, and `https://github.com/formio/angular-demo/blob/master/src/app/app.module.ts`.
+- [x] 5.2 Write failing test: `CONFIG.md` references the external URLs `https://help.form.io/developers/introduction/application`, `https://github.com/formio/angular-demo/blob/master/src/app/config.ts`, and `https://github.com/formio/angular-demo/blob/master/src/app/app-module.ts`.
 - [x] 5.3 Write failing test: `CONFIG.md` contains a code template for `src/app/config.ts` that (a) exports a symbol named `AppConfig`, (b) uses the `FormioAppConfig` type from `@formio/angular`, (c) has `appUrl` and `apiUrl` placeholders populated from the SETUP values.
-- [x] 5.4 Write failing test: `CONFIG.md` contains guidance for editing `src/app/app.module.ts` to add the `{ provide: FormioAppConfig, useValue: AppConfig }` provider and import `FormioModule` from `@formio/angular`.
+- [x] 5.4 Write failing test: `CONFIG.md` contains guidance for editing `src/app/app-module.ts` to add the `{ provide: FormioAppConfig, useValue: AppConfig }` provider and import `FormioModule` from `@formio/angular`.
 - [x] 5.5 Write failing test: `CONFIG.md` describes the approval-gate behavior — preview then wait for approval before writing (covers scenario "User bails at CONFIG gate", partial; the preview/approval wording must be present).
 - [x] 5.6 Write failing test: `CONFIG.md` describes the "skip if already wired" detection logic (covers scenario "Existing config is detected and CONFIG phase is skipped").
 
@@ -95,7 +95,7 @@
 ### Red
 
 - [x] 6.1 Write failing test: `skills/formio-angular/AUTH.md` exists and has no frontmatter.
-- [x] 6.2 Write failing test: `AUTH.md` references the external URLs `https://help.form.io/developers/introduction/application#user-authentication`, `https://github.com/formio/angular-demo/blob/master/src/app/auth/auth.module.ts`, and `https://github.com/formio/angular-demo/blob/master/src/app/app.module.ts#L71`.
+- [x] 6.2 Write failing test: `AUTH.md` references the external URLs `https://help.form.io/developers/introduction/application#user-authentication`, `https://github.com/formio/angular-demo/blob/master/src/app/auth/auth.module.ts`, and `https://github.com/formio/angular-demo/blob/master/src/app/app-module.ts#L71`.
 - [x] 6.3 Write failing test: `AUTH.md` instructs Claude how to derive the auth configuration from a `formio-resource-planner` `template.json` — specifically extracting the user resource, login form name, register form name, and role list (covers scenario "AUTH derived from template.json").
 - [x] 6.4 Write failing test: `AUTH.md` contains a code template for `src/app/auth/auth.module.ts` that uses `FormioAuthConfig` from `@formio/angular/auth`.
 - [x] 6.5 Write failing test: `AUTH.md` documents the "no `template.json` available" branch — offer to run the planner or skip AUTH with a TODO comment pointing at `formio-api/references/runtime-auth` and `formio-api/references/platform-auth` (covers scenario "No template.json — user chooses to skip AUTH").

@@ -94,8 +94,8 @@ The sub-skill description MUST NOT claim initial build-an-app phrasings such as 
 The parent `formio-angular` `SKILL.md` SHALL instruct Claude to execute four phases in the following strict order, with a user-approval gate between each:
 
 1. **SETUP** — interview the user for the Form.io `Project URL` (project URL) and `Base URL` (base URL) if they are not already derivable from context.
-2. **CONFIG** — generate `src/app/config.ts` exporting `AppConfig: FormioAppConfig` with `appUrl` = project URL and `apiUrl` = base URL, and wire it into `AppModule` via `{ provide: FormioAppConfig, useValue: AppConfig }`. Match the pattern at `https://github.com/formio/angular-demo/blob/master/src/app/config.ts` and `https://github.com/formio/angular-demo/blob/master/src/app/app.module.ts`.
-3. **AUTH** — generate `src/app/auth/auth.module.ts` configuring `FormioAuthConfig` from the `template.json` auth resources (user resource name, login form, register form) and roles. Import the `AuthModule` into `AppModule`. Match the pattern at `https://github.com/formio/angular-demo/blob/master/src/app/auth/auth.module.ts` and `https://github.com/formio/angular-demo/blob/master/src/app/app.module.ts`.
+2. **CONFIG** — generate `src/app/config.ts` exporting `AppConfig: FormioAppConfig` with `appUrl` = project URL and `apiUrl` = base URL, and wire it into `AppModule` via `{ provide: FormioAppConfig, useValue: AppConfig }`. Match the pattern at `https://github.com/formio/angular-demo/blob/master/src/app/config.ts` and `https://github.com/formio/angular-demo/blob/master/src/app/app-module.ts`.
+3. **AUTH** — generate `src/app/auth/auth.module.ts` configuring `FormioAuthConfig` from the `template.json` auth resources (user resource name, login form, register form) and roles. Import the `AuthModule` into `AppModule`. Match the pattern at `https://github.com/formio/angular-demo/blob/master/src/app/auth/auth.module.ts` and `https://github.com/formio/angular-demo/blob/master/src/app/app-module.ts`.
 4. **Resources** — delegate to the `formio-angular-resources` sub-skill, passing the already-collected context (workspace path, `AppConfig` values, auth-module contents, planner `template.json`).
 
 Each phase MUST end with an approval gate: Claude prints a preview of what it is about to write and waits for explicit user approval before writing files or proceeding to the next phase.
@@ -137,7 +137,7 @@ If no `template.json` is available, the parent MUST ask the user whether to (a) 
 #### Scenario: No template.json — user chooses to skip AUTH
 
 - **WHEN** no `template.json` is available and the user opts to skip AUTH
-- **THEN** the parent skill writes `app.module.ts` without importing an `AuthModule`
+- **THEN** the parent skill writes `app-module.ts` without importing an `AuthModule`
 - **AND** the parent skill inserts a `// TODO: configure auth — see formio-api/references/runtime-auth` comment where the import would go
 
 ### Requirement: Parent skill detects existing configuration
