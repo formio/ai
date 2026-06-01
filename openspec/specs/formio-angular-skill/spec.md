@@ -94,7 +94,7 @@ The description MUST include a `Not for:` clause pointing at `formio-application
 The parent `formio-angular` `SKILL.md` SHALL instruct Claude to execute the following phases in the following strict order, with a user-approval gate between each:
 
 1. **SETUP** — capture the Form.io `Project URL` and `Base URL` via interview, UNLESS they were already captured by `formio-application`'s Deployment step and handed in as context. When handed in, the skill SHALL confirm the values with the user in one short acknowledgement and proceed without re-interviewing.
-2. **CONFIG** — generate `src/app/config.ts` exporting `AppConfig: FormioAppConfig` with `appUrl` = project URL and `apiUrl` = base URL, and wire it into `AppModule` via `{ provide: FormioAppConfig, useValue: AppConfig }`. Match the pattern at `https://github.com/formio/angular-demo/blob/master/src/app/config.ts` and `https://github.com/formio/angular-demo/blob/master/src/app/app.module.ts`.
+2. **CONFIG** — generate `src/app/config.ts` exporting `AppConfig: FormioAppConfig` with `appUrl` = project URL and `apiUrl` = base URL, and wire it into `AppModule` via `{ provide: FormioAppConfig, useValue: AppConfig }`. Match the pattern at `https://github.com/formio/angular-demo/blob/master/src/app/config.ts` and `https://github.com/formio/angular-demo/blob/master/src/app/app-module.ts`.
 3. **AUTH** — generate `src/app/auth/auth.module.ts` configuring `FormioAuthConfig` from the `template.json` auth resources and roles. Import `AuthModule` into `AppModule`.
 4. **Resources** — delegate to the `formio-angular-resources` sub-skill with the accumulated context.
 
@@ -163,7 +163,7 @@ If no `template.json` is available, the parent MUST ask the user whether to (a) 
 #### Scenario: No template.json — user chooses to skip AUTH
 
 - **WHEN** no `template.json` is available and the user opts to skip AUTH
-- **THEN** the parent skill writes `app.module.ts` without importing an `AuthModule`
+- **THEN** the parent skill writes `app-module.ts` without importing an `AuthModule`
 - **AND** the parent skill inserts a `// TODO: configure auth — see formio-api/references/runtime-auth` comment where the import would go
 
 ### Requirement: Parent skill detects existing configuration

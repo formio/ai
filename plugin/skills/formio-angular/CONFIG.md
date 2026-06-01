@@ -2,20 +2,12 @@
 
 This document is loaded by the parent `formio-angular` skill during Phase 3. It is **not** a standalone skill — no frontmatter, no independent trigger. The parent reads it after BOOTSTRAP has left the workspace in place and before AUTH.
 
-## External references (authoritative)
-
-- https://help.form.io/developers/introduction/application — the canonical explanation of `FormioAppConfig` and how the Angular client resolves the project vs. base URLs at runtime.
-- https://github.com/formio/angular-demo/blob/master/src/app/config.ts — the reference implementation of `src/app/config.ts`. Match this shape.
-- https://github.com/formio/angular-demo/blob/master/src/app/app.module.ts — the reference implementation of `AppModule`, including the `FormioAppConfig` provider registration and the `FormioModule` import.
-
-Read these URLs before generating the files below if you are at all unsure about a detail. The templates here are faithful to the demo at the time of writing, but the demo is the source of truth.
-
 ## Skip-if-already-wired detection
 
 Before generating anything, inspect the target workspace:
 
 1. Read `src/app/config.ts`. Parse it (even a rough string search is fine) for an exported symbol whose value looks like a `FormioAppConfig` — specifically an object literal with keys `appUrl` and `apiUrl`.
-2. Read `src/app/app.module.ts`. Check for an `import { FormioModule } from '@formio/angular';` line AND a `{ provide: FormioAppConfig, useValue: AppConfig }` (or equivalent) entry in the `providers` array.
+2. Read `src/app/app-module.ts`. Check for an `import { FormioModule } from '@formio/angular';` line AND a `{ provide: FormioAppConfig, useValue: AppConfig }` (or equivalent) entry in the `providers` array.
 
 If both conditions hold AND the captured `appUrl`/`apiUrl` match the SETUP values, **skip this phase**. Tell the user which files triggered the skip:
 
@@ -43,13 +35,13 @@ Notes on why this shape:
 - `FormioAppConfig` is a TypeScript interface exported by `@formio/angular`; using the type ensures compile-time failure if the SDK later adds required fields.
 - Exporting `AppConfig` (capital A) matches the demo; the parent skill registers it by that exact name.
 
-## `src/app/app.module.ts` edits
+## `src/app/app-module.ts` edits
 
 The `AppModule` needs three additions if they are not already present. Edit in place — don't regenerate the whole file.
 
 ### 1. Import
 
-At the top of `app.module.ts`, add:
+At the top of `app-module.ts`, add:
 
 ```ts
 import { FormioModule, FormioAppConfig } from '@formio/angular';
@@ -98,7 +90,7 @@ Files to create
   src/app/config.ts  (new file)
 
 Files to edit
-  src/app/app.module.ts
+  src/app/app-module.ts
     + import { FormioModule, FormioAppConfig } from '@formio/angular';
     + import { AppConfig } from './config';
     + FormioModule added to @NgModule imports
@@ -111,8 +103,8 @@ Wait for explicit approval. If the user declines, stop — do not write partial 
 
 ## After approval
 
-Write `config.ts` and edit `app.module.ts`. Then tell the user what was written and what the next phase is:
+Write `config.ts` and edit `app-module.ts`. Then tell the user what was written and what the next phase is:
 
-> Wrote `src/app/config.ts` and updated `src/app/app.module.ts`. Moving to AUTH.
+> Wrote `src/app/config.ts` and updated `src/app/app-module.ts`. Moving to AUTH.
 
 Proceed to `AUTH.md`.

@@ -18,7 +18,7 @@ We need a parent orchestration skill that owns the full Angular+Form.io setup fl
 - The resource skill's eval harness (`evals/`, `references/`, `assets/`) moves with it under `skills/formio-angular/resources/`. The `.eval-artifacts/formio-resource-angular/` artifact path is renamed to `.eval-artifacts/formio-angular-resources/` (or equivalent) so the grader keeps working.
 - The parent skill references (by link) the two canonical sources of truth for the `angular-demo` pattern:
   - https://help.form.io/developers/introduction/application
-  - https://github.com/formio/angular-demo (`src/app/config.ts`, `src/app/app.module.ts`, `src/app/auth/auth.module.ts`)
+  - https://github.com/formio/angular-demo (`src/app/config.ts`, `src/app/app-module.ts`, `src/app/auth/auth.module.ts`)
 - `CLAUDE.md` updated to note the new skill location and that `formio-resource-planner` → `formio-angular` is the canonical handoff (not `formio-resource-planner` → `formio-resource-angular`).
 - `packages/mcp-server/src/skills-validator.ts` updated so the schema/naming rules cover the new parent skill and its sub-documents (`SETUP.md`, `CONFIG.md`, `AUTH.md` are not SKILL.md files and must not be validated as such).
 

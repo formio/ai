@@ -19,7 +19,7 @@ Every resource module you generate plugs into a shared foundation. This file is 
 
 ## 1. `AppModule`
 
-`src/app/app.module.ts`:
+`src/app/app-module.ts`:
 
 ```typescript
 import { BrowserModule } from '@angular/platform-browser';
@@ -58,7 +58,7 @@ If the user has an existing AppModule, **merge** these declarations/imports/prov
 
 ## 2. `AppRoutingModule`
 
-`src/app/app-routing.module.ts`:
+`src/app/app-routing-module.ts`:
 
 ```typescript
 import { NgModule } from '@angular/core';
@@ -308,7 +308,7 @@ Do not pin versions inside the skill — the user's Angular version dictates the
 
 ## 10. Reading an existing workspace — don't overwrite
 
-When mode is "existing workspace," before writing `app.module.ts` / `app-routing.module.ts`:
+When mode is "existing workspace," before writing `app-module.ts` / `app-routing-module.ts`:
 
 1. Read the existing file.
 2. Merge: add new `import` lines, add new entries to `imports: [...]`, `declarations: [...]`, `providers: [...]`, `routes: [...]`. Leave untouched everything you didn't add.

@@ -128,7 +128,7 @@ def grade_eval_0(out_dir):
         "evidence": f"children.push={has_push}, refs 'users'={has_users_path}"
     })
 
-    app_mod = next((p for p in ts_files if p.name == "app.module.ts"), None)
+    app_mod = next((p for p in ts_files if p.name == "app-module.ts"), None)
     app_content = read(app_mod) if app_mod else ""
     has_resources = "FormioResources" in app_content
     has_authservice = "FormioAuthService" in app_content
@@ -257,7 +257,7 @@ def grade_eval_1(out_dir):
         "evidence": f"children.push={user_has_push}, refs 'teams'={user_refs_teams}"
     })
 
-    app_mod = next((p for p in ts_files if p.name == "app.module.ts"), None)
+    app_mod = next((p for p in ts_files if p.name == "app-module.ts"), None)
     app_content = read(app_mod) if app_mod else ""
     homecomp_still = "HomeComponent" in app_content
     has_resources = "FormioResources" in app_content
@@ -270,7 +270,7 @@ def grade_eval_1(out_dir):
         "evidence": f"HomeComponent={homecomp_still}, FormioResources={has_resources}, FormioAuthService={has_authservice}, AppRoutingModule={has_approuting}"
     })
 
-    routing_mod = next((p for p in ts_files if p.name == "app-routing.module.ts"), None)
+    routing_mod = next((p for p in ts_files if p.name == "app-routing-module.ts"), None)
     routing_content = read(routing_mod) if routing_mod else ""
     original_home_route = "HomeComponent" in routing_content
     has_team = "team" in routing_content

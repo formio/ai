@@ -189,8 +189,8 @@ Emit the plan as a single fenced markdown block. Use this exact template — ter
 <tree grouped by folder — mark "NEW" or "MODIFY". Every browsable resource gets a custom ResourceComponent + ViewComponent pair, no exceptions.>
 
   src/app/
-    app.module.ts                                       MODIFY  (adds imports)
-    app-routing.module.ts                               NEW
+    app-module.ts                                       MODIFY  (adds imports)
+    app-routing-module.ts                               NEW
     app.config.ts                                       NEW     (FormioAppConfig + FormioAuthConfig)
     home/home.component.{ts,html,scss}                  NEW
     auth/auth.module.ts                                 NEW
@@ -265,7 +265,7 @@ If the user says revise, incorporate the feedback, re-emit the plan, re-ask. Ite
 Only when the user has approved the plan:
 
 1. **If mode = new workspace**: print the exact `ng new` / `ng add` commands, then write the files into the created workspace. If you cannot run `ng new` for the user, print the command and pause — the user runs it themselves and confirms before you continue.
-2. **If mode = existing workspace**: write the new files under `src/app/`, modify `app.module.ts` and `app-routing.module.ts` in place.
+2. **If mode = existing workspace**: write the new files under `src/app/`, modify `app-module.ts` and `app-routing-module.ts` in place.
 3. Announce each file path as you write it. Short lines; no file-by-file paragraphs.
 
 Use `references/resource-module-patterns.md` for the exact code for every pattern. Use `references/app-integration.md` for `AppModule`, `AppRoutingModule`, `AppConfig`, and the home / auth module shapes. Do not improvise structure.
@@ -331,8 +331,8 @@ Every browsable resource ALWAYS generates a module + `resource.component.{ts,htm
 ### Files to create / modify
 
   src/app/
-    app.module.ts                                       NEW
-    app-routing.module.ts                               NEW
+    app-module.ts                                       NEW
+    app-routing-module.ts                               NEW
     app.config.ts                                       NEW
     home/home.component.{ts,html,scss}                  NEW
     auth/auth.module.ts                                 NEW
@@ -458,9 +458,6 @@ See `references/resource-module-patterns.md` for the complete worked set (every 
 
 - `references/resource-module-patterns.md` — every concrete code pattern (simple, nested, N:N, transitive, custom view, SSO)
 - `references/app-integration.md` — AppModule, AppRoutingModule, AppConfig, AuthModule, index.html, angular.json
-- `@formio/angular` wiki: <https://github.com/formio/angular/wiki/Resource-Management>
-- angular-demo reference implementation: <https://github.com/formio/angular-demo>
-- FormioResource source: <https://github.com/formio/angular/tree/master/projects/angular-formio/resource>
 
 ## What this skill does NOT do
 

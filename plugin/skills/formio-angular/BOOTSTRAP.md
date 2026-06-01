@@ -109,7 +109,7 @@ Do not override `angular-new-app`'s approval gates — it runs its own, and laye
 Before advancing, verify all of the following exist:
 
 - `<workspace>/angular.json`
-- `<workspace>/src/app/app.module.ts`
+- `<workspace>/src/app/app-module.ts`
 - `<workspace>/package.json` with `@angular/core` present at the major resolved in Step 1
 - `<workspace>/package.json` with `@formio/angular` pinned as `"^<FORMIO_ANGULAR_VERSION>"` and `@formio/js` pinned as `"^<FORMIO_JS_VERSION>"`
 
@@ -241,27 +241,26 @@ A clean build confirms both that `zone.js` is resolvable in `node_modules` and t
 
 ### Why this step exists
 
-Every downstream phase in `formio-angular` that authors a user-facing surface (the AUTH phase's `app.component.html` nav chrome, the Resources phase's `resource.component.html` / `view/view.component.html` / per-resource SCSS, any custom login/register component override, any dashboard or landing template) is required — via the parent skill's Stance bullet — to consult Claude's `frontend-design` skill before writing output. That requirement only works if the skill is loadable in the session. BOOTSTRAP is the right place to confirm it, because BOOTSTRAP is the last phase that runs before any UI file gets written.
+Every downstream phase in `formio-angular` that authors a user-facing surface (the AUTH phase's `app.component.html` nav chrome, the Resources phase's `resource.component.html` / `view/view.component.html` / per-resource SCSS, any custom login/register component override, any dashboard or landing template) should consult Claude's `frontend-design` plugin before writing output — that is how the generated UI ends up polished instead of generic. `frontend-design` is **strongly recommended but NOT required**. BOOTSTRAP only **detects** its availability and records the status; it does NOT run its own install prompt. The strong recommendation + install prompt is owned by the orchestrator `formio-application` (Step 6a) — keeping it in one place avoids two skills nagging the user about the same plugin.
 
-### 7a. Detect whether `frontend-design` is already available
+### 7a. Detect whether `frontend-design` is available — match the namespaced name
 
-`frontend-design` is one of Anthropic's built-in Claude skills. It usually ships with the Claude agent by default, in which case no install is needed and you can just note that it is available. Check the session's skill registry for an entry whose name is `frontend-design`. If present → skip to the approval gate; nothing to do.
+`frontend-design` is a Claude Code **plugin** (from the `claude-plugins-official` marketplace), so it registers under the **plugin-namespaced** name `frontend-design:frontend-design`. The bare name `frontend-design` may also appear depending on how it was installed. Check the session's skill registry for **either** form and treat a match as "available". 
 
-### 7b. Install `frontend-design` when missing
+Do NOT only look for the bare `frontend-design` — that is the historical bug that made this step silently fail and the UI fall back to plain, unstyled Bootstrap.
 
-If the skill is NOT in the registry — e.g., the user is on a stripped-down Claude Code build, or they explicitly pruned built-in skills — install it using the same `skills` CLI that Step 2 used for `angular/skills`. Anthropic distributes the skill under its public skills repo; pin the install to Claude Code and accept the defaults:
+### 7b. Honor the handoff status; do not run a competing install prompt
 
-```bash
-npx skills add frontend-design -a claude-code -y
-```
+- **Invoked via `formio-application` handoff:** the orchestrator already ran its `frontend-design` pre-check (Step 6a) and passed `frontendDesignStatus`.
+  - `frontendDesignStatus: 'available'` → consult `frontend-design` (with the brief from 7d) on every UI surface, as the Stance requires.
+  - `frontendDesignStatus: 'declined'` → the user was already offered the plugin and chose to proceed without it. Do NOT re-prompt. Generate UI as best you can, but disclose on **every** UI approval gate (AUTH nav chrome, each Resources Phase A plan) that the file was generated **without** `frontend-design` consultation, so the user can review it critically.
+- **Invoked directly (no handoff):** run the 7a detection yourself.
+  - Available → consult it normally.
+  - Missing → it is strongly recommended, not required. Surface a one-line strong recommendation that the user install it — interactively via `/plugin` (Browse → `claude-plugins-official` → `frontend-design` → Install) or by running `claude plugin install frontend-design@claude-plugins-official`, then restarting Claude Code so the plugin loads — and let them choose to install-then-resume or proceed without it. If they proceed without it, disclose on every later UI gate that the output was generated without `frontend-design`. Do NOT hard-block, and do NOT silently fall back to plain Bootstrap.
 
-If `frontend-design` is not distributed via `npx skills add` in the user's environment, surface that as an explicit blocker rather than proceeding: print the exact error, tell the user the Stance bullet in `formio-angular/SKILL.md` requires `frontend-design` for every UI-authoring phase, and ask whether they want to (a) install it manually and then resume, (b) temporarily waive the requirement (in which case you MUST call out every UI write as "generated without `frontend-design` consultation" in the approval gates of later phases so the user can review critically), or (c) abort BOOTSTRAP.
+### 7c. Record the availability for the summary
 
-Do NOT fall back to generating UI from memory — the point of the Stance rule is that `frontend-design` encodes visual-design conventions the user's LLM would otherwise hallucinate.
-
-### 7c. Smoke-check that the skill is loadable
-
-After install, list the session's available skills one more time and confirm `frontend-design` appears. If it does not, the install failed silently — stop BOOTSTRAP and report the exact `npx skills add` output.
+Note in BOOTSTRAP's working context whether `frontend-design` is available, declined, or being recommended-pending, so the approval-gate summary can report it and later phases know whether to disclose.
 
 ### 7d. Record the Bootstrap-5 design brief for later phases
 
@@ -332,14 +331,15 @@ Bootstrap complete
   Bootstrap Icons version:  <BOOTSTRAP_ICONS_VERSION>        (or "skipped — user opted out")
   Angular skills installed: <path reported by npx>
   Workspace:                <absolute workspace path>
-  Key files:                angular.json, src/app/app.module.ts
+  Key files:                angular.json, src/app/app-module.ts
   package.json entries:
     "@formio/angular":  "^<FORMIO_ANGULAR_VERSION>"
     "@formio/js":       "^<FORMIO_JS_VERSION>"
     "bootstrap":        "^<BOOTSTRAP_VERSION>"
     "bootstrap-icons":  "^<BOOTSTRAP_ICONS_VERSION>"
   zone.js:                  present in node_modules + registered in angular.json polyfills
-  frontend-design skill:    available in session (required for every UI-authoring phase)
+  frontend-design plugin:   available in session (strongly recommended; will be consulted on every UI surface)
+                            -- or "not installed — proceeding without it; UI gates will disclose this" if the user declined
   angular.json styles (prepended to project build target):
     node_modules/bootstrap/dist/css/bootstrap.min.css
     node_modules/bootstrap-icons/font/bootstrap-icons.css
