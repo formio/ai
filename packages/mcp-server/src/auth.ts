@@ -52,7 +52,10 @@ Formio.createForm(document.getElementById('formio'), '${loginFormUrl}').then(fun
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ token: token })
     }).then(function() {
-      statusEl.innerHTML = 'Login successful. You can close this tab.';
+      document.querySelector('.auth-card').innerHTML =
+        '<div class="alert alert-success text-center mb-0" role="alert">' +
+        '<i class="bi bi-check-circle-fill me-2"></i>Login successful. You may close this window.' +
+        '</div>';
     }).catch(function(err) {
       statusEl.innerHTML = 'Error sending token: ' + err.message;
     });
