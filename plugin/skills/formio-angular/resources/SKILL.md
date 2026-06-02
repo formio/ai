@@ -31,7 +31,7 @@ The `formio-resource-planner` Phase B artifact **pair**:
   - `## Resources` — resource definitions (name, type, purpose, fields, access, actions) in the planner's terse block form.
   - `## Users & Auth` — user resource, login/register form names, SSO.
   - `## Roles` — role machine names + capability summaries.
-  - `## Access Matrix` — truth table per (resource, actor) with tokens `all` / `own` / `group` / `group(<join>)` / `role(<r>)` / `—`. Use this to decide whether a module needs a route guard vs. relying on server-side enforcement.
+  - `## Access Matrix` — truth table per (resource, actor) with tokens `all` / `own` / `group` / `group(<join>)` / `role(<r>)` / `—`. Use this to make TWO separate guard decisions per resource. **(1) Authentication guard — almost always yes.** If the `anonymous` actor's row is `—` (no access — the normal case for any logged-in app), the route MUST carry `canActivate: [authGuard]` so an anonymous visitor is redirected to `/auth/login` instead of landing on a page that 401/403s and renders broken/empty. **(2) Authorization guard (role/group) — default no.** Distinguishing *which* authenticated actor (a role or group) is left to the server; authenticated routes stay open among logged-in users and the backend 403s. Do NOT collapse these two: "server enforces access" is true for authorization but is NOT a reason to skip the authentication guard.
   - `## ER Diagram` — Mermaid `erDiagram`; gives you the hierarchy and join topology at a glance, with explicit cardinality semantics (`||--o{`, `}o--o{`). Parse this to discover parent/child pairs and join resources.
   - `## Access Flow Diagram` — Mermaid `flowchart TD`; shows how ACL propagates at runtime. Critical for deciding whether a field is a real parent reference or a hidden calculated mirror (Angular does NOT touch mirror fields — the planner's form JSON handles them). Hidden calculated mirrors are annotated on the edges: `"hidden calculated mirror<br/>value = data.account.data.team"`.
 - **`template.json`** — the structured companion. Read this when you need:
@@ -78,9 +78,10 @@ For each join resource, pin down how both sides should be named in the URL:
 
 `template.md`'s `## Users & Auth` section names the `Login form` and `Registration form` explicitly. Default: generate `AuthModule` wired to those exact form names via `@formio/angular/auth`'s `FormioAuthConfig`. Confirm:
 
-- Should `/login` and `/register` be public top-level routes? (default yes)
+- Should `/login` and `/register` be public top-level routes? (default yes — these stay UNguarded so anonymous users can reach them)
 - Is there a `/logout` convenience route? (default yes, via `FormioAuthService.logout()`)
-- Is any resource gated by a role guard? (default no — Form.io handles access server-side; Angular routes stay open and let the backend 403)
+- **Authentication guard — default YES for every non-public resource route.** Any resource whose Access Matrix gives the `anonymous` actor no access (`—`) MUST mount `canActivate: [authGuard]` so an anonymous visitor is redirected to `/auth/login` rather than navigating into a page that 401/403s and shows broken/empty content. The `authGuard` file is produced by the parent skill's AUTH phase (`auth.guard.ts`); this sub-skill attaches it to each protected route. Only routes the matrix marks reachable by `anonymous` stay unguarded.
+- **Authorization guard (role/group) — default no.** Gating *which* authenticated role or group sees a route is left to the server: authenticated routes stay open among logged-in users and the backend 403s. Add a role guard only if the user explicitly asks for client-side role gating. Keep this separate from the authentication guard above — server-side authorization is not a reason to drop the authentication guard.
 
 ### 5. Produce the Scaffolding Plan, then gate on approval
 
@@ -208,13 +209,15 @@ Use the map's field list to pick summary fields. Ask the user to flag anything t
 
 ### Module & route map
 
-| Path                                | Module                     | Resource (`form`)    | Parents           |
-| ----------------------------------- | -------------------------- | -------------------- | ----------------- |
-| `/login`                            | AuthModule → login         | userLogin            | —                 |
-| `/register`                         | AuthModule → register      | userRegister         | —                 |
-| `/<resource>`                       | <Resource>Module           | <resource>           | —                 |
-| `/<resource>/:id/<nested>`          | <Nested>Module             | <nested>             | ['<resource>']    |
-| `/<resource>/:id/<joinOther>`       | <ResourceJoinOther>Module  | <join>               | ['<resource>']    |
+The `Guard` column records whether the route mounts `canActivate: [authGuard]` (authentication). Default `authGuard` for every route the Access Matrix marks unreachable by `anonymous`; `—` only for the public `/auth` routes.
+
+| Path                                | Module                     | Resource (`form`)    | Parents           | Guard         |
+| ----------------------------------- | -------------------------- | -------------------- | ----------------- | ------------- |
+| `/login`                            | AuthModule → login         | userLogin            | —                 | —             |
+| `/register`                         | AuthModule → register      | userRegister         | —                 | —             |
+| `/<resource>`                       | <Resource>Module           | <resource>           | —                 | `authGuard`   |
+| `/<resource>/:id/<nested>`          | <Nested>Module             | <nested>             | ['<resource>']    | `authGuard`   |
+| `/<resource>/:id/<joinOther>`       | <ResourceJoinOther>Module  | <join>               | ['<resource>']    | `authGuard`   |
 
 ### N:N joins
 - <JoinResource>: mounted on both sides
@@ -223,14 +226,16 @@ Use the map's field list to pick summary fields. Ask the user to flag anything t
   - index grid column `<otherSideKey>` rendered as link to `/<otherSide>/<id>/view`
 
 ### Auth
-- Login form: `userLogin` → route `/login`
-- Register form: `userRegister` → route `/register`
+- Login form: `userLogin` → route `/login` (no guard — must stay reachable while anonymous)
+- Register form: `userRegister` → route `/register` (no guard)
 - Logout: `/logout` → FormioAuthService.logout() then `/login`
 - FormioAuthConfig provided in app.config.ts
+- Authentication guard: `authGuard` (`src/app/auth/auth.guard.ts`, from parent AUTH phase) applied via `canActivate: [authGuard]` to every authenticated route above. Authorization (role/group narrowing) stays server-side — no client-side role guard unless explicitly requested.
 
 ### Integration points touched in an existing app
 - `AppModule.imports` ← adds FormioModule, FormioGrid, and RouterModule entries for each resource
 - `AppModule.providers` ← adds FormioResources, FormioAuthService, FormioAppConfig, FormioAuthConfig
+- `AppRoutingModule` ← imports `authGuard` and adds `canActivate: [authGuard]` to each new authenticated resource route (leaves existing routes untouched)
 - `angular.json` ← adds Bootstrap 5 + FontAwesome CSS (only if selected)
 - `index.html` ← no changes unless CDN-based styling is requested
 ```
@@ -293,12 +298,12 @@ Every browsable resource ALWAYS generates a module + `resource.component.{ts,htm
 | Map entry                                                                                         | Generates                                                                                                                                                                                                                                                    |
 | ------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | `(type: resource)` at top level                                                                   | `<resource>/<resource>.module.ts` calling `FormioResourceRoutes({ resource: ResourceComponent, view: ViewComponent })`, no `parents`                                                                                                                         |
-| `(type: resource)` whose access is group-inherited                                                | Same module, plus a note in Phase A that access is enforced server-side by field-based `submissionAccess` (already in the template). No Angular change needed.                                                                                               |
+| `(type: resource)` whose access is group-inherited                                                | Same module. The route STILL gets `canActivate: [authGuard]` (anonymous has no access). Add a Phase A note that the per-group *authorization* narrowing is enforced server-side by field-based `submissionAccess` (already in the template) — so no role/group guard, but the authentication guard still applies.                                            |
 | `(type: resource)` with a 1:N parent                                                              | Child module with `parents: ['<parent>']`; parent module's routes get a child route pushed in; both parent and child get their own designed ViewComponent.                                                                                                   |
 | `(type: resource, join)` between A and B                                                          | TWO sibling modules — `a/<bs>/<a-bs>.module.ts` (parents: ['a']) and `b/<as>/<b-as>.module.ts` (parents: ['b']). Parent routes get child routes pushed in. No root module. Each side gets its own designed index grid (linking rows to the opposite entity). |
 | One resource nested under multiple different parents (e.g., Activity under both Account and Deal) | Same two-sibling-modules technique as the join. One module per mount: distinct `name` (e.g., `accountActivities` vs `dealActivities`), same `form`, different `parents`. Each parent module pushes its own child route.                                      |
 | Transitive group mirror (hidden `team` select)                                                    | No Angular change — the hidden field is server-side plumbing baked into the form JSON by the planner's `template.json`.                                                                                                                                      |
-| `User resource: default user` + `Login form: userLogin`                                           | AuthModule using `@formio/angular/auth`'s `FormioAuthConfig` pointing at `userLogin` + `userRegister`                                                                                                                                                        |
+| `User resource: default user` + `Login form: userLogin`                                           | AuthModule using `@formio/angular/auth`'s `FormioAuthConfig` pointing at `userLogin` + `userRegister`, PLUS `src/app/auth/auth.guard.ts` (`authGuard`) applied via `canActivate: [authGuard]` on every authenticated route                                    |
 | `SSO: OIDC` / `SSO: SAML`                                                                         | AuthModule links to the Form.io SSO redirect URL (see `references/app-integration.md` → "SSO")                                                                                                                                                               |
 
 ## Worked example
@@ -368,7 +373,8 @@ Every browsable resource ALWAYS generates a module + `resource.component.{ts,htm
 - ProjectUser: mounted on Project only (User side omitted — admin operation on the join, not a normal user view). Index grid column `user` → link to that user's profile (or omitted if no User CRUD).
 
 ### Auth
-- `/login` → userLogin, `/register` → userRegister, `/logout` → FormioAuthService.logout().
+- `/login` → userLogin, `/register` → userRegister, `/logout` → FormioAuthService.logout(). These three stay UNguarded.
+- `authGuard` (`src/app/auth/auth.guard.ts`) applied via `canActivate: [authGuard]` on the root `/project` and `/task` routes in `app-routing-module.ts` (anonymous has no access per `## Access Matrix`). The nested `/project/:id/tasks` and `/project/:id/users` routes inherit protection from the guarded parent. Per-group narrowing stays server-side — no role/group guard.
 ```
 
 **After approval, Phase B** writes the full file set. The module file is only part of the story — every resource also gets `resource.component.{ts,html,scss}` and `view/view.component.{ts,html,scss}` with designed templates. Here's `project.module.ts` wiring in the custom overrides:
