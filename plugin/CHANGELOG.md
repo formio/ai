@@ -1,5 +1,11 @@
 # @formio/ai
 
+## 0.3.0
+
+### Minor Changes
+
+- 736278e: Added better authentication indication in login page. Improved formio-angular for correct Auth module use. Encourage the use of frontend-design skill when building applications.
+
 ## 0.2.0
 
 ### Minor Changes
