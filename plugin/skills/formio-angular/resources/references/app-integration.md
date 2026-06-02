@@ -8,7 +8,7 @@ Every resource module you generate plugs into a shared foundation. This file is 
 2. `AppRoutingModule`
 3. `AppConfig` (FormioAppConfig + FormioAuthConfig)
 4. `AppComponent` and `HomeComponent`
-5. `AuthModule`
+5. `AuthModule` and `authGuard`
 6. `angular.json` — Bootstrap 5 + FontAwesome
 7. Logout route
 8. SSO (OIDC / SAML)
@@ -64,16 +64,21 @@ If the user has an existing AppModule, **merge** these declarations/imports/prov
 import { NgModule } from '@angular/core';
 import { RouterModule, Routes } from '@angular/router';
 import { HomeComponent } from './home/home.component';
+import { authGuard } from './auth/auth.guard';
 
 const routes: Routes = [
   { path: '', component: HomeComponent },
   {
     path: 'auth',
+    // NO guard — login / register must be reachable while anonymous.
     loadChildren: () => import('./auth/auth.module').then(m => m.AuthModule)
   },
-  // One entry per browsable resource module:
+  // One entry per browsable resource module. Authenticated resources (anonymous = `—`
+  // in the Access Matrix) MUST carry canActivate: [authGuard] — without it an anonymous
+  // visitor navigates straight in, the load 401/403s, and the page renders broken/empty.
   {
     path: '<kebab>',
+    canActivate: [authGuard],
     loadChildren: () =>
       import('./<kebab>/<kebab>.module').then(m => m.<Pascal>Module)
   }
@@ -88,6 +93,12 @@ export class AppRoutingModule {}
 ```
 
 Why `useHash: true`? Matches the angular-demo and sidesteps server-rewrite config for the common "just deploy to a static host" case. Swap to path-based routing only if the user asks.
+
+### `authGuard` — the authentication guard (required for protected routes)
+
+`authGuard` is produced by the parent skill's AUTH phase at `src/app/auth/auth.guard.ts` (a functional `CanActivateFn` that awaits `FormioAuthService.ready`, then returns `true` if `auth.authenticated` else a `UrlTree` to `/auth/login`). See the parent `AUTH.md` → "`src/app/auth/auth.guard.ts`" for the file body. This sub-skill's job is to attach `canActivate: [authGuard]` to every resource route the Access Matrix marks unreachable by `anonymous`. If you are generating a routing module in a workspace where AUTH was skipped and no `auth.guard.ts` exists, flag the gap (the route is unprotected) rather than silently omitting the guard.
+
+**Authentication vs. authorization — do not conflate them.** The guard enforces *authentication* only (is anyone logged in). It does NOT enforce *authorization* (which role / group) — that stays server-side and is allowed to 403. So: a group-access resource (e.g. Task gated by ProjectUser membership) STILL gets `canActivate: [authGuard]` because anonymous users have no access at all; the per-group narrowing is left to the backend. "Server enforces access" justifies skipping a role/group guard, never the authentication guard.
 
 ## 3. `AppConfig` — `FormioAppConfig` + `FormioAuthConfig`
 
@@ -193,7 +204,27 @@ export class HomeComponent {}
 </div>
 ```
 
-## 5. `AuthModule`
+## 5. `AuthModule` and `authGuard`
+
+`src/app/auth/auth.guard.ts` — the authentication guard wired onto protected routes in section 2. Generate it alongside `AuthModule`:
+
+```typescript
+import { inject } from '@angular/core';
+import { CanActivateFn, Router } from '@angular/router';
+import { FormioAuthService } from '@formio/angular/auth';
+
+// Blocks protected routes for anonymous visitors. Awaits the cached-JWT restore
+// (auth.ready) so a returning, still-authenticated user is not bounced on a cold
+// deep-link, then redirects anyone unauthenticated to the login form.
+export const authGuard: CanActivateFn = async () => {
+  const auth = inject(FormioAuthService);
+  const router = inject(Router);
+
+  await auth.ready;
+
+  return auth.authenticated ? true : router.createUrlTree(['/auth/login']);
+};
+```
 
 `src/app/auth/auth.module.ts`:
 

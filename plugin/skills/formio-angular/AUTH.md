@@ -8,12 +8,13 @@ Before generating anything, inspect the target workspace:
 
 1. Read `src/app/app-module.ts`. Check for an `import { AuthModule } from './auth/auth.module'` (or equivalent path) and an entry for `AuthModule` inside `@NgModule({ imports: [...] })`.
 2. Read `src/app/auth/auth.module.ts` if it exists. Check that it (a) configures `FormioAuthConfig` (typically by declaring an `AuthConfig` object and providing it) AND (b) mounts `RouterModule.forChild(FormioAuthRoutes())` so the login/register URLs resolve. A file that configures the provider but does not mount `FormioAuthRoutes()` is half-wired — treat that as "needs regeneration" and run the phase.
-3. Read `src/app/app-routing-module.ts`. Check for a route whose `path` is `'auth'` with a `loadChildren` entry pointing at `./auth/auth.module`. Missing this route means `/auth/login` is a dead URL even when `AuthModule` is correct.
+3. Read `src/app/app-routing-module.ts`. Check for a route whose `path` is `'auth'` with a `loadChildren` entry pointing at `./auth/auth.module`. Missing this route means `/auth/login` is a dead URL even when `AuthModule` is correct. ALSO check that the authenticated routes carry `canActivate: [authGuard]` — a routing module that mounts the resource routes but leaves them unguarded is half-wired (anonymous visitors can navigate straight into them); treat that as "needs the guard added" and run the phase.
 4. Read `src/app/app.component.ts` (or `app/app.ts`). Check for `FormioAuthService` import + `onLogin` + `onLogout` subscriptions + `router.navigate` calls.
+5. Read `src/app/auth/auth.guard.ts`. Check that it exports an `authGuard` `CanActivateFn` that reads `FormioAuthService.authenticated` and redirects unauthenticated visitors to `/auth/login`. Missing this file (or a routing module that never references it) means protected routes are reachable while anonymous — run the phase to add it.
 
-If ALL four conditions hold, **skip this phase**. Tell the user which files triggered the skip:
+If ALL five conditions hold, **skip this phase**. Tell the user which files triggered the skip:
 
-> Skipping AUTH — `src/app/auth/auth.module.ts` already configures `FormioAuthConfig` and mounts `FormioAuthRoutes()`, `AppModule` already imports `AuthModule`, `AppRoutingModule` has the `/auth` lazy route, and `AppComponent` subscribes to `FormioAuthService.onLogin` / `onLogout`. Moving to Resources. Say if you want to regenerate the auth wiring anyway.
+> Skipping AUTH — `src/app/auth/auth.module.ts` already configures `FormioAuthConfig` and mounts `FormioAuthRoutes()`, `src/app/auth/auth.guard.ts` exports `authGuard`, `AppModule` already imports `AuthModule`, `AppRoutingModule` has the `/auth` lazy route and applies `canActivate: [authGuard]` on the authenticated routes, and `AppComponent` subscribes to `FormioAuthService.onLogin` / `onLogout`. Moving to Resources. Say if you want to regenerate the auth wiring anyway.
 
 If only a subset is already wired, run the phase and regenerate ONLY the missing pieces (don't clobber user-customized files). If the user wants to fully regenerate, run the phase as normal and overwrite.
 
@@ -346,6 +347,63 @@ export class CustomLoginComponent extends FormioAuthLoginComponent {
 
 The custom register component follows the identical pattern against `FormioAuthRegisterComponent`. Do this only when the default UI truly does not fit — most apps get what they want by styling the default components via CSS against the `form.formio` selector.
 
+## `src/app/auth/auth.guard.ts` — REQUIRED route guard for authenticated routes
+
+**This file is not optional whenever any route requires an authenticated user.** Subscribing to `onLogin` / `onLogout` in `app.component.ts` only redirects on auth *events* — it does NOT stop an anonymous visitor from clicking a `routerLink` (or deep-linking) straight into a route that needs a JWT. Without a `canActivate` guard, the anonymous user lands on the resource page, `FormioResourceService` fires its load request, the backend returns `401` / `403`, and the user sees a broken or empty screen instead of being sent to the login form. A guard is the only thing that gates navigation *before* the route activates.
+
+Write this functional guard whenever the app has any non-public resource route (i.e. the Access Matrix shows the `anonymous` actor has no access — almost every authenticated app):
+
+```ts
+// src/app/auth/auth.guard.ts
+import { inject } from '@angular/core';
+import { CanActivateFn, Router } from '@angular/router';
+import { FormioAuthService } from '@formio/angular/auth';
+
+/**
+ * Blocks protected routes for anonymous visitors. Waits for the cached-JWT
+ * restore to finish (`auth.ready`) so a returning, still-authenticated user
+ * is not bounced on a cold deep-link, then redirects anyone unauthenticated
+ * to the login form.
+ */
+export const authGuard: CanActivateFn = async () => {
+  const auth = inject(FormioAuthService);
+  const router = inject(Router);
+
+  await auth.ready;
+
+  return auth.authenticated ? true : router.createUrlTree(['/auth/login']);
+};
+```
+
+Notes:
+
+- **`await auth.ready` is load-bearing.** Without it, a returning user with a valid cached JWT gets bounced to `/auth/login` on a cold deep-link, because the guard runs before the token-restore promise resolves. `auth.ready` resolves exactly once, after the JWT-restore attempt — gating on it makes the guard correct for both fresh and returning sessions. It is the same promise documented in the event-surface section above.
+- This is a **functional** guard (`CanActivateFn` + `inject`), the current Angular idiom — not the legacy class-based `CanActivate` interface. It is mounted by adding `canActivate: [authGuard]` to a route (see the routing edits below and the Resources sub-skill's `app-integration.md`).
+- The guard enforces **authentication only** (is there a logged-in user at all). It does NOT enforce **authorization** (which role / which group) — that stays server-side and is allowed to 403. See the Resources sub-skill for the authentication-vs-authorization split and which routes get the guard.
+- Redirect target is `/auth/login` — the same path the logout subscription uses, mounted by the `/auth` lazy route below.
+
+### Wiring the guard onto routes
+
+The guard must be attached to every route that requires an authenticated user. For app-shell routes defined in `app-routing-module.ts`, add `canActivate: [authGuard]`; the `/auth` route itself stays UNguarded (otherwise login is unreachable):
+
+```ts
+import { authGuard } from './auth/auth.guard';
+
+const routes: Routes = [
+  {
+    path: '<resource>',
+    canActivate: [authGuard], // <-- gate authenticated routes
+    loadChildren: () => import('./<resource>/<resource>.module').then((m) => m.<Pascal>Module),
+  },
+  {
+    path: 'auth', // <-- NO guard: login/register must be reachable while anonymous
+    loadChildren: () => import('./auth/auth.module').then((m) => m.AuthModule),
+  },
+];
+```
+
+Per-resource routing inside each feature module is owned by the Resources sub-skill (`./resources/SKILL.md`) — it applies the same `canActivate: [authGuard]` rule there. This file only establishes the guard file and the app-shell wiring.
+
 ## The approval gate — preview then approve
 
 Before writing or editing any files, print a preview that cites the exact values used (pulled from `template.md`, confirmed against `template.json`):
@@ -363,6 +421,7 @@ Auth values derived from template.md (confirmed against template.json)
 
 Files to create
   src/app/auth/auth.module.ts  (new file — imports FormioAuth + RouterModule.forChild(FormioAuthRoutes()))
+  src/app/auth/auth.guard.ts   (new file — authGuard CanActivateFn; REQUIRED when any route needs a logged-in user)
 
 Files to edit
   src/app/app-module.ts
@@ -372,7 +431,9 @@ Files to edit
     + AuthConfig added to providers as `{ provide: FormioAuthConfig, useValue: AuthConfig }`
     + FormioAuthService added to providers
   src/app/app-routing-module.ts
-    + add { path: 'auth', loadChildren: () => import('./auth/auth.module').then(m => m.AuthModule) } to Routes
+    + import { authGuard } from './auth/auth.guard'
+    + add { path: 'auth', loadChildren: () => import('./auth/auth.module').then(m => m.AuthModule) } to Routes (NO guard — login must stay reachable)
+    + add canActivate: [authGuard] to every authenticated app-shell route
   src/app/app.component.ts (or `src/app/app.ts`)
     + import FormioAuthService from '@formio/angular/auth' and Router from '@angular/router'
     + subscribe to auth.onLogin    → router.navigate(['/'])           (post-login redirect)
@@ -391,6 +452,6 @@ Wait for explicit approval. If the user declines, stop — do not write partial 
 
 Write `auth.module.ts` and edit `app-module.ts`. Then tell the user what was written and what the next phase is:
 
-> Wrote `src/app/auth/auth.module.ts` (with `FormioAuthRoutes()` mounted via `RouterModule.forChild`), updated `src/app/app-module.ts`, added the `/auth` lazy-load route to `src/app/app-routing-module.ts`, wired `src/app/app.component.ts` (or `src/app/app.ts`) to subscribe to `FormioAuthService.onLogin` / `onRegister` / `onLogout` (redirect to `/` on login/register, to `/auth/login` on logout), and updated `src/app/app.component.html` with auth-aware nav chrome. Loading `./resources/SKILL.md` (the nested Resources sub-skill of this skill) for per-resource NgModule scaffolding.
+> Wrote `src/app/auth/auth.module.ts` (with `FormioAuthRoutes()` mounted via `RouterModule.forChild`) and `src/app/auth/auth.guard.ts` (the `authGuard` `CanActivateFn`), updated `src/app/app-module.ts`, added the `/auth` lazy-load route plus `canActivate: [authGuard]` on the authenticated app-shell routes in `src/app/app-routing-module.ts`, wired `src/app/app.component.ts` (or `src/app/app.ts`) to subscribe to `FormioAuthService.onLogin` / `onRegister` / `onLogout` (redirect to `/` on login/register, to `/auth/login` on logout), and updated `src/app/app.component.html` with auth-aware nav chrome. Loading `./resources/SKILL.md` (the nested Resources sub-skill of this skill) for per-resource NgModule scaffolding.
 
 Hand off to the sub-skill with the context described in the parent `SKILL.md`'s "Handoff contract with the Resources sub-skill (`./resources/SKILL.md`)" section. The sub-skill is a sub-folder of this skill — load that file directly, do NOT attempt to invoke a top-level skill named `formio-angular-resources`.
