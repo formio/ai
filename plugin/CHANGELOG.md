@@ -1,5 +1,11 @@
 # @formio/ai
 
+## 0.4.0
+
+### Minor Changes
+
+- f75be94: Added authenticated route guards to the angular skill.
+
 ## 0.3.0
 
 ### Minor Changes
