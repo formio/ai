@@ -16,7 +16,7 @@ The result: every app your agent builds inherits the model, the governance, RBAC
 
 - **Claude Code plugin: `@formio/ai`.** One-command install. Bundles the MCP server and skill library, registers them with Claude Code.
 - **MCP server: `@formio/mcp`.** Form.io operations (`form_*`, `role_*`, `action_*`, `project_*`) as MCP tools. Works with any MCP-aware client: Claude Code, Claude Desktop, VS Copilot, and whatever comes next.
-- **Skills library:** Skills covering app orchestration, resource planning, framework scaffolding, form authoring, action configuration, and the full Form.io REST surface.
+- **Skills library:** Eight activatable skills covering app orchestration, resource planning, Angular scaffolding, JSON-schema authoring, action configuration, authentication & authorization, the `@formio/js` SDK surface, and the full Form.io REST surface.
 
 ## Why this exists
 
@@ -37,8 +37,10 @@ Form.io has been the data standardization layer for enterprise data for a decade
 - [Quickstart — Claude Code plugin](#quickstart--claude-code-plugin)
 - [Quickstart — standalone MCP server](#quickstart--standalone-mcp-server)
 - [How it works](#how-it-works)
+  - [Skill routing map](#skill-routing-map)
   - [The `formio-application` flow](#the-formio-application-flow)
   - [The `formio-resource-planner` two-phase flow](#the-formio-resource-planner-two-phase-flow)
+  - [The planner ↔ `formio-auth` handoff](#the-planner--formio-auth-handoff)
   - [The `formio-angular` five-phase flow](#the-formio-angular-five-phase-flow)
 - [Sample resource maps](#sample-resource-maps)
   - [Task manager (group-via-join)](#task-manager-group-via-join)
@@ -197,7 +199,42 @@ In standalone (non-plugin) mode, `FORMIO_BASE_URL` and `FORMIO_PROJECT_URL` are 
 
 ## How it works
 
-Three skills do the heavy lifting on a build. The orchestrator (`formio-application`) routes work; the planner (`formio-resource-planner`) designs the data model; the framework implementor (`formio-angular`) scaffolds the front-end.
+Three skills do the heavy lifting on a build: the orchestrator (`formio-application`) routes work, the planner (`formio-resource-planner`) designs the data model, and the framework implementor (`formio-angular`) scaffolds the front-end. Four more skills are pulled in on demand — `formio-auth` (authentication & authorization), `formio-schema` (project / form / submission JSON), `formio-actions` (server-side behavior), `formio-sdk` (the `@formio/js` runtime), and `formio-api` (raw REST) — whenever the build or a direct question touches their domain.
+
+### Skill routing map
+
+Claude activates the skill whose `description` matches the request. Build-an-app intent enters through `formio-application`, which delegates to the planner, hands off to `formio-auth` when the data model needs auth beyond default roles, and routes to `formio-angular` for the front-end. The reference skills (`formio-schema`, `formio-actions`, `formio-sdk`, `formio-api`) activate directly on a matching question, or are consulted mid-build.
+
+```mermaid
+flowchart TD
+    User([User request]) --> Router{Claude routes<br/>by skill description}
+
+    Router -->|"&quot;build / extend an app&quot;"| App[formio-application<br/>orchestrator]
+    Router -->|"&quot;plan / model the data&quot;"| Planner[formio-resource-planner]
+    Router -->|"&quot;login, SSO, RBAC, JWT&quot;"| Auth[formio-auth]
+    Router -->|"&quot;Angular front-end&quot;"| Ng[formio-angular]
+    Router -->|"&quot;form / submission / project JSON&quot;"| Schema[formio-schema]
+    Router -->|"&quot;email / webhook / login action&quot;"| Actions[formio-actions]
+    Router -->|"&quot;Formio.* / Utils.* in JS&quot;"| Sdk[formio-sdk]
+    Router -->|"&quot;call a REST endpoint&quot;"| Api[formio-api]
+
+    App -->|Step 2: Plan| Planner
+    Planner -.->|"non-default auth<br/>(SSO / Custom JWT / groups)"| Auth
+    App -->|Step 6: Framework| Ng
+    Ng -.->|per-resource modules| NgRes[formio-angular/resources]
+
+    Planner -.->|consults| Schema
+    Planner -.->|emits| Actions
+    Ng -.->|runtime calls| Sdk
+    App & Ng -.->|MCP tools| MCP[(@formio/mcp<br/>form_* role_* action_* project_*)]
+
+    style Router fill:#67b346,color:#fff
+    style App fill:#e8f5e4
+    style Planner fill:#e8f5e4
+    style Auth fill:#fff4e0
+    style Ng fill:#e8f5e4
+    style MCP fill:#fff4e0
+```
 
 ### The `formio-application` flow
 
@@ -276,6 +313,27 @@ flowchart TD
 
 Every emitted `template.json` includes a top-level `actions` map with at minimum a `Save Submission` action per resource (omitting it produces a project where forms accept submissions but never store them — the planner treats that as a hard failure).
 
+### The planner ↔ `formio-auth` handoff
+
+The contract between the two auth-aware skills is explicit. `formio-resource-planner` owns the **data model** — roles, the `user` resource, login/registration forms, group joins — and emits the canonical `template.json` shapes for the Login, Role Assignment, and Group Assignment actions plus the `access` / `submissionAccess` arrays. `formio-auth` owns the **auth configuration that runs on top of that model** — SSO (OIDC / OAuth / SAML / LDAP) with provider role mapping, Token Swap, Custom JWT signed with `JWT_SECRET`, passwordless email-token auth, and JWT / session / 2FA / reCAPTCHA mechanics. Action JSON shapes are never duplicated; `formio-auth` references the planner's `references/template-json.md` by path.
+
+```mermaid
+flowchart TD
+    Map[Resource Map approved<br/>Users &amp; Auth section] --> Q{Auth beyond<br/>resource login + Role + Group?}
+    Q -->|no| Planner[formio-resource-planner<br/>emits template.json<br/>Login / Role / Group actions]
+    Q -->|"SSO ≠ none, Custom JWT,<br/>Token Swap, passwordless, 2FA"| Auth[formio-auth<br/>configures auth layer<br/>on top of the model]
+    Planner --> Import([project_import])
+    Auth -.->|references template-json.md| Planner
+    Auth --> Import
+
+    style Q fill:#67b346,color:#fff
+    style Auth fill:#fff4e0
+    style Planner fill:#e8f5e4
+    style Import fill:#67b346,color:#fff
+```
+
+Hand off to `formio-auth` immediately after the Resource Map is approved whenever its `Users & Auth` section emits a non-`none` `SSO` field, a `Custom JWT: yes`, or any auth concern beyond resource-backed login plus Role and Group Assignment.
+
 ### The `formio-angular` five-phase flow
 
 Invoked either as a handoff from `formio-application` (URLs and `template.json` already in hand) or directly when the user names Angular explicitly. Each phase has its own approval gate.
@@ -293,8 +351,8 @@ flowchart TD
     Bootstrap -->|yes| Config
 
     Install --> Config[Phase 3<br/>CONFIG<br/>generate src/app/config.ts<br/>FormioAppConfig]
-    Config --> AuthPhase[Phase 4<br/>AUTH<br/>generate AuthModule<br/>derived from template.md]
-    AuthPhase --> Resources[Phase 5<br/>Resources sub-skill<br/>per-resource NgModule<br/>FormioResourceConfig + Routes]
+    Config --> AuthPhase[Phase 4<br/>AUTH<br/>AuthModule + login/register<br/>route guards on protected routes<br/>login-success notification]
+    AuthPhase --> Resources[Phase 5<br/>Resources sub-skill<br/>per-resource NgModule<br/>FormioResourceConfig + guarded Routes]
     Resources --> Done([Running Angular app])
 
     style Bootstrap fill:#67b346,color:#fff
@@ -304,7 +362,7 @@ flowchart TD
     style Done fill:#67b346,color:#fff
 ```
 
-Generated workspaces use NgModule-based components (`standalone: false`) to match the official `@formio/angular` demo, with Bootstrap 5 + Bootstrap Icons wired via `angular.json`. UI-touching files consult Claude's built-in `frontend-design` skill before authoring templates or styles.
+Generated workspaces use NgModule-based components (`standalone: false`) to match the official `@formio/angular` demo, with Bootstrap 5 + Bootstrap Icons wired via `angular.json`. The AUTH phase wires a `FormioAuthService`-backed login/register experience and attaches route guards so protected resource routes redirect unauthenticated users to login (with a login-success notification on return). UI-touching files consult Claude's built-in `frontend-design` skill before authoring templates or styles.
 
 ---
 
@@ -424,23 +482,24 @@ Runtime propagation:
 
 ## Skills library
 
-Seven activatable skills under [`plugin/skills/`](./plugin/skills/). Claude routes between them based on what the user asked for.
+Eight activatable skills under [`plugin/skills/`](./plugin/skills/). Claude routes between them based on what the user asked for (see the [skill routing map](#skill-routing-map)).
 
 ### Orchestration & framework skills
 
 | Skill | Purpose |
 | --- | --- |
 | [`formio-application`](./plugin/skills/formio-application/) | Default "build me an app" orchestrator. Six-step pipeline: Intent → Plan → Deployment → MCP Config → Import → Framework routing. Build-new runs all six; modify-existing runs Plan (delta) + Import (additive) + Framework (extend sub-skill), skipping only Deployment + MCP Config. |
-| [`formio-resource-planner`](./plugin/skills/formio-resource-planner/) | Turns plain-language requirements into a Form.io project `template.md` + `template.json` pair — resources, fields, roles, actions, access model. Two-phase: Resource Map (review) → paired artifacts (after explicit approval). |
+| [`formio-resource-planner`](./plugin/skills/formio-resource-planner/) | Turns plain-language requirements into a Form.io project `template.md` + `template.json` pair — resources, fields, roles, actions, access model. Two-phase: Resource Map (review) → paired artifacts (after explicit approval). Encodes when to model something as a resource vs a plain form, and the access-model anti-patterns to avoid. Hands non-default auth off to `formio-auth`. |
 | [`formio-angular`](./plugin/skills/formio-angular/) | Angular framework implementor. Five-phase scaffold flow over `@formio/angular` (NgModule-based, `standalone: false`, Bootstrap 5). Sub-skill at [`resources/`](./plugin/skills/formio-angular/resources/) handles per-resource NgModule generation and modify-existing extension. |
 
-### Form-definition & action skills
+### Schema, action & SDK skills
 
 | Skill | Purpose |
 | --- | --- |
-| [`formio-form`](./plugin/skills/formio-form/) | Guide to constructing a new Form.io form JSON definition — structure, component types, how the schema maps to MCP tools. |
-| [`formio-schema`](./plugin/skills/formio-schema/) | Comprehensive Form.io form JSON schema reference. Consulted when reading, writing, or editing any form definition. |
+| [`formio-schema`](./plugin/skills/formio-schema/) | Comprehensive JSON schema reference for **projects, forms (and resources), and submissions** — component types, validation, conditional logic, project settings/integrations, submission `data`/`access`/`metadata`/state. Consulted when reading, writing, or editing any Form.io JSON. (Absorbs the former `formio-form` skill.) |
 | [`formio-actions`](./plugin/skills/formio-actions/) | Deep reference for configuring Form.io server-side actions — email, login, webhook, role assignment, save, reset password — including handler/method, priorities, and conditions. |
+| [`formio-auth`](./plugin/skills/formio-auth/) | Authentication & authorization specialist — resource-backed login (Login + Role Assignment actions), the eight RBAC permission types, group permissions (single-level + transitive), SSO via OIDC/OAuth/SAML/LDAP with role mapping, Token Swap, Custom JWT (`JWT_SECRET`), passwordless email-token auth, and JWT/session/2FA/reCAPTCHA mechanics. Peer to the planner; owns the auth layer the planner's data model runs on. |
+| [`formio-sdk`](./plugin/skills/formio-sdk/) | Source-derived reference for the `@formio/js` SDK, `@formio/js/utils` Utilities, and `@formio/core` helpers — static & instance `Formio.*` methods, VanillaJS rendering (`Formio.createForm`, `Formio.builder`), the plugin lifecycle, and the `Utils` surface (Evaluator, traversal, conditions, JSONLogic, mask/sanitize). Mandates ESM imports. |
 
 ### API skill + reference library
 
@@ -455,7 +514,12 @@ The endpoint detail lives under [`plugin/skills/formio-api/references/`](./plugi
 - **Runtime scope** (`${FORMIO_PROJECT_URL}/`): `runtime-auth`, `runtime-custom-users`, `runtime-access-control`, `runtime-reports`, `runtime-submissions`
 - **PDF scope** (`${FORMIO_PROJECT_URL}/pdf-proxy/`): `pdf-api`
 
-Skills are validated on every test run by [`packages/mcp-server/src/skills-validator.ts`](./packages/mcp-server/src/skills-validator.ts) — `pnpm test` fails if router frontmatter drifts, any reference file is missing or empty, the canonical portal-login JWT auth paragraph is missing, or scope/terminology rules are violated. Terminology is strict: `baseUrl`/`base_url` always means `FORMIO_BASE_URL`; `projectUrl`/`project_url` always means `FORMIO_PROJECT_URL`.
+Two automated checks guard the skill library (both also run under the repo-wide `turbo run test`):
+
+- **Plugin bundle structure** — `pnpm --filter @formio/mcp test` runs [`packages/mcp-server/src/__tests__/plugin-build.test.ts`](./packages/mcp-server/src/__tests__/plugin-build.test.ts), which asserts the right skills ship in `dist/plugin/skills/` (e.g. `formio-api` and `formio-schema` present, the retired `formio-form` and the `openspec-*` / `tdd-*` skills excluded) and that `plugin.json` and the bundled stdio server are well-formed. (Run `pnpm build:plugin` first to populate `dist/plugin/`.)
+- **SDK example execution** — `pnpm --filter @formio/skill-tests test` runs the [`@formio/skill-tests`](./packages/skill-tests/) package, which executes the code examples shipped in `formio-sdk`'s reference docs against the real `@formio/js` / `@formio/core` at runtime, so a doc that drifts from the SDK's actual export shape fails a test with a pointer to the bad example.
+
+Terminology in the skills is strict (a convention, not test-enforced): `baseUrl`/`base_url` always means `FORMIO_BASE_URL`; `projectUrl`/`project_url` always means `FORMIO_PROJECT_URL`.
 
 ---
 
@@ -467,10 +531,12 @@ The bundled `@formio/mcp` server exposes these tools. Skills prefer these over r
 
 | Tool | Purpose |
 | --- | --- |
-| `form_create` | Create a new form. Use the `formio-form` skill first to build the JSON definition. |
+| `form_create` | Create a new form. Use the `formio-schema` skill first to build the JSON definition. |
 | `form_get` | Fetch a single form definition by ID or path. |
 | `form_list` | List forms with optional filtering and pagination. |
-| `form_update` | Update an existing form. Call `form_get` first, edit with `formio-form`, then update. |
+| `form_update` | Update an existing form. Call `form_get` first, edit with `formio-schema`, then update. |
+| `form_revisions_list` | List the immutable published revision summaries for a form (`_vid`, `_id`, `modified`, `user`, `_vnote`). Requires form revisions to be enabled. |
+| `form_revision_get` | Fetch a single immutable form revision by `_vid` or revision document `_id`. |
 
 ### Roles
 
@@ -536,6 +602,7 @@ The probe runs lazily — only when the local auth page is actually served.
 | `FORMIO_API_KEY` | no | `undefined` | Long-lived project API key. When set, the server skips the browser login flow. | `CHANGEME` | `CHANGEME` |
 | `FORMIO_LOGIN_FORM` | no | Auto-resolved | Override the portal login form URL used by the JWT login flow. | `https://formio.form.io/user/login` | `https://forms.example.com/formio/user/login` |
 | `FORMIO_PLUGIN_CONTEXT` | no | `0` | Set by the plugin manifest. When `1`, the server enables `project_set` and reads `FORMIO_PROJECT_URL` from `~/.formio/projects.json` per cwd instead of env. |  |  |
+| `FORMIO_INSECURE_TLS` | no | `false` | When `true`, skips TLS certificate verification (sets `NODE_TLS_REJECT_UNAUTHORIZED=0`) — for self-hosted deployments behind self-signed certs. Do not use against production. | — | `true` |
 
 \* In plugin context, `FORMIO_PROJECT_URL` is captured per-cwd by the `project_set` tool and persisted to `~/.formio/projects.json`. The `verify-project-url` `SessionStart`/`PreToolUse` hook offers `formio_default_project_url` (from plugin user-config) as the default the first time you enter a workspace.
 
@@ -556,7 +623,7 @@ This is a [pnpm](https://pnpm.io/) + [Turborepo](https://turbo.build/) monorepo.
 pnpm install        # install workspace deps
 pnpm build          # build all packages
 pnpm dev            # run all packages in watch mode
-pnpm test           # run all tests (Vitest + skills-validator)
+pnpm test           # run all tests (Vitest across @formio/mcp + @formio/skill-tests + plugin build/smoke)
 pnpm lint           # type-check all packages
 pnpm format         # prettier --write .
 pnpm clean          # clean build artifacts
@@ -572,6 +639,14 @@ pnpm --filter @formio/mcp test        # run tests once
 pnpm --filter @formio/mcp test:watch  # run tests in watch mode
 pnpm --filter @formio/mcp build       # compile to dist/
 ```
+
+### Skill SDK tests
+
+```bash
+pnpm --filter @formio/skill-tests test   # run formio-sdk doc examples against the real @formio/js
+```
+
+[`@formio/skill-tests`](./packages/skill-tests/) executes the code examples in `formio-sdk`'s reference docs against the live SDK — a failing test means a reference doc has drifted from the SDK's actual surface. See [`packages/skill-tests/README.md`](./packages/skill-tests/README.md).
 
 ### Definition of Done
 
