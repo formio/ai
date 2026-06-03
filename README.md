@@ -226,7 +226,8 @@ flowchart TD
     Planner -.->|consults| Schema
     Planner -.->|emits| Actions
     Ng -.->|runtime calls| Sdk
-    App & Ng -.->|MCP tools| MCP[(@formio/mcp<br/>form_* role_* action_* project_*)]
+    App -.->|MCP tools| MCP[("@formio/mcp<br/>form_* role_* action_* project_*")]
+    Ng -.->|MCP tools| MCP
 
     style Router fill:#67b346,color:#fff
     style App fill:#e8f5e4
