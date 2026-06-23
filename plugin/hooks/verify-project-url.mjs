@@ -100,13 +100,18 @@ const mapPath = join(homedir(), '.formio', 'projects.json');
 if (readMappedUrl(mapPath, cwd)) {
   process.exit(0);
 }
-// this env var is defined by the hooks; it doesn't exist in the MCP server
+// these env vars are defined by the hooks; they don't exist in the MCP server
 const defaultUrl = process.env.FORMIO_DEFAULT_PROJECT_URL ?? '';
+const defaultBaseUrl = process.env.FORMIO_DEFAULT_BASE_URL ?? '';
 const rule =
   '~/.formio/projects.json is owned by project_set; never write it by hand (no Write/Edit/heredoc/jq). If project_set fails, surface the error — do not work around it.';
-const reason = defaultUrl
-  ? `No project mapped for ${cwd}. AskUserQuestion: 'Use default (${defaultUrl})' or 'Other'. Then project_set({ cwd, projectUrl }), then retry. ${rule}`
-  : `No project mapped for ${cwd}. AskUserQuestion for URL, then project_set({ cwd, projectUrl }), then retry. ${rule}`;
+const projectClause = defaultUrl
+  ? `For the project URL, AskUserQuestion: 'Use default (${defaultUrl})' or 'Other'.`
+  : `AskUserQuestion for the project URL.`;
+const baseClause = defaultBaseUrl
+  ? `For the deployment (base) URL of the Form.io Enterprise Server, AskUserQuestion: 'Use default (${defaultBaseUrl})' or 'Other'.`
+  : `AskUserQuestion for the deployment (base) URL of the Form.io Enterprise Server.`;
+const reason = `No project mapped for ${cwd}. ${projectClause} ${baseClause} Then project_set({ cwd, projectUrl, baseUrl }), then retry. ${rule}`;
 
 const output =
   event === 'PreToolUse'

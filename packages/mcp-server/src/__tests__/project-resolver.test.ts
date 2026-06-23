@@ -37,6 +37,28 @@ describe('resolveProjectConfig', () => {
     expect(cfg.apiKey).toBe('abc');
   });
 
+  it('prefers the mapped base URL over baseConfig.baseUrl in plugin context', () => {
+    writeProjectEntry('/workspace/pkg-a', {
+      FORMIO_PROJECT_URL: 'https://mapped.form.io/mapped',
+      FORMIO_BASE_URL: 'https://mapped.form.io',
+    });
+
+    const cfg = resolveProjectConfig('/workspace/pkg-a', baseConfig);
+
+    expect(cfg.baseUrl).toBe('https://mapped.form.io');
+    expect(cfg.projectUrl).toBe('https://mapped.form.io/mapped');
+  });
+
+  it('falls back to baseConfig.baseUrl when the mapped entry has no base URL', () => {
+    writeProjectEntry('/workspace/pkg-a', {
+      FORMIO_PROJECT_URL: 'https://api.form.io/mapped',
+    });
+
+    const cfg = resolveProjectConfig('/workspace/pkg-a', baseConfig);
+
+    expect(cfg.baseUrl).toBe('https://api.form.io');
+  });
+
   it('strips a trailing slash from the mapped project URL', () => {
     writeProjectEntry('/workspace/pkg-a', {
       FORMIO_PROJECT_URL: 'https://api.form.io/mapped/',

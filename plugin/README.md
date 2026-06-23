@@ -50,12 +50,12 @@ The plugin prompts for `FORMIO_BASE_URL` and the default `FORMIO_PROJECT_URL` on
 
 | Name | Required | Default | Purpose |
 | --- | :-: | --- | --- |
-| `FORMIO_BASE_URL` | yes | — | Full base URL of your Form.io deployment (e.g. `https://api.form.io`). Set via plugin user-config. |
+| `FORMIO_BASE_URL` | yes\* | — | Full base URL of your Form.io deployment (e.g. `https://api.form.io`). Set via plugin user-config. In plugin mode, only the global fallback the `verify-project-url` hook offers as the default base URL when prompting for an unmapped cwd. |
 | `FORMIO_PROJECT_URL` | yes\* | — | Full URL of the Form.io project the MCP server should target. In plugin mode, only used as the pre-filled default the `verify-project-url` hook offers when prompting for an unmapped cwd. |
 | `FORMIO_API_KEY` | no | `undefined` | Long-lived project API key. When set, the server skips the browser login flow and attaches `x-token`. |
 | `FORMIO_LOGIN_FORM` | no | Auto-resolved | Override the portal login form URL. |
 
-\* The `verify-project-url` hook persists per-cwd mappings to `~/.formio/projects.json` via the `project_set` MCP tool (offering the plugin user-config `formio_default_project_url` as the default). Once a directory is mapped, the MCP server resolves `FORMIO_PROJECT_URL` from that file instead of env.
+\* The `verify-project-url` hook persists per-cwd mappings to `~/.formio/projects.json` via the `project_set` MCP tool — prompting for **both** the project URL (default: `formio_default_project_url`) and the deployment/base URL (default: `formio_base_url`). Once a directory is mapped, the MCP server resolves `FORMIO_PROJECT_URL` **and** `FORMIO_BASE_URL` from that file per-cwd, falling back to the global env values only when an entry omits them.
 
 ### Authentication modes
 

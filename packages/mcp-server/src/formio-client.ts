@@ -3,7 +3,18 @@ import { getAuthHeader } from './auth-header.js';
 import { ensureAuthenticated, invalidateJwtCache } from './ensure-auth.js';
 import { clearToken } from './token-cache.js';
 
-if (process.env.FORMIO_INSECURE_TLS === 'true') {
+// Accept the common truthy spellings ("true", "TRUE", "1") so a self-signed
+// deployment (e.g. a local Form.io Enterprise server) is not rejected over a
+// trivial casing/format mismatch in the env value.
+export function isInsecureTlsEnabled(value: string | undefined): boolean {
+  if (!value) {
+    return false;
+  }
+  const normalized = value.trim().toLowerCase();
+  return normalized === 'true' || normalized === '1';
+}
+
+if (isInsecureTlsEnabled(process.env.FORMIO_INSECURE_TLS)) {
   process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
 }
 

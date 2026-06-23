@@ -8,7 +8,10 @@ import os from 'os';
 import { readProjectEntry } from '../project-map.js';
 import { registerProjectSetTool } from '../tools/project_set.js';
 
-async function createTestClient(options?: { cwd?: () => string }) {
+async function createTestClient(options?: {
+  cwd?: () => string;
+  baseUrl?: () => string | undefined;
+}) {
   const server = new McpServer({ name: 'test', version: '0.0.0' });
   registerProjectSetTool(server, options);
 
@@ -126,6 +129,129 @@ describe('project_set tool', () => {
     expect(first.text).toContain('no change');
     const mtimeAfter = fs.statSync(projectsJsonPath()).mtimeMs;
     expect(mtimeAfter).toBe(mtimeBefore);
+  });
+
+  it('persists FORMIO_BASE_URL alongside FORMIO_PROJECT_URL when a base URL is available', async () => {
+    const { client } = await createTestClient({
+      cwd: () => cwd,
+      baseUrl: () => 'https://api.form.io',
+    });
+
+    await client.callTool({
+      name: 'project_set',
+      arguments: { projectUrl: 'https://api.form.io/next' },
+    });
+
+    expect(readProjectEntry(cwd)).toEqual({
+      env: {
+        FORMIO_PROJECT_URL: 'https://api.form.io/next',
+        FORMIO_BASE_URL: 'https://api.form.io',
+      },
+    });
+  });
+
+  it('persists an explicit baseUrl argument, overriding the env global', async () => {
+    const { client } = await createTestClient({
+      cwd: () => cwd,
+      baseUrl: () => 'https://global.form.io',
+    });
+
+    await client.callTool({
+      name: 'project_set',
+      arguments: {
+        projectUrl: 'https://enterprise.form.io/next',
+        baseUrl: 'https://enterprise.form.io',
+      },
+    });
+
+    expect(readProjectEntry(cwd)).toEqual({
+      env: {
+        FORMIO_PROJECT_URL: 'https://enterprise.form.io/next',
+        FORMIO_BASE_URL: 'https://enterprise.form.io',
+      },
+    });
+  });
+
+  it('strips a trailing slash from an explicit baseUrl argument', async () => {
+    const { client } = await createTestClient({ cwd: () => cwd });
+
+    await client.callTool({
+      name: 'project_set',
+      arguments: {
+        projectUrl: 'https://enterprise.form.io/next',
+        baseUrl: 'https://enterprise.form.io/',
+      },
+    });
+
+    expect(readProjectEntry(cwd)).toEqual({
+      env: {
+        FORMIO_PROJECT_URL: 'https://enterprise.form.io/next',
+        FORMIO_BASE_URL: 'https://enterprise.form.io',
+      },
+    });
+  });
+
+  it('rejects an invalid baseUrl and does not write', async () => {
+    const { client } = await createTestClient({ cwd: () => cwd });
+
+    const result = await client.callTool({
+      name: 'project_set',
+      arguments: {
+        projectUrl: 'https://api.form.io/next',
+        baseUrl: 'not a url',
+      },
+    });
+
+    expect(result.isError).toBe(true);
+    expect(readProjectEntry(cwd)).toBeNull();
+  });
+
+  it('strips a trailing slash from the base URL before persisting', async () => {
+    const { client } = await createTestClient({
+      cwd: () => cwd,
+      baseUrl: () => 'https://api.form.io/',
+    });
+
+    await client.callTool({
+      name: 'project_set',
+      arguments: { projectUrl: 'https://api.form.io/next' },
+    });
+
+    expect(readProjectEntry(cwd)).toEqual({
+      env: {
+        FORMIO_PROJECT_URL: 'https://api.form.io/next',
+        FORMIO_BASE_URL: 'https://api.form.io',
+      },
+    });
+  });
+
+  it('rewrites the entry when only the base URL changed for the same project URL', async () => {
+    const first = await createTestClient({
+      cwd: () => cwd,
+      baseUrl: () => 'https://old.form.io',
+    });
+    await first.client.callTool({
+      name: 'project_set',
+      arguments: { projectUrl: 'https://api.form.io/same' },
+    });
+
+    const second = await createTestClient({
+      cwd: () => cwd,
+      baseUrl: () => 'https://new.form.io',
+    });
+    const result = await second.client.callTool({
+      name: 'project_set',
+      arguments: { projectUrl: 'https://api.form.io/same' },
+    });
+
+    const [first0] = result.content as Array<{ type: string; text: string }>;
+    expect(first0.text).not.toContain('no change');
+    expect(readProjectEntry(cwd)).toEqual({
+      env: {
+        FORMIO_PROJECT_URL: 'https://api.form.io/same',
+        FORMIO_BASE_URL: 'https://new.form.io',
+      },
+    });
   });
 
   it('persists under the explicit cwd argument when provided, ignoring server cwd', async () => {
