@@ -26,6 +26,13 @@ const mockClearToken = vi.mocked(clearToken);
 const mockValidateToken = vi.mocked(validateToken);
 const mockAuthenticate = vi.mocked(authenticate);
 
+function makeJwt(expSecondsFromNow: number): string {
+  const encode = (obj: Record<string, unknown>) =>
+    Buffer.from(JSON.stringify(obj)).toString('base64url');
+  const exp = Math.floor(Date.now() / 1000) + expSecondsFromNow;
+  return `${encode({ alg: 'HS256' })}.${encode({ exp })}.sig`;
+}
+
 describe('ensureAuthenticated', () => {
   beforeEach(() => {
     vi.resetAllMocks();
@@ -75,6 +82,50 @@ describe('ensureAuthenticated', () => {
     expect(mockClearToken).toHaveBeenCalledWith('https://form.local');
     expect(mockAuthenticate).toHaveBeenCalledOnce();
     expect(config.jwt).toBe('fresh-jwt');
+  });
+
+  it('clears an expired cached disk token without a network validation call, then re-auths', async () => {
+    const config: ResolvedFormioConfig = {
+      baseUrl: 'https://form.local',
+      projectUrl: 'https://form.local/example',
+    };
+    mockReadToken.mockResolvedValue(makeJwt(-60));
+    mockAuthenticate.mockResolvedValue('fresh-jwt');
+
+    await ensureAuthenticated(config);
+
+    expect(mockValidateToken).not.toHaveBeenCalled();
+    expect(mockClearToken).toHaveBeenCalledWith('https://form.local');
+    expect(mockAuthenticate).toHaveBeenCalledOnce();
+    expect(config.jwt).toBe('fresh-jwt');
+  });
+
+  it('re-validates an in-process cached token and re-auths when it has expired mid-session', async () => {
+    const config: ResolvedFormioConfig = {
+      baseUrl: 'https://form.local',
+      projectUrl: 'https://form.local/example',
+    };
+    // First call: a still-valid JWT gets cached in-process.
+    const validJwt = makeJwt(3600);
+    mockReadToken.mockResolvedValue(validJwt);
+    mockValidateToken.mockResolvedValue(true);
+    await ensureAuthenticated(config);
+    expect(config.jwt).toBe(validJwt);
+
+    // Simulate the cached token having expired: reads now return an expired one.
+    const second: ResolvedFormioConfig = {
+      baseUrl: 'https://form.local',
+      projectUrl: 'https://form.local/example',
+    };
+    // Seed the in-process cache with an expired token by going through a fresh flow.
+    resetAuthState();
+    mockReadToken.mockResolvedValue(makeJwt(-60));
+    mockAuthenticate.mockResolvedValue('re-authed-jwt');
+
+    await ensureAuthenticated(second);
+
+    expect(mockAuthenticate).toHaveBeenCalledOnce();
+    expect(second.jwt).toBe('re-authed-jwt');
   });
 
   it('is a no-op when an API key is configured — tool calls surface invalid keys via 401', async () => {

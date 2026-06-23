@@ -1,6 +1,7 @@
 import { ResolvedFormioConfig } from './config.js';
 import { readToken, saveToken, clearToken } from './token-cache.js';
 import { validateToken } from './token-validation.js';
+import { isJwtExpired } from './token-expiry.js';
 import { authenticate } from './auth.js';
 
 // Keyed by baseUrl: one JWT is valid for every project on the same Form.io
@@ -18,15 +19,22 @@ async function runAuthFlow(config: ResolvedFormioConfig): Promise<void> {
   const cachedToken = await readToken(config.baseUrl);
 
   if (cachedToken) {
-    config.jwt = cachedToken;
-    const valid = await validateToken(config);
-    if (valid) {
-      jwtCache.set(config.baseUrl, cachedToken);
-      return;
+    // Local expiry check first: a plainly-expired JWT is cleared without a
+    // wasted network round-trip, avoiding the thrash of firing requests with a
+    // token we already know is dead.
+    if (isJwtExpired(cachedToken)) {
+      await clearToken(config.baseUrl);
+    } else {
+      config.jwt = cachedToken;
+      const valid = await validateToken(config);
+      if (valid) {
+        jwtCache.set(config.baseUrl, cachedToken);
+        return;
+      }
+      // Rejected by the server (revoked, etc.) — clear and re-auth
+      await clearToken(config.baseUrl);
+      config.jwt = undefined;
     }
-    // Expired — clear and re-auth
-    await clearToken(config.baseUrl);
-    config.jwt = undefined;
   }
 
   // No valid token — login
@@ -37,11 +45,18 @@ async function runAuthFlow(config: ResolvedFormioConfig): Promise<void> {
 }
 
 export async function ensureAuthenticated(config: ResolvedFormioConfig): Promise<void> {
-  // Short-circuit: already authenticated in this process
+  // Short-circuit: already authenticated in this process. Re-check expiry — a
+  // token validated at session start can expire mid-session, and we must not
+  // reuse it blindly.
   const cached = jwtCache.get(config.baseUrl);
   if (cached) {
-    config.jwt = cached;
-    return;
+    if (!isJwtExpired(cached)) {
+      config.jwt = cached;
+      return;
+    }
+    // Expired in-process — drop it and fall through to the full auth flow.
+    jwtCache.delete(config.baseUrl);
+    config.jwt = undefined;
   }
 
   // Single-flight per baseUrl: reuse an in-flight auth promise if one exists
