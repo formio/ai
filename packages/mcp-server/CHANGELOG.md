@@ -1,5 +1,15 @@
 # @formio/mcp
 
+## 0.4.1
+
+### Patch Changes
+
+- ae993dc: Fixed issues with baseURL not getting set correctly.
+- 4237e6c: Check cached JWT expiry locally before use. The MCP server now decodes a cached
+  token's `exp` claim and clears expired tokens — both from the on-disk cache and
+  the in-process cache — before attempting any request, triggering re-auth instead
+  of thrashing on failing calls with a known-dead token.
+
 ## 0.4.0
 
 ### Minor Changes
