@@ -25,19 +25,21 @@ export function resolveProjectConfig(cwd: string, baseConfig: FormioConfig): Res
   // authoritative. Standalone context: the map is at best stale leftover from
   // prior plugin use in this cwd — ignore it so the user's .mcp.json env wins.
   const pluginContext = process.env.FORMIO_PLUGIN_CONTEXT === '1';
-  const mapped = pluginContext ? readProjectEntry(cwd)?.env.FORMIO_PROJECT_URL : undefined;
+  const mappedEnv = pluginContext ? readProjectEntry(cwd)?.env : undefined;
+  const mapped = mappedEnv?.FORMIO_PROJECT_URL;
   const projectUrl = mapped ?? baseConfig.projectUrl;
   if (!projectUrl) {
     throw new Error(
       `No Form.io project is mapped for cwd=${cwd}. Call project_set with projectUrl and cwd=${cwd}, or set the FORMIO_PROJECT_URL environment variable, before invoking Form.io tools.`
     );
   }
-  if (!baseConfig.baseUrl) {
+  const baseUrl = mappedEnv?.FORMIO_BASE_URL ?? baseConfig.baseUrl;
+  if (!baseUrl) {
     throw new Error('baseUrl is missing on config. getConfig() should always populate it.');
   }
   return {
     ...baseConfig,
-    baseUrl: baseConfig.baseUrl,
+    baseUrl: baseUrl.replace(/\/+$/, ''),
     projectUrl: projectUrl.replace(/\/+$/, ''),
   };
 }

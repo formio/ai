@@ -6,7 +6,7 @@
           {
             "matcher": "*",
             "type": "command",
-            "command": "FORMIO_DEFAULT_PROJECT_URL=\"${user_config.formio_default_project_url}\" node \"${CLAUDE_PLUGIN_ROOT}/hooks/verify-project-url.mjs\""
+            "command": "FORMIO_DEFAULT_PROJECT_URL=\"${user_config.formio_default_project_url}\" FORMIO_DEFAULT_BASE_URL=\"${user_config.formio_base_url}\" node \"${CLAUDE_PLUGIN_ROOT}/hooks/verify-project-url.mjs\""
           }
         ]
       }
@@ -17,7 +17,7 @@
           {
             "matcher": "*",
             "type": "command",
-            "command": "FORMIO_DEFAULT_PROJECT_URL=\"${user_config.formio_default_project_url}\" node \"${CLAUDE_PLUGIN_ROOT}/hooks/verify-project-url.mjs\""
+            "command": "FORMIO_DEFAULT_PROJECT_URL=\"${user_config.formio_default_project_url}\" FORMIO_DEFAULT_BASE_URL=\"${user_config.formio_base_url}\" node \"${CLAUDE_PLUGIN_ROOT}/hooks/verify-project-url.mjs\""
           }
         ]
       }
@@ -28,7 +28,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "FORMIO_DEFAULT_PROJECT_URL=\"${user_config.formio_default_project_url}\" node \"${CLAUDE_PLUGIN_ROOT}/hooks/verify-project-url.mjs\""
+            "command": "FORMIO_DEFAULT_PROJECT_URL=\"${user_config.formio_default_project_url}\" FORMIO_DEFAULT_BASE_URL=\"${user_config.formio_base_url}\" node \"${CLAUDE_PLUGIN_ROOT}/hooks/verify-project-url.mjs\""
           }
         ]
       }
