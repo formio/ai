@@ -175,67 +175,66 @@ Do NOT add Bootstrap's JavaScript bundle (`bootstrap.bundle.min.js` via `angular
 
 After editing `angular.json`, re-run a clean `npm install` (or `ng build --configuration=development` as a smoke check) to confirm the new style paths resolve. If either path 404s, verify the package version in `node_modules` — a Bootstrap 5+ major always ships `dist/css/bootstrap.min.css`, and Bootstrap Icons always ships `font/bootstrap-icons.css`, so a 404 means the install did not land.
 
-## Step 6 — ensure `zone.js` is registered as a polyfill
+## Step 6 — set an explicit change-detection mode
 
-Angular's change-detection machinery depends on Zone.js. Older `@angular/cli` versions preconfigured it automatically; newer versions (and certain `angular-new-app` flag combinations such as zoneless or `--no-zone`) can omit it. When it is missing at runtime, the application boots with errors like `Zone is not defined` or `NG0908: In this configuration Angular requires Zone.js`, which is what the Form.io integration will hit if we do not guard against it here.
+A generated app must **pin its change-detection (CD) mode explicitly** rather than inherit whatever `angular-new-app` / the resolved CLI version happened to default to. Leaving it implicit is what makes generated apps non-deterministic: the CLI's zone default has drifted across Angular majors (newer `ng new` scaffolds zoneless), so the same skill can produce a zoned app one month and a zoneless app the next — and any code that re-enters Angular via `NgZone.run` silently stops updating the view under zoneless.
 
-Because `@formio/angular` relies on the default zone-based change-detection model, BOOTSTRAP must guarantee the Zone.js polyfill is present — regardless of what `angular-new-app` decided.
+`@formio/angular` >= 11.1 is **change-detection-mode agnostic** (it renders correctly under both zoned and zoneless CD), so either mode is safe. BOOTSTRAP's job is only to choose one **explicitly** and configure it, then make sure all generated component code is written to work in the chosen mode (see Step 6c).
 
-### 6a. Verify the package is installed
+### 6a. Choose the mode from the resolved Angular major
 
-Zone.js ships as a peer / transitive dependency of Angular and should already be present in `node_modules/zone.js`. Confirm with:
+Use `FORMIO_ANGULAR_TARGET_VERSION` from Step 1:
 
-```bash
-npm ls zone.js
-```
+- **Angular 20 or newer → zoneless.** `provideZonelessChangeDetection()` is stable from v20. This matches the CLI default and drops the ~13 KB `zone.js` polyfill.
+- **Angular 17–19 → zoned.** Stable zoneless does not exist before v20, so pin zoned change detection and keep `zone.js`.
 
-If the output shows `zone.js` missing (empty / not-installed), install it explicitly, using the caret range so patch updates flow through automatically:
+### 6b. Wire the chosen mode
 
-```bash
-npm install --save zone.js@^<ZONE_JS_VERSION>
-```
+Add the provider to the generated `AppModule` `providers` array (alongside `provideBrowserGlobalErrorListeners()`), and set `angular.json` polyfills to match.
 
-Resolve `ZONE_JS_VERSION` the same way Step 1 resolves the other versions — fetch `https://unpkg.com/zone.js/package.json` and read its top-level `version` field. Fall back to `npm view zone.js version` if unpkg is unreachable. Do NOT hard-code a version in the skill.
-
-### 6b. Register the polyfill in `angular.json`
-
-Open `<workspace>/angular.json` and find the same `projects.<projectName>.architect.build.options` block you edited for styles. There are two accepted shapes depending on the Angular major `angular-new-app` generated:
-
-**Shape A — `polyfills` is an array (Angular 15+ / application builder):**
-
-```json
-"polyfills": [
-  "zone.js"
-]
-```
-
-If the array is already present and includes `zone.js`, leave it alone. If the array exists but does NOT include `"zone.js"`, add the entry (keep any existing entries — e.g., `@angular/localize/init`). If the `polyfills` key is missing entirely, add the array with `"zone.js"` as its first entry.
-
-**Shape B — `polyfills` is a string pointing at `src/polyfills.ts` (older Angular majors):**
-
-```json
-"polyfills": "src/polyfills.ts"
-```
-
-In this shape, open `<workspace>/src/polyfills.ts` and make sure it contains the side-effect import:
+**Zoneless (Angular 20+):**
 
 ```ts
-import 'zone.js';
+// app-module.ts
+import { provideZonelessChangeDetection } from '@angular/core';
+// ...providers: [ provideZonelessChangeDetection(), ... ]
 ```
 
-If the file does not exist (`angular-new-app` generated Shape A instead), prefer Shape A above — do NOT create a parallel `src/polyfills.ts` just to satisfy an older convention. Match whatever the generated workspace uses.
+`angular.json` — `zone.js` is **not** needed; leave the `polyfills` array empty (or without `zone.js`) on both `build` and `test` targets:
 
-Apply the same edit to the `test` target's `polyfills` entry (it lives immediately below `build` in most generated configs). Unit tests run in the same zone-based model as the app; skipping the test-target edit produces identical `Zone is not defined` failures in `ng test`.
+```json
+"polyfills": []
+```
 
-### 6c. Smoke-check that the polyfill resolves
+For the `test` target, add `provideZonelessChangeDetection()` to the `TestBed.configureTestingModule({ providers: [...] })` of generated specs so unit tests run in the same mode.
 
-After editing, run:
+**Zoned (Angular 17–19):**
+
+```ts
+// app-module.ts
+import { provideZoneChangeDetection } from '@angular/core';
+// ...providers: [ provideZoneChangeDetection({ eventCoalescing: true }), ... ]
+```
+
+`angular.json` — ensure `zone.js` is present in `polyfills` on both `build` and `test` targets:
+
+```json
+"polyfills": ["zone.js"]
+```
+
+If `polyfills` is the older string form (`"src/polyfills.ts"`), ensure that file contains `import 'zone.js';`. Match whatever shape `angular-new-app` generated; don't create a parallel `src/polyfills.ts`.
+
+### 6c. One Form.io-specific caveat
+
+The Form.io SDK's promises (`loadSubmissions`, `loadForms`, …) resolve outside Angular's zone. In a **zoneless** app, do not reach for `NgZone.run(...)` to refresh the view after them — it is a no-op under zoneless. Update state the standard zoneless way (a `signal()` write, or `ChangeDetectorRef.markForCheck()`). No other special handling is needed — `@formio/angular`'s own components already do this internally.
+
+### 6d. Smoke-check
 
 ```bash
 ng build --configuration=development
 ```
 
-A clean build confirms both that `zone.js` is resolvable in `node_modules` and that the `polyfills` entry shape you wrote matches what the builder expects. If the build errors with `Module not found: zone.js` or `Cannot find module 'zone.js'`, the install in 6a did not land — re-run it. If the build succeeds but the running app still logs `Zone is not defined`, the edit to `angular.json` hit the wrong project / target pair; open `angular.json` again and confirm the `defaultProject` (or the project the user is running) points at the same block you edited.
+A clean build confirms the polyfills shape matches the builder and the CD provider import resolves. If a zoneless app logs `NG0908` / `Zone is not defined` at runtime, a dependency still expects zone.js — re-check that no generated code imports `zone.js` and that the CD provider is actually registered.
 
 ## Step 7 — confirm Claude's `frontend-design` skill is available
 
