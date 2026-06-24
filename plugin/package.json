@@ -1,6 +1,6 @@
 {
   "name": "@formio/ai",
-  "version": "0.4.1",
+  "version": "0.5.0",
   "description": "Form.io Claude Code plugin — MCP server and skills library",
   "type": "module",
   "license": "MIT",
