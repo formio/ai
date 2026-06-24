@@ -35,14 +35,14 @@ unpkg resolves an unpinned package path to the latest published version automati
 What to read from it:
 
 1. **The resolved `@formio/angular` version.** The returned JSON has a top-level `"version"` field (e.g., `"10.0.1"`). Capture it as `FORMIO_ANGULAR_VERSION` — this is what you will install in Step 4 and cite in the approval summary.
-2. **Supported Angular major.** Look under `peerDependencies` for an entry like `@angular/core`. The range (e.g., `^18.0.0`, `>=18 <19`, `~18.2.0`) names the supported major — in this example, Angular `18`. If `peerDependencies` is absent or ambiguous, fall back to `dependencies` for the same key. If neither is present, stop and tell the user — do NOT guess.
-3. **Latest patch within that major.** Query the npm registry for the newest published version of `@angular/core` that matches the supported major. The simplest way is:
+2. **Highest supported Angular major.** Look under `peerDependencies` for `@angular/core`. The range typically lists several majors (e.g. `^17.0.0 || ^18.0.0 || … || ^N.0.0`). Take the **highest** major in that range — that is the newest Angular `@formio/angular` supports, and always the one to target. Capture it as `FORMIO_ANGULAR_SUPPORTED_MAJOR`. If `peerDependencies` is absent, fall back to `dependencies` for the same key; if neither is present, stop and tell the user — do NOT guess. (The goal is always the latest supported Angular — never an older major, and never a major newer than `@formio/angular` declares.)
+3. **Latest patch within that major.** Query the npm registry for the newest published version of `@angular/core` in that major:
 
    ```bash
    npm view @angular/core@<major>.x.x version
    ```
 
-   e.g., `npm view @angular/core@18.x.x version` prints the latest `18.*.*` release (something like `18.2.13`). Capture that full `MAJOR.MINOR.PATCH` string — that is the version you will pin the new workspace to in Step 3.
+   This prints the latest patch in that major. Capture the full `MAJOR.MINOR.PATCH` string as `FORMIO_ANGULAR_TARGET_VERSION` — the version you pin the new workspace to in Step 3.
 
 Then do the same resolution for `@formio/js`, the core Form.io SDK that `@formio/angular` wraps. Fetch its unpinned `package.json` from unpkg:
 
@@ -63,12 +63,12 @@ Read the top-level `"version"` field from each and capture them as `BOOTSTRAP_VE
 
 Stash the six results for later phases:
 
-- `FORMIO_ANGULAR_VERSION` — e.g., `10.0.1` (resolved latest from unpkg)
-- `FORMIO_JS_VERSION` — e.g., `5.3.3` (resolved latest from unpkg, constrained to `@formio/angular`'s declared range)
-- `FORMIO_ANGULAR_SUPPORTED_MAJOR` — e.g., `18`
-- `FORMIO_ANGULAR_TARGET_VERSION` — e.g., `18.2.13`
-- `BOOTSTRAP_VERSION` — e.g., `5.3.3` (must be a Bootstrap 5 major)
-- `BOOTSTRAP_ICONS_VERSION` — e.g., `1.11.3`
+- `FORMIO_ANGULAR_VERSION` — the latest `@formio/angular`, resolved from unpkg
+- `FORMIO_JS_VERSION` — the latest `@formio/js`, resolved from unpkg (constrained to `@formio/angular`'s declared range)
+- `FORMIO_ANGULAR_SUPPORTED_MAJOR` — the highest Angular major in `@formio/angular`'s peer range
+- `FORMIO_ANGULAR_TARGET_VERSION` — the latest `MAJOR.MINOR.PATCH` within that major
+- `BOOTSTRAP_VERSION` — the latest Bootstrap (must be a Bootstrap 5 major)
+- `BOOTSTRAP_ICONS_VERSION` — the latest Bootstrap Icons
 
 If unpkg is unreachable (offline / proxied environment), fall back to `npm view @formio/angular version` / `npm view @formio/js version` / `npm view bootstrap@5 version` / `npm view bootstrap-icons version` + `npm view @formio/angular peerDependencies` to read the same fields from the npm registry directly. If the npm registry is also unreachable for `@angular/core@<major>.x.x`, fall back to the **highest version listed** in `@formio/angular`'s own `dependencies` for `@angular/core`, and tell the user you could not confirm a newer patch was available. Never silently pick a major the `@formio/angular` package has not declared support for.
 
@@ -99,7 +99,7 @@ What to pass to `angular-new-app`:
 
 - **Working directory:** the absolute path where the workspace should be created. Usually the cwd, or the `workspacePath` from `formio-application`'s handoff context.
 - **Project name (if asked):** offer a name derived from the Form.io `Project URL`'s subdomain if the user gave one (e.g., `https://foo.form.io` → `foo`). Otherwise let `angular-new-app` default to the directory name.
-- **Angular version (critical):** pass the `FORMIO_ANGULAR_TARGET_VERSION` resolved in Step 1 (e.g., `18.2.13`). This pins the generated workspace to the exact Angular major `@formio/angular` supports at its latest patch. If `angular-new-app` exposes a version / CLI-version option, use it; if it shells out to `@angular/cli` and takes CLI flags, pass `@angular/cli@<FORMIO_ANGULAR_SUPPORTED_MAJOR>` so `npx` resolves the matching CLI major before running `ng new`. Do NOT let the skill default to "latest" — a newer Angular major than `@formio/angular` declares support for will break `npm install` at Step 4.
+- **Angular version (critical):** pass the `FORMIO_ANGULAR_TARGET_VERSION` resolved in Step 1 — the latest patch of the highest Angular major `@formio/angular` supports. If `angular-new-app` exposes a version / CLI-version option, use it; if it shells out to `@angular/cli` and takes CLI flags, pass `@angular/cli@<FORMIO_ANGULAR_SUPPORTED_MAJOR>` so `npx` resolves the matching CLI major before running `ng new`. Always target the newest Angular `@formio/angular` supports; the only thing to avoid is an even-newer Angular major that `@formio/angular` has not yet declared, which would break `npm install` at Step 4.
 - **Intent note:** "This workspace will be wired against `@formio/angular@<version>`, which supports Angular `<major>`. The Form.io integration (config, auth, resource NgModules) is generated in subsequent phases by `formio-angular` and its nested Resources sub-skill at `./resources/SKILL.md`." The Angular skill does not need this for correctness, but surfacing it keeps the flow transparent to the user watching the transcript.
 
 Do not override `angular-new-app`'s approval gates — it runs its own, and layering a second one on top is confusing. When `angular-new-app` reports success and the workspace exists on disk, BOOTSTRAP is done.
@@ -175,24 +175,13 @@ Do NOT add Bootstrap's JavaScript bundle (`bootstrap.bundle.min.js` via `angular
 
 After editing `angular.json`, re-run a clean `npm install` (or `ng build --configuration=development` as a smoke check) to confirm the new style paths resolve. If either path 404s, verify the package version in `node_modules` — a Bootstrap 5+ major always ships `dist/css/bootstrap.min.css`, and Bootstrap Icons always ships `font/bootstrap-icons.css`, so a 404 means the install did not land.
 
-## Step 6 — set an explicit change-detection mode
+## Step 6 — pin zoneless change detection explicitly
 
-A generated app must **pin its change-detection (CD) mode explicitly** rather than inherit whatever `angular-new-app` / the resolved CLI version happened to default to. Leaving it implicit is what makes generated apps non-deterministic: the CLI's zone default has drifted across Angular majors (newer `ng new` scaffolds zoneless), so the same skill can produce a zoned app one month and a zoneless app the next — and any code that re-enters Angular via `NgZone.run` silently stops updating the view under zoneless.
+A generated app must **pin its change-detection mode explicitly** rather than inherit whatever `angular-new-app` / the CLI happened to default to — that default has drifted across Angular releases, which would make generated apps non-deterministic. Because the skill always targets the latest Angular `@formio/angular` supports (Step 1), the app uses **zoneless** change detection. `@formio/angular` is change-detection-mode agnostic, so pinning zoneless is safe; pinning it *explicitly* is what makes the result deterministic.
 
-`@formio/angular` >= 11.1 is **change-detection-mode agnostic** (it renders correctly under both zoned and zoneless CD), so either mode is safe. BOOTSTRAP's job is only to choose one **explicitly** and configure it, then make sure all generated component code is written to work in the chosen mode (see Step 6c).
+### 6a. Wire zoneless
 
-### 6a. Choose the mode from the resolved Angular major
-
-Use `FORMIO_ANGULAR_TARGET_VERSION` from Step 1:
-
-- **Angular 20 or newer → zoneless.** `provideZonelessChangeDetection()` is stable from v20. This matches the CLI default and drops the ~13 KB `zone.js` polyfill.
-- **Angular 17–19 → zoned.** Stable zoneless does not exist before v20, so pin zoned change detection and keep `zone.js`.
-
-### 6b. Wire the chosen mode
-
-Add the provider to the generated `AppModule` `providers` array (alongside `provideBrowserGlobalErrorListeners()`), and set `angular.json` polyfills to match.
-
-**Zoneless (Angular 20+):**
+Add the provider to the generated `AppModule` `providers` array (alongside `provideBrowserGlobalErrorListeners()`):
 
 ```ts
 // app-module.ts
@@ -200,7 +189,7 @@ import { provideZonelessChangeDetection } from '@angular/core';
 // ...providers: [ provideZonelessChangeDetection(), ... ]
 ```
 
-`angular.json` — `zone.js` is **not** needed; leave the `polyfills` array empty (or without `zone.js`) on both `build` and `test` targets:
+`zone.js` is not needed; leave the `angular.json` `polyfills` array empty on both `build` and `test` targets:
 
 ```json
 "polyfills": []
@@ -208,33 +197,17 @@ import { provideZonelessChangeDetection } from '@angular/core';
 
 For the `test` target, add `provideZonelessChangeDetection()` to the `TestBed.configureTestingModule({ providers: [...] })` of generated specs so unit tests run in the same mode.
 
-**Zoned (Angular 17–19):**
+### 6b. One Form.io-specific caveat
 
-```ts
-// app-module.ts
-import { provideZoneChangeDetection } from '@angular/core';
-// ...providers: [ provideZoneChangeDetection({ eventCoalescing: true }), ... ]
-```
+The Form.io SDK's promises (`loadSubmissions`, `loadForms`, …) resolve outside Angular's zone. Do not reach for `NgZone.run(...)` to refresh the view after them — it is a no-op under zoneless. Update state the standard zoneless way (a `signal()` write, or `ChangeDetectorRef.markForCheck()`). No other special handling is needed — `@formio/angular`'s own components already do this internally.
 
-`angular.json` — ensure `zone.js` is present in `polyfills` on both `build` and `test` targets:
-
-```json
-"polyfills": ["zone.js"]
-```
-
-If `polyfills` is the older string form (`"src/polyfills.ts"`), ensure that file contains `import 'zone.js';`. Match whatever shape `angular-new-app` generated; don't create a parallel `src/polyfills.ts`.
-
-### 6c. One Form.io-specific caveat
-
-The Form.io SDK's promises (`loadSubmissions`, `loadForms`, …) resolve outside Angular's zone. In a **zoneless** app, do not reach for `NgZone.run(...)` to refresh the view after them — it is a no-op under zoneless. Update state the standard zoneless way (a `signal()` write, or `ChangeDetectorRef.markForCheck()`). No other special handling is needed — `@formio/angular`'s own components already do this internally.
-
-### 6d. Smoke-check
+### 6c. Smoke-check
 
 ```bash
 ng build --configuration=development
 ```
 
-A clean build confirms the polyfills shape matches the builder and the CD provider import resolves. If a zoneless app logs `NG0908` / `Zone is not defined` at runtime, a dependency still expects zone.js — re-check that no generated code imports `zone.js` and that the CD provider is actually registered.
+A clean build confirms the `polyfills` shape matches the builder and the CD provider import resolves. If the app logs `NG0908` / `Zone is not defined` at runtime, a dependency still expects `zone.js` — re-check that no generated code imports `zone.js` and that `provideZonelessChangeDetection()` is actually registered.
 
 ## Step 7 — confirm Claude's `frontend-design` skill is available
 
