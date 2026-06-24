@@ -42,6 +42,7 @@ import { HomeComponent } from './home/home.component';
   declarations: [AppComponent, HomeComponent],
   imports: [BrowserModule, CommonModule, FormioModule, FormioGrid, AppRoutingModule],
   providers: [
+    // provideZonelessChangeDetection() is added by BOOTSTRAP (see BOOTSTRAP.md Step 6).
     FormioAuthService,
     FormioResources,
     { provide: FormioAppConfig, useValue: AppConfig },
@@ -52,7 +53,7 @@ import { HomeComponent } from './home/home.component';
 export class AppModule {}
 ```
 
-Three provider lines are doing the heavy lifting. `FormioResources` (plural!) is the registry every nested resource module looks up its parents through. `FormioAuthService` is what makes `currentUser` available as an object-parent to any resource that wants to auto-fill a user field. `FormioAppConfig` carries `appUrl` (project URL) — every `FormioResourceService` reads it at init time.
+The heavy lifting: `FormioAppConfig` carries `appUrl` (project URL) — every `FormioResourceService` reads it at init time, and `FormioModule` configures the SDK (`Formio.setBaseUrl`/`setProjectUrl`) from it in its constructor at bootstrap, so the plain `useValue` provider is sufficient. `FormioResources` (plural!) is the registry every nested resource module looks up its parents through. `FormioAuthService` is what makes `currentUser` available as an object-parent to any resource that wants to auto-fill a user field.
 
 If the user has an existing AppModule, **merge** these declarations/imports/providers rather than overwriting. See section 10.
 

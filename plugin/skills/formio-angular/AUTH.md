@@ -107,6 +107,7 @@ import { AuthModule, AuthConfig } from './auth/auth.module';
     AuthModule
   ],
   providers: [
+    // provideZonelessChangeDetection() is added by BOOTSTRAP — see BOOTSTRAP.md Step 6.
     provideBrowserGlobalErrorListeners(),
     { provide: FormioAppConfig, useValue: AppConfig },
     { provide: FormioAuthConfig, useValue: AuthConfig },
@@ -117,6 +118,8 @@ import { AuthModule, AuthConfig } from './auth/auth.module';
 })
 export class AppModule { }
 ```
+
+**Config wiring:** the `{ provide: FormioAppConfig, useValue: AppConfig }` provider is all that is needed — `FormioModule` reads it in its constructor and configures the SDK (`Formio.setBaseUrl`/`setProjectUrl`) at bootstrap. See CONFIG.md.
 
 **Why `FormioAuthRoutes()` matters.** Without it, the `AuthModule` registers the providers + components but does NOT map any URL to the login/register form — so `router.navigate(['/auth/login'])` from `app.component.ts` (or `app/app.ts`) resolves to an empty outlet and the user sees a blank page. `FormioAuthRoutes()` returns a pre-built `Routes` array that wires `login` → `FormioAuthLoginComponent`, `register` → `FormioAuthRegisterComponent`, and `logout` → a redirect, which is why mounting it via `RouterModule.forChild(...)` is required, not optional. Customization (override login/register components, tweak the redirect target) is handled by passing an options object to the function — see the optional "Customizing the login and register components" section below.
 

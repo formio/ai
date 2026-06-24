@@ -81,6 +81,8 @@ Add the provider registration to `@NgModule({ providers: [...] })`:
 export class AppModule {}
 ```
 
+This `useValue` form is all that is needed: `FormioModule` reads the provided `FormioAppConfig` in its constructor and calls `Formio.setBaseUrl`/`setProjectUrl` at bootstrap, so the SDK is configured even though `useValue` skips the `FormioAppConfig` constructor. No `forRoot` / `FORMIO_CONFIG` wiring is required.
+
 ## The approval gate — preview then approve
 
 Before writing or editing any files, print a diff-style preview:
