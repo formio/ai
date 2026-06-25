@@ -585,7 +585,7 @@ Attached to any form with email/password fields that should issue a JWT:
 }
 ```
 
-#### `settings.resources` — always `["user"]`
+#### `settings.resources` — `["user"]`, `["admin"]`, or `["user", "admin"]`
 
 `settings.resources` is an array of user-type resource machine names the login form authenticates against. For the `userLogin:login` action, you should emit `["user"]` for most applications. If the application prompt asks for ONLY "admins" to access the application, then you must emit `["admin"]`. If the application prompt states that both "admins" AND "users" can access the application, then you should emit `["user", "admin"]`.
 

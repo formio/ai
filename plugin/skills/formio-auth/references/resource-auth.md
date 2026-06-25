@@ -45,7 +45,7 @@ The login form is a normal Form.io form with two components — `email` (type `e
 - `submissionAccess`: `create_own` for `anonymous` (so visitors can submit it).
 - One Login Action attached to the form.
 
-The Login Action's `settings.resources` should be `["user"]` for most cases (or whichever Resource holds the credentials). `settings.username` names the field that holds the username/email (typically `"email"`); `settings.password` names the password field (typically `"password"`). Brute-force protection is controlled by `allowedAttempts`, `attemptWindow`, and `lockWait`.
+The Login Action's `settings.resources` should be `["user"]` for most cases (or whichever Resource holds the credentials, such as `"admin"` for applications requiring admin logins). `settings.username` names the field that holds the username/email (typically `"email"`); `settings.password` names the password field (typically `"password"`). Brute-force protection is controlled by `allowedAttempts`, `attemptWindow`, and `lockWait`.
 
 For the canonical Login Action JSON shape (priority, handler, method, all field names), see `plugin/skills/formio-resource-planner/references/template-json.md` lines 504–534.
 
