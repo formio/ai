@@ -587,7 +587,7 @@ Attached to any form with email/password fields that should issue a JWT:
 
 #### `settings.resources` — always `["user"]`
 
-`settings.resources` is an array of user-type resource machine names the login form authenticates against. For the `userLogin:login` action, you should emit `["user"]` for most applications. If the application prompt asks for ONLY "admins" to access the application, then you must emit `["admin"]`. If the application prompt says states that both "admins" AND "users" can access the application, then you should emit `["user", "admin"]`.
+`settings.resources` is an array of user-type resource machine names the login form authenticates against. For the `userLogin:login` action, you should emit `["user"]` for most applications. If the application prompt asks for ONLY "admins" to access the application, then you must emit `["admin"]`. If the application prompt states that both "admins" AND "users" can access the application, then you should emit `["user", "admin"]`.
 
 For most applications, administrator responsibilities (seeding reference data, creating group-membership rows, assigning roles, reviewing/moderating submissions, inviting users) are performed by an administrator signing in to the **Form.io project portal** — the same portal used to manage forms, resources, and submissions at the project level. The app's login form is for end users only.
 
