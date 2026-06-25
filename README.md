@@ -12,6 +12,12 @@ The result: every app your agent builds inherits the model, the governance, RBAC
 
 > **Note on scope.** This repo is for AI coding agents while writing code. Form.io also provides a Universal Agent Gateway (UAG) for governing agentic workflows running in production. [More on Form.io UAG here.](https://form.io/uag)
 
+Official Documentation
+--------------------------
+For the latest documentation, release information, and guides, always refer to the official Form.io Help Documentation available here:
+
+**[https://help.form.io](https://help.form.io/dev/ai)**
+
 ## What you get
 
 - **Claude Code plugin: `@formio/ai`.** One-command install. Bundles the MCP server and skill library, registers them with Claude Code.
