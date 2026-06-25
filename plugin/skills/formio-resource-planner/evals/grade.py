@@ -267,18 +267,6 @@ def grade_run(run_dir: Path, eval_name: str):
                 "evidence": f"action types on {rf}: {sorted(t for t in rf_action_types if t)}",
             })
 
-        # Login actions must have settings.resources == ["user"] exactly — no "admin" or other extras (importer rejects).
-        login_actions = [
-            (k, a) for k, a in actions.items() if (a or {}).get("name") == "login"
-        ]
-        for lkey, ldef in login_actions:
-            resources_list = ((ldef or {}).get("settings") or {}).get("resources") or []
-            results.append({
-                "text": f"Login action `{lkey}` has settings.resources equal to exactly [\"user\"]",
-                "passed": resources_list == ["user"],
-                "evidence": f"resources={resources_list}",
-            })
-
         # Every join resource that participates in group-based access needs a Group Assignment action.
         join_resources_with_group = []
         for rname, rdef in resources_map.items():

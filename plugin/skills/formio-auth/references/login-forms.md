@@ -63,7 +63,7 @@ Actions (order matters because `priority` is the tie-breaker among handlers at t
 2. **Role Assignment Action** — `settings.association: "new"`, `settings.type: "add"`, `settings.role: "authenticated"`. Priority 1, `handler: ["after"]`. Runs after the save so the new submission already has an `_id`.
 3. **Login Action** — `settings.resources: ["user"]`, same field names as the login form. Priority 2, `handler: ["before"]`. Issues the JWT immediately so the new user is logged in without a second round-trip.
 
-NEVER include `"admin"` in the Login Action's `settings.resources`. Admin work is performed via the Form.io project portal, not via an app-side login form, and including `"admin"` breaks project import.
+If the prompt specifically requires "admins" log into the application, then you may include `"admin"` in the Login Action's `settings.resources`. It should be noted, however, that most administrative work is performed via the Form.io project portal.
 
 For the canonical action JSON shapes, see `plugin/skills/formio-resource-planner/references/template-json.md` lines 504–553.
 
