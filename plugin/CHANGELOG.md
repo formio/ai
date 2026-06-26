@@ -1,5 +1,11 @@
 # @formio/ai
 
+## 0.6.0
+
+### Minor Changes
+
+- 231c3bf: Fixed issues where "admin" applications would pick "user" for Login actions instead of "admin"
+
 ## 0.5.0
 
 ### Minor Changes
