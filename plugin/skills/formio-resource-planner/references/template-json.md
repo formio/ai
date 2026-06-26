@@ -575,7 +575,7 @@ Attached to any form with email/password fields that should issue a JWT:
   "method": ["create"],
   "handler": ["before"],
   "settings": {
-    "resources": ["user"], // always just ["user"] — do NOT add "admin"; see rule below
+    "resources": ["user"],
     "username": "email",
     "password": "password",
     "allowedAttempts": 5,
@@ -585,11 +585,11 @@ Attached to any form with email/password fields that should issue a JWT:
 }
 ```
 
-#### `settings.resources` — always `["user"]`
+#### `settings.resources` — `["user"]`, `["admin"]`, or `["user", "admin"]`
 
-`settings.resources` is an array of user-type resource machine names the login form authenticates against. Emit `["user"]` and nothing else. Do NOT add `"admin"` (or any other built-in user-type resource name the template does not itself declare) — doing so causes Form.io's project importer to reject the template.
+`settings.resources` is an array of user-type resource machine names the login form authenticates against. For the `userLogin:login` action, you should emit `["user"]` for most applications. If the application prompt asks for ONLY "admins" to access the application, then you must emit `["admin"]`. If the application prompt states that both "admins" AND "users" can access the application, then you should emit `["user", "admin"]`.
 
-Administrator responsibilities (seeding reference data, creating group-membership rows, assigning roles, reviewing/moderating submissions, inviting users) are performed by an administrator signing in to the **Form.io project portal** — the same portal used to manage forms, resources, and submissions at the project level. The app's login form is for end users only.
+For most applications, administrator responsibilities (seeding reference data, creating group-membership rows, assigning roles, reviewing/moderating submissions, inviting users) are performed by an administrator signing in to the **Form.io project portal** — the same portal used to manage forms, resources, and submissions at the project level. The app's login form is for end users only.
 
 On register forms that should log the user in immediately after signup, attach a Login action too (same settings, form points to the register form, same `resources: ["user"]`).
 
@@ -662,7 +662,7 @@ Before emitting the Phase B JSON, walk through this list:
 - [ ] Every resource and form has a Save Submission action in `actions`.
 - [ ] Every `select` with `dataSrc: "resource"` has a `data.resource` key that matches an actual `resources.<key>` machineName.
 - [ ] Every `select` with `dataSrc: "resource"` has `"reference": true` and does **not** have `"valueProperty"`. Bare `valueProperty: "_id"` breaks multi-level resource hierarchies at read time.
-- [ ] Every login-action `settings.resources` array equals exactly `["user"]`. Never include `"admin"` or any other resource name the template itself does not declare — the Form.io importer rejects it. Administrator tasks are performed via the Form.io project portal, not via the app login form.
+- [ ] Every login-action `settings.resources` array equals `["user"]`. If the application requires "admins" to access the application, then `"admin"` can also be included in the resources array. In most cases, however, administrator tasks are performed via the Form.io project portal, not via the app login form.
 - [ ] Every Role Assignment action references a role that exists in `roles`.
 - [ ] Every Group Assignment action's `settings.group` and `settings.user` match field keys on the join resource it's attached to.
 - [ ] **Every child resource whose access flows from a group has a four-entry `submissionAccess` (`read`, `create`, `update`, `delete`, roles: `[]`) on the `select` component that references the group.** Missing this block silently breaks group permissions on the child.
