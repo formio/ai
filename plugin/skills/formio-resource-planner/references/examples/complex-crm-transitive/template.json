@@ -187,14 +187,6 @@
         "password": "password"
       }
     },
-    "userLogin:save": {
-      "title": "Save Submission",
-      "name": "save",
-      "form": "userLogin",
-      "priority": 10,
-      "method": ["create", "update"],
-      "handler": ["before"]
-    },
     "userLogin:login": {
       "title": "Login",
       "name": "login",

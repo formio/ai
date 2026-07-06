@@ -100,7 +100,25 @@ On approval, invoke the MCP tool with the template content loaded from the plann
 mcp__formio-mcp__project_import({ template: <the template object> })
 ```
 
-The tool returns the server's response text on success. Surface it to the user in one sentence ("Imported X resources, Y roles, Z forms into `<project URL>`.") and advance to Step 6.
+The tool returns the server's response text on success. Surface it to the user in one sentence ("Imported X resources, Y roles, Z forms into `<project URL>`.") and advance to the config check.
+
+### Post-import — project public config for `{{ config.<key> }}` tokens
+
+Any `{{ config.<key> }}` token in an email template, subject, or other server-rendered string reads from the **project's public configuration**. If the key is absent from the project config, the token renders empty (e.g. an email's "return to app" link ships blank). The importer does NOT populate this — you must set it.
+
+After a successful import, scan the imported `template.json` for `{{ config.<something> }}` tokens (commonly `{{ config.appUrl }}` in Email actions). For each distinct key found:
+
+1. Ask the user for its value (e.g. "What URL should emails link back to? This is your deployed app's address."). Do not guess. If the user is building a 'localhost' application, then use the correct localhost url and inform the user that this will need to be changed when the application is published to a live environment.
+2. `PUT` the merged config to the project endpoint:
+
+   ```jsonc
+   // PUT <FORMIO_PROJECT_URL>
+   { "config": { "appUrl": "<value the user gave>" /* , other keys */ } }
+   ```
+
+   `config` merges into the project's existing public configuration. Send all discovered keys in one PUT.
+
+If no `{{ config.* }}` tokens are present, skip this step. Then advance to Step 6.
 
 ### Error branches
 
