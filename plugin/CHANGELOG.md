@@ -1,5 +1,11 @@
 # @formio/ai
 
+## 0.7.0
+
+### Minor Changes
+
+- e620bdb: Fixed login action and email action related issues.
+
 ## 0.6.0
 
 ### Minor Changes
