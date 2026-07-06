@@ -83,13 +83,13 @@ What you can do with these tools: Five real prompts, paste-ready in Claude Code.
 
 ### Build a complete app from one prompt
 
-> "Build me a CRM where sales reps only see accounts owned by the teams they belong to."
+> "/formio-application Build me a CRM where sales reps only see accounts owned by the teams they belong to."
 
 The agent plans the data model, imports it into Form.io, and scaffolds an Angular front-end wired to the project. Approval gate at every step. At the end you have a running application — not a prototype.
 
 ### Extend a running app
 
-> "Also let customers leave reviews on each completed booking, and let providers reply to them."
+> "/formio-application Also let customers leave reviews on each completed booking, and let providers reply to them."
 
 In a workspace that's already wired to a Form.io project, the agent plans only what's new and adds it without touching what works. Existing project content stays intact.
 
@@ -124,7 +124,7 @@ The fastest way to get started. From inside Claude Code:
 
 Claude Code prompts for `FORMIO_BASE_URL` and `FORMIO_PROJECT_URL` on install. Then describe what you want:
 
-> "Build me a task manager where each project has its own team of users, and users only see tasks inside projects they belong to."
+> "/formio-application Build me a task manager where each project has its own team of users, and users only see tasks inside projects they belong to."
 
 The `formio-application` skill activates, runs the planner, captures URLs, imports the template, and hands off to `formio-angular` to scaffold the Angular front-end. Each step has an approval gate.
 
