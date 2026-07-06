@@ -25,7 +25,7 @@
 
 **Name:** `save` | **Priority:** 10 | **Handler:** `before` | **Method:** `create`, `update`
 
-The save action persists the submission to the database. Every form that accepts submissions needs one. It runs at priority 10 so other actions can depend on the saved submission.
+The save action persists the submission to the database. Add it to any form or resource meant to store its submissions — most are. Omit it when the form is not meant to persist: a login form (auth only), a notification-only form (fires an Email or Webhook on submit but stores nothing), or a client-only form whose data the app reads in the browser and never sends to the submission API. It runs at priority 10 so other actions can depend on the saved submission.
 
 ### Settings
 
@@ -142,7 +142,7 @@ Sends an email notification when a submission event occurs.
 | Field | Key | Type | Required | Default | Description |
 |-------|-----|------|----------|---------|-------------|
 | Transport | `transport` | string | Yes | — | Email transport name (e.g., `"default"`) |
-| From | `from` | string | No | Server default | Sender email address |
+| From | `from` | string | No | `no-reply@example.com` | Sender email address — see "From address" below |
 | Reply-To | `replyTo` | string | No | — | Reply-to address |
 | To Emails | `emails` | string[] | Yes | — | Recipient addresses |
 | Send Each | `sendEach` | boolean | No | false | Send individual email per recipient |
@@ -158,12 +158,39 @@ Sends an email notification when a submission event occurs.
 | Variable | Description |
 |----------|-------------|
 | `{{ data.fieldKey }}` | Individual submission field value |
+| `{{ id }}` | The current submission's `_id` |
 | `{{ submission(data, form.components) }}` | Formatted table of all submission fields |
 | `{{ form.title }}` | Form title |
 | `{{ form._id }}` | Form ID |
 | `{{ owner.data.email }}` | Submission owner's email (if available) |
+| `{{ config.<key> }}` | A value from the project's public configuration — see "config tokens" below |
 
 Email addresses in `emails`, `cc`, `bcc` also support template variables, allowing dynamic recipients: `{{ data.managerEmail }}`.
+
+### From address
+
+`from` addresses at the `@form.io` domain (e.g. `no-reply@form.io`) are **blocked by the platform and silently fail to send** — never use them. When an Email action is needed, **ask the user which "from" address they want** before emitting the action. If they don't provide one, default to `no-reply@example.com` — never `no-reply@form.io`.
+
+### `submission._id` is not a token
+
+`{{ submission._id }}` does NOT work — `submission` is not a template variable, so it renders empty. To inject the current submission's id, use **`{{ id }}`**.
+
+### config tokens — require project public configuration
+
+Any `{{ config.<key> }}` token (e.g. `{{ config.appUrl }}` for a link back to the app) reads from the **project's public configuration**. If that key is not present in the project config, the token renders as an empty string and the email ships with a blank link. Whenever a template or subject references `{{ config.<something> }}`, that `<something>` MUST be added to the project's public config first.
+
+Set it with a `PUT` to the project endpoint, passing a `config` object:
+
+```jsonc
+// PUT /project/{projectId}   (or PUT {projectUrl})
+{
+  ...,
+  "config": {
+    ...,
+    "appUrl": "https://myapp.example.com"
+  }
+}
+```
 
 ### External Templates
 

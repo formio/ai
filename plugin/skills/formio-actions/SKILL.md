@@ -214,7 +214,9 @@ Login includes brute-force protection: after 5 failed attempts within 30 seconds
 }
 ```
 
-The `{{ submission(data, form.components) }}` template renders all form fields as a formatted table. You can also reference individual fields: `{{ data.firstName }}`, `{{ data.email }}`.
+The `{{ submission(data, form.components) }}` template renders all form fields as a formatted table. You can also reference individual fields: `{{ data.firstName }}`, `{{ data.email }}`. For the current submission's id use `{{ id }}`.
+
+**`from` address:** ask the user which address to send from before emitting an Email action; default to `no-reply@example.com` if they don't say. Never use an `@form.io` address — the platform blocks them and the mail silently fails. Any `{{ config.<key> }}` token (e.g. `{{ config.appUrl }}`) requires that key to exist in the project's public config first (PUT `{ "config": { ... } }` to the project). See [`references/action-types.md`](references/action-types.md) → Email for details.
 
 ### Conditional email (only when status = approved)
 

@@ -163,7 +163,12 @@ Group-based access (row-level, driven by a Group Assignment action on a join res
 
 ## Component shapes
 
-Every `components` array ends with a submit button. Each input component has at minimum `type`, `key`, `label`, `input: true`.
+**Default: a `components` array ends with a submit button — on both resources and forms.** A form or resource that is meant to be submitted from the rendered UI needs one, and this is the common case; do not skip it just because a Resource feels "data-model" rather than "form" (a Resource renders and submits like any other form). Two deliberate exceptions where you omit the button:
+
+1. **An embedded form not meant to be submitted** — e.g. a client-only Search form whose data the app reads in the browser, or any form whose submit is fired programmatically by the host application (`form.submit()`). No user-facing submit.
+2. **A `display: "wizard"` form** — the wizard display renders its own Next/Previous/Submit controls as internal logic. Do NOT add a manual submit button to a wizard; it produces a duplicate.
+
+Outside those cases, include the button — omitting it on a form that IS meant to be submitted with the default display is a bug. Each input component has at minimum `type`, `key`, `label`, `input: true`.
 
 ### textfield
 
@@ -469,7 +474,9 @@ This entry needs a `jobApplication:save` action in `actions` like any other form
 
 ## The canonical `user` resource
 
-Always include the `user` resource when the project has authentication. Its shape is fixed:
+When the project has authentication, include a user-type resource to hold credentials. `user` is the conventional name and the default — use it unless the plan calls for a differently-named credential resource (e.g. a separate `admin` resource, or a domain name like `member`).
+
+The credential fields are whatever the plan needs, not a fixed pair. Form.io authenticates **any identifier component against any secret component** — the Login action's `settings.username` and `settings.password` just point at the two component keys you choose. `email` + `password` is the common default and what the block below shows, but `username` + `password`, `userId` (textfield) + `pin`, or `phone` + a code all work equally. Pick the identifier and secret the app actually uses, mark the identifier `unique: true` and the secret `type: "password"` (`protected: true`), then add the rest of the plan's fields. Treat the block below as a starting template, not a required shape:
 
 ```jsonc
 "user": {
@@ -497,23 +504,24 @@ Always include the `user` resource when the project has authentication. Its shap
 }
 ```
 
-Add extra fields (firstName, lastName, profile photo, etc.) after `email`/`password` and before `submit` if the user described a custom user shape.
+Add extra fields (firstName, lastName, profile photo, etc.) after the identifier/secret pair and before `submit` if the user described a custom user shape. If the plan uses a different credential pair than `email`/`password` (e.g. `userId`/`pin`), swap the first two components accordingly and set the Login action's `settings.username`/`settings.password` to match those component keys.
 
 ## Actions
 
-**Actions are mandatory.** The top-level `actions` map is not decoration — it is where Form.io persists submissions and enforces access. A `template.json` whose `actions` map does not contain a `save` entry for each resource and form is broken on arrival: the forms render, accept input, and then drop every submission, because nothing is wired to write them to MongoDB. Every entry in `resources` AND every entry in `forms` MUST contribute at least one key to the `actions` map.
+**Actions follow intent.** The top-level `actions` map is where Form.io persists submissions and enforces access. Add the actions each resource/form needs for its purpose — no more, no less. Anything meant to store records needs a `save`; skip it (and any other action) on a form/resource that never sends data to the submission API, such as a client-only Search form. The failure mode to avoid is the accidental one: a form or resource that WAS meant to persist ends up with no `save`, so it renders, accepts input, and silently drops every submission because nothing writes it to MongoDB.
 
-Minimum set per resource/form type (reference — the planner SKILL.md `Actions emission — required per resource` section re-states the algorithm):
+Typical set per resource/form type (reference — the planner SKILL.md `Actions emission — per use-case` section re-states the algorithm). "Client-only form (Search, etc.)" is deliberately absent from this table because it has no actions:
 
-| Resource / form type                           | Required `actions` keys                                            |
+| Resource / form type                           | Typical `actions` keys                                            |
 | ---------------------------------------------- | ------------------------------------------------------------------ |
 | Plain resource (Project, Task, …)              | `<name>:save`                                                      |
 | `user` resource                                | `user:save`                                                        |
-| Login form                                     | `<name>:save`, `<name>:login`                                      |
+| Login form                                     | `<name>:login` (a plain `<name>:save` is optional — audit only; see warning) |
 | Register form                                  | `<name>:save`, `<name>:role`, `<name>:login`                       |
 | Join resource with group-based access          | `<name>:save`, `<name>:group`                                      |
 | Join resource without group access             | `<name>:save`                                                      |
-| Any form that sends email / calls a webhook    | the above plus `<name>:email` / `<name>:webhook`                   |
+| Notification form (sends email / webhook)      | `<name>:email` / `<name>:webhook` — plus `<name>:save` only if it also persists |
+| Client-only form (embedded Search, etc.)       | none — data read in the browser, never sent to the submission API |
 
 Each action is keyed `"<formMachineName>:<actionName>"`. Fields:
 
@@ -525,9 +533,9 @@ Each action is keyed `"<formMachineName>:<actionName>"`. Fields:
 - `handler`: `["before"]` or `["after"]`
 - `settings`: action-specific payload
 
-### Save Submission (default on every form/resource)
+### Save Submission (anything that persists)
 
-Every form and resource gets a Save Submission action by default. Include one per form/resource in the `actions` map:
+A Save Submission action persists a submission to the submission API. Add one to any resource or form meant to store records — which is most resources and ordinary data-collection forms. **Omit it** when the form/resource does not persist: a login form (auth only), a notification-only form (email/webhook, nothing stored), or a client-only form/resource whose data the app reads in the browser and never sends to the submission API (e.g. an embedded Search form) — the latter may have no actions at all. Include one per persisting form/resource in the `actions` map:
 
 ```jsonc
 "project:save": {
@@ -564,7 +572,7 @@ For a register form that forwards its data into the `user` resource:
 
 ### Login
 
-Attached to any form with email/password fields that should issue a JWT:
+Attached to any form with an identifier + secret pair that should issue a JWT. `settings.username` and `settings.password` name the two component keys — `email`/`password` below, but set them to whatever the credential resource actually uses (e.g. `userId`/`pin`):
 
 ```jsonc
 "userLogin:login": {
@@ -592,6 +600,10 @@ Attached to any form with email/password fields that should issue a JWT:
 For most applications, administrator responsibilities (seeding reference data, creating group-membership rows, assigning roles, reviewing/moderating submissions, inviting users) are performed by an administrator signing in to the **Form.io project portal** — the same portal used to manage forms, resources, and submissions at the project level. The app's login form is for end users only.
 
 On register forms that should log the user in immediately after signup, attach a Login action too (same settings, form points to the register form, same `resources: ["user"]`).
+
+> **A Login form's Save Submission action must NEVER point to an underlying resource (`settings.resource`).** A `save` action on a login form with any `settings.resource` set is ALWAYS wrong — it makes every login attempt try to create a brand-new record in that resource (e.g. `settings.resource: "user"` creates a new user on every login). Forwarding a submission into a resource is the **register** form's job (`userRegister:save` with `settings.resource: "user"`), not the login form's.
+>
+> A **plain** save on a login form — `settings: {}`, no `resource` key — is legitimate but uncommon: it records each login attempt as a submission on the login form itself, for audit/history purposes. Only add it when the user explicitly wants a login audit trail. By default a login form emits ONLY `<name>:login`; if you do add `<name>:save`, it MUST have empty `settings` (records to this form) and MUST NOT set `settings.resource`.
 
 ### Role Assignment
 
@@ -657,9 +669,9 @@ Before emitting the Phase B JSON, walk through this list:
 - [ ] Top-level has all eight keys in EXACTLY this order: `title`, `version`, `name`, `roles`, `forms`, `actions`, `resources`, `access`. `description` is optional; if included, it goes immediately after `title`. `access` is a non-empty array (see "Top-level `access`").
 - [ ] `version` is `"2.0.0"`.
 - [ ] `roles` contains `administrator`, `authenticated`, `anonymous` plus any custom roles from the plan; exactly one has `default: true`.
-- [ ] Every resource has an `access` array with `read_all` granted to all three base roles.
+- [ ] Every resource has an `access` array. `read_all` to all three base roles is the default (form definitions are public metadata); tighten it only when the plan calls for a resource whose definition should not be world-readable.
 - [ ] Every resource with user data has a meaningful `submissionAccess` reflecting the plan (owner, group, role-based, public).
-- [ ] Every resource and form has a Save Submission action in `actions`.
+- [ ] Every resource or form **meant to persist** has a Save Submission action in `actions` (a missing one there silently drops submissions). Forms/resources that don't persist — login forms, notification-only forms (email/webhook), client-only forms (e.g. an embedded Search form) — may have no Save, or no actions at all. That is valid.
 - [ ] Every `select` with `dataSrc: "resource"` has a `data.resource` key that matches an actual `resources.<key>` machineName.
 - [ ] Every `select` with `dataSrc: "resource"` has `"reference": true` and does **not** have `"valueProperty"`. Bare `valueProperty: "_id"` breaks multi-level resource hierarchies at read time.
 - [ ] Every login-action `settings.resources` array equals `["user"]`. If the application requires "admins" to access the application, then `"admin"` can also be included in the resources array. In most cases, however, administrator tasks are performed via the Form.io project portal, not via the app login form.
@@ -668,7 +680,8 @@ Before emitting the Phase B JSON, walk through this list:
 - [ ] **Every child resource whose access flows from a group has a four-entry `submissionAccess` (`read`, `create`, `update`, `delete`, roles: `[]`) on the `select` component that references the group.** Missing this block silently breaks group permissions on the child.
 - [ ] **Every resource 2+ levels below the group has a hidden, calculated mirror of the group select** (`hidden: true`, `calculateValue: "value = data.<parent>.data.<group>;"`, `refreshOn: "<parent>"`, `reference: true`) carrying the same four-entry `submissionAccess` block. Without the mirror, group access stops at the direct child and grandchildren are invisible to group members.
 - [ ] The `user` resource is present if the plan has any authentication.
-- [ ] `components` arrays end with a submit button.
+- [ ] **No login form has a `save` action that sets `settings.resource`.** A login-form `save` pointing to any underlying resource is always wrong (it tries to create a new record in that resource on every login — e.g. a new user). A login form emits ONLY `<name>:login` by default; a plain `save` (empty `settings`, no `resource`) is allowed ONLY when the user asked for a login audit trail.
+- [ ] **Every form/resource meant to be submitted from the UI ends its `components` array with a submit button** (`{ "type": "button", "key": "submit", "action": "submit", ... }`). Exceptions: a `display: "wizard"` form (the wizard renders its own submit — never add a manual one) and an embedded/client-only or programmatically-submitted form (no user-facing submit).
 - [ ] `path` values are kebab-case; `name` and `key` values are camelCase; neither contains collision-avoidance integer suffixes (no `user-123`, no `Employee 775`).
 
 ## Verification
