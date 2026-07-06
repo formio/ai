@@ -118,7 +118,7 @@ The agent queries the live project through the MCP server, surfaces what's missi
 The fastest way to get started. From inside Claude Code:
 
 ```text
-/plugin marketplace add git@github.com:formio/ai.git
+/plugin marketplace add https://github.com/formio/ai.git
 /plugin install formio-ai@formio
 ```
 
