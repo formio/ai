@@ -1,57 +1,19 @@
 ---
 name: formio-application
 description: >-
-  Default "build me an app" skill for this library — framework-agnostic orchestrator
-  that turns plain-language intent into a running application backed by a Form.io project.
-  Use this skill whenever the user wants to build, create, spin up, scaffold, or stand up
-  an app, tool, system, portal, dashboard, tracker, or workflow around data, OR when the
-  user wants to extend an already-running app with a new feature — in plain language that
-  does NOT require the user to know anything about Form.io, Angular, React, resources,
-  NgModules, CRUD, or any framework terminology.
-  Example build-new triggers this skill claims include "build me an app to track
-  maintenance requests", "create a CRM for my consulting practice", "I need a tool to
-  track who signed up for each event", "spin up a help desk", and bare domain archetypes
-  ("task manager", "help desk", "CRM", "booking system", "member directory", "issue
-  tracker", "order management").
-  Example extend triggers this skill claims include "also track attendees for each event",
-  "add a way to see line items for an order", "each project should have a list of
-  milestones", "let customers leave reviews on products", "let admins tag users".
-  Internally runs a six-step orchestration with approval gates —
-  (1) Intent — ask whether this is a new app or an existing app to extend;
-  (2) Plan — invoke `formio-resource-planner` to produce a `template.json` (full project
-  for build-new; additive delta containing ONLY the new resources, fields, or actions for
-  modify-existing);
-  (3) Deployment — in plugin mode, capture only the Form.io Project URL via one
-  `AskUserQuestion` (default offered from `FORMIO_DEFAULT_PROJECT_URL` when the
-  verify-project-url hook surfaces one) and persist via `project_set({ cwd, projectUrl })`
-  so future sessions in the same cwd skip the prompt — the Base URL comes from the
-  plugin's MCP server env (set by the user's plugin configuration), not from this
-  skill; in no-plugin mode, fall back to the batched Base URL + Project URL interview
-  with plain-language descriptions of each (build-new only; modify-existing reads both
-  URLs from the existing workspace's `FormioAppConfig`);
-  (4) MCP Config — skipped when the `@formio/ai` plugin provides the MCP server
-  (detected via `mcp__plugin_formio-ai_formio-mcp__*` tools or the verify-project-url
-  hook), since `project_set` already routes per-cwd via `~/.formio/projects.json`;
-  otherwise write (or merge into) `.mcp.json` in the workspace root with captured URLs
-  under `FORMIO_PROJECT_URL` and `FORMIO_BASE_URL`, then halt the invocation so the user
-  can restart Claude Code (or run `/mcp` to reconnect) — Claude Code only reads
-  `.mcp.json` at session start, so the flow must pause across one restart boundary
-  (build-new only; modify-existing keeps its existing `.mcp.json`);
-  (5) Import — call the `project_import` MCP tool to additively merge the
-  planner-generated `template.json` into the target Form.io project, with an explicit
-  approval gate citing the URLs and merge-overwrite warning (runs on BOTH branches —
-  import is additive, so adding new resources to an existing project is safe);
-  (6) Framework — consult the library's framework registry and route to the right
-  framework-specific skill (build-new: scaffold a new app; modify-existing: hand off to
-  the framework's extend sub-skill with the new resources).
-  Authentication is implicit — the first authenticated MCP tool call triggers the
-  portal-login flow in a browser on a cache miss and caches the JWT for subsequent calls.
-  Not for: framework-explicit Angular requests (the user names Angular or @formio/angular
-  verbatim) — see `formio-angular` for initial Angular scaffolding and
-  `formio-angular-resources` for Angular-explicit feature additions.
-  Not for: planning a data model without building an app around it — see
-  `formio-resource-planner`.
-  Not for: looking up Form.io REST endpoints — see the `formio-api` skill.
+  Default "build me an app" orchestrator. Either builds a new "greenfield" application
+  backed by a Form.io project from a plain-language idea, OR jumps into an existing
+  application to add a new feature — the two are independent entry paths, not sequential
+  steps (extending an app never requires building one first).
+  Use whenever the user wants to build, create, spin up, scaffold, or stand up an app, tool,
+  system, portal, dashboard, tracker, or workflow around data — or extend an existing app
+  with a new feature — without naming a UI framework. Example triggers: "build me an app to
+  track maintenance requests", "create a CRM for my consulting practice", "spin up a help
+  desk", bare archetypes ("task manager", "booking system", "issue tracker"), and extensions
+  like "also track attendees for each event" or "let customers leave reviews on products".
+  Not for: framework-explicit requests that name Angular or @formio/angular (see
+  `formio-angular`); planning a data model without building an app around it (see
+  `formio-resource-planner`); Form.io REST endpoint lookups (see `formio-api`).
 ---
 
 # Form.io Application Orchestrator
