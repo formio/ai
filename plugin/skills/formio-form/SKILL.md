@@ -17,7 +17,9 @@ description: >-
   a whole app, portal, or tracker around data (see `formio-application`);
   designing the data model, resources, or permissions (see
   `formio-resource-planner`); Form.io REST endpoint lookups (see `formio-api`);
-  the raw SDK/Utils API reference beyond embedding (see `formio-sdk`).
+  the raw SDK/Utils API reference beyond embedding (see `formio-sdk`); creating
+  a NEW form that does not exist yet — "build a form", "create a survey" —
+  this skill stays embed-only (see `formio-form-builder`).
 ---
 
 # Embedding Form.io Forms (Vanilla JS renderer)
@@ -47,6 +49,15 @@ which behaviors compose with which.
 | Advanced field logic (`logic` triggers and actions) | [references/field-logic.md](./references/field-logic.md) |
 | External data sources and cascading selects (make → model → year) | [references/external-data.md](./references/external-data.md) |
 | Wizards — conditional pages, custom navigation | [references/wizards.md](./references/wizards.md) |
+
+## When the form does not exist yet
+
+This skill embeds forms that already exist. If the embed request reveals the
+form is not in the user's project yet (`form_get` misses, or the user is
+describing a form from scratch — "embed a multi-step intake wizard on my
+page"), route to `formio-form-builder` first: it determines the form type
+(webform vs wizard vs PDF form), authors the definition, and saves it. When
+it finishes, embedding resumes here with the saved form URL.
 
 ## URL terminology
 

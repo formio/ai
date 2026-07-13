@@ -44,6 +44,8 @@ The description MUST drop all plain-language "build me an app" triggers (those n
 
 The description MUST include a `Not for:` clause pointing at `formio-application` for generic build-an-app requests and for framework-agnostic "I want to build X" requests.
 
+The description MUST include a `Not for:` clause pointing at `formio-form` for framework-agnostic embed/render-a-form requests that do not name Angular or `@formio/angular`.
+
 The description MUST continue to include the existing `Not for:` clause pointing at `formio-angular-resources` for add-a-feature-to-an-existing-app requests.
 
 #### Scenario: formio-angular only fires on Angular-explicit phrasing
@@ -57,6 +59,13 @@ The description MUST continue to include the existing `Not for:` clause pointing
 - **WHEN** the user says "build me a CRM" (no mention of Angular)
 - **THEN** the `formio-angular` skill does NOT activate
 - **AND** `formio-application` activates instead
+
+#### Scenario: formio-angular does not fire on generic embed phrasing
+
+- **WHEN** the user says "embed this form in my web page" (no mention of Angular)
+- **THEN** the `formio-angular` skill does NOT activate
+- **AND** `formio-form` activates instead
+- **AND** the `formio-angular` description contains a `Not for:` clause with the literal substring `formio-form`
 
 #### Scenario: formio-angular description Not-for clause names the orchestrator
 

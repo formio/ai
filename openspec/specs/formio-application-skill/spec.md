@@ -35,6 +35,8 @@ The description MUST include `Not for:` clauses pointing at:
 - `formio-angular-resources` for framework-explicit Angular extension requests.
 - `formio-resource-planner` for data-model-only planning requests without building an app.
 - `formio-api` for endpoint lookups.
+- `formio-form` for embedding or rendering a single form in an existing page or application (no app build or orchestration).
+- `formio-form-builder` for standalone single-form creation requests — "build/create a form", surveys, contact forms, intake forms, registration forms, questionnaires, wizards, PDF forms — where the user wants one form, not a data model, resources, or an app around the data.
 
 The description MUST also state that the skill writes a `.mcp.json` file in the workspace root as part of the flow (so users know a file will be created and why) and that the flow pauses for a Claude Code restart after the `.mcp.json` write.
 
@@ -55,6 +57,20 @@ The description MUST also state that the skill writes a `.mcp.json` file in the 
 - **WHEN** the user says "build it in Angular" or "add an Angular module for X"
 - **THEN** `formio-angular` (or `formio-angular-resources`) activates directly
 - **AND** `formio-application` does not activate
+
+#### Scenario: Embed-a-form phrasing does NOT route through formio-application
+
+- **WHEN** the user says "embed this form in my existing site" or "render this form on my page" (no app build requested)
+- **THEN** `formio-form` activates
+- **AND** `formio-application` does not activate
+- **AND** the `formio-application` description's `Not for:` clauses contain the literal substring `formio-form`
+
+#### Scenario: Standalone form-creation phrasing does NOT route through formio-application
+
+- **WHEN** the user says "build me a form to collect customer feedback" or "create a survey" (a standalone form, not an app or data model)
+- **THEN** `formio-form-builder` activates
+- **AND** `formio-application` does not activate
+- **AND** the `formio-application` description's `Not for:` clauses name the backtick-delimited `` `formio-form-builder` ``
 
 #### Scenario: Description mentions the .mcp.json write
 
@@ -314,3 +330,13 @@ The MCP server SHALL register a new tool named `authenticate` at `packages/mcp-s
 - **WHEN** `authenticate` succeeds but the subsequent `GET /current` call fails (network error, 404, etc.)
 - **THEN** the tool still returns `authenticated: true` with no `userEmail` field
 - **AND** the tool call itself does NOT error
+
+### Requirement: formio-application hands standalone form creation off to formio-form-builder
+
+When, during or at the start of an orchestration, the user's request turns out to be a standalone FORM — one form to collect responses, not a resource, not a data model, not an app — the `formio-application` skill SHALL hand off to the `formio-form-builder` skill rather than running the planner/import pipeline. A standalone form that may later be embedded in an application still belongs to `formio-form-builder` (its own flow captures embed intent).
+
+#### Scenario: Mid-orchestration standalone form request hands off
+
+- **WHEN** `formio-application` is active and the user's clarified intent is a single standalone form (e.g., "actually I just need a feedback form, not a whole app")
+- **THEN** `formio-application` hands off to `formio-form-builder`
+- **AND** the planner/import pipeline does not run for that request
