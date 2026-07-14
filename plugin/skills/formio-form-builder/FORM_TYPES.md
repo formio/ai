@@ -59,11 +59,13 @@ hybrid mode can collect data as a normal webform while still printing through
 the PDF template.
 
 **Prerequisite — the PDF document.** A PDF form renders over an uploaded,
-hosted PDF document: the user must upload their PDF (standard page sizes —
-A4, Letter — non-standard sizes fail) through the Form.io portal, which
-processes and hosts it. This skill does not convert documents or provide a
-PDF server — creating a PDF form's definition saves the form; the PDF
-document itself must exist in (or be uploaded to) the user's project.
+hosted PDF document (standard page sizes — A4, Letter — non-standard sizes
+fail). This skill performs the upload and field enrichment itself via
+[`PDF_FORM.md`](./PDF_FORM.md): the agent analyzes the PDF's AcroForm fields,
+uploads it with the `pdf_upload` tool, and improves the auto-converted
+components (labels, validations, conditionals) before saving. The project
+must have the PDF server enabled; this skill does not convert documents or
+provide a PDF server.
 
 **When to choose.** Digitizing an existing paper or official document,
 pixel-perfect output matching a mandated layout (government / compliance

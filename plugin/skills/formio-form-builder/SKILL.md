@@ -39,7 +39,9 @@ Determine, in one batched interview, (a) the form type — `webform` (single-pag
 
 ### Step 2 — SCHEMA
 
-Invoke the `formio-schema` skill to select the right components and author the complete form JSON definition for the confirmed form type and the user's described fields. Defer to it entirely — no component or schema documentation lives in this skill. Carry the confirmed form type into the definition (`display: "form"` for a webform, `display: "wizard"` for a wizard, `display: "pdf"` for a PDF form — `formio-schema` owns the exact shapes).
+**PDF lane:** when INTENT confirmed the `pdf` form type, skip to [`PDF_FORM.md`](./PDF_FORM.md) — it subsumes SCHEMA and SAVE for PDF forms (the agent analyzes the PDF, uploads it via `pdf_upload`, and enriches the server's auto-converted components before saving). EMBED still applies afterward.
+
+Otherwise, invoke the `formio-schema` skill to select the right components and author the complete form JSON definition for the confirmed form type and the user's described fields. Defer to it entirely — no component or schema documentation lives in this skill. Carry the confirmed form type into the definition (`display: "form"` for a webform, `display: "wizard"` for a wizard — `formio-schema` owns the exact shapes).
 
 ### Step 3 — SAVE
 
@@ -62,6 +64,7 @@ Prefer the MCP server's first-party tools over ad-hoc HTTP requests:
 
 - `form_create` — persist the authored form definition (Step 3).
 - `form_get` — check whether a form path already exists, or re-fetch the saved definition.
+- `pdf_upload` — upload a PDF template and receive the auto-converted component skeleton (PDF lane, see [`PDF_FORM.md`](./PDF_FORM.md)).
 - `authenticate` — obtain credentials when a tool call returns an auth error.
 
 Authentication uses the MCP server's browser-based portal-login flow: it captures a portal JWT and attaches it to every request as the `x-jwt-token` header via `formioFetch`. Do not use PKCE or API keys.
@@ -72,3 +75,4 @@ Authentication uses the MCP server's browser-based portal-login flow: it capture
 - [`INTENT.md`](./INTENT.md) — Step 1 batched interview script
 - [`SAVE.md`](./SAVE.md) — Step 3 `form_create` gate + error branches
 - [`EMBED.md`](./EMBED.md) — Step 4 conditional embed handoff
+- [`PDF_FORM.md`](./PDF_FORM.md) — the PDF lane: analyze, upload (`pdf_upload`), enrich, gate, save

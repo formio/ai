@@ -17,7 +17,7 @@ const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../../../..')
 const skillDir = join(repoRoot, 'plugin/skills/formio-form-builder');
 const skillMdPath = join(skillDir, 'SKILL.md');
 
-const STEP_DOCS = ['FORM_TYPES.md', 'INTENT.md', 'SAVE.md', 'EMBED.md'] as const;
+const STEP_DOCS = ['FORM_TYPES.md', 'INTENT.md', 'SAVE.md', 'EMBED.md', 'PDF_FORM.md'] as const;
 
 function readSkillMd(): string {
   return readFileSync(skillMdPath, 'utf8');
@@ -65,6 +65,18 @@ describe('formio-form-builder directory layout', () => {
     const link = join(repoRoot, '.claude/skills/formio-form-builder');
     expect(lstatSync(link).isSymbolicLink()).toBe(true);
     expect(realpathSync(link)).toBe(realpathSync(skillDir));
+  });
+});
+
+describe('formio-form-builder MCP Tool Preference', () => {
+  it('SKILL.md section names the first-party tools and portal-login auth', () => {
+    const skillMd = readSkillMd();
+    expect(skillMd).toContain('## MCP Tool Preference');
+    const section = skillMd.slice(skillMd.indexOf('## MCP Tool Preference'));
+    for (const tool of ['form_create', 'form_get', 'pdf_upload', 'authenticate']) {
+      expect(section, `MCP Tool Preference missing ${tool}`).toContain(tool);
+    }
+    expect(section).toContain('x-jwt-token');
   });
 });
 

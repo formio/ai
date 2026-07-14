@@ -13,7 +13,7 @@ Every request to these endpoints MUST include an `x-jwt-token` header holding th
 
 ## MCP Tool Preference
 
-No MCP tool covers this operation — use the HTTP endpoint directly.
+For uploading a PDF template (`POST ${FORMIO_PROJECT_URL}/pdf-proxy/upload`), prefer the MCP server's first-party `pdf_upload` tool — it performs the multipart upload through the portal-login JWT flow and returns the `path`, `file`, and `formfields` response verbatim. No MCP tool covers the other PDF endpoints — use those HTTP endpoints directly.
 
 ## Endpoints
 

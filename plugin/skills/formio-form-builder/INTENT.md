@@ -71,4 +71,4 @@ The EMBED step fires ONLY on the explicit yes. Never infer embed intent from con
 
 - `formType` — `webform` | `wizard` | `pdf`; Step 2 (SCHEMA) passes it to `formio-schema` for the definition's display mode.
 - `embedIntent` — `yes` | `no`; read after SAVE to decide whether Step 4 runs.
-- For `pdf`: note the PDF-document prerequisite from [`FORM_TYPES.md`](./FORM_TYPES.md) — surface it to the user before SCHEMA so they know a hosted PDF document is required.
+- For `pdf`: route to [`PDF_FORM.md`](./PDF_FORM.md) — the PDF lane subsumes SCHEMA and SAVE, has the agent analyze and upload the user's PDF document itself, and enriches the auto-converted fields before saving.

@@ -250,6 +250,47 @@ describe('formioFetch', () => {
     expect(result).toBe('Ok');
   });
 
+  it('sends a FormData body unserialized without a JSON Content-Type header', async () => {
+    mockFetch.mockResolvedValue({ ok: true, json: () => Promise.resolve({ file: 'uuid' }) });
+
+    const formData = new FormData();
+    formData.set('file', new Blob(['%PDF-1.7'], { type: 'application/pdf' }), 'template.pdf');
+
+    const result = await formioFetch('pdf-proxy/upload', {}, config, {
+      method: 'POST',
+      body: formData,
+    });
+
+    const calledOptions = mockFetch.mock.calls[0][1] as RequestInit;
+    expect(calledOptions.method).toBe('POST');
+    expect(calledOptions.body).toBe(formData);
+    expect(calledOptions.headers).toEqual({ 'x-token': 'abc123' });
+    expect(result).toEqual({ file: 'uuid' });
+  });
+
+  it('on 401 in JWT mode re-sends the same FormData body on the retry', async () => {
+    const jwtConfig: ResolvedFormioConfig = {
+      baseUrl: 'https://form.local',
+      projectUrl: 'https://form.local/example',
+      jwt: 'expired-jwt',
+    };
+    mockEnsureAuth.mockImplementation(async () => {
+      jwtConfig.jwt = 'fresh-jwt';
+    });
+    mockFetch
+      .mockResolvedValueOnce({ ok: false, status: 401, statusText: 'Unauthorized' })
+      .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve({ file: 'uuid' }) });
+
+    const formData = new FormData();
+    formData.set('file', new Blob(['%PDF-1.7'], { type: 'application/pdf' }), 'template.pdf');
+
+    await formioFetch('pdf-proxy/upload', {}, jwtConfig, { method: 'POST', body: formData });
+
+    const retryOptions = mockFetch.mock.calls[1][1] as RequestInit;
+    expect(retryOptions.body).toBe(formData);
+    expect(retryOptions.headers).toEqual({ 'x-jwt-token': 'fresh-jwt' });
+  });
+
   it('uses the refreshed config.jwt header on the retry after a successful gate during 401 re-auth', async () => {
     const jwtConfig: ResolvedFormioConfig = {
       baseUrl: 'https://form.local',

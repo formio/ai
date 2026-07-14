@@ -11,7 +11,62 @@ import { fileURLToPath } from 'node:url';
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../../../..');
 const skillDir = join(repoRoot, 'plugin/skills/formio-form-builder');
 
-const ALL_SKILL_DOCS = ['SKILL.md', 'FORM_TYPES.md', 'INTENT.md', 'SAVE.md', 'EMBED.md'] as const;
+const ALL_SKILL_DOCS = [
+  'SKILL.md',
+  'FORM_TYPES.md',
+  'INTENT.md',
+  'SAVE.md',
+  'EMBED.md',
+  'PDF_FORM.md',
+] as const;
+
+describe('PDF_FORM.md — the agent-enriched PDF pipeline', () => {
+  it('scripts the preflight AcroForm check with flat-PDF off-ramps', () => {
+    const pdfForm = readStepDoc('PDF_FORM.md');
+    expect(pdfForm).toContain('AcroForm');
+    expect(pdfForm).toMatch(/flat|scanned/i);
+    expect(pdfForm).toMatch(/without enrichment/i);
+  });
+
+  it('documents both analysis passes — structural dump and visual read', () => {
+    const pdfForm = readStepDoc('PDF_FORM.md');
+    expect(pdfForm).toMatch(/structural/i);
+    expect(pdfForm).toMatch(/visual/i);
+    expect(pdfForm).toMatch(/tooltip/i);
+  });
+
+  it('uploads via the pdf_upload MCP tool', () => {
+    const pdfForm = readStepDoc('PDF_FORM.md');
+    expect(pdfForm).toContain('pdf_upload');
+  });
+
+  it('states overlay values are never modified', () => {
+    const pdfForm = readStepDoc('PDF_FORM.md');
+    expect(pdfForm).toContain('overlay');
+    expect(pdfForm).toMatch(/never/i);
+  });
+
+  it('scripts the approval gate before form_create', () => {
+    const pdfForm = readStepDoc('PDF_FORM.md');
+    expect(pdfForm).toMatch(/approval gate/i);
+    expect(pdfForm).toContain('form_create');
+  });
+
+  it('references pdf-api.md by path and restates no endpoint shapes', () => {
+    const pdfForm = readStepDoc('PDF_FORM.md');
+    expect(pdfForm).toContain('pdf-api.md');
+    expect(pdfForm).not.toContain('curl');
+    expect(pdfForm).not.toContain('multipart/form-data');
+  });
+
+  it('INTENT.md routes the pdf branch to PDF_FORM.md', () => {
+    expect(readStepDoc('INTENT.md')).toContain('PDF_FORM.md');
+  });
+
+  it('FORM_TYPES.md PDF section points at PDF_FORM.md', () => {
+    expect(readStepDoc('FORM_TYPES.md')).toContain('PDF_FORM.md');
+  });
+});
 
 function readStepDoc(doc: string): string {
   return readFileSync(join(skillDir, doc), 'utf8');

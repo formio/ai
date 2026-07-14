@@ -1,4 +1,4 @@
-## ADDED Requirements
+## MODIFIED Requirements
 
 ### Requirement: Authenticated requests to Form.io API
 
@@ -51,29 +51,3 @@ The `formioFetch` function SHALL send requests with the appropriate auth header 
 
 - **WHEN** `formioFetch` is called with a config that has neither `jwt` nor `apiKey`
 - **THEN** it throws an error indicating no authentication credentials are available
-
-### Requirement: HTTP error handling with re-auth on 401
-
-The `formioFetch` function SHALL throw a descriptive error when the API returns a non-OK response. In JWT mode, a 401 response SHALL trigger re-authentication and a single retry of the original request.
-
-#### Scenario: 401 in JWT mode triggers re-auth and retry
-
-- **WHEN** the Form.io API responds with status 401 and `config.jwt` is set
-- **THEN** `formioFetch` triggers the login flow to get a new JWT
-- **AND** retries the original request with the new JWT
-- **AND** returns the result of the retry
-
-#### Scenario: 401 retry also fails
-
-- **WHEN** the original request returns 401, re-auth succeeds, but the retry also returns 401
-- **THEN** `formioFetch` throws an error containing the status code (no infinite retry loop)
-
-#### Scenario: 401 in API key mode throws without retry
-
-- **WHEN** the Form.io API responds with status 401 and `config.apiKey` is set (no JWT)
-- **THEN** `formioFetch` throws an error containing the status code without attempting re-auth
-
-#### Scenario: API returns 400 Bad Request
-
-- **WHEN** the Form.io API responds with status 400
-- **THEN** `formioFetch` throws an error containing the status code
