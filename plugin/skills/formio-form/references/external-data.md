@@ -72,7 +72,7 @@ definition itself with the Data Source component, below.
 
 The [Data Source component](https://help.form.io/form-building/premium-components#data-source)
 is a hidden premium component that performs the fetch for you: it calls an
-external URL (or reads IndexedDB) on a configurable trigger and makes the
+external URL on a configurable trigger and makes the
 result available to other components — no hand-written `fetch` code. It is
 strictly a retrieval mechanism; by default the fetched data lives only in
 memory for the form session and is not stored in the submission
