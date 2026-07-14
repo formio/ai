@@ -30,10 +30,16 @@ export const jsonConditionalFormDefinition: Record<string, unknown> = {
   display: 'form',
   components: [
     {
-      type: 'textfield',
+      type: 'select',
       key: 'employed',
-      label: 'Are you employed? (yes/no)',
+      label: 'Are you employed?',
       input: true,
+      data: {
+        values: [
+          { label: 'Yes', value: 'yes' },
+          { label: 'No', value: 'no' },
+        ],
+      },
     },
     {
       type: 'textfield',
@@ -51,9 +57,15 @@ export const simpleConditionalFormDefinition: Record<string, unknown> = {
   display: 'form',
   components: [
     {
-      type: 'textfield',
+      type: 'select',
+      data: {
+        values: [
+          { label: 'Yes', value: 'yes' },
+          { label: 'No', value: 'no' },
+        ],
+      },
       key: 'employed',
-      label: 'Are you employed? (yes/no)',
+      label: 'Are you employed?',
       input: true,
     },
     {
