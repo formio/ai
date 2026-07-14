@@ -13,7 +13,10 @@ description: >-
   like "also track attendees for each event" or "let customers leave reviews on products".
   Not for: framework-explicit requests that name Angular or @formio/angular (see
   `formio-angular`); planning a data model without building an app around it (see
-  `formio-resource-planner`); Form.io REST endpoint lookups (see `formio-api`).
+  `formio-resource-planner`); Form.io REST endpoint lookups (see `formio-api`);
+  embedding or rendering a single form in an existing page or application with no
+  app build or orchestration — "embed this form", "render this form on my page"
+  (see `formio-form`).
 ---
 
 # Form.io Application Orchestrator
