@@ -36,14 +36,18 @@ they want a wizard.
 **Nested wizard workflows (child wizards).** A wizard can embed another wizard
 — a **child wizard** — for hierarchical flows: build the child wizard as its
 own standard wizard form, then in the parent wizard add a Panel to the target
-page, hide the Panel's label, place a Nested Form component inside it, and
-link it to the child wizard. The Panel keeps the child wizard's pages rendered
-as sub-navigation beneath the parent's navigation instead of colliding with
-it. Use nested wizards when a complex workflow has sub-sections that deserve
-their own step-by-step navigation; use Tab components instead when
-step-by-step navigation is not needed. Creating the child wizard is its own
-SCHEMA → SAVE pass through this skill's pipeline (each wizard is a separate
-form in the project); the parent links to the saved child.
+page, place a Nested Form component inside it, and link it to the child wizard.
+Like any Nested Form, the component should set `reference: false` so the child
+wizard acts as a nested interface saved inline with the parent — not a separate
+child submission; the canonical guidance lives in `formio-schema`'s
+`references/form/data-components.md` (Form component section), which the SCHEMA
+step loads.
+The Panel keeps the child wizard's pages rendered as sub-navigation beneath the 
+parent's navigation instead of colliding with it. Use nested wizards when a complex 
+workflow has sub-sections that deserve their own step-by-step navigation; use Tab 
+components instead when step-by-step navigation is not needed. Creating the child 
+wizard is its own SCHEMA → SAVE pass through this skill's pipeline (each wizard is 
+a separate form in the project); the parent links to the saved child.
 
 ## PDF form
 
