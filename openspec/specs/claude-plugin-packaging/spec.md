@@ -29,13 +29,23 @@ The `plugin/package.json` SHALL set `name` to `@formio/ai`, `publishConfig.acces
 
 ### Requirement: Plugin bundles the skills library
 
-The plugin source tree SHALL include, and the build SHALL copy to `dist/plugin/skills/`, the full `formio-api` router skill, every `formio-api-<group>` capability-group skill, and the `formio-schema` and `formio-resource-planner` skills. The bundled set SHALL NOT include `formio-form`.
+The plugin source tree SHALL include, and the build SHALL copy to `dist/plugin/skills/`, the full `formio-api` router skill, every `formio-api-<group>` capability-group skill, and the `formio-schema`, `formio-resource-planner`, `formio-form`, and `formio-form-builder` skills. (`formio-form` is the `@formio/js` embed skill; `formio-form-builder` is the build-a-form orchestrator introduced by the `formio-form-builder-skill` capability.) The plugin build test's skill-inclusion assertions (`packages/mcp-server/src/__tests__/plugin-build.test.ts`) SHALL assert `formio-form-builder` is present in the bundled `skills/` directory.
 
 #### Scenario: Installed plugin exposes all skills
 
 - **WHEN** a user installs `@formio/ai` in a Claude Code project
-- **THEN** Claude Code discovers every `formio-api`, `formio-schema`, and `formio-resource-planner` skill from the plugin's `skills/` directory
-- **AND** no skill named `formio-form` is present in the bundled `skills/` directory
+- **THEN** Claude Code discovers every `formio-api`, `formio-schema`, `formio-resource-planner`, `formio-form`, and `formio-form-builder` skill from the plugin's `skills/` directory
+
+#### Scenario: Bundled formio-form-builder is the orchestrator skill
+
+- **WHEN** the bundled `skills/formio-form-builder/SKILL.md` is inspected
+- **THEN** its frontmatter `name` is `formio-form-builder` and its description claims single-form creation triggers
+
+#### Scenario: Build test asserts inclusion, not a stale exclusion
+
+- **WHEN** the plugin build test suite runs against a built `dist/plugin/`
+- **THEN** it asserts `formio-form-builder` is present in `dist/plugin/skills/`
+- **AND** no assertion excludes `formio-form-builder` from the bundle
 
 ### Requirement: Build script produces a self-contained plugin tree
 
@@ -53,7 +63,7 @@ A `scripts/build-plugin.ts` script SHALL clean `dist/plugin/`, copy the `plugin/
 
 ### Requirement: Smoke test validates the built plugin over stdio
 
-A `scripts/test-plugin.ts` script SHALL validate that `dist/plugin/` exists, that `plugin.json` contains required fields (`name`, `version`, `description`, at least one `mcpServers` entry), that required skill directories (at minimum `formio-api` and `formio-schema`) are present, and that spawning the bundled server and sending a JSON-RPC `tools/list` request returns a well-formed response. The smoke test SHALL NOT require `formio-form` to be present.
+A `scripts/test-plugin.ts` script SHALL validate that `dist/plugin/` exists, that `plugin.json` contains required fields (`name`, `version`, `description`, at least one `mcpServers` entry), that required skill directories (at minimum `formio-api` and `formio-schema`) are present, and that spawning the bundled server and sending a JSON-RPC `tools/list` request returns a well-formed response.
 
 #### Scenario: Smoke test fails when build is missing
 
@@ -69,7 +79,6 @@ A `scripts/test-plugin.ts` script SHALL validate that `dist/plugin/` exists, tha
 
 - **WHEN** the smoke test inspects the bundled `skills/` directory
 - **THEN** it SHALL assert `formio-schema` is present
-- **AND** it SHALL NOT assert `formio-form` is present
 
 ### Requirement: Plugin ships a README documenting environment variables
 

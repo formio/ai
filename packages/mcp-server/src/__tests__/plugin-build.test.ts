@@ -64,12 +64,13 @@ describe('pnpm build:plugin', () => {
     ).not.toThrow();
   });
 
-  it('1.3 includes formio-api/, formio-schema/, and formio-form/ but excludes openspec-* and tdd-* skills', () => {
+  it('1.3 includes formio-api/, formio-schema/, formio-form/, and formio-form-builder/ but excludes openspec-* and tdd-* skills', () => {
     expect(fs.existsSync(SKILLS_DIR)).toBe(true);
     const entries = fs.readdirSync(SKILLS_DIR);
     expect(entries).toContain('formio-api');
     expect(entries).toContain('formio-schema');
     expect(entries).toContain('formio-form');
+    expect(entries).toContain('formio-form-builder');
     for (const entry of entries) {
       expect(
         entry.startsWith('openspec-'),

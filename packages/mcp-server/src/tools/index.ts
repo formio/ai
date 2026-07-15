@@ -14,6 +14,7 @@ import { registerFormRevisionGetTool } from './form_revision_get.js';
 import { registerFormRevisionsListTool } from './form_revisions_list.js';
 import { registerFormUpdateTool } from './form_update.js';
 import { registerHelloTool } from './hello.js';
+import { registerPdfUploadTool } from './pdf_upload.js';
 import { registerProjectExportTool } from './project_export.js';
 import { registerProjectImportTool } from './project_import.js';
 import { registerProjectSetTool } from './project_set.js';
@@ -37,6 +38,7 @@ export function registerAllTools(
   registerFormRevisionGetTool(server, config);
   registerFormRevisionsListTool(server, config);
   registerFormUpdateTool(server, config);
+  registerPdfUploadTool(server, config);
   registerProjectExportTool(server, config);
   registerProjectImportTool(server, config);
   // project_set is only useful when the SessionStart/PreToolUse hook drives

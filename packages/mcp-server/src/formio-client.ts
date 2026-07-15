@@ -36,18 +36,21 @@ function formatApiError(status: number, url: URL): string {
 }
 
 function buildFetchInit(config: FormioConfig, options?: FormioFetchOptions): RequestInit {
-  const hasBody = options?.body !== undefined;
+  const body = options?.body;
+  const isFormData = body instanceof FormData;
+  // FormData bodies go through unserialized with no explicit Content-Type —
+  // fetch writes the multipart boundary itself.
   const headers: Record<string, string> = {
     ...getAuthHeader(config),
-    ...(hasBody ? { 'Content-Type': 'application/json' } : {}),
+    ...(body !== undefined && !isFormData ? { 'Content-Type': 'application/json' } : {}),
   };
 
   const init: RequestInit = { headers };
   if (options?.method) {
     init.method = options.method;
   }
-  if (hasBody) {
-    init.body = JSON.stringify(options.body);
+  if (body !== undefined) {
+    init.body = isFormData ? body : JSON.stringify(body);
   }
   if (options?.signal) {
     init.signal = options.signal;
