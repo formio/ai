@@ -45,7 +45,7 @@ Key-value pair editor. Extends DataGrid. Submission shape: `{ [key]: { userKey1:
 
 ## Form (`type: "form"`)
 
-Embeds another form. Either references it (just the submission ID) or inlines its data.
+Embeds another form (a **Nested Form**). Either references it (just the submission ID) or inlines its data.
 
 | Property    | Type      | Description                                                    |
 | ----------- | --------- | -------------------------------------------------------------- |
@@ -53,6 +53,19 @@ Embeds another form. Either references it (just the submission ID) or inlines it
 | `form`      | `string`  | Form ID to embed.                                              |
 | `path`      | `string`  | Form path to embed.                                            |
 | `reference` | `boolean` | Store as a reference instead of embedding the submission data. |
+
+**Default `reference: false` — common gotcha.** In most cases a Nested Form is
+meant to serve as a nested form *interface* — the child form's fields render
+inside the parent, and the child data is saved inline as part of the parent's
+submission. That behavior requires `reference: false`. Leaving `reference`
+at its default (`true`, "Save as Reference") makes the child data submit as a
+*separate* submission against the child form, with the parent storing only a
+`{ _id }` pointer — surprising anyone who expected one combined submission.
+Set `reference: false` on every Nested Form component (including nested
+wizards) unless the user explicitly wants child submissions stored separately
+under the child form (e.g., a shared child record referenced by many parents).
+See `references/submission/submission-data.md` for the two resulting data
+shapes.
 
 ## Address (`type: "address"`)
 

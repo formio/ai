@@ -16,7 +16,10 @@ description: >-
   `formio-resource-planner`); Form.io REST endpoint lookups (see `formio-api`);
   embedding or rendering a single form in an existing page or application with no
   app build or orchestration — "embed this form", "render this form on my page"
-  (see `formio-form`).
+  (see `formio-form`); creating a standalone single form — "build a form", "create
+  a form", a survey, contact form, intake form, registration form, questionnaire,
+  wizard, or PDF form to collect responses, with no data model, resources, or app
+  around it (see `formio-form-builder`).
 ---
 
 # Form.io Application Orchestrator
@@ -28,6 +31,7 @@ You are the library's default "build me an app" skill. When a user describes an 
 - **Translate, do not interrogate.** Lead with a plain-language restatement of what the app (or the new feature) will DO and let the user confirm or correct. Never open the conversation with Form.io or framework jargon.
 - **One step at a time, left to right.** Intent → Plan → Deployment → MCP Config → Import → Framework. Each step that writes files, calls the MCP server, or imports into a live project ends with an approval gate. A declined gate stops the flow; partial state is never left behind.
 - **Route, do not reimplement.** Planning lives in `formio-resource-planner`. Framework file generation lives in `formio-angular` (today) and in future framework skills. Your job is to orchestrate the handoffs, not to duplicate their logic.
+- **A standalone form is not an app.** If, at any point — the opening request or a mid-orchestration clarification ("actually I just need a feedback form, not a whole app") — the intent turns out to be a single standalone FORM to collect responses (not a resource, not a data model, not an app), hand off to `formio-form-builder` instead of running the planner/import pipeline. That skill captures embed intent itself, so "a form that might go into an app later" still belongs to it.
 - **Pick the right kind per entity — Resource or Form.** Most of what users describe is a reusable **data model** (a Resource — Contact, Product, Project), and many apps are entirely Resources — that is correct and common. Some entities are instead **bespoke data collection** (a Form — a job application, a survey, an RSVP, an intake/feedback form). The planner makes this call per entity; do not force everything into Resources, and equally do not force an entity into a Form when a Resource fits. When the user's request is clearly survey-like or one-off (e.g., "a form for people to apply"), say so in your plain-language restatement so the planner can classify it as a Form. See `formio-resource-planner` → "Resources vs. Forms — the core modeling decision".
 - **Modify-existing still plans and imports.** If the user is extending an already-running app, still run the planner (in delta mode — it plans ONLY the new resources/fields/actions for the feature) and still call `project_import` (import is additive — adding new resources to the existing project is safe). What modify-existing skips is Deployment (URLs are already in the workspace) and MCP Config (`.mcp.json` already exists and targets the right project). Then route to the framework's extend sub-skill with the new resources in hand.
 - **Batch your questions.** When input is needed (URLs in Step 3, framework pick in Step 6), use one `AskUserQuestion` per step. Do not pepper.
