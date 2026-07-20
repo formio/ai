@@ -1,5 +1,10 @@
 # The Form.io Agentic Coding Toolset
 
+[![CI](https://github.com/formio/ai/actions/workflows/ci.yml/badge.svg)](https://github.com/formio/ai/actions/workflows/ci.yml)
+[![npm: @formio/ai](https://img.shields.io/npm/v/%40formio%2Fai?label=%40formio%2Fai)](https://www.npmjs.com/package/@formio/ai)
+[![npm: @formio/mcp](https://img.shields.io/npm/v/%40formio%2Fmcp?label=%40formio%2Fmcp)](https://www.npmjs.com/package/@formio/mcp)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](./LICENSE)
+
 `@formio/ai` is what brings Form.io into your agentic coding environment. It provides a series of tools that enable any developer to perform a number of complex actions against the Form.io Enterprise Server using their favorite Agentic Coding toolsets (starting with Claude Code). This turns the Form.io Enterprise Server into a **Composable Backend for Agentically Coded Applications**.
 
 ## Getting Started
@@ -16,14 +21,14 @@ Getting started is easy.  First install Claude Code as follows:
 
 Claude Code prompts for the `Project URL` and the `Base URL` on install. These are described as follows:
 
- - **Project URL**: This is the endpoint for your 'project'. If you are using our SaaS environment (https://portal.form.io), then your project URL will be a sub-domain, such https://myproject.form.io.  However, for most use cases, when Form.io is deployed in your own enviornment, then the project url is typically a 'sub-directory' structure like https://forms.mysite.com/myproject.
- - **Base URL**: This is the endpoint for the deployment. If you are using the SaaS environment (https://portal.form.io), then this is always going to be https://api.form.io. However, for most use cases, when Form.io is deployed in your own environment, then this is the URL of the deployment like https://forms.mysite.com. 
+ - **Project URL**: This is the endpoint for your 'project'. If you are using our SaaS environment (https://portal.form.io), then your project URL will be a sub-domain, such as https://myproject.form.io. However, for most use cases, when Form.io is deployed in your own environment, then the project url is typically a 'sub-directory' structure like https://forms.mysite.com/myproject.
+ - **Base URL**: This is the endpoint for the deployment. If you are using the SaaS environment (https://portal.form.io), then this is always going to be https://api.form.io. However, for most use cases, when Form.io is deployed in your own environment, then this is the URL of the deployment like https://forms.mysite.com.
 
  ## What you get
 
 - **Claude Code plugin: `@formio/ai`.** One-command install. Bundles the MCP server and skill library, registers them with Claude Code.
 - **MCP server: `@formio/mcp`.** Form.io operations (`form_*`, `role_*`, `action_*`, `project_*`) as MCP tools. Works with any MCP-aware client: Claude Code, Claude Desktop, VS Copilot, and whatever comes next.
-- **Skills library:** Nine activatable skills covering app orchestration, resource planning, Form building, JSON-schema authoring, action configuration, authentication & authorization, the `@formio/js` SDK surface, and the full Form.io REST surface.
+- **Skills library:** Ten activatable skills covering app orchestration, form building (webforms and wizards), form embedding, resource planning, JSON-schema authoring, action configuration, authentication & authorization, the `@formio/js` SDK surface, and the full Form.io REST surface.
 
 ## Why this exists
 
@@ -46,13 +51,15 @@ Orchestration skills are special skills that serve as the **entry point** for mo
 | Skill | What it does |
 | --- | --- |
 | `formio-application` | Framework-agnostic "build me an app" orchestrator. Turns plain-language intent into a running application backed by a Form.io project — planning resources, importing the template, and handing off to a framework implementor. Also handles adding new features to an existing app. |
-| `form-builder` *(coming soon)* | Orchestrates any "form building" prompt — complex forms, multi-page conditional wizards, and schema-compliant form definitions (e.g. FHIR) — from intent through creation in your deployment. |
+| `formio-form-builder` | "Build me a form" orchestrator. Builds a single form end to end — webform or multi-page wizard — from intent through schema authoring to a saved form in your deployment, with an optional embed handoff. Also handles field edits to an existing form. |
 
 ### All skills
 
 | Skill | What it does |
 | --- | --- |
 | `formio-application` | Orchestration entry point for building or extending an application on the Form.io platform (see above). |
+| `formio-form-builder` | Orchestration entry point for building a single form — webform or wizard — end to end (see above). |
+| `formio-form` | Embeds and renders Form.io forms in any web application with the `@formio/js` renderer — pre-fill, conditional fields, calculated values, custom validation, and conditional wizard pages. |
 | `formio-resource-planner` | Plans the resource structure, field configuration, and access/permission model from high-level requirements, then emits a ready-to-import `template.json`. |
 | `formio-schema` | Reference for Form.io JSON schema — the document shapes for projects, forms/resources, and submissions. Used when constructing, editing, or interpreting any Form.io JSON. |
 | `formio-actions` | Reference for configuring Form.io actions — the server-side behavior layer for email notifications, authentication, webhooks, role assignment, and form-to-form saves. |
@@ -62,17 +69,33 @@ Orchestration skills are special skills that serve as the **entry point** for mo
 | `formio-angular` | Angular framework implementor. Turns an approved `template.json` plus a target project into a working Angular app using `@formio/angular`. Delegated to by `formio-application`. |
 
 ## Examples and Use Cases
-Once this is installed, you are ready to do the following:
 
- - [Build an Enterprise 'greenfield' form-based workflow application from a single prompt](#build-an-enterprise-greenfield-form-based-workdlow-application-from-a-single-prompt)
- - [Introduce new Form.io features within existing applications](#introduce-new-formio-features-within-existing-applications)
- - [Prompt your agent to build conditional forms and wizards with complex validations](#prompt-your-agent-to-build-conditional-forms-and-wizards-with-complex-validations)
- - [Build forms using descriptions of data models and integration interfaces](#build-forms-using-descriptions-of-data-models-and-integration-interfaces)
- - [Create new Resource / Model structures using the REST API's within your Form.io project via prompt](#create-new-resource--model-structures-using-the-rest-apis-within-your-formio-project-via-prompt)
- - [Embed a simple form.io form within a bespoke application](#embed-a-simple-formio-form-within-a-bespoke-application)
+- [The Form.io Agentic Coding Toolset](#the-formio-agentic-coding-toolset)
+  - [Getting Started](#getting-started)
+  - [What you get](#what-you-get)
+  - [Why this exists](#why-this-exists)
+  - [Agentic Skill Library](#agentic-skill-library)
+    - [Orchestration skills](#orchestration-skills)
+    - [All skills](#all-skills)
+  - [Examples and Use Cases](#examples-and-use-cases)
+    - [Build complete applications](#build-complete-applications)
+    - [Build forms and wizards](#build-forms-and-wizards)
+    - [Embed forms in existing applications](#embed-forms-in-existing-applications)
+    - [Work the REST API via prompt](#work-the-rest-api-via-prompt)
+  - [Using the MCP server without the skills](#using-the-mcp-server-without-the-skills)
+  - [MCP server tools](#mcp-server-tools)
+    - [Forms](#forms)
+    - [Roles](#roles)
+    - [Actions](#actions)
+    - [Project](#project)
+    - [Diagnostic](#diagnostic)
+  - [Authentication](#authentication)
+    - [Login-form auto-resolution](#login-form-auto-resolution)
+  - [Environment variables](#environment-variables)
+  - [Contributing](#contributing)
+  - [License](#license)
 
-## Build an Enterprise 'greenfield' form-based workdlow application from a single prompt.
-With this plugin, you can create a brand-new 'greenfield' form-based [application](#this-library-currently-only-supports-angular-other-frameworks-are-coming-soon) using the `formio-application` skill. To get started, simply create a new folder within your computer and then start claude code within that folder as follows:
+Ready-to-paste example prompts live in [`examples/`](./examples/) — each file is one self-contained prompt plus notes on what it should exercise. To try one, create a new folder, start Claude Code inside it, and paste the prompt:
 
 ```bash
 mkdir form-app
@@ -80,52 +103,74 @@ cd form-app
 claude
 ```
 
-From this prompt, you can then perform the following to create a new application, like the following:
+### Build complete applications
 
-```bash
-/formio-application I would like to create a story board application for my Sales Team to keep track of the sales status of leads. This application should allow each user create their own story board, and with those story boards create custom swim lanes, and then within those swim lanes create new "Leads". These Leads can then be dragged-and-dropped between the swim lanes to keep track of the status of the lead. Each user should then be able to create Teams, and then add new users to that team, and then add that team to the story board where that user would then have read/write access to the story board they have been added to.
+Create a brand-new 'greenfield' form-based application — or introduce a new form-based feature within an existing one — using the `formio-application` orchestration skill. The agent plans the data model, imports it into your Form.io project, and scaffolds the front end, using the Form.io platform as the composable backend for the full application logic.
+
+- [CRM Application](./examples/apps/crm.md) — clients, deals, and activity logs with owner-scoped access.
+- [Help Desk](./examples/apps/help-desk.md) — customer tickets, agent workflows, internal notes, and email notifications.
+- [Storyboard](./examples/apps/storyboard.md) — production → scene → shot hierarchy with collaborative crew access.
+- [EMR Patient Onboarding](./examples/apps/emr-patient-onboarding.md) — extend an existing application with a new form-based feature.
+
+***This library currently only supports the Angular application framework for new 'greenfield' applications. Other frameworks are coming soon.***
+
+### Build forms and wizards
+
+Create complex forms and multi-page conditional wizards with the `formio-form-builder` skill. The agent authors the form JSON and automatically creates the form within any stage of your deployment — including forms whose submission data must adhere to well-defined external schemas such as [FHIR](https://hl7.org/fhir).
+
+- [College Application Wizard](./examples/forms/college-application.md) — multi-page wizard with program-driven conditional pages.
+- [FHIR-Compliant Patient Form](./examples/forms/fhir-patient.md) — submission data that conforms to the FHIR Patient resource.
+- [Customer Feedback Form](./examples/forms/customer-feedback.md) — conditional follow-up fields and a conditional email notification.
+- [Student Onboarding Wizard](./examples/forms/student-onboarding-embed.md) — create a wizard and embed it within your application in one pass.
+
+### Embed forms in existing applications
+
+Embed an existing form or wizard within any HTML-based application using the `formio-form` skill.
+
+- [Embed an Existing Form](./examples/embed/render-existing-form.md) — render a saved form with `@formio/js`, pre-fill it, and handle submit events.
+
+### Work the REST API via prompt
+
+The `formio-api` skill knows the full REST surface of your Form.io deployment — create any Resource, Form, Submission, or other entity via prompt.
+
+- [Create a Patient Resource](./examples/api/patient-resource.md) — create a new resource through the MCP server's first-party tools.
+
+## Using the MCP server without the skills
+
+The bundled MCP server is also published standalone as [`@formio/mcp`](https://www.npmjs.com/package/@formio/mcp) — you do not need the Claude Code plugin or the skill library to use it. Any MCP-aware client (Claude Code, Claude Desktop, Cursor, VS Code Copilot) can spawn the server directly and call the [tools below](#mcp-server-tools).
+
+To connect from Claude Code without the plugin, add a `.mcp.json` to your project root:
+
+```json
+{
+  "mcpServers": {
+    "formio-mcp": {
+      "command": "npx",
+      "args": ["-y", "@formio/mcp"],
+      "env": {
+        "FORMIO_BASE_URL": "https://api.form.io",
+        "FORMIO_PROJECT_URL": "https://your-project.form.io"
+      }
+    }
+  }
+}
 ```
 
-The plugin will then use the `formio-application` skill as the orchestration skill to create this new application using the Form.io platform as the composable backend for the full application logic.
+In standalone mode, `FORMIO_BASE_URL` and `FORMIO_PROJECT_URL` are required env vars ([full list](#environment-variables)). Authentication works the same as in plugin mode: the first authenticated tool call opens the browser portal-login flow, or set `FORMIO_API_KEY` to skip the browser entirely.
 
-## Introduce new Form.io features within existing applications.
-In addition to being able to create new 'greenfield' [applications](#this-library-currently-only-supports-angular-other-frameworks-are-coming-soon), it is also possible to use this plugin to introduce new complex form-based workflow features within existing [applications](#this-library-currently-only-supports-angular-other-frameworks-are-coming-soon). This can also be achieved using the `formio-application` skill as follows.
+Once connected, prompt the tools directly — no skill activation involved:
 
-```bash
-/formio-application Within this EMR portal application, I would like to add the ability for each Clinic to create their own Patient Onboarding forms within the Form.io Platform portal, and then embed those patient onboarding forms within their own clinic websites. When a potential patient fills out the patient onboarding form, I would like to introduce a new section within this EMR application called "Patient Onboarding" that displays a table view of all the new patient applications (forms). The clinic administrator should be able to click on each patient onboarding submission, call that patient, and through their own phone call convert that into a scheduled patient appointment within the EMR portal."
+```
+Using the formio-mcp tools, show me every form and role in my Form.io project, then export the full project template and save it to ./backup/template.json.
 ```
 
-From this prompt, the `formio-application` should understand that this is a new 'form-based' feature that is being added within an exsting [application](#this-library-currently-only-supports-angular-other-frameworks-are-coming-soon), and then initiate the development process for introducing this new feature using the Form.io platform as the underlying platform for such feature.
-
-## Prompt your agent to build conditional forms and wizards with complex validations
-Using the `form-builder` skill, you can easily prompt your agent to create complex forms, as well as multi-page conditional wizards. Not only will the agent create the JSON for this form, but it will also automatically create the form within any stage of your deployment.
-
-```bash
-/form-builder I would like to create a new multi-page wizard form that is responsible for collecting college applications, which we will embed within our content management system. This wizard should have multiple sections where it first collects the applicants personal information, followed by scholastic achievements, followed by extra curricular activities. It should follow up with them selecting their desired program, and based on what they select, the following wizard pages should contain the specific onboarding questions for that program.
+```
+Using the formio-mcp form_create tool, create a new form called "Contact Us" with fields for full name (required), email (required), subject, and message, plus a submit button.
 ```
 
-## Build forms using descriptions of data models and integration interfaces
-The `form-builder` skill is also capable of enabling an Agent to produce form definitions that are capable of producing submission data structures that adhere to well defined schemas. This is very useful when a form is needed to produce a data object that meets a very specific structure, such as when that data is to be used against an already defined integration or standard. For example, you can use this skill to produce forms that are [FHIR compliant](https://hl7.org/fhir).
+Ready-to-paste versions of these live in [`examples/mcp/`](./examples/mcp/): [Inspect and Export a Project](./examples/mcp/inspect-and-export.md) and [Create a Form Directly](./examples/mcp/create-form-direct.md).
 
-```bash
-/form-builder I am building a new patient onboarding application that must adhere to the FHIR Patient resource definitions described at https://build.fhir.org/patient.html. Can you create a form that will onboard a new patient and the data that it produces generate FHIR compliant data for Patients?
-```
-
-## Create new Resource / Model structures using the REST API's within your Form.io project via prompt
-The `formio-api` skill is fully aware how to interface with your Form.io Enterprise Deployment via REST API's. This provides the ability to create any Resource, Form, Submission, or any other entity using the REST API's of that deployment.
-
-```bash
-/formio-api I would like to create a new Patient resource within my Form.io deployment.
-```
-
-## Embed a simple form.io form within a bespoke application.
-In addition to building new 'greenfield' applications, the `formio-application` skill is also capable of embedding a form or wizard within any HTML-based application.
-
-```bash
-/formio-application I would like to create and embed a multi-page student onbaording wizard within my application.
-```
-
-#### ***This library currently only supports Angular application framework for new 'greenfield' applications. Other frameworks are coming soon***
+One caveat: without the skills, the agent authors Form.io JSON (form schemas, action settings, access arrays) from its own general knowledge instead of the conventions the skill library encodes — every operation the tools cover still works, but you give up the guardrails. For other transports (Streamable HTTP for remote clients, SSE for Claude Desktop) and running the server from a clone of this repo, see the [MCP server README](./packages/mcp-server/README.md).
 
 ## MCP server tools
 
@@ -211,6 +256,10 @@ The probe runs lazily — only when the local auth page is actually served.
 \* In plugin context, `FORMIO_PROJECT_URL` is captured per-cwd by the `project_set` tool and persisted to `~/.formio/projects.json`. The `verify-project-url` `SessionStart`/`PreToolUse` hook offers `formio_default_project_url` (from plugin user-config) as the default the first time you enter a workspace.
 
 ---
+
+## Contributing
+
+This is a pnpm + Turborepo monorepo: the `@formio/mcp` MCP server (`packages/mcp-server/`), the `@formio/ai` Claude Code plugin (`plugin/`, bundling the server + skill library), and the skill test suite (`packages/skill-tests/`). Setup, conventions, skill-authoring guidelines, and the release flow are in [CONTRIBUTING.md](./CONTRIBUTING.md). Security reports: [SECURITY.md](./SECURITY.md).
 
 ## License
 
