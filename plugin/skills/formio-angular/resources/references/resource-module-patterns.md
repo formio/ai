@@ -6,6 +6,43 @@ Every pattern you generate in Phase B. Copy the shape, swap the names, don't inv
 
 **Every resource module in this skill overrides both the `ResourceComponent` (navigation chrome) AND the `ViewComponent` (read-only detail page) with designed templates.** Bare `FormioResourceRoutes()` with no options is not acceptable output — it means the user gets `@formio/angular`'s default "render the form read-only" chrome, which is the generic CRUD fallback this skill exists to avoid. If you are ever tempted to skip the override pair, stop and re-read "Designing the ViewComponent from the resource's fields" at the bottom of this file.
 
+## The primitives you import
+
+You do not re-implement these; you import them from `@formio/angular/resource`.
+
+### Route shape from `FormioResourceRoutes()`
+
+`FormioResourceRoutes()` returns:
+
+```
+[
+  { path: '',    component: FormioResourceIndexComponent  },   // [0] list
+  { path: 'new', component: FormioResourceCreateComponent },   // [1] create
+  { path: ':id', component: FormioResourceComponent, children: [
+      { path: '',     redirectTo: 'view', pathMatch: 'full' },
+      { path: 'view',   component: FormioResourceViewComponent   },
+      { path: 'edit',   component: FormioResourceEditComponent   },
+      { path: 'delete', component: FormioResourceDeleteComponent }
+    ]
+  }                                                            // [2] item
+]
+```
+
+`routes[2].children` is where you push nested resource routes (children, N:N joins, etc.) — see sections 3–5 below for exact code.
+
+### `FormioResourceConfig` shape
+
+```typescript
+{
+  name:    string;               // the resource's key in FormioResources registry — property-style camelCase
+  form:    string;               // MUST equal the form's `path` in template.json — usually kebab-case
+  parents?: Array<string | { field: string; resource: string; filter?: boolean }>;
+}
+```
+
+- Plain-string parent (`parents: ['event']`) tells `FormioResourceService.loadParents()` to find a select component whose `key === 'event'` and auto-fill it with the parent submission.
+- Object parent (`{ field: 'user', resource: 'currentUser', filter: false }`) is used by `@formio/angular/auth`'s `currentUser` resource to pre-fill a `user` field with the logged-in user without using it as a list filter.
+
 ## Contents
 
 1. Simple resource (always with designed overrides)
@@ -77,26 +114,36 @@ Mount from `AppRoutingModule`:
 
 Note `FormioResourceRoutes({ resource, view })` — never `FormioResourceRoutes()` with no options.
 
-### `name` vs. `form` — the two keys do NOT share casing
+### `name` vs. `form` — DO NOT conflate these two
 
-`name` and `form` serve different layers. Do not derive one from the other:
+This trips up every first pass on multi-word resources (`Team User`, `Line Item`, `Account Contact`, etc.). The two fields serve different layers and almost always have different casing:
 
-- `name` — **camelCase** Angular registry key (e.g. `Team User` → `teamUser`). Consumed by child modules' `parents: ['teamUser']`, and used to distinguish sibling join modules (e.g. `teamUsers` vs `userTeams` on a `TeamUser` bidirectional join).
-- `form` — the URL path segment. `FormioResourceService` builds every REST call as `appUrl + '/' + config.form`, so this value MUST equal the `path` property of the corresponding form inside `template.json`. The planner writes `path` in **kebab-case** by default, so multi-word resources diverge: `name: 'teamUser'`, `form: 'team-user'`. Copy `form` from `template.json.<form>.path` verbatim — never lowercase/hyphenate `name` to produce it.
+- **`name`** is an in-memory registry key used by the Angular side only. It is the symbol every child/join module references when it declares `parents: ['teamUser']`, and it is how `FormioResources` distinguishes sibling modules (e.g., a bidirectional join has two sibling modules with distinct `name` values — `teamUsers` vs `userTeams` — pointing at the same form). Because it flows through TypeScript identifiers and is consumed as a JS property, it is **camelCase** derived from the resource's display name: `Team User` → `teamUser`, `Line Item` → `lineItem`, `Account Contact` → `accountContact`.
 
-Concrete example for a `Team User` resource whose `template.json` form entry is `{ name: 'teamUser', path: 'team-user' }`:
+- **`form`** is a URL-path segment. `FormioResourceService` concatenates `appUrl + '/' + config.form` to build every REST call (`/teamUser/submission`, `/teamUser/submission/:id`, etc.). It therefore MUST equal the `path` property of the corresponding form inside `template.json` — no exceptions, no heuristics, no casing transforms. Form.io's project-import step creates each resource's form at exactly the `path` recorded in `template.json`; if the `form` value you write into `FormioResourceConfig` does not match that `path` byte-for-byte, every request 404s and the CRUD surface is dead on arrival.
 
-```typescript
-{
-  provide: FormioResourceConfig,
-  useValue: {
-    name: 'teamUser',   // camelCase registry key
-    form: 'team-user'   // === template.json form's `path`
-  }
-}
+  The planner emits `path` in **kebab-case by default** (`team-user`, `line-item`, `account-contact`), so on multi-word resources the two fields diverge — `name` is camelCase, `form` is kebab-case, and that is correct. Copy the `path` value from `template.json` verbatim; do NOT derive `form` from `name` by lowercasing or inserting hyphens, because single-word resources where the planner chose a non-obvious path will silently break.
+
+**How to populate both in Phase B.** For every module you generate, read the corresponding resource's form out of `template.json` (look under `template.json.resources` or `template.json.forms` for the entry whose `name` or `machineName` matches the resource in the plan) and copy its `path` string into the `form` field. Derive `name` from the plan's resource display name via camelCase. If the planner's artifact pair is missing the resource's `path`, stop and surface the gap — do not guess.
+
+**Worked example — `Team User` resource, whose `template.json` form entry is `{ name: 'teamUser', path: 'team-user', ... }`:**
+
+```ts
+providers: [
+  FormioResourceService,
+  {
+    provide: FormioResourceConfig,
+    useValue: {
+      name: 'teamUser', // camelCase registry key, consumed by parents: ['teamUser']
+      form: 'team-user', // MUST equal template.json form's `path` — the URL segment
+    },
+  },
+];
 ```
 
-Single-word resources (`Event`, `Team`) collapse to the same spelling for both fields, but that is coincidence — still copy `form` from `template.json.path` rather than from `name`.
+**Worked example — single-word `Event` resource, whose `template.json` form entry is `{ name: 'event', path: 'event', ... }`:** `name` and `form` happen to coincide, but that is because `path` and camelCase both collapse to `event` for a single lowercase word — NOT because they are computed from each other. Still copy `form` from `template.json.path`.
+
+**Phase-B self-check.** Before writing each resource module, quickly verify `providers[].useValue.form === template.json.<form-entry>.path`. Phase-A plan output should call out the (`name`, `form`) pair per resource in the route map block so the user can sanity-check the divergence before any file is written, especially on multi-word resources and on bidirectional joins where two sibling modules both have to pin `form` to the same `path`.
 
 The next section is the resource-component and view-component bodies that make this override pair do actual design work.
 

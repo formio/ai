@@ -1,4 +1,3 @@
-
 ## Overview
 
 The Reports API lets a runtime caller run a MongoDB-style aggregation pipeline against the project's submissions collection and receive the shaped output. It is the right tool for cross-form joins (via `$lookup`), group-by counts (`$group`), and projections (`$project`) that would be awkward to express with simple `data.*` query filters on `GET /:formPath/submission`.

@@ -4,11 +4,11 @@ This directory holds everything a teammate needs to run evals against the skill 
 
 ## What's here
 
-| File         | Purpose                                                                                                                                                                                                                                                                 |
-| ------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `evals.json` | Four test prompts: task-manager-classic, crm-with-company-scoping, minimal-no-auth-feedback, complex-crm-transitive. Each has an `expected_output` summary used to drive the grader's assertions.                                                                       |
-| `grade.py`   | Converts subagent outputs → pass/fail grades. Asserts the Phase B artifact pair (`template.md` and `template.json`) exists in `outputs/`, that `template.md` has the required section headings in order (`# Resource Map`, `## Resources`, `## Users & Auth`, `## Roles`, `## Access Matrix`, `## ER Diagram`, `## Access Flow Diagram`, `## Companion artifact`), that the Access Matrix has at least one data row in the token vocabulary, that both ASCII diagrams have bodies, and that `template.json` has the required top-level keys, default roles, and (for the transitive eval) the hidden/calculated group-mirror pattern on grandchildren. |
-| `README.md`  | This file.                                                                                                                                                                                                                                                              |
+| File | Purpose |
+| --- | --- |
+| `evals.json` | Four test prompts: task-manager-classic, crm-with-company-scoping, minimal-no-auth-feedback, complex-crm-transitive. Each has an `expected_output` summary used to drive the grader's assertions. |
+| `grade.py` | Converts subagent outputs → pass/fail grades. Asserts the Phase B artifact pair (`template.md` and `template.json`) exists in `outputs/`, that `template.md` has the required section headings in order (`# Resource Map`, `## Resources`, `## Users & Auth`, `## Roles`, `## Access Matrix`, `## ER Diagram`, `## Access Flow Diagram`, `## Companion artifact`), that the Access Matrix has at least one data row in the token vocabulary, that both ASCII diagrams have bodies, and that `template.json` has the required top-level keys, default roles, and (for the transitive eval) the hidden/calculated group-mirror pattern on grandchildren. |
+| `README.md` | This file. |
 
 No `fixtures/` directory — the planner is pure-prompt-in, pure-artifact-out. Every prompt is self-contained in `evals.json`.
 

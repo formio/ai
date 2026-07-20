@@ -1,4 +1,3 @@
-
 ## Overview
 
 This skill documents the runtime HTTP calls that demonstrate Form.io's two most common multi-tenant access patterns:
@@ -39,9 +38,9 @@ Request body (JSON):
   "path": "support",
   "components": [
     { "label": "First Name", "type": "textfield", "key": "firstName" },
-    { "label": "Last Name",  "type": "textfield", "key": "lastName" },
-    { "label": "Email",      "type": "email",     "key": "email" },
-    { "label": "Message",    "type": "message",   "key": "message" },
+    { "label": "Last Name", "type": "textfield", "key": "lastName" },
+    { "label": "Email", "type": "email", "key": "email" },
+    { "label": "Message", "type": "message", "key": "message" },
     { "type": "button", "label": "Submit", "key": "submit", "action": "submit" }
   ],
   "access": [],
@@ -220,7 +219,7 @@ Assign Employee 1 to Company 1 by creating a join submission. Because the Group 
 {
   "data": {
     "employee": { "_id": "${employee1Id}", "data": { "email": "${employee1Email}" } },
-    "company":  { "_id": "${company1Id}",  "data": { "name":  "${company1Name}"  } }
+    "company": { "_id": "${company1Id}", "data": { "name": "${company1Name}" } }
   }
 }
 ```
@@ -235,7 +234,7 @@ Assign Employee 2 to Company 2 with the same shape:
 {
   "data": {
     "employee": { "_id": "${employee2Id}", "data": { "email": "${employee2Email}" } },
-    "company":  { "_id": "${company2Id}",  "data": { "name":  "${company2Name}"  } }
+    "company": { "_id": "${company2Id}", "data": { "name": "${company2Name}" } }
   }
 }
 ```
@@ -258,8 +257,8 @@ Response: employee submission with Company 2's role in `roles`.
 
 List join submissions filtered by company ID to retrieve the members of a group.
 
-| Query parameter | Type | Description |
-| --- | --- | --- |
+| Query parameter    | Type   | Description                            |
+| ------------------ | ------ | -------------------------------------- |
 | `data.company._id` | string | Company submission `_id` to filter on. |
 
 Response: JSON array of join submissions for the specified company.

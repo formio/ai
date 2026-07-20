@@ -6,23 +6,23 @@
 
 ## Access entry shape
 
-| Property    | Type       | Required | Description                                                                                   |
-| ----------- | ---------- | -------- | --------------------------------------------------------------------------------------------- |
-| `type`      | `string`   | **Yes**  | One of the AccessType values below.                                                           |
-| `resources` | `string[]` | **Yes**  | IDs granted this permission on the submission. Each ID is a user submission ID or a group submission ID. An entry without `resources` is skipped. |
+| Property | Type | Required | Description |
+| --- | --- | --- | --- |
+| `type` | `string` | **Yes** | One of the AccessType values below. |
+| `resources` | `string[]` | **Yes** | IDs granted this permission on the submission. Each ID is a user submission ID or a group submission ID. An entry without `resources` is skipped. |
 
 The `access` field on the Submission envelope is an array of these entries. Each entry maps one permission `type` to the set of IDs that get it.
 
 ## AccessType values
 
-| Value    | Grants                                       |
-| -------- | -------------------------------------------- |
-| `read`   | read                                         |
-| `create` | create                                       |
-| `update` | update                                       |
-| `delete` | delete                                       |
-| `write`  | read + create + update                       |
-| `admin`  | read + create + update + delete              |
+| Value    | Grants                          |
+| -------- | ------------------------------- |
+| `read`   | read                            |
+| `create` | create                          |
+| `update` | update                          |
+| `delete` | delete                          |
+| `write`  | read + create + update          |
+| `admin`  | read + create + update + delete |
 
 Each ID in `resources` is added to the submission's effective access set for the granted permission(s). A request gains access when the requesting user's own ID — or an ID the user is a member of — appears in that set. `read`, `create`, `update`, and `write` grants are explicitly flagged so they do **not** confer implicit admin (delete) rights on the record; only `admin` confers full delete.
 

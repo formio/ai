@@ -21,6 +21,7 @@ Not for:
 - Issuing a Form.io JWT entirely from your own backend without an IdP at all → see [`custom-jwt.md`](./custom-jwt.md).
 
 ## Configuration
+
 In order to perform a token swap, the project's OpenID settings must be configured. See [`sso-oidc.md`](./sso-oidc.md) for instructions on these configurations.
 
 **Important: You must also ensure you have the role mappings configured within the project settings to properly map the OIDC claims with the Form.io Roles.**
@@ -51,12 +52,12 @@ Formio.setProjectUrl(projectUrl);
 
 // A simple token swap function.
 async function tokenSwap(authToken) {
-    return await (new Formio(projectUrl)).currentUser({
-        external: true,
-        headers: {
-            Authorization: authToken
-        },
-    });
+  return await new Formio(projectUrl).currentUser({
+    external: true,
+    headers: {
+      Authorization: authToken,
+    },
+  });
 }
 
 // Swap the bearer token with an authenticated Form.io user with a valid JWT token.
@@ -64,11 +65,11 @@ const user = await tokenSwap('Bearer 2e762950-9498-4079-a699-xxxxxxxxxxxx');
 
 // Any other calls will now use the `x-jwt-token` swapped. In this example, this would be a submission
 // made to the 'myform' using the correct JWT token.
-(new Formio(`${projectUrl}/myform`)).saveSubmission({
-    data: {
-        firstName: user.data.firstName, // This data comes from the OIDC userInfo
-        lastName: user.data.lastName
-    }
+new Formio(`${projectUrl}/myform`).saveSubmission({
+  data: {
+    firstName: user.data.firstName, // This data comes from the OIDC userInfo
+    lastName: user.data.lastName,
+  },
 });
 ```
 
@@ -98,7 +99,7 @@ const user = await tokenSwap('Bearer 2e762950-9498-4079-a699-xxxxxxxxxxxx');
 Token Swap provider configuration (OpenID / OIDC settings, Role Mapping) MUST be performed via the Form.io project portal. The swap itself is driven client-side by the Form.io JavaScript SDK (`currentUser({ external: true, header })`), not by an MCP tool. Surrounding workflow:
 
 - Use `role_list` / `role_create` to ensure the Form.io Roles your OAuth Role Mapping targets exist.
-- Use `authenticate` once on the MCP server to obtain a portal JWT for project administration calls (the portal JWT is separate from any user token produced by Token Swap).
+- The MCP server obtains its portal JWT implicitly on the first authenticated tool call (browser-based portal-login flow) for project administration calls — the portal JWT is separate from any user token produced by Token Swap.
 
 ## See also
 

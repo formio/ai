@@ -6,13 +6,39 @@ This document is loaded by the parent `formio-application` skill during Step 6. 
 
 Routing is driven by this table. Rows are data; adding a framework is a table edit, not a code change.
 
-| Framework | Entry skill      | Extend sub-skill (nested file path under Entry skill)      | Detection signal                                                                          |
-| --------- | ---------------- | ---------------------------------------------------------- | ----------------------------------------------------------------------------------------- |
-| Angular   | `formio-angular` | `formio-angular-resources` — nested at `formio-angular/resources/SKILL.md` | `angular.json` in workspace root OR `@angular/core` listed in `package.json` dependencies |
+| Framework | Entry skill | Extend sub-skill (nested file path under Entry skill) | Detection signal |
+| --- | --- | --- | --- |
+| Angular | `formio-angular` | `formio-angular-resources` — nested at `formio-angular/resources/SKILL.md` | `angular.json` in workspace root OR `@angular/core` listed in `package.json` dependencies |
 
 **Important:** the "Extend sub-skill" column names a **nested file inside the Entry skill's directory**, not a separately-registered top-level skill. Claude may not resolve the name by itself — the Step 6 modify-existing logic below loads the file by path (e.g., `plugin/skills/formio-angular/resources/SKILL.md`) and follows its instructions inline, the same way the Entry skill loads its own `SETUP.md` / `CONFIG.md` / `AUTH.md` companions. The name is preserved for documentation, eval tooling, and backward compatibility.
 
 When a future change adds a framework skill (React, Vue, etc.), it adds a row to this table with the framework's entry skill, extend sub-skill, and detection signal. No edit to `SKILL.md` or to the routing logic below is required.
+
+## Step 6a — `frontend-design` pre-check (runs on BOTH branches, before routing)
+
+Every framework skill authors user-facing UI and is dramatically better at it when Claude's `frontend-design` plugin is loadable — without it, generated UI degrades to generic, unstyled output. Before routing, check the session's skill registry for `frontend-design` — it registers under the plugin-namespaced name `frontend-design:frontend-design` (the bare name `frontend-design` may also appear; accept either).
+
+- **If present** → note it ("`frontend-design` is available — the UI will be designed with it") and continue to 6b. Pass `frontendDesignStatus: 'available'` in the handoff.
+- **If missing** → it is strongly recommended but not required. Surface one `AskUserQuestion`:
+
+```
+AskUserQuestion({
+  questions: [
+    {
+      question: "I strongly recommend installing Claude's frontend-design plugin before I build the UI — it produces a far more polished, distinctive interface instead of generic styling. It's optional, but highly recommended. How would you like to proceed?",
+      header: "frontend-design",
+      multiSelect: false,
+      options: [
+        { label: "Install it first (recommended)", description: "I'll guide you to install frontend-design, then you restart Claude Code (or run /plugin) and we resume the build with it active." },
+        { label: "Proceed without it", description: "Continue now. The UI will be generated without frontend-design, and every UI file will be flagged as such so you can review it critically." }
+      ]
+    }
+  ]
+})
+```
+
+- **Install it first** → tell the user to install the plugin from the official marketplace — interactively via `/plugin` (Browse → `claude-plugins-official` → `frontend-design` → Install) or by running `claude plugin install frontend-design@claude-plugins-official` — followed by a `/reload-plugins`. When they tell you to `continue`, re-run 6a and you should now find the plugin.
+- **Proceed without it** → continue to 6b with `frontendDesignStatus: 'declined'`. The framework skill is responsible for disclosing on every UI approval gate that the file was generated without `frontend-design` consultation, so the user can review it critically. Do NOT silently emit plain UI.
 
 ## Step 6 logic
 

@@ -2,8 +2,7 @@
 
 ## Overview
 
-`Formio.createForm` resolves to the form instance. Everything below hangs off
-that instance — keep the reference:
+`Formio.createForm` resolves to the form instance. Everything below hangs off that instance — keep the reference:
 
 ```js
 const form = await Formio.createForm(el, srcOrJson, options);
@@ -11,8 +10,7 @@ const form = await Formio.createForm(el, srcOrJson, options);
 
 ## Events
 
-Register handlers with `form.on(event, handler)`; remove with
-`form.off(event)`. The renderer's core events:
+Register handlers with `form.on(event, handler)`; remove with `form.off(event)`. The renderer's core events:
 
 | Event | Fires when | Handler receives |
 | --- | --- | --- |
@@ -39,9 +37,7 @@ form.on('error', (errors) => {
 });
 ```
 
-Forms rendered from inline JSON have no server: `submit` still fires, but
-persisting the data is your handler's job. `submitDone` only fires for
-URL-backed forms.
+Forms rendered from inline JSON have no server: `submit` still fires, but persisting the data is your handler's job. `submitDone` only fires for URL-backed forms.
 
 ## Reading and writing submission data
 
@@ -61,14 +57,11 @@ await form.setSubmission({ data: { firstName: 'Jane' } });
 
 ```js
 const firstName = form.getComponent('firstName');
-firstName.setValue('Jane');          // triggers change + validation
+firstName.setValue('Jane'); // triggers change + validation
 const value = firstName.getValue();
 ```
 
-Component instances expose `setValue`, `getValue`, `disabled`, `visible`,
-`component` (the JSON schema), and `redraw()`. For bulk traversal use the
-Utilities documented in the `formio-sdk` skill
-(`references/utils-form-traversal.md`).
+Component instances expose `setValue`, `getValue`, `disabled`, `visible`, `component` (the JSON schema), and `redraw()`. For bulk traversal use the Utilities documented in the `formio-sdk` skill (`references/utils-form-traversal.md`).
 
 ## Submitting programmatically
 
@@ -76,16 +69,14 @@ Utilities documented in the `formio-sdk` skill
 form.submit();
 ```
 
-Runs validation, emits `submit`, and — for URL-backed forms — saves to the
-server then emits `submitDone`. It returns a promise resolving to the
-submission, so `await form.submit()` when you need the result inline.
+Runs validation, emits `submit`, and — for URL-backed forms — saves to the server then emits `submitDone`. It returns a promise resolving to the submission, so `await form.submit()` when you need the result inline.
 
 ## Other instance controls
 
 ```js
 form.emit('customEvent', payload); // fire an event through the form
-form.redraw();                     // re-render after external mutation
-form.destroy();                    // tear down listeners before removing the element
+form.redraw(); // re-render after external mutation
+form.destroy(); // tear down listeners before removing the element
 ```
 
 ## See also

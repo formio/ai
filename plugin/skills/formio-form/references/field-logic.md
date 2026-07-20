@@ -2,11 +2,7 @@
 
 ## Overview
 
-A component's `logic` array is the general-purpose reaction mechanism: when a
-**trigger** fires, its **actions** mutate the component. Use it when
-[conditionals.md](./conditionals.md) (visibility) and
-[calculated-values.md](./calculated-values.md) (value derivation) aren't
-enough — disabling fields, swapping labels, merging schema changes.
+A component's `logic` array is the general-purpose reaction mechanism: when a **trigger** fires, its **actions** mutate the component. Use it when [conditionals.md](./conditionals.md) (visibility) and [calculated-values.md](./calculated-values.md) (value derivation) aren't enough — disabling fields, swapping labels, merging schema changes.
 
 ```json
 {
@@ -72,8 +68,7 @@ Disable `notes` while `status` is `locked`:
 }
 ```
 
-While `data.status === 'locked'` the component's `disabled` property is `true`;
-when the trigger stops matching, the property reverts.
+While `data.status === 'locked'` the component's `disabled` property is `true`; when the trigger stops matching, the property reverts.
 
 A `mergeComponentSchema` variant of the same trigger:
 

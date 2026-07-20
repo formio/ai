@@ -18,10 +18,10 @@ Collapsible section with a header. In a form with `display: "wizard"`, each top-
 
 Multi-column layout. Each column is a container of components with a width (typically a Bootstrap-style 1–12 grid unit).
 
-| Property     | Type      | Description                                                              |
-| ------------ | --------- | ------------------------------------------------------------------------ |
-| `columns`    | `array`   | Column definitions: `[{ components, width, offset, push, pull, size }]`. |
-| `autoAdjust` | `boolean` | Auto-adjust column widths.                                               |
+| Property | Type | Description |
+| --- | --- | --- |
+| `columns` | `array` | Column definitions: `[{ components, width, offset, push, pull, size }]`. |
+| `autoAdjust` | `boolean` | Auto-adjust column widths. |
 
 ## Table (`type: "table"`)
 

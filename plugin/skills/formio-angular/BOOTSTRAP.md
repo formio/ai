@@ -177,7 +177,7 @@ After editing `angular.json`, re-run a clean `npm install` (or `ng build --confi
 
 ## Step 6 — pin zoneless change detection explicitly
 
-A generated app must **pin its change-detection mode explicitly** rather than inherit whatever `angular-new-app` / the CLI happened to default to — that default has drifted across Angular releases, which would make generated apps non-deterministic. Because the skill always targets the latest Angular `@formio/angular` supports (Step 1), the app uses **zoneless** change detection. `@formio/angular` is change-detection-mode agnostic, so pinning zoneless is safe; pinning it *explicitly* is what makes the result deterministic.
+A generated app must **pin its change-detection mode explicitly** rather than inherit whatever `angular-new-app` / the CLI happened to default to — that default has drifted across Angular releases, which would make generated apps non-deterministic. Because the skill always targets the latest Angular `@formio/angular` supports (Step 1), the app uses **zoneless** change detection. `@formio/angular` is change-detection-mode agnostic, so pinning zoneless is safe; pinning it _explicitly_ is what makes the result deterministic.
 
 ### 6a. Wire zoneless
 
@@ -213,11 +213,11 @@ A clean build confirms the `polyfills` shape matches the builder and the CD prov
 
 ### Why this step exists
 
-Every downstream phase in `formio-angular` that authors a user-facing surface (the AUTH phase's `app.component.html` nav chrome, the Resources phase's `resource.component.html` / `view/view.component.html` / per-resource SCSS, any custom login/register component override, any dashboard or landing template) should consult Claude's `frontend-design` plugin before writing output — that is how the generated UI ends up polished instead of generic. `frontend-design` is **strongly recommended but NOT required**. BOOTSTRAP only **detects** its availability and records the status; it does NOT run its own install prompt. The strong recommendation + install prompt is owned by the orchestrator `formio-application` (Step 6a) — keeping it in one place avoids two skills nagging the user about the same plugin.
+Every downstream phase in `formio-angular` that authors a user-facing surface (the AUTH phase's `app.component.html` nav chrome, the Resources phase's `resource.component.html` / `view/view.component.html` / per-resource SCSS, any custom login/register component override, any dashboard or landing template) should consult Claude's `frontend-design` plugin before writing output — that is how the generated UI ends up polished instead of generic. "User-facing surface" means anything touching: HTML templates, SCSS/CSS, component layout, spacing, typography, color, nav chrome, empty states, loading states, error states, list-vs-card layouts, form styling beyond `form-control` defaults, responsive behavior, and accessibility (focus order, ARIA, contrast). Form-field styling that comes directly from the Form.io renderer's default Bootstrap 5 template is exempt — you do not override what the renderer already provides — but anything the skill itself authors outside the renderer's output is NOT exempt. `frontend-design` is **strongly recommended but NOT required**. BOOTSTRAP only **detects** its availability and records the status; it does NOT run its own install prompt. The strong recommendation + install prompt is owned by the orchestrator `formio-application` (Step 6a) — keeping it in one place avoids two skills nagging the user about the same plugin.
 
 ### 7a. Detect whether `frontend-design` is available — match the namespaced name
 
-`frontend-design` is a Claude Code **plugin** (from the `claude-plugins-official` marketplace), so it registers under the **plugin-namespaced** name `frontend-design:frontend-design`. The bare name `frontend-design` may also appear depending on how it was installed. Check the session's skill registry for **either** form and treat a match as "available". 
+`frontend-design` is a Claude Code **plugin** (from the `claude-plugins-official` marketplace), so it registers under the **plugin-namespaced** name `frontend-design:frontend-design`. The bare name `frontend-design` may also appear depending on how it was installed. Check the session's skill registry for **either** form and treat a match as "available".
 
 Do NOT only look for the bare `frontend-design` — that is the historical bug that made this step silently fail and the UI fall back to plain, unstyled Bootstrap.
 
@@ -309,7 +309,7 @@ Bootstrap complete
     "@formio/js":       "^<FORMIO_JS_VERSION>"
     "bootstrap":        "^<BOOTSTRAP_VERSION>"
     "bootstrap-icons":  "^<BOOTSTRAP_ICONS_VERSION>"
-  zone.js:                  present in node_modules + registered in angular.json polyfills
+  change detection:         zoneless — provideZonelessChangeDetection() registered, angular.json polyfills empty (no zone.js)
   frontend-design plugin:   available in session (strongly recommended; will be consulted on every UI surface)
                             -- or "not installed — proceeding without it; UI gates will disclose this" if the user declined
   angular.json styles (prepended to project build target):

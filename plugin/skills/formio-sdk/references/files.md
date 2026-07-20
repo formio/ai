@@ -60,12 +60,8 @@ const input = document.querySelector<HTMLInputElement>('#file-input');
 const file = input.files?.[0];
 if (!file) throw new Error('no file selected');
 
-const descriptor = await formio.uploadFile(
-  's3',
-  file,
-  `intake/${file.name}`,
-  '',
-  (event) => console.log('progress', event.loaded, '/', event.total),
+const descriptor = await formio.uploadFile('s3', file, `intake/${file.name}`, '', (event) =>
+  console.log('progress', event.loaded, '/', event.total)
 );
 console.log('uploaded:', descriptor.url);
 ```

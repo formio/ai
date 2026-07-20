@@ -89,7 +89,7 @@ Formio.setProjectUrl('https://forms.mysite.com/myproject');
 
 const form = await Formio.createForm(
   document.getElementById('formio')!,
-  `${Formio.getProjectUrl()}/intake`,
+  `${Formio.getProjectUrl()}/intake`
 );
 
 form.on('submit', (submission) => {
@@ -107,7 +107,7 @@ Formio.setProjectUrl('https://myproject.form.io');
 
 const form = await Formio.createForm(
   document.getElementById('formio')!,
-  `${Formio.getProjectUrl()}/intake`,
+  `${Formio.getProjectUrl()}/intake`
 );
 ```
 
@@ -118,7 +118,7 @@ import { Formio } from '@formio/js';
 
 const form = await Formio.createForm(
   document.getElementById('formio')!,
-  `${Formio.getProjectUrl()}/intake`,
+  `${Formio.getProjectUrl()}/intake`
 );
 
 form.submission = {
@@ -136,7 +136,7 @@ import { Formio } from '@formio/js';
 
 const form = await Formio.createForm(
   document.getElementById('formio')!,
-  `${Formio.getProjectUrl()}/intake`,
+  `${Formio.getProjectUrl()}/intake`
 );
 
 form.on('change', ({ changed, isValid }) => {
@@ -157,7 +157,7 @@ import { Formio } from '@formio/js';
 
 const wizard = await Formio.createForm(
   document.getElementById('formio')!,
-  `${Formio.getProjectUrl()}/onboarding`,
+  `${Formio.getProjectUrl()}/onboarding`
 );
 
 wizard.on('nextPage', ({ page, submission }) => {
@@ -176,7 +176,7 @@ import { Formio } from '@formio/js';
 await Formio.createForm(
   document.getElementById('review')!,
   `${Formio.getProjectUrl()}/intake/submission/000000000000000000000010`,
-  { readOnly: true, viewAsHtml: true },
+  { readOnly: true, viewAsHtml: true }
 );
 ```
 
@@ -188,10 +188,10 @@ import { Formio } from '@formio/js';
 Formio.setBaseUrl('https://forms.mysite.com');
 Formio.setProjectUrl('https://forms.mysite.com/myproject');
 
-const builder = await Formio.builder(
-  document.getElementById('builder')!,
-  { display: 'form', components: [] },
-);
+const builder = await Formio.builder(document.getElementById('builder')!, {
+  display: 'form',
+  components: [],
+});
 
 builder.on('change', (form) => {
   console.log('builder edited:', form.components.length, 'components');
@@ -203,10 +203,7 @@ builder.on('change', (form) => {
 ```ts
 import { Formio } from '@formio/js';
 
-await Formio.createForm(
-  document.getElementById('formio')!,
-  `${Formio.getProjectUrl()}/w2-pdf`,
-);
+await Formio.createForm(document.getElementById('formio')!, `${Formio.getProjectUrl()}/w2-pdf`);
 // PDF-backed forms detect display === 'pdf' on the loaded definition and
 // switch the renderer to the PDF view automatically.
 ```
@@ -239,7 +236,7 @@ import { Formio } from '@formio/js';
 
 const form = await Formio.createForm(
   document.getElementById('formio')!,
-  `${Formio.getProjectUrl()}/intake`,
+  `${Formio.getProjectUrl()}/intake`
 );
 
 document.getElementById('submitBtn')!.addEventListener('click', async () => {
@@ -259,7 +256,7 @@ import { Formio } from '@formio/js';
 
 const form = await Formio.createForm(
   document.getElementById('formio')!,
-  `${Formio.getProjectUrl()}/intake`,
+  `${Formio.getProjectUrl()}/intake`
 );
 
 window.addEventListener('beforeunload', () => {

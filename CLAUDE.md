@@ -28,6 +28,8 @@ Authentication: the MCP server uses a browser-based portal-login flow — a shor
 
 Skill authoring conventions (not enforced by automated tests): the router's frontmatter and three-clause description, required reference files present and non-empty, the required reference-doc heading layout, the canonical portal-login JWT auth paragraph (except in `server-status.md`), and scope consistency. Terminology is strict: `baseUrl`/`base_url` refers only to `FORMIO_BASE_URL`; `projectUrl`/`project_url` refers only to `FORMIO_PROJECT_URL`.
 
+Skill markdown formatting: no hard line wraps — write each paragraph (and each frontmatter `description`) as a single line. Prose renders identically either way, and unwrapped lines keep edits from forcing a re-flow of the rest of the paragraph. If wraps sneak back in, unwrap with `npx prettier --prose-wrap never --ignore-path=/dev/null --write "plugin/skills/**/*.md"` (the explicit `--ignore-path` is required because `.prettierignore` excludes `*.md`).
+
 ## Iterating on skills
 
 Some skills ship with their own eval harness for measuring whether a change improved or regressed the skill. The convention is:

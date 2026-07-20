@@ -59,16 +59,19 @@ Required claim semantics:
 ```js
 import jwt from 'jsonwebtoken';
 
-const token = jwt.sign({
-  external: true,
-  form:    { _id: '59795d259be16e3ee58fddaa' },
-  project: { _id: '59795d259be16e3ee58fdda6' },
-  user: {
-    _id: 'external',
-    data: { name: 'joe' },
-    roles: ['59795d259be16e3ee58fdda7']
-  }
-}, process.env.JWT_SECRET);
+const token = jwt.sign(
+  {
+    external: true,
+    form: { _id: '59795d259be16e3ee58fddaa' },
+    project: { _id: '59795d259be16e3ee58fdda6' },
+    user: {
+      _id: 'external',
+      data: { name: 'joe' },
+      roles: ['59795d259be16e3ee58fdda7'],
+    },
+  },
+  process.env.JWT_SECRET
+);
 ```
 
 The same library that signs (`jsonwebtoken` in Node, equivalents in Python, Go, Ruby, etc.) can be used in any backend the customer controls. Sign with HS256 unless the deployment is configured for a different algorithm.

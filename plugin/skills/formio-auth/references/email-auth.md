@@ -2,7 +2,7 @@
 
 ## Overview
 
-Email-token authentication (Form.io's "SSO Email Token" workflow) issues a one-time login link via email instead of asking for a password. A form submission triggers a standard **Email action**, and the email body contains a `[[token(...)]]` macro. At send time Form.io resolves that macro by **searching a Resource for the record that matches the recipient's email**, and — if a record is found — mints a JWT for that user and substitutes it into the link. The recipient clicks the link, lands on a page in *your* application (the **callback URL**), and that page exchanges the token for a Form.io session. The result is a regular Form.io session indistinguishable from Resource-backed login or SSO.
+Email-token authentication (Form.io's "SSO Email Token" workflow) issues a one-time login link via email instead of asking for a password. A form submission triggers a standard **Email action**, and the email body contains a `[[token(...)]]` macro. At send time Form.io resolves that macro by **searching a Resource for the record that matches the recipient's email**, and — if a record is found — mints a JWT for that user and substitutes it into the link. The recipient clicks the link, lands on a page in _your_ application (the **callback URL**), and that page exchanges the token for a Form.io session. The result is a regular Form.io session indistinguishable from Resource-backed login or SSO.
 
 ## When to use this
 
@@ -68,7 +68,7 @@ For a 'default' passwordless **login** flow, the equivalent macro searches the `
 
 ### The application link is a callback URL
 
-In an application built by the coding agent, the **callback URL** is a page that exists *inside the application the agent is building*. Only the host/path changes; the `?token=[[token(...)]]` macro stays exactly as above. For example:
+In an application built by the coding agent, the **callback URL** is a page that exists _inside the application the agent is building_. Only the host/path changes; the `?token=[[token(...)]]` macro stays exactly as above. For example:
 
 ```
 https://your-app.example.com/auth/callback?token=[[token(data.email=user)]]
@@ -93,15 +93,15 @@ The token macro does not automatically create users that it does not find. The m
 
 ### Typical user onboarding workflow
 
-For many applications, you may wish to accomplish a typical workflow where anyone can create an account, that account is verified with their email, and then they click on a "Magic Link" to complete their user onboarding process.  This process uses the email authentication process by using the following process:
+For many applications, you may wish to accomplish a typical workflow where anyone can create an account, that account is verified with their email, and then they click on a "Magic Link" to complete their user onboarding process. This process uses the email authentication process by using the following process:
 
- - User lands on an application 'register' page, where they see an embedded form with ONLY an email address.
- - This is a Form.io form that only contains an Email field.
- - This form 'Create Own' permission is set to allow 'Anonymous' submissions.
- - This form contains two actions:  Save Submission (pointing to User resource) and Email
- - The email action contains the token macro described above, with a callback url navigating to an 'onboarding' page within the application.
- - The user clicks on the link, and it navigates them to the onboarding page with the `token=...` set within the url.
- - The onboarding page has a controller that reads the token (using `Formio.pageQuery()`) and then authenticates the user (which was created with the 'Save Submission' action on the register form). They are authenticated with `Formio.setToken(token)`. 
+- User lands on an application 'register' page, where they see an embedded form with ONLY an email address.
+- This is a Form.io form that only contains an Email field.
+- This form 'Create Own' permission is set to allow 'Anonymous' submissions.
+- This form contains two actions: Save Submission (pointing to User resource) and Email
+- The email action contains the token macro described above, with a callback url navigating to an 'onboarding' page within the application.
+- The user clicks on the link, and it navigates them to the onboarding page with the `token=...` set within the url.
+- The onboarding page has a controller that reads the token (using `Formio.pageQuery()`) and then authenticates the user (which was created with the 'Save Submission' action on the register form). They are authenticated with `Formio.setToken(token)`.
 
 This onboarding page could then contain whatever content is needed to complete the user registration. This could be to set the 'password' of the user, or complete filling out their profile. This user is now 'verified' since they needed to click on a link within their email in order to complete the registration.
 

@@ -1,16 +1,7 @@
 ---
 name: formio-actions
 description: >-
-  Deep reference for configuring Form.io actions — the server-side behavior layer
-  that powers email notifications, authentication, webhooks, role assignment, and
-  form-to-form saves. Use this skill whenever the user wants to add, configure, or
-  troubleshoot an action on a form, choose the right action type for a use case,
-  understand the action execution lifecycle, set up conditions or handler/method
-  combinations, or wire up authentication flows. Also use when the user mentions
-  action settings, action priorities, action conditions, email actions, login actions,
-  webhook actions, role actions, save actions, or reset password actions — even if
-  they don't say "action" explicitly (e.g., "send an email when someone submits",
-  "add login to this form", "assign a role after registration").
+  Deep reference for configuring Form.io actions — the server-side behavior layer that powers email notifications, authentication, webhooks, role assignment, and form-to-form saves. Use this skill whenever the user wants to add, configure, or troubleshoot an action on a form, choose the right action type for a use case, understand the action execution lifecycle, set up conditions or handler/method combinations, or wire up authentication flows. Also use when the user mentions action settings, action priorities, action conditions, email actions, login actions, webhook actions, role actions, save actions, or reset password actions — even if they don't say "action" explicitly (e.g., "send an email when someone submits", "add login to this form", "assign a role after registration"). Not for: auth architecture — SSO (OIDC/OAuth/SAML/LDAP), Token Swap, Custom JWT, JWT/session mechanics, 2FA, or RBAC tuning (see `formio-auth`); REST endpoint lookups (see `formio-api`).
 ---
 
 # Form.io Actions Reference
@@ -21,17 +12,18 @@ Actions are server-side behaviors attached to forms. When a submission is create
 
 When the user wants to manage actions on a live Form.io project, prefer the MCP server's first-party tools:
 
-| Operation | MCP Tool |
-|-----------|----------|
-| List available action types | `action_types_list` |
-| Get action type info + settings schema | `action_type_get` |
-| Create an action on a form | `action_create` |
-| List actions on a form | `action_list` |
-| Get a single action | `action_get` |
-| Update an action | `action_update` |
-| Delete an action | `action_delete` |
+| Operation                              | MCP Tool            |
+| -------------------------------------- | ------------------- |
+| List available action types            | `action_types_list` |
+| Get action type info + settings schema | `action_type_get`   |
+| Create an action on a form             | `action_create`     |
+| List actions on a form                 | `action_list`       |
+| Get a single action                    | `action_get`        |
+| Update an action                       | `action_update`     |
+| Delete an action                       | `action_delete`     |
 
 **Workflow for creating an action:**
+
 1. Call `action_type_get` with the action name to discover the required settings schema
 2. Construct the action definition using the settings schema as a guide
 3. Call `action_create` with the complete action definition
@@ -47,35 +39,39 @@ Every action has these core fields:
   "handler": ["after"],
   "method": ["create"],
   "priority": 0,
-  "settings": { /* varies per action type */ },
-  "condition": { /* optional, see Conditions section */ }
+  "settings": {
+    /* varies per action type */
+  },
+  "condition": {
+    /* optional, see Conditions section */
+  }
 }
 ```
 
 ### Handler — When it runs relative to the save
 
 | Handler | Timing | Use for |
-|---------|--------|---------|
+| --- | --- | --- |
 | `before` | Before the submission is saved to the database | Validation, authentication, data transformation, blocking operations |
 | `after` | After the submission is saved | Notifications, webhooks, role assignment, anything that needs the saved submission |
 
 ### Method — Which operation triggers it
 
-| Method | HTTP Verb | When |
-|--------|-----------|------|
-| `create` | POST | New submission |
+| Method   | HTTP Verb | When                         |
+| -------- | --------- | ---------------------------- |
+| `create` | POST      | New submission               |
 | `update` | PUT/PATCH | Existing submission modified |
-| `delete` | DELETE | Submission removed |
-| `read` | GET | Single submission retrieved |
-| `index` | GET | Submission list retrieved |
-| `form` | GET | Form schema requested |
+| `delete` | DELETE    | Submission removed           |
+| `read`   | GET       | Single submission retrieved  |
+| `index`  | GET       | Submission list retrieved    |
+| `form`   | GET       | Form schema requested        |
 
 ### Priority — Execution order
 
 Actions run in descending priority order. Higher numbers run first.
 
 | Action Type | Default Priority | Why |
-|-------------|-----------------|-----|
+| --- | --- | --- |
 | `oauth` | 20 | OAuth must intercept before anything else (enterprise) |
 | `save` | 10 | Must save before other actions can reference the submission |
 | `esign` | 6 | eSignature after save (enterprise) |
@@ -94,7 +90,7 @@ Form.io ships 6 action types in the open-source server. Enterprise servers add 7
 ### Quick Reference — Open Source
 
 | Type | Purpose | Default Handler | Default Method |
-|------|---------|----------------|----------------|
+| --- | --- | --- | --- |
 | `save` | Persist submission to database | `before` | `create`, `update` |
 | `login` | Authenticate users against a resource | `before` | `create` |
 | `role` | Add or remove a role from a user | `after` | `create` |
@@ -105,7 +101,7 @@ Form.io ships 6 action types in the open-source server. Enterprise servers add 7
 ### Quick Reference — Enterprise
 
 | Type | Purpose | Default Handler | Default Method |
-|------|---------|----------------|----------------|
+| --- | --- | --- | --- |
 | `oauth` | OAuth/SSO authentication (Google, GitHub, OpenID, etc.) | `after` | `form`, `create` |
 | `group` | Assign users to groups for group-based permissions | `after` | `create`, `update`, `delete` |
 | `ldap` | Authenticate against LDAP/Active Directory | `before` | `create` |
@@ -139,7 +135,7 @@ Conditions control whether an action executes for a given submission. If no cond
 ### Available operators
 
 | Category | Operators |
-|----------|-----------|
+| --- | --- |
 | General | `isEqual`, `isNotEqual`, `isEmpty`, `isNotEmpty` |
 | Numeric | `greaterThan`, `greaterThanOrEqual`, `lessThan`, `lessThanOrEqual` |
 | String | `startsWith`, `endsWith`, `includes`, `notIncludes` |
@@ -235,9 +231,7 @@ The `{{ submission(data, form.components) }}` template renders all form fields a
   },
   "condition": {
     "conjunction": "all",
-    "conditions": [
-      { "component": "status", "operator": "isEqual", "value": "approved" }
-    ]
+    "conditions": [{ "component": "status", "operator": "isEqual", "value": "approved" }]
   }
 }
 ```
@@ -262,12 +256,21 @@ Set `block: true` if you need the webhook response before the form submission co
 The webhook URL supports interpolation: `https://api.example.com/{{ data.type }}/submit`.
 
 The webhook sends:
+
 ```json
 {
-  "request": { /* original submission body */ },
-  "response": { /* response object */ },
-  "submission": { /* current submission */ },
-  "params": { /* URL parameters */ }
+  "request": {
+    /* original submission body */
+  },
+  "response": {
+    /* response object */
+  },
+  "submission": {
+    /* current submission */
+  },
+  "params": {
+    /* URL parameters */
+  }
 }
 ```
 
@@ -302,26 +305,31 @@ The `{{ resetlink }}` template variable is replaced with the full URL including 
 ## Troubleshooting
 
 **Action not firing:**
+
 - Check handler matches the operation timing (before/after)
 - Check method matches the HTTP verb (create/update/delete)
 - Check condition logic — use `action_get` to inspect the saved condition
 - Verify priority isn't causing another action to fail first and stop the pipeline
 
 **Email not sending:**
+
 - Verify transport is configured on the server
 - Check `settings.emails` is not empty
 - Template fetch failures fall back to the message field silently
 
 **Webhook timing out:**
+
 - Non-blocking mode (`block: false`) won't report errors to the user
 - Blocking mode waits for the response — if the external service is slow, the submission will be slow
 
 **Login returning 401:**
+
 - Verify `resources` array contains the correct resource form ID
 - Verify `username` and `password` keys match the login form's component API keys
 - Check brute-force lockout: `allowedAttempts` (default 5), `lockWait` (default 1800s = 30 min)
 
 **Role not being assigned:**
+
 - For new registrations, use `association: "new"`
 - For admin forms modifying existing users, use `association: "existing"` and ensure the form has a component that submits the target resource's submission ID
 - Verify the role ID exists (use the project roles API)

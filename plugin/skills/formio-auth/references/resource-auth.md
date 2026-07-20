@@ -66,7 +66,7 @@ The canonical `user` Resource holds `email` (unique, `protected: false`) and `pa
 
 Prefer the first-party MCP tools when wiring this auth flow:
 
-- `authenticate` — obtain a Form.io portal JWT for the MCP server itself the first time you connect.
+- The MCP server authenticates implicitly — the first authenticated tool call triggers its browser-based portal-login flow on a cache miss and caches the portal JWT. There is no explicit authenticate tool.
 - `role_list`, `role_create`, `role_update` — inspect and create the roles you assign (typically `administrator`, `authenticated`, `anonymous`).
 - `form_create`, `form_get`, `form_update` — create the login form, the registration form, and the `user` Resource. Use `form_update` to adjust `access` / `submissionAccess` on each.
 - `action_create`, `action_list`, `action_update` — attach the Login Action and Role Assignment Action to the appropriate forms. Use `action_type_get` to inspect each action's `settings` schema before creating.

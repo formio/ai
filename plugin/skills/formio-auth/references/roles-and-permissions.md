@@ -45,16 +45,16 @@ Add custom roles when the default trio is not enough — for example `salesRep`,
 
 The same eight types appear across every scope:
 
-| Type | Meaning |
-|------|---------|
-| `create_own` | Create an entity; the actor becomes the owner. |
-| `create_all` | Create an entity; the actor may set `owner` to any user. |
-| `read_own` | Read entities the actor owns. |
-| `read_all` | Read every entity, regardless of ownership. |
-| `update_own` | Update entities the actor owns. |
+| Type         | Meaning                                                                  |
+| ------------ | ------------------------------------------------------------------------ |
+| `create_own` | Create an entity; the actor becomes the owner.                           |
+| `create_all` | Create an entity; the actor may set `owner` to any user.                 |
+| `read_own`   | Read entities the actor owns.                                            |
+| `read_all`   | Read every entity, regardless of ownership.                              |
+| `update_own` | Update entities the actor owns.                                          |
 | `update_all` | Update every entity. On Submissions, also lets the actor change `owner`. |
-| `delete_own` | Delete entities the actor owns. |
-| `delete_all` | Delete every entity. |
+| `delete_own` | Delete entities the actor owns.                                          |
+| `delete_all` | Delete every entity.                                                     |
 
 Key rules:
 
@@ -66,7 +66,7 @@ Key rules:
 ### The three permission scopes
 
 | Scope | Where it lives | Controls |
-|-------|----------------|----------|
+| --- | --- | --- |
 | Project | `access[]` on the Project object | Who can create, read, update, delete forms/resources/roles inside the project. |
 | Form Definition | `access[]` on each Form/Resource | Who can read/update/delete the form's JSON definition. `read_all` is required for users to load the form's renderer. |
 | Submission Data | `submissionAccess[]` on each Form/Resource | Who can create/read/update/delete actual submission rows. This is "the real access-control story". |

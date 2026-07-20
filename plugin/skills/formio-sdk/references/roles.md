@@ -94,10 +94,10 @@ await new Formio(`${Formio.getProjectUrl()}/role/000000000000000000000020`).dele
 
 Inside this workspace, prefer the first-party MCP tools:
 
-| Operation | MCP tool | SDK fallback |
-| --- | --- | --- |
+| Operation     | MCP tool      | SDK fallback                          |
+| ------------- | ------------- | ------------------------------------- |
 | Create a role | `role_create` | `new Formio(rolesUrl).saveRole(role)` |
-| List roles | `role_list` | `new Formio(rolesUrl).loadRoles()` |
-| Update a role | `role_update` | `new Formio(roleUrl).saveRole(role)` |
+| List roles    | `role_list`   | `new Formio(rolesUrl).loadRoles()`    |
+| Update a role | `role_update` | `new Formio(roleUrl).saveRole(role)`  |
 
 There is no first-party `role_delete` MCP tool today — use the SDK or `DELETE ${roleUrl}` for deletion.

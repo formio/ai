@@ -6,10 +6,10 @@ This document is loaded by the parent `formio-application` skill during Step 3 o
 
 Two URLs that Step 4 (MCP Config), Step 5 (Import), and the Step 6 framework handoff all depend on. Stash them under the variable names `FORMIO_PROJECT_URL` and `FORMIO_BASE_URL` so downstream steps and the framework-specific SETUP phase can read them without another round of questions.
 
-| Name in this skill | Variable              | Example (hosted)            | Example (self-hosted)             |
-| ------------------ | --------------------- | --------------------------- | --------------------------------- |
-| **Base URL**       | `FORMIO_BASE_URL` | `https://api.form.io`       | `https://forms.acme-corp.com`     |
-| **Project URL**    | `FORMIO_PROJECT_URL`  | `https://mycompany.form.io` | `https://forms.acme-corp.com/crm` |
+| Name in this skill | Variable | Example (hosted) | Example (self-hosted) |
+| --- | --- | --- | --- |
+| **Base URL** | `FORMIO_BASE_URL` | `https://api.form.io` | `https://forms.acme-corp.com` |
+| **Project URL** | `FORMIO_PROJECT_URL` | `https://mycompany.form.io` | `https://forms.acme-corp.com/crm` |
 
 ### Plain-language descriptions
 
@@ -72,7 +72,7 @@ FORMIO_PROJECT_URL = <captured Project URL with no trailing slash>
 FORMIO_BASE_URL = <captured Base URL with no trailing slash>
 ```
 
-Step 4 (MCP Config — see [`MCP_CONFIG.md`](./MCP_CONFIG.md)) writes these into `./.mcp.json` under the keys `FORMIO_PROJECT_URL` and `FORMIO_BASE_URL`. Note the naming shift: this skill's internal state uses `FORMIO_BASE_URL` for the platform deployment URL, but the env-var key written to `.mcp.json` is `FORMIO_BASE_URL` (two names for the same concept — `MCP_CONFIG.md` documents the mapping). Step 5 (Import) passes the Project URL to `project_import` — the first authenticated MCP call, which triggers the portal-login flow on a JWT cache miss. The framework handoff (Step 6) passes both URLs to the framework's SETUP so its URL interview is skipped.
+Step 4 (MCP Config — see [`MCP_CONFIG.md`](./MCP_CONFIG.md)) writes these into `./.mcp.json` under the same keys, `FORMIO_PROJECT_URL` and `FORMIO_BASE_URL` — no renaming happens between orchestrator state and `.mcp.json`. Step 5 (Import) passes the Project URL to `project_import` — the first authenticated MCP call, which triggers the portal-login flow on a JWT cache miss. The framework handoff (Step 6) passes both URLs to the framework's SETUP so its URL interview is skipped.
 
 ---
 
@@ -87,7 +87,7 @@ Take the plugin branch if ANY of the following are true at the start of Step 3:
 - The `verify-project-url` hook has injected a "No project mapped for `<cwd>`…" message into the session (via `SessionStart` `additionalContext` or a `PreToolUse` `permissionDecisionReason`). The presence of that string is conclusive proof the plugin's hook is live.
 - Form.io MCP tools are exposed under the `mcp__plugin_formio-ai_formio-mcp__*` namespace (e.g., `mcp__plugin_formio-ai_formio-mcp__project_set`) rather than bare `formio-mcp`.
 
-Otherwise, fall back to the standalone branch above — capture both URLs via the batched interview and let Step 4 (MCP Config) write them into `./.mcp.json`.
+Otherwise, fall back to the standalone branch above — capture both URLs via the batched interview and let Step 4 (MCP Config) write them into `./.mcp.json`. On the standalone branch there is no hook-provided default and no `project_set` call — the server is spawned from `.mcp.json` in Step 4, not routed via `~/.formio/projects.json`.
 
 ### Source of the default
 
@@ -95,7 +95,7 @@ The hook injects an `additionalContext` or `permissionDecisionReason` string of 
 
 > No project mapped for `<cwd>`. AskUserQuestion: 'Use default (`<url>`)' or 'Other'. Then project_set({ cwd, projectUrl }), then retry.
 
-The `<url>` in that message is `FORMIO_DEFAULT_PROJECT_URL` as seen by the hook. Treat it as the authoritative default — do NOT re-prompt for a Base URL, and do NOT construct defaults from environment variables yourself. If no default appears (the hook falls back to "AskUserQuestion for URL" with no default), skip straight to the "Define a new project URL" option.
+The `<url>` in that message is `FORMIO_DEFAULT_PROJECT_URL` as seen by the hook. Treat it as the authoritative default — do NOT re-prompt for a Base URL (`FORMIO_BASE_URL` is inherited from the plugin's MCP server env, set via the user's plugin configuration, not per-cwd), and do NOT construct defaults from environment variables yourself. If no default appears (the hook falls back to "AskUserQuestion for URL" with no default), skip straight to the "Define a new project URL" option.
 
 ### Run the interview — one `AskUserQuestion`
 
@@ -133,12 +133,12 @@ AskUserQuestion({
 
 Parse `FORMIO_PROJECT_URL` and set `FORMIO_BASE_URL` to its origin — scheme, host, and port only; no path. Examples:
 
-| `FORMIO_PROJECT_URL`                     | Derived `FORMIO_BASE_URL`         |
-| ---------------------------------------- | --------------------------------- |
-| `https://api.form.io/my-project`         | `https://api.form.io`             |
-| `https://mycompany.form.io`              | `https://mycompany.form.io`       |
-| `https://forms.acme-corp.com/crm`        | `https://forms.acme-corp.com`     |
-| `http://localhost:3000/authoring-abc123` | `http://localhost:3000`           |
+| `FORMIO_PROJECT_URL`                     | Derived `FORMIO_BASE_URL`     |
+| ---------------------------------------- | ----------------------------- |
+| `https://api.form.io/my-project`         | `https://api.form.io`         |
+| `https://mycompany.form.io`              | `https://mycompany.form.io`   |
+| `https://forms.acme-corp.com/crm`        | `https://forms.acme-corp.com` |
+| `http://localhost:3000/authoring-abc123` | `http://localhost:3000`       |
 
 Do not ask the user to confirm the derivation.
 

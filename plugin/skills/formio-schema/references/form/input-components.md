@@ -71,28 +71,28 @@ URL input. Same properties as TextField.
 
 Date and/or time picker.
 
-| Property            | Type      | Description                                                         |
-| ------------------- | --------- | ------------------------------------------------------------------- |
-| `format`            | `string`  | Display format (e.g., `"yyyy-MM-dd HH:mm"`).                        |
-| `enableDate`        | `boolean` | Enable date selection.                                              |
-| `enableTime`        | `boolean` | Enable time selection.                                              |
-| `defaultDate`       | `string`  | Default date value.                                                 |
-| `displayInTimezone` | `string`  | Timezone for display: `"viewer"`, `"submission"`, `"utc"`.          |
-| `timezone`          | `string`  | Specific timezone identifier.                                       |
-| `datePicker`        | `object`  | Date picker configuration (min/max dates, disabled weekends, etc.). |
-| `timePicker`        | `object`  | Time picker configuration (hour/minute step, meridian).             |
+| Property | Type | Description |
+| --- | --- | --- |
+| `format` | `string` | Display format (e.g., `"yyyy-MM-dd HH:mm"`). |
+| `enableDate` | `boolean` | Enable date selection. |
+| `enableTime` | `boolean` | Enable time selection. |
+| `defaultDate` | `string` | Default date value. |
+| `displayInTimezone` | `string` | Timezone for display: `"viewer"`, `"submission"`, `"utc"`. |
+| `timezone` | `string` | Specific timezone identifier. |
+| `datePicker` | `object` | Date picker configuration (min/max dates, disabled weekends, etc.). |
+| `timePicker` | `object` | Time picker configuration (hour/minute step, meridian). |
 
 ## Day (`type: "day"`)
 
 Separate day/month/year inputs.
 
-| Property          | Type      | Description                                                                                  |
-| ----------------- | --------- | -------------------------------------------------------------------------------------------- |
-| `fields`          | `object`  | Configuration for `day`, `month`, and `year` sub-fields (type, placeholder, required, hide). |
-| `dayFirst`        | `boolean` | Show day before month.                                                                       |
-| `hideInputLabels` | `boolean` | Hide the sub-field labels.                                                                   |
-| `minDate`         | `string`  | Minimum allowed date.                                                                        |
-| `maxDate`         | `string`  | Maximum allowed date.                                                                        |
+| Property | Type | Description |
+| --- | --- | --- |
+| `fields` | `object` | Configuration for `day`, `month`, and `year` sub-fields (type, placeholder, required, hide). |
+| `dayFirst` | `boolean` | Show day before month. |
+| `hideInputLabels` | `boolean` | Hide the sub-field labels. |
+| `minDate` | `string` | Minimum allowed date. |
+| `maxDate` | `string` | Maximum allowed date. |
 
 ## Time (`type: "time"`)
 
@@ -138,27 +138,27 @@ Multiple checkbox group. Extends Radio.
 
 Dropdown selection.
 
-| Property         | Type              | Description                                                                                                |
-| ---------------- | ----------------- | ---------------------------------------------------------------------------------------------------------- |
-| `dataSrc`        | `string`          | Data source: `"values"`, `"json"`, `"url"`, `"resource"`, `"custom"`.                                      |
-| `data.values`    | `array`           | Static options: `[{ label, value }]`.                                                                      |
-| `data.url`       | `string`          | URL to fetch remote options from.                                                                          |
-| `data.resource`  | `string`          | Resource ID for resource-based options.                                                                    |
-| `data.json`      | `array \| string` | JSON data source.                                                                                          |
-| `data.custom`    | `string`          | Custom JavaScript returning options.                                                                       |
-| `valueProperty`  | `string`          | Property to use as the stored value.                                                                       |
-| `searchEnabled`  | `boolean`         | Enable type-ahead search.                                                                                  |
-| `searchField`    | `string`          | Field to search against in remote data.                                                                    |
-| `searchDebounce` | `number`          | Debounce delay for search requests (ms).                                                                   |
-| `minSearch`      | `number`          | Minimum characters before triggering search.                                                               |
-| `lazyLoad`       | `boolean`         | Load options on first open instead of on form load.                                                        |
-| `filter`         | `string`          | Query filter for remote data.                                                                              |
-| `limit`          | `number`          | Max options to load per request.                                                                           |
-| `selectFields`   | `string`          | Fields to select from remote data.                                                                         |
-| `sort`           | `string`          | Sort order for remote data.                                                                                |
-| `clearOnRefresh` | `boolean`         | Clear value when dependent field changes.                                                                  |
-| `template`       | `string`          | HTML span with interpolated JS to set value to display for select options (when fetching from remote url). |
-| `uniqueOptions`  | `boolean`         | Remove duplicate options.                                                                                  |
+| Property | Type | Description |
+| --- | --- | --- |
+| `dataSrc` | `string` | Data source: `"values"`, `"json"`, `"url"`, `"resource"`, `"custom"`. |
+| `data.values` | `array` | Static options: `[{ label, value }]`. |
+| `data.url` | `string` | URL to fetch remote options from. |
+| `data.resource` | `string` | Resource ID for resource-based options. |
+| `data.json` | `array \| string` | JSON data source. |
+| `data.custom` | `string` | Custom JavaScript returning options. |
+| `valueProperty` | `string` | Property to use as the stored value. |
+| `searchEnabled` | `boolean` | Enable type-ahead search. |
+| `searchField` | `string` | Field to search against in remote data. |
+| `searchDebounce` | `number` | Debounce delay for search requests (ms). |
+| `minSearch` | `number` | Minimum characters before triggering search. |
+| `lazyLoad` | `boolean` | Load options on first open instead of on form load. |
+| `filter` | `string` | Query filter for remote data. |
+| `limit` | `number` | Max options to load per request. |
+| `selectFields` | `string` | Fields to select from remote data. |
+| `sort` | `string` | Sort order for remote data. |
+| `clearOnRefresh` | `boolean` | Clear value when dependent field changes. |
+| `template` | `string` | HTML span with interpolated JS to set value to display for select options (when fetching from remote url). |
+| `uniqueOptions` | `boolean` | Remove duplicate options. |
 
 ## Resource (`type: "resource"`)
 
@@ -177,16 +177,16 @@ Hidden input. Stores data without UI. Base properties only.
 
 Action button.
 
-| Property           | Type      | Description                                                                               |
-| ------------------ | --------- | ----------------------------------------------------------------------------------------- |
-| `action`           | `string`  | Button action: `"submit"`, `"reset"`, `"event"`, `"oauth"`, `"url"`, `"saveState"`.       |
-| `theme`            | `string`  | Button style: `"primary"`, `"secondary"`, `"info"`, `"success"`, `"danger"`, `"warning"`. |
-| `size`             | `string`  | Size: `"sm"`, `"md"`, `"lg"`, `"xl"`, `"xxl"`.                                            |
-| `block`            | `boolean` | Full-width button.                                                                        |
-| `leftIcon`         | `string`  | Icon class for left icon.                                                                 |
-| `rightIcon`        | `string`  | Icon class for right icon.                                                                |
-| `disableOnInvalid` | `boolean` | Disable button when form is invalid.                                                      |
-| `event`            | `string`  | Custom event name (when `action: "event"`).                                               |
+| Property | Type | Description |
+| --- | --- | --- |
+| `action` | `string` | Button action: `"submit"`, `"reset"`, `"event"`, `"oauth"`, `"url"`, `"saveState"`. |
+| `theme` | `string` | Button style: `"primary"`, `"secondary"`, `"info"`, `"success"`, `"danger"`, `"warning"`. |
+| `size` | `string` | Size: `"sm"`, `"md"`, `"lg"`, `"xl"`, `"xxl"`. |
+| `block` | `boolean` | Full-width button. |
+| `leftIcon` | `string` | Icon class for left icon. |
+| `rightIcon` | `string` | Icon class for right icon. |
+| `disableOnInvalid` | `boolean` | Disable button when form is invalid. |
+| `event` | `string` | Custom event name (when `action: "event"`). |
 
 ## Signature (`type: "signature"`)
 

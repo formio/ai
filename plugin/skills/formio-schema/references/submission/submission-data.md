@@ -24,14 +24,14 @@ Layout components (`panel`, `columns`, `tabs`, `fieldset`, `well`, `table`, `con
 
 Data components (the ones documented in `references/form/data-components.md`) introduce nested data shapes under their own `key`:
 
-| Component   | Shape under `data[key]`                                                                                                |
-| ----------- | ---------------------------------------------------------------------------------------------------------------------- |
-| `container` | A nested object: `data.containerKey.childKey = value` — child components are namespaced under the container's key.     |
-| `datagrid`  | An array of row objects: `data.gridKey = [ { childKey: value, ... }, ... ]` — each row mirrors the component schema.   |
-| `editgrid`  | Same array-of-rows shape as `datagrid`.                                                                                |
-| `datamap`   | A key-value object where each key is user-defined: `data.mapKey = { userKey1: value1, userKey2: value2 }`.             |
-| `form`      | Either the nested form's full submission object (when `reference: false`) or a `{ _id }` reference (when `reference: true`). |
-| `address`   | A discriminated union — see "Address mode" below.                                                                      |
+| Component | Shape under `data[key]` |
+| --- | --- |
+| `container` | A nested object: `data.containerKey.childKey = value` — child components are namespaced under the container's key. |
+| `datagrid` | An array of row objects: `data.gridKey = [ { childKey: value, ... }, ... ]` — each row mirrors the component schema. |
+| `editgrid` | Same array-of-rows shape as `datagrid`. |
+| `datamap` | A key-value object where each key is user-defined: `data.mapKey = { userKey1: value1, userKey2: value2 }`. |
+| `form` | Either the nested form's full submission object (when `reference: false`) or a `{ _id }` reference (when `reference: true`). |
+| `address` | A discriminated union — see "Address mode" below. |
 
 For exact per-component value shapes (e.g., what a `file` component stores, what a `signature` stores, what a `select` stores when `multiple: true`), load `references/form/input-components.md` and `references/form/data-components.md`.
 

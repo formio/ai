@@ -1,25 +1,7 @@
 ---
 name: formio-auth
 description: >-
-  Form.io authentication and authorization specialist — teaches an AI agent the full
-  Form.io auth surface, including resource-backed login with the Login Action plus
-  Role Assignment Action, login and registration form shapes, role-based access control
-  (the eight permission types across project, form-definition, and submission-data scopes),
-  group permissions (single-level plus transitive via field-based `submissionAccess`),
-  SSO via OIDC/OAuth/SAML/LDAP with provider role mapping, Token Swap from an external
-  OIDC token, Custom JWT for Enterprise/on-prem deployments signed with `JWT_SECRET`,
-  email-token (passwordless) authentication, and JWT/session mechanics (the `x-jwt-token`
-  header, `jti` Session ID, logout, 2FA, reCAPTCHA).
-  Use when the user asks to configure login, JWT, sessions, SSO, OIDC, OAuth, SAML, LDAP,
-  Token Swap, Custom JWT, passwordless/email-token auth, roles, permissions, RBAC, group
-  permissions, 2FA, reCAPTCHA, the Login Action, the Role Assignment Action, the Group
-  Assignment Action, or any auth/authorization concern in Form.io.
-  Not for designing the resource map, planning a new app's data model, or emitting a
-  `template.json` from scratch (those go through `formio-resource-planner`); orchestrating
-  the full build-an-app pipeline of plan → import → scaffold a framework (that goes through
-  `formio-application`); looking up a specific REST endpoint URL or HTTP shape (that goes
-  through `formio-api`); or wiring a front-end login screen, route guard, or
-  `FormioAuthService` into an Angular workspace (that goes through `formio-angular`).
+  Form.io authentication and authorization specialist — resource-backed login (Login plus Role Assignment Actions), role-based access control and group permissions, SSO via OIDC/OAuth/SAML/LDAP with provider role mapping, Token Swap, Custom JWT for Enterprise/on-prem (signed with `JWT_SECRET`), email-token (passwordless) auth, and JWT/session mechanics (the `x-jwt-token` header, `jti` Session ID, logout, 2FA, reCAPTCHA). Use when the user asks to configure how users authenticate — SSO, OIDC, OAuth, SAML, LDAP, Token Swap, Custom JWT, passwordless auth, JWT, sessions, roles, permissions, RBAC, group permissions, 2FA, or reCAPTCHA in Form.io. Not for: designing the resource map or data model (see `formio-resource-planner`); orchestrating an app build (see `formio-application`); adding a Login or Role Assignment Action to one form — per-form action settings, priorities, conditions (see `formio-actions`); REST endpoint lookups (see `formio-api`); wiring a login screen into Angular (see `formio-angular`).
 ---
 
 ## Overview

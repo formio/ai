@@ -31,7 +31,7 @@ import { FormioGrid } from '@formio/angular/grid';
 import { FormioAuthService, FormioAuthConfig } from '@formio/angular/auth';
 import { FormioResources } from '@formio/angular/resource';
 
-import { AppConfig, AuthConfig } from './app.config';
+import { AppConfig, AuthConfig } from './config';
 import { AppRoutingModule } from './app-routing.module';
 import { AppComponent } from './app.component';
 import { HomeComponent } from './home/home.component';
@@ -99,11 +99,11 @@ Why `useHash: true`? Matches the angular-demo and sidesteps server-rewrite confi
 
 `authGuard` is produced by the parent skill's AUTH phase at `src/app/auth/auth.guard.ts` (a functional `CanActivateFn` that awaits `FormioAuthService.ready`, then returns `true` if `auth.authenticated` else a `UrlTree` to `/auth/login`). See the parent `AUTH.md` → "`src/app/auth/auth.guard.ts`" for the file body. This sub-skill's job is to attach `canActivate: [authGuard]` to every resource route the Access Matrix marks unreachable by `anonymous`. If you are generating a routing module in a workspace where AUTH was skipped and no `auth.guard.ts` exists, flag the gap (the route is unprotected) rather than silently omitting the guard.
 
-**Authentication vs. authorization — do not conflate them.** The guard enforces *authentication* only (is anyone logged in). It does NOT enforce *authorization* (which role / group) — that stays server-side and is allowed to 403. So: a group-access resource (e.g. Task gated by ProjectUser membership) STILL gets `canActivate: [authGuard]` because anonymous users have no access at all; the per-group narrowing is left to the backend. "Server enforces access" justifies skipping a role/group guard, never the authentication guard.
+**Authentication vs. authorization — do not conflate them.** The guard enforces _authentication_ only (is anyone logged in). It does NOT enforce _authorization_ (which role / group) — that stays server-side and is allowed to 403. So: a group-access resource (e.g. Task gated by ProjectUser membership) STILL gets `canActivate: [authGuard]` because anonymous users have no access at all; the per-group narrowing is left to the backend. "Server enforces access" justifies skipping a role/group guard, never the authentication guard.
 
 ## 3. `AppConfig` — `FormioAppConfig` + `FormioAuthConfig`
 
-`src/app/app.config.ts`:
+`src/app/config.ts` — the SAME file the parent skill's CONFIG phase generates (see parent `CONFIG.md`). On an orchestrated run this file already exists with `AppConfig`; extend it with the `AuthConfig` export if missing rather than creating a second config file. Do NOT name it `app.config.ts` — that name is reserved by Angular standalone convention for `ApplicationConfig`, and the parent's SETUP/CONFIG phases read `src/app/config.ts`:
 
 ```typescript
 import { FormioAppConfig } from '@formio/angular';

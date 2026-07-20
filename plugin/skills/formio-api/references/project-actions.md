@@ -1,4 +1,3 @@
-
 ## Overview
 
 Form Actions are server-side hooks (email, webhook, save, login, role, etc.) that run before or after submission events on a form. This skill covers everything a project admin does with actions: discovering the action types available in the project, inspecting a specific action's settings form, attaching an action to a form, listing and retrieving the actions configured on a form, updating an action's settings, and removing an action. These operations apply per-form — every action is scoped to exactly one form.
@@ -78,9 +77,9 @@ curl -H "x-jwt-token: $FORMIO_JWT" \
 
 Attach an action instance to a form.
 
-| Path parameter | Type | Description |
-| --- | --- | --- |
-| `formId` | string | The MongoDB `_id` of the form to attach the action to. |
+| Path parameter | Type   | Description                                            |
+| -------------- | ------ | ------------------------------------------------------ |
+| `formId`       | string | The MongoDB `_id` of the form to attach the action to. |
 
 Request body (JSON):
 
@@ -119,9 +118,9 @@ curl -X POST -H "x-jwt-token: $FORMIO_JWT" -H "Content-Type: application/json" \
 
 List all actions currently attached to a form, in priority order.
 
-| Path parameter | Type | Description |
-| --- | --- | --- |
-| `formId` | string | The MongoDB `_id` of the form. |
+| Path parameter | Type   | Description                    |
+| -------------- | ------ | ------------------------------ |
+| `formId`       | string | The MongoDB `_id` of the form. |
 
 Response: JSON array of action documents. Each entry includes `_id`, `title`, `name`, `handler`, `method`, `priority`, `form`, and `machineName`. Note that `settings` may be omitted from the list response for brevity — fetch a single action for its full settings.
 
@@ -153,10 +152,10 @@ curl -H "x-jwt-token: $FORMIO_JWT" \
 
 Retrieve a single configured action, including its full `settings`.
 
-| Path parameter | Type | Description |
-| --- | --- | --- |
-| `formId` | string | The MongoDB `_id` of the form. |
-| `actionId` | string | The MongoDB `_id` of the action instance. |
+| Path parameter | Type   | Description                               |
+| -------------- | ------ | ----------------------------------------- |
+| `formId`       | string | The MongoDB `_id` of the form.            |
+| `actionId`     | string | The MongoDB `_id` of the action instance. |
 
 Response: the full action document — `_id`, `title`, `name`, `handler`, `method`, `priority`, `settings`, `form`, `machineName`.
 
@@ -173,10 +172,10 @@ curl -H "x-jwt-token: $FORMIO_JWT" \
 
 Update a configured action. This is a full replacement of the action's editable fields — include every field you want to preserve.
 
-| Path parameter | Type | Description |
-| --- | --- | --- |
-| `formId` | string | The MongoDB `_id` of the form. |
-| `actionId` | string | The MongoDB `_id` of the action instance to update. |
+| Path parameter | Type   | Description                                         |
+| -------------- | ------ | --------------------------------------------------- |
+| `formId`       | string | The MongoDB `_id` of the form.                      |
+| `actionId`     | string | The MongoDB `_id` of the action instance to update. |
 
 Request body (JSON): same shape as the create body.
 
@@ -213,10 +212,10 @@ curl -X PUT -H "x-jwt-token: $FORMIO_JWT" -H "Content-Type: application/json" \
 
 Remove an action from a form. Irreversible — the action stops running immediately.
 
-| Path parameter | Type | Description |
-| --- | --- | --- |
-| `formId` | string | The MongoDB `_id` of the form. |
-| `actionId` | string | The MongoDB `_id` of the action instance to delete. |
+| Path parameter | Type   | Description                                         |
+| -------------- | ------ | --------------------------------------------------- |
+| `formId`       | string | The MongoDB `_id` of the form.                      |
+| `actionId`     | string | The MongoDB `_id` of the action instance to delete. |
 
 Response: `200 OK` with plain text body `OK`.
 

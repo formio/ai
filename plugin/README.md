@@ -30,16 +30,20 @@ Every step has an approval gate before any file is written or any MCP call hits 
 ## What's in the box
 
 - **MCP server** (`@formio/mcp`) — first-party Form.io operations as MCP tools (`form_*`, `role_*`, `action_*`, `project_*`).
-- **Skills library** — seven activatable skills (orchestration, planner, framework implementor, form JSON, schema, actions, API router) plus a reference library under `formio-api/references/` covering every endpoint in the Form.io API Postman collection.
+- **Skills library** — ten activatable skills (app orchestration, form building, form embedding, planner, framework implementor, schema, actions, auth, SDK, API router) plus a reference library under `formio-api/references/` covering every endpoint in the Form.io API Postman collection.
 - **`verify-project-url` hook** — `SessionStart` / `PreToolUse` hook that offers `formio_default_project_url` as the per-cwd default and routes the MCP server through `~/.formio/projects.json`, so each working directory can target a different Form.io project.
 
 | Skill | Purpose |
 | --- | --- |
 | `formio-application` | Default "build me an app" orchestrator. Six-step pipeline (Intent → Plan → Deployment → MCP Config → Import → Framework). |
+| `formio-form-builder` | Default "build me a form" orchestrator — webform or wizard from intent to a saved form, plus field edits to existing forms. |
+| `formio-form` | Embeds and renders forms in any web application with `@formio/js` — pre-fill, conditionals, calculated values, custom validation. |
 | `formio-resource-planner` | Plans resources, fields, roles, actions, access — emits paired `template.md` + `template.json`. |
 | `formio-angular` | Angular framework implementor. Five-phase scaffold flow over `@formio/angular`. |
-| `formio-schema` | Comprehensive Form.io JSON schema reference — form, submission and project definitions today, with placeholder slots for actions and roles. |
+| `formio-schema` | Comprehensive Form.io JSON schema reference — form, submission, and project document shapes. |
 | `formio-actions` | Configuration reference for Form.io server-side actions. |
+| `formio-auth` | Authentication and authorization — login/registration, RBAC, SSO (OIDC/SAML/LDAP), Token Swap, Custom JWT, sessions. |
+| `formio-sdk` | Source-derived reference for the `@formio/js` SDK and `@formio/js/utils` Utilities. |
 | `formio-api` | Router into the full Form.io REST API surface (platform, project, runtime, PDF). |
 
 See the [root README's "How it works"](https://github.com/formio/ai#how-it-works) for the orchestrator, planner, and Angular flow diagrams, plus full sample resource maps.
@@ -54,6 +58,7 @@ The plugin prompts for `FORMIO_BASE_URL` and the default `FORMIO_PROJECT_URL` on
 | `FORMIO_PROJECT_URL` | yes\* | — | Full URL of the Form.io project the MCP server should target. In plugin mode, only used as the pre-filled default the `verify-project-url` hook offers when prompting for an unmapped cwd. |
 | `FORMIO_API_KEY` | no | `undefined` | Long-lived project API key. When set, the server skips the browser login flow and attaches `x-token`. |
 | `FORMIO_LOGIN_FORM` | no | Auto-resolved | Override the portal login form URL. |
+| `FORMIO_INSECURE_TLS` | no | `false` | When `true`, skips TLS certificate verification — for self-hosted deployments behind self-signed certs. Do not use against production. |
 
 \* The `verify-project-url` hook persists per-cwd mappings to `~/.formio/projects.json` via the `project_set` MCP tool — prompting for **both** the project URL (default: `formio_default_project_url`) and the deployment/base URL (default: `formio_base_url`). Once a directory is mapped, the MCP server resolves `FORMIO_PROJECT_URL` **and** `FORMIO_BASE_URL` from that file per-cwd, falling back to the global env values only when an entry omits them.
 

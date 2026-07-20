@@ -34,11 +34,11 @@ A decoded Form.io JWT looks like this:
 ```json
 {
   "user": { "_id": "5e5411ba1e29ee1aab5031d9" },
-  "iss":  "https://api.form.io:3000",
-  "sub":  "5e5411ba1e29ee1aab5031d9",
-  "jti":  "5fffbb5646d76c292a7b5df1",
-  "iat":  1610595158,
-  "exp":  1610609558
+  "iss": "https://api.form.io:3000",
+  "sub": "5e5411ba1e29ee1aab5031d9",
+  "jti": "5fffbb5646d76c292a7b5df1",
+  "iat": 1610595158,
+  "exp": 1610609558
 }
 ```
 
@@ -91,7 +91,7 @@ The Form.io JWT is a standard JWS. Decode it with `https://jwt.io` or any standa
 
 ## MCP Tool Preference
 
-- `authenticate` — drive the MCP server's browser-based portal-login flow and obtain the portal JWT that `formioFetch` attaches to every subsequent call.
+- The MCP server authenticates implicitly — the first authenticated tool call drives its browser-based portal-login flow on a cache miss and obtains the portal JWT that `formioFetch` attaches to every subsequent call. There is no explicit authenticate tool.
 - For the runtime endpoint that invalidates a session (`/logout`) and the token-introspection endpoints, see the `runtime-auth` reference in the `formio-api` skill — those calls are HTTP endpoints, not MCP tools.
 - For 2FA / reCAPTCHA configuration, use the Form.io project portal. No MCP tool covers premium component configuration today.
 

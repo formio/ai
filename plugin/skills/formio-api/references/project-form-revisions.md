@@ -1,4 +1,3 @@
-
 ## Overview
 
 The Form Revisions API gives a project admin a draft/publish workflow for form definitions. Once revisions are enabled on a form, every published change creates a new numbered revision; admins can work on a draft that does not yet affect submissions, publish that draft to create the next revision, and retrieve any historical revision by its version number or revision ID. This skill covers enabling revisions, drafting, publishing, listing revisions, and fetching a specific revision. For non-revisioned form CRUD, see `project-forms.md`.
@@ -60,9 +59,9 @@ On cancel, the tool throws and no update is performed.
 
 Enable form revisions on an existing form by setting `revisions` on the form document. This endpoint is the standard form update (see `project-forms.md`), but when a form is saved with `revisions` turned on, subsequent draft/publish operations become available on that form. Once enabled, every `PUT` to this path creates a new published revision.
 
-| Path parameter | Type | Description |
-| --- | --- | --- |
-| `formId` | string | The MongoDB `_id` of the form to update. |
+| Path parameter | Type   | Description                              |
+| -------------- | ------ | ---------------------------------------- |
+| `formId`       | string | The MongoDB `_id` of the form to update. |
 
 Request body (JSON): the full form definition, including `_id`, `title`, `name`, `path`, `type`, `display`, `components`, and (to enable the feature) a `revisions` flag per the form's settings.
 
@@ -77,8 +76,18 @@ Request body (JSON): the full form definition, including `_id`, `title`, `name`,
   "tags": [],
   "owner": "69d6813b040fa2cea257285a",
   "components": [
-    { "type": "textfield", "label": "First Name", "key": "firstName", "validate": { "required": true } },
-    { "type": "textfield", "label": "Last Name", "key": "lastName", "validate": { "required": true } },
+    {
+      "type": "textfield",
+      "label": "First Name",
+      "key": "firstName",
+      "validate": { "required": true }
+    },
+    {
+      "type": "textfield",
+      "label": "Last Name",
+      "key": "lastName",
+      "validate": { "required": true }
+    },
     { "type": "email", "label": "Email", "key": "email", "validate": { "required": true } }
   ]
 }
@@ -100,9 +109,9 @@ curl -X PUT -H "x-jwt-token: $FORMIO_JWT" -H "Content-Type: application/json" \
 
 Save an in-progress draft of a revisioned form. Drafts do not affect live submissions; they are a working copy that the admin iterates on until ready to publish.
 
-| Path parameter | Type | Description |
-| --- | --- | --- |
-| `formId` | string | The MongoDB `_id` of the form whose draft is being updated. |
+| Path parameter | Type   | Description                                                 |
+| -------------- | ------ | ----------------------------------------------------------- |
+| `formId`       | string | The MongoDB `_id` of the form whose draft is being updated. |
 
 Request body (JSON): same shape as the published form body — `_id`, `title`, `name`, `path`, `type`, `display`, `components`, etc.
 
@@ -122,11 +131,11 @@ curl -X PUT -H "x-jwt-token: $FORMIO_JWT" -H "Content-Type: application/json" \
 
 Retrieve the current draft for a revisioned form.
 
-| Path parameter | Type | Description |
-| --- | --- | --- |
-| `formId` | string | The MongoDB `_id` of the form. |
+| Path parameter | Type   | Description                    |
+| -------------- | ------ | ------------------------------ |
+| `formId`       | string | The MongoDB `_id` of the form. |
 
-Response: the draft form document, including `_id`, `title`, `name`, `path`, `components`, `access`, `submissionAccess`, and any in-progress edits. 
+Response: the draft form document, including `_id`, `title`, `name`, `path`, `components`, `access`, `submissionAccess`, and any in-progress edits.
 
 Example:
 
@@ -139,9 +148,9 @@ curl -H "x-jwt-token: $FORMIO_JWT" \
 
 Publish a draft. Publishing is done by issuing a standard `PUT` to the form endpoint with the desired definition — Form.io treats that save as the next published revision when revisions are enabled. After publishing, the draft is cleared and the new revision is appended to the revision list.
 
-| Path parameter | Type | Description |
-| --- | --- | --- |
-| `formId` | string | The MongoDB `_id` of the form being published. |
+| Path parameter | Type   | Description                                    |
+| -------------- | ------ | ---------------------------------------------- |
+| `formId`       | string | The MongoDB `_id` of the form being published. |
 
 Request body (JSON): the full form definition to publish. Typically the admin fetches `GET .../draft`, makes any last edits, then `PUT`s that body here.
 
@@ -161,9 +170,9 @@ curl -X PUT -H "x-jwt-token: $FORMIO_JWT" -H "Content-Type: application/json" \
 
 List every revision of a form, ordered oldest to newest. Each revision is a full snapshot of the form definition at publish time.
 
-| Path parameter | Type | Description |
-| --- | --- | --- |
-| `formId` | string | The MongoDB `_id` of the form. |
+| Path parameter | Type   | Description                    |
+| -------------- | ------ | ------------------------------ |
+| `formId`       | string | The MongoDB `_id` of the form. |
 
 Response: JSON array of form-revision documents. Each entry includes `_id` (revision ID, distinct from the form's `_id`), `title`, `name`, `path`, `type`, `display`, `tags`, `access`, `submissionAccess`, `owner`, and `components`. The revision's sequential version number is implied by array order and by the URL used to retrieve it.
 

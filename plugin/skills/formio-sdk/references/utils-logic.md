@@ -22,13 +22,13 @@ Runtime entrypoint (`@formio/core/process`):
 
 ```ts
 interface LogicContext {
-  component: Component;            // the component whose logic[] is being processed
-  data: object;                    // full submission data
-  row: object;                     // contextual row data (same as data at top level)
+  component: Component; // the component whose logic[] is being processed
+  data: object; // full submission data
+  row: object; // contextual row data (same as data at top level)
   form: { components: Component[] };
-  path: string;                    // dotted path of the component (used by scope writes)
+  path: string; // dotted path of the component (used by scope writes)
   scope: { conditionals?: object[] };
-  instance?: Component;            // renderer-attached instance (optional)
+  instance?: Component; // renderer-attached instance (optional)
 }
 ```
 
@@ -80,7 +80,7 @@ const fired = Utils.checkTrigger(
   submission.data,
   submission.data,
   form,
-  null,
+  null
 );
 ```
 

@@ -1,4 +1,3 @@
-
 ## Overview
 
 The runtime authentication API covers end-user (application user) account lifecycle inside a Form.io project: creating a new user via the default `user` resource, logging in, retrieving the currently authenticated user, logging out, and recognizing an expired session. This skill documents the default `user`/`userLogin` endpoints — for custom user types (e.g., `employee`) and role assignment wiring, see `runtime-custom-users.md`. For platform-admin auth use the `platform-auth` skill; for project-admin auth use `project-auth`.

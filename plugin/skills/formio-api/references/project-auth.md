@@ -1,4 +1,3 @@
-
 ## Overview
 
 The Project Authentication API covers everything a project admin does to manage administrative credentials for a Form.io project: inspecting the `admin` resource that backs admin accounts, creating/listing/retrieving/deleting project admin submissions, inspecting the admin login form and its actions, and exchanging admin credentials for a JWT via the admin login endpoint. These operations are for privileged users who configure the project; for regular end-user login flows, see `runtime-auth.md`.
@@ -80,8 +79,8 @@ curl -H "x-jwt-token: $FORMIO_JWT" \
 
 Retrieve a single project admin submission by its ID.
 
-| Path parameter | Type | Description |
-| --- | --- | --- |
+| Path parameter   | Type   | Description                                         |
+| ---------------- | ------ | --------------------------------------------------- |
 | `projectAdminId` | string | The MongoDB `_id` of the admin submission to fetch. |
 
 Response: the full admin submission document (same shape as list entries).
@@ -99,8 +98,8 @@ curl -H "x-jwt-token: $FORMIO_JWT" \
 
 Delete a project admin by ID. Irreversible — the admin loses access immediately.
 
-| Path parameter | Type | Description |
-| --- | --- | --- |
+| Path parameter   | Type   | Description                                          |
+| ---------------- | ------ | ---------------------------------------------------- |
 | `projectAdminId` | string | The MongoDB `_id` of the admin submission to delete. |
 
 Response: empty body with `200 OK` on success. Response shape inferred from Form.io conventions.

@@ -42,10 +42,9 @@ Hot-swap helpers (`packages/core/src/utils/Evaluator.ts` and the renderer index 
 ```ts
 import { Utils } from '@formio/js/utils';
 
-const greeting = Utils.Evaluator.interpolateString(
-  'Hello {{ data.firstName }}!',
-  { data: { firstName: 'Alice' } },
-);
+const greeting = Utils.Evaluator.interpolateString('Hello {{ data.firstName }}!', {
+  data: { firstName: 'Alice' },
+});
 console.log(greeting); // "Hello Alice!"
 ```
 
@@ -54,11 +53,7 @@ console.log(greeting); // "Hello Alice!"
 ```ts
 import { Utils } from '@formio/js/utils';
 
-const valid = Utils.Evaluator.evaluate(
-  'valid = data.age >= 18;',
-  { data: { age: 21 } },
-  'valid',
-);
+const valid = Utils.Evaluator.evaluate('valid = data.age >= 18;', { data: { age: 21 } }, 'valid');
 console.log(valid); // true
 ```
 
@@ -67,10 +62,7 @@ console.log(valid); // true
 ```ts
 import { Utils } from '@formio/js/utils';
 
-const ok = Utils.Evaluator.evaluate(
-  { '>=': [{ var: 'data.age' }, 18] },
-  { data: { age: 21 } },
-);
+const ok = Utils.Evaluator.evaluate({ '>=': [{ var: 'data.age' }, 18] }, { data: { age: 21 } });
 console.log(ok); // true
 ```
 
@@ -92,10 +84,9 @@ Use this pattern: `interpolateString` for value substitution → `sanitize` for 
 ```ts
 import { Utils } from '@formio/js/utils';
 
-const raw = Utils.Evaluator.interpolateString(
-  '<p>Hello {{ data.firstName }}</p>',
-  { data: { firstName: '<img src=x onerror=alert(1)>' } },
-);
+const raw = Utils.Evaluator.interpolateString('<p>Hello {{ data.firstName }}</p>', {
+  data: { firstName: '<img src=x onerror=alert(1)>' },
+});
 // raw === '<p>Hello <img src=x onerror=alert(1)></p>' — DANGEROUS to render as-is.
 
 const safe = Utils.sanitize(raw, {});

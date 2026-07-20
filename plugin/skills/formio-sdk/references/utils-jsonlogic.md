@@ -58,7 +58,7 @@ import { jsonLogic } from '@formio/core';
 
 const total = jsonLogic.apply(
   { '*': [{ var: 'data.qty' }, { var: 'data.unitPrice' }] },
-  { data: { qty: 3, unitPrice: 19.99 } },
+  { data: { qty: 3, unitPrice: 19.99 } }
 );
 console.log(total); // 59.97
 ```
@@ -76,7 +76,7 @@ const eligible = jsonLogic.apply(
       { '==': [{ var: 'data.consent' }, true] },
     ],
   },
-  { data: { country: 'US', age: 25, consent: true } },
+  { data: { country: 'US', age: 25, consent: true } }
 );
 console.log(eligible); // true
 ```
@@ -90,7 +90,7 @@ const within30 = jsonLogic.apply(
   {
     '<=': [{ var: 'data.appointment' }, { relativeMaxDate: [30] }],
   },
-  { data: { appointment: '2026-06-01T00:00:00.000Z' } },
+  { data: { appointment: '2026-06-01T00:00:00.000Z' } }
 );
 ```
 
@@ -99,13 +99,15 @@ const within30 = jsonLogic.apply(
 ```ts
 import { jsonLogic } from '@formio/core';
 
-jsonLogic.add_operation('startsWith', (str: string, prefix: string) =>
-  typeof str === 'string' && typeof prefix === 'string' && str.startsWith(prefix),
+jsonLogic.add_operation(
+  'startsWith',
+  (str: string, prefix: string) =>
+    typeof str === 'string' && typeof prefix === 'string' && str.startsWith(prefix)
 );
 
 const ok = jsonLogic.apply(
   { startsWith: [{ var: 'data.sku' }, 'ACME-'] },
-  { data: { sku: 'ACME-1234' } },
+  { data: { sku: 'ACME-1234' } }
 );
 ```
 
@@ -115,10 +117,7 @@ const ok = jsonLogic.apply(
 import { jsonLogic } from '@formio/core';
 
 const rule = {
-  and: [
-    { '==': [{ var: 'data.country' }, 'US'] },
-    { '>=': [{ var: 'data.age' }, 21] },
-  ],
+  and: [{ '==': [{ var: 'data.country' }, 'US'] }, { '>=': [{ var: 'data.age' }, 21] }],
 };
 
 console.log(jsonLogic.uses_data(rule));

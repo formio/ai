@@ -3,6 +3,7 @@
 ## Table of Contents
 
 ### Open Source
+
 1. [Save Submission](#save-submission)
 2. [Login](#login)
 3. [Role Assignment](#role-assignment)
@@ -11,6 +12,7 @@
 6. [Reset Password](#reset-password)
 
 ### Enterprise
+
 7. [OAuth](#oauth)
 8. [Group Assignment](#group-assignment)
 9. [LDAP Login](#ldap-login)
@@ -30,7 +32,7 @@ The save action persists the submission to the database. Add it to any form or r
 ### Settings
 
 | Field | Key | Type | Description |
-|-------|-----|------|-------------|
+| --- | --- | --- | --- |
 | Save to Resource | `resource` | resource select | Optional. Maps submission data to a different resource form |
 
 ### Field Mapping (when saving to another resource)
@@ -77,7 +79,7 @@ Authenticates a user against one or more resource forms. Does not create a submi
 ### Settings
 
 | Field | Key | Type | Required | Default | Description |
-|-------|-----|------|----------|---------|-------------|
+| --- | --- | --- | --- | --- | --- |
 | Resources | `resources` | string[] | Yes | — | Resource form IDs to authenticate against |
 | Username Field | `username` | string | Yes | — | Component API key for the username/email field |
 | Password Field | `password` | string | Yes | — | Component API key for the password field |
@@ -96,6 +98,7 @@ Authenticates a user against one or more resource forms. Does not create a submi
 ### Brute-Force Protection
 
 Failed attempts are tracked in `user.metadata.login`:
+
 - After `allowedAttempts` failures within `attemptWindow` seconds, the account locks
 - Locked accounts must wait `lockWait` seconds before retrying
 - Setting `allowedAttempts: 0` disables lockout (not recommended)
@@ -111,7 +114,7 @@ Adds or removes a role from a user's submission. The target user is determined b
 ### Settings
 
 | Field | Key | Type | Options | Required | Description |
-|-------|-----|------|---------|----------|-------------|
+| --- | --- | --- | --- | --- | --- |
 | Resource Association | `association` | string | `new`, `existing` | Yes | Which resource to modify |
 | Action Type | `type` | string | `add`, `remove` | Yes | Whether to add or remove the role |
 | Role | `role` | string | — | Yes | The role ID to assign/remove |
@@ -140,7 +143,7 @@ Sends an email notification when a submission event occurs.
 ### Settings
 
 | Field | Key | Type | Required | Default | Description |
-|-------|-----|------|----------|---------|-------------|
+| --- | --- | --- | --- | --- | --- |
 | Transport | `transport` | string | Yes | — | Email transport name (e.g., `"default"`) |
 | From | `from` | string | No | `no-reply@example.com` | Sender email address — see "From address" below |
 | Reply-To | `replyTo` | string | No | — | Reply-to address |
@@ -156,7 +159,7 @@ Sends an email notification when a submission event occurs.
 ### Template Variables
 
 | Variable | Description |
-|----------|-------------|
+| --- | --- |
 | `{{ data.fieldKey }}` | Individual submission field value |
 | `{{ id }}` | The current submission's `_id` |
 | `{{ submission(data, form.components) }}` | Formatted table of all submission fields |
@@ -207,7 +210,7 @@ Makes an HTTP request to an external URL when a submission event occurs.
 ### Settings
 
 | Field | Key | Type | Required | Default | Description |
-|-------|-----|------|----------|---------|-------------|
+| --- | --- | --- | --- | --- | --- |
 | Webhook URL | `url` | string | Yes | — | Target URL (supports `{{ data.field }}` interpolation) |
 | Block Request | `block` | boolean | No | false | Wait for webhook response before completing submission |
 | Username | `username` | string | No | — | HTTP Basic Auth username |
@@ -219,10 +222,18 @@ The webhook sends a JSON POST/PUT/DELETE (matching the submission's HTTP method)
 
 ```json
 {
-  "request": { /* original request body */ },
-  "response": { /* response object */ },
-  "submission": { /* current submission as plain object */ },
-  "params": { /* URL route parameters */ }
+  "request": {
+    /* original request body */
+  },
+  "response": {
+    /* response object */
+  },
+  "submission": {
+    /* current submission as plain object */
+  },
+  "params": {
+    /* URL route parameters */
+  }
 }
 ```
 
@@ -247,7 +258,7 @@ Implements a two-phase password reset flow using temporary JWT tokens.
 ### Settings
 
 | Field | Key | Type | Required | Default | Description |
-|-------|-----|------|----------|---------|-------------|
+| --- | --- | --- | --- | --- | --- |
 | Resources | `resources` | string[] | Yes | — | Resource forms containing user submissions |
 | Username Field | `username` | string | Yes | — | Component API key for username/email |
 | Password Field | `password` | string | Yes | — | Component API key for password |
@@ -261,6 +272,7 @@ Implements a two-phase password reset flow using temporary JWT tokens.
 ### Two-Phase Flow
 
 **Phase 1 — Request reset (user submits email):**
+
 1. The `before` + `form` handler modifies the form display: hides password field, shows only username, changes submit button label
 2. User submits their email/username
 3. Server looks up the user across configured resources
@@ -268,6 +280,7 @@ Implements a two-phase password reset flow using temporary JWT tokens.
 5. Sends email with `{{ resetlink }}` expanded to `{url}?x-jwt-token={token}`
 
 **Phase 2 — Set new password (user clicks link):**
+
 1. The `before` + `form` handler modifies the form: hides username, shows password field
 2. User enters new password and submits
 3. Server validates the JWT token type is `"resetpass"`
@@ -276,8 +289,8 @@ Implements a two-phase password reset flow using temporary JWT tokens.
 
 ### Template Variables
 
-| Variable | Description |
-|----------|-------------|
+| Variable          | Description                                         |
+| ----------------- | --------------------------------------------------- |
 | `{{ resetlink }}` | Full URL with JWT token appended as query parameter |
 
 ---
@@ -297,10 +310,10 @@ Provides OAuth/SSO authentication. Supports multiple providers (Google, GitHub, 
 ### Settings
 
 | Field | Key | Type | Required | Description |
-|-------|-----|------|----------|-------------|
+| --- | --- | --- | --- | --- |
 | OAuth Provider | `provider` | select | Yes | The configured OAuth provider |
 | Action | `association` | select | Yes | What to do after OAuth completes (see below) |
-| Resource | `resource` | select | Yes* | Target resource form (*required for `existing` and `new`) |
+| Resource | `resource` | select | Yes\* | Target resource form (\*required for `existing` and `new`) |
 | Role | `role` | select | No | Role to assign (only for `new` association) |
 | Sign-in Button | `button` | select | Yes | Form button component with `action: "oauth"` |
 | Assign Roles | `roles` | datagrid | No | Map OAuth claims to roles (only for `remote` association) |
@@ -309,7 +322,7 @@ Provides OAuth/SSO authentication. Supports multiple providers (Google, GitHub, 
 ### Association Types
 
 | Value | Label | Behavior |
-|-------|-------|----------|
+| --- | --- | --- |
 | `remote` | Remote Authentication | Authenticates via OAuth provider only; no local resource lookup |
 | `existing` | Login Existing Resource | Matches OAuth identity to an existing resource submission |
 | `new` | Register New Resource | Creates a new resource submission from OAuth profile |
@@ -330,7 +343,7 @@ Assigns users to groups for group-based access control. This is a premium featur
 ### Settings
 
 | Field | Key | Type | Required | Default | Description |
-|-------|-----|------|----------|---------|-------------|
+| --- | --- | --- | --- | --- | --- |
 | Group Resource | `group` | select | Yes | — | Select component on the form that references the group resource |
 | User Resource | `user` | select | No | `self` | Select component referencing the user resource (defaults to current user) |
 | User Role | `role` | select | No | — | Select component referencing the role to assign within the group |
@@ -353,7 +366,7 @@ Authenticates users against an LDAP or Active Directory server. Requires LDAP to
 ### Settings
 
 | Field | Key | Type | Required | Default | Description |
-|-------|-----|------|----------|---------|-------------|
+| --- | --- | --- | --- | --- | --- |
 | Username Field | `usernameField` | select | Yes | — | Form component key (textfield or email) |
 | Password Field | `passwordField` | select | Yes | — | Form component key (password type) |
 | Passthrough | `passthrough` | boolean | No | false | If true, failed LDAP auth passes through to the next action (incorrect passwords still fail) |
@@ -388,9 +401,9 @@ Handles two-factor authentication login. Requires the user to have 2FA enabled o
 
 ### Settings
 
-| Field | Key | Type | Required | Description |
-|-------|-----|------|----------|-------------|
-| Token Field | `token` | select | No | Form component for the TOTP token |
+| Field       | Key     | Type   | Required | Description                       |
+| ----------- | ------- | ------ | -------- | --------------------------------- |
+| Token Field | `token` | select | No       | Form component for the TOTP token |
 
 ### How It Works
 
@@ -410,9 +423,9 @@ Handles login with a 2FA recovery code when the user has lost access to their au
 
 ### Settings
 
-| Field | Key | Type | Required | Description |
-|-------|-----|------|----------|-------------|
-| Recovery Code Field | `token` | select | No | Form component for the recovery code |
+| Field               | Key     | Type   | Required | Description                          |
+| ------------------- | ------- | ------ | -------- | ------------------------------------ |
+| Recovery Code Field | `token` | select | No       | Form component for the recovery code |
 
 ### How It Works
 
@@ -432,7 +445,7 @@ Syncs submission data to a Google Sheets spreadsheet. Requires Google Sheets int
 ### Settings
 
 | Field | Key | Type | Required | Default | Description |
-|-------|-----|------|----------|---------|-------------|
+| --- | --- | --- | --- | --- | --- |
 | Sheet ID | `sheetID` | string | Yes | — | The Google Sheets spreadsheet ID |
 | Worksheet Name | `worksheetName` | string | Yes | — | The worksheet tab name (e.g., `"Sheet1"`) |
 | Start Row | `spreadSheetStartRow` | string | No | `"2"` | First data row (row 1 is typically headers) |
@@ -458,7 +471,7 @@ Executes SQL operations against a remote database via Resquel. Only available wh
 ### Settings
 
 | Field | Key | Type | Required | Default | Description |
-|-------|-----|------|----------|---------|-------------|
+| --- | --- | --- | --- | --- | --- |
 | Block Request | `block` | boolean | No | false | Wait for SQL response before completing submission |
 | Table Name | `table` | string | Yes | — | Target database table |
 | Primary Key | `primary` | string | Yes | `"id"` | Must be auto-incrementing |

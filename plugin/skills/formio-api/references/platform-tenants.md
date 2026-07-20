@@ -1,4 +1,3 @@
-
 ## Overview
 
 A tenant is a specialized sub-project type (`type: "tenant"`) used to give isolated admin/data namespaces to customer organizations sharing a common parent project. This skill covers creating tenants, listing tenants within a parent project, retrieving tenant information, updating tenant metadata, provisioning tenant administrators, logging in as a tenant admin, and creating forms inside a tenant. All operations are rooted at `${FORMIO_BASE_URL}/project` — tenants are project-like documents, so they share the `/project` resource tree with top-level projects and stages.
@@ -39,11 +38,11 @@ The Postman documentation shows creating two separate tenants (Tenant A, Tenant 
 
 List tenants within a parent project.
 
-| Query parameter | Type | Description |
-| --- | --- | --- |
-| `project` | string | Parent project ID. Required. |
-| `type` | string | Must be `tenant`. |
-| `select` | string | Optional field projection (e.g., `title,name`). |
+| Query parameter | Type   | Description                                     |
+| --------------- | ------ | ----------------------------------------------- |
+| `project`       | string | Parent project ID. Required.                    |
+| `type`          | string | Must be `tenant`.                               |
+| `select`        | string | Optional field projection (e.g., `title,name`). |
 
 Response: array of tenant documents (projection limited by `select`).
 

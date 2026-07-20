@@ -410,14 +410,14 @@ Used inside a `type: "form"` entry to link the form to a Resource record that wa
   "label": "Applicant",
   "widget": "choicesjs",
   "dataSrc": "resource",
-  "data": { "resource": "applicant" },        // machineName of the existing Resource
+  "data": { "resource": "applicant" }, // machineName of the existing Resource
   "template": "<span>{{ item.data.firstName }} {{ item.data.lastName }}</span>",
-  "reference": true,                            // store a resolvable reference, not a bare _id
-  "disabled": true,                             // locked — the user cannot change it
-  "defaultValue": "",                           // pre-populated at runtime to the user's own Applicant record
+  "reference": true, // store a resolvable reference, not a bare _id
+  "disabled": true, // locked — the user cannot change it
+  "defaultValue": "", // pre-populated at runtime to the user's own Applicant record
   "validate": { "required": true },
   "input": true,
-  "tableView": true
+  "tableView": true,
 }
 ```
 
@@ -512,16 +512,16 @@ Add extra fields (firstName, lastName, profile photo, etc.) after the identifier
 
 Typical set per resource/form type (reference — the planner SKILL.md `Actions emission — per use-case` section re-states the algorithm). "Client-only form (Search, etc.)" is deliberately absent from this table because it has no actions:
 
-| Resource / form type                           | Typical `actions` keys                                            |
-| ---------------------------------------------- | ------------------------------------------------------------------ |
-| Plain resource (Project, Task, …)              | `<name>:save`                                                      |
-| `user` resource                                | `user:save`                                                        |
-| Login form                                     | `<name>:login` (a plain `<name>:save` is optional — audit only; see warning) |
-| Register form                                  | `<name>:save`, `<name>:role`, `<name>:login`                       |
-| Join resource with group-based access          | `<name>:save`, `<name>:group`                                      |
-| Join resource without group access             | `<name>:save`                                                      |
-| Notification form (sends email / webhook)      | `<name>:email` / `<name>:webhook` — plus `<name>:save` only if it also persists |
-| Client-only form (embedded Search, etc.)       | none — data read in the browser, never sent to the submission API |
+| Resource / form type | Typical `actions` keys |
+| --- | --- |
+| Plain resource (Project, Task, …) | `<name>:save` |
+| `user` resource | `user:save` |
+| Login form | `<name>:login` (a plain `<name>:save` is optional — audit only; see warning) |
+| Register form | `<name>:save`, `<name>:role`, `<name>:login` |
+| Join resource with group-based access | `<name>:save`, `<name>:group` |
+| Join resource without group access | `<name>:save` |
+| Notification form (sends email / webhook) | `<name>:email` / `<name>:webhook` — plus `<name>:save` only if it also persists |
+| Client-only form (embedded Search, etc.) | none — data read in the browser, never sent to the submission API |
 
 Each action is keyed `"<formMachineName>:<actionName>"`. Fields:
 

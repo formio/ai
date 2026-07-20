@@ -35,10 +35,10 @@ The planner's `complex-crm-transitive` example walks through the many-to-many sh
 
 Decide cardinality first, because it dictates where the Group Assignment Action lives:
 
-| User belongs to … | Shape | Group Assignment Action attaches to |
-|-------------------|-------|-------------------------------------|
-| Exactly one group | One-to-many | The `user` Resource |
-| Many groups | Many-to-many | The join Resource (`UserTeam`, etc.) |
+| User belongs to … | Shape        | Group Assignment Action attaches to  |
+| ----------------- | ------------ | ------------------------------------ |
+| Exactly one group | One-to-many  | The `user` Resource                  |
+| Many groups       | Many-to-many | The join Resource (`UserTeam`, etc.) |
 
 If the requirement might evolve from one-to-many to many-to-many later, start with many-to-many — migrating from a `select` on `user` to a join Resource after data has been written is a non-trivial backfill.
 
@@ -69,8 +69,7 @@ Setup steps:
 1. **Create the group Resource** — same as the one-to-many case.
 2. **Create a join Resource** — `UserTeam`, `UserDepartment`, `ProjectUser`, etc. One row per (user, group) membership. Carries at minimum two `select` components (both `reference: true`):
    - `user` — points at the `user` Resource.
-   - A group-reference field (e.g. `team`) — points at the group Resource.
-   Add metadata fields (`role`, `joinedAt`, `invitedBy`) on the join itself when needed.
+   - A group-reference field (e.g. `team`) — points at the group Resource. Add metadata fields (`role`, `joinedAt`, `invitedBy`) on the join itself when needed.
 3. **Attach a Group Assignment Action to the join Resource** — `name: "group"`, `priority: 5`, `method: ["create"]`, `handler: ["after"]`. Settings name the join's own keys:
    - `settings.group` — the group-reference field on the join (e.g. `"team"`).
    - `settings.user` — the user-reference field on the join (e.g. `"user"`).
@@ -104,7 +103,7 @@ The `select` component on the child Resource that references the group must carr
   "key": "project",
   "reference": true,
   "submissionAccess": [
-    { "type": "read",   "roles": [] },
+    { "type": "read", "roles": [] },
     { "type": "create", "roles": [] },
     { "type": "update", "roles": [] },
     { "type": "delete", "roles": [] }
@@ -132,7 +131,7 @@ The fix is a **hidden calculated mirror**: a hidden `select` on the grandchild t
   "refreshOn": "account",
   "reference": true,
   "submissionAccess": [
-    { "type": "read",   "roles": [] },
+    { "type": "read", "roles": [] },
     { "type": "create", "roles": [] },
     { "type": "update", "roles": [] },
     { "type": "delete", "roles": [] }
