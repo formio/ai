@@ -110,7 +110,6 @@ Create a brand-new 'greenfield' form-based application — or introduce a new fo
 - [CRM Application](./examples/apps/crm.md) — clients, deals, and activity logs with owner-scoped access.
 - [Help Desk](./examples/apps/help-desk.md) — customer tickets, agent workflows, internal notes, and email notifications.
 - [Storyboard](./examples/apps/storyboard.md) — production → scene → shot hierarchy with collaborative crew access.
-- [EMR Patient Onboarding](./examples/apps/emr-patient-onboarding.md) — extend an existing application with a new form-based feature.
 
 ***This library currently only supports the Angular application framework for new 'greenfield' applications. Other frameworks are coming soon.***
 
