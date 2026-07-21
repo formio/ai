@@ -10,6 +10,6 @@ A classic sales CRM. Exercises the full build-new pipeline: multi-resource data 
 
 ## What to look for
 
-- The planner should propose three Resources (Client, Deal, Activity) with Deal → Client and Activity → Deal references, plus a user resource, and an owner-based Access Matrix with a sales role and an admin/owner role.
+- The planner should propose three new Resources (Client, Deal, Activity) with Deal → Client and Activity → Deal references, reuse the default user resource (rather than creating a new one), and produce an owner-based Access Matrix with a sales role and an admin/owner role
 - "only see their own" should surface as `own`-scoped submission access, not a role guard in the front end.
 - After import, framework routing should offer the registered framework (Angular today) and hand off with both template paths.
