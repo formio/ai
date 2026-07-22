@@ -1,5 +1,11 @@
 # @formio/ai
 
+## 0.8.0
+
+### Minor Changes
+
+- a9012a6: Adding `formio-form`, `formio-form-builder` skills and general cleanup.
+
 ## 0.7.0
 
 ### Minor Changes

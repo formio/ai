@@ -1,5 +1,11 @@
 # @formio/mcp
 
+## 0.5.0
+
+### Minor Changes
+
+- a9012a6: Adding `formio-form`, `formio-form-builder` skills and general cleanup.
+
 ## 0.4.1
 
 ### Patch Changes
