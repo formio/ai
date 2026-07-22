@@ -5,7 +5,7 @@ A multi-page conditional wizard. Exercises the `formio-form-builder` orchestrato
 ## Prompt
 
 ```
-/formio-form-builder I would like to create a new multi-page wizard form that is responsible for collecting college applications, which we will embed within our content management system. This wizard should have multiple sections where it first collects the applicants personal information, followed by scholastic achievements, followed by extra curricular activities. It should follow up with them selecting their desired program, and based on what they select, the following wizard pages should contain the specific onboarding questions for that program.
+/formio-form-builder I would like to create a new multi-page wizard form that is responsible for collecting college applications, which we will embed within our content management system. This wizard should have multiple sections where it first collects the applicant's personal information, followed by scholastic achievements, followed by extra curricular activities. It should follow up with them after they select their desired program, and based on what they select, the following wizard pages should contain the specific onboarding questions for that program.
 ```
 
 ## What to look for
