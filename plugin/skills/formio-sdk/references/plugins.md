@@ -54,7 +54,12 @@ interface Plugin {
   deregister?(Formio: typeof FormioStatic): void;
 
   // Lifecycle hooks (any subset):
-  preRequest?(requestArgs: { url: string; method: string; data: any; opts: any }): void | Promise<void>;
+  preRequest?(requestArgs: {
+    url: string;
+    method: string;
+    data: any;
+    opts: any;
+  }): void | Promise<void>;
   request?(requestArgs): Promise<any> | null;
   staticRequest?(requestArgs): Promise<any> | null;
   fileRequest?(requestArgs): Promise<any> | null;
@@ -97,7 +102,7 @@ Formio.registerPlugin(
       return options;
     },
   },
-  'tenant-header',
+  'tenant-header'
 );
 ```
 
@@ -124,7 +129,7 @@ Formio.registerPlugin(
       });
     },
   },
-  'memo-cache',
+  'memo-cache'
 );
 ```
 
@@ -144,7 +149,7 @@ Formio.registerPlugin(
       console.log('[formio]', method, url);
     },
   },
-  'logger',
+  'logger'
 );
 ```
 

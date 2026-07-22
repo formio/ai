@@ -1,7 +1,6 @@
-
 ## Overview
 
-Project management at the platform level: creating new projects, listing all projects/stages/tenants on a deployment, retrieving a project by ID or alias, updating project metadata (title, access, framework, settings), exporting a project template, importing a template, and deleting a project. The create/list/get-by-id/delete operations are rooted at `${FORMIO_BASE_URL}/project` (platform root). Update-by-alias, access-info, export, and import operations are actually invoked at the *project* endpoint (`${FORMIO_PROJECT_URL}/...`) and are documented here because they are project-management operations typically performed by a platform admin.
+Project management at the platform level: creating new projects, listing all projects/stages/tenants on a deployment, retrieving a project by ID or alias, updating project metadata (title, access, framework, settings), exporting a project template, importing a template, and deleting a project. The create/list/get-by-id/delete operations are rooted at `${FORMIO_BASE_URL}/project` (platform root). Update-by-alias, access-info, export, and import operations are actually invoked at the _project_ endpoint (`${FORMIO_PROJECT_URL}/...`) and are documented here because they are project-management operations typically performed by a platform admin.
 
 ## Root URL
 
@@ -69,11 +68,11 @@ Get a project by its MongoDB ID. Returns the full project document including acc
 
 Errors: `404` if no project with that ID; `401`/`403` if the caller lacks read access to the project.
 
-### GET ${FORMIO_PROJECT_URL} *(project-endpoint alias)*
+### GET ${FORMIO_PROJECT_URL} _(project-endpoint alias)_
 
 Cross-scope convenience: the project endpoint's root returns the same document as `/project/:projectId`, addressed by alias (`{{baseUrl}}/{{projectName}}`). Use this when you have the project name but not the ID.
 
-### PUT ${FORMIO_PROJECT_URL} *(project-endpoint, update project metadata)*
+### PUT ${FORMIO_PROJECT_URL} _(project-endpoint, update project metadata)_
 
 Cross-scope: replace the project's metadata (title, description, access, framework, settings, default access). The request body MUST include the project's `_id`; omitted fields are reset to defaults.
 
@@ -81,7 +80,7 @@ Request body: full project document (see create shape) plus `_id`. Include every
 
 Response: the updated project document. `409` if a stage-aware revision check fails.
 
-### GET ${FORMIO_PROJECT_URL}/access *(project-endpoint, access info)*
+### GET ${FORMIO_PROJECT_URL}/access _(project-endpoint, access info)_
 
 Cross-scope: return the project's complete access configuration — roles (with IDs), resource-level access map, and public access flags. Used by UIs that render "who can do what" for a project.
 
@@ -97,20 +96,20 @@ Response shape (abridged):
 }
 ```
 
-### GET ${FORMIO_PROJECT_URL}/export *(project-endpoint, export template)*
+### GET ${FORMIO_PROJECT_URL}/export _(project-endpoint, export template)_
 
 Cross-scope: export the project's complete template (roles, forms/resources, actions) as a portable JSON document. Use this to migrate a project between deployments or to snapshot it before making destructive changes.
 
 Response: a template JSON object with `title`, `version`, `roles`, `forms`, `actions`, and `resources`.
 
-### POST ${FORMIO_PROJECT_URL}/import *(project-endpoint, import template)*
+### POST ${FORMIO_PROJECT_URL}/import _(project-endpoint, import template)_
 
 Cross-scope: import a template JSON into an existing project. Merges the template's roles, resources, forms, and actions into the current project.
 
 Request body:
 
 ```json
-{ "template": { "title": "...", "version": "2.0.0", "roles": { }, "forms": [], "resources": [] } }
+{ "template": { "title": "...", "version": "2.0.0", "roles": {}, "forms": [], "resources": [] } }
 ```
 
 Response: plain text `Ok` on success. `400` if the template is malformed or incompatible with the current project's resources.

@@ -6,10 +6,10 @@ This document is loaded by the parent `formio-angular` skill during Phase 1. It 
 
 Two URLs that every later phase depends on. Store both as values the rest of the orchestrator can read — by convention the parent stashes them under the variable names `FORMIO_PROJECT_URL` and `FORMIO_BASE_URL`, matching the MCP server's environment-variable contract so the same identifiers flow through CONFIG.md, AUTH.md, and the sub-skill.
 
-| Name in this skill | Env-var name the MCP uses | Goes into `config.ts` as | Example               |
-| ------------------ | ------------------------- | ------------------------ | --------------------- |
-| `Project URL`      | `FORMIO_PROJECT_URL`      | `appUrl`                 | `https://abc.form.io` |
-| `Base URL`         | `FORMIO_BASE_URL`     | `apiUrl`                 | `https://api.form.io`     |
+| Name in this skill | Env-var name the MCP uses | Goes into `config.ts` as | Example |
+| --- | --- | --- | --- |
+| `Project URL` | `FORMIO_PROJECT_URL` | `appUrl` | `https://abc.form.io` |
+| `Base URL` | `FORMIO_BASE_URL` | `apiUrl` | `https://api.form.io` |
 
 The `Project URL` is the user's project API root — where forms and submissions live. The `Base URL` is the Form.io platform deployment that hosts the project. The Form.io SDK needs both so it knows which project to address AND which platform to fetch auth + tenant metadata from.
 

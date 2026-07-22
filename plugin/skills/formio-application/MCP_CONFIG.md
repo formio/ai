@@ -26,16 +26,9 @@ Tell the user:
 
 The rest of this document describes the "no plugin" path — user-authored `.mcp.json` with explicit env vars. Only follow it when plugin-mode detection above fails.
 
-## Env-var naming — read this first
+## Env-var naming
 
-There are two names for the platform deployment URL in this repo:
-
-| Where                                                        | Name                  | Why                                                                                                          |
-| ------------------------------------------------------------ | --------------------- | ------------------------------------------------------------------------------------------------------------ |
-| Orchestrator internal state (set in Step 2, `DEPLOYMENT.md`) | `FORMIO_BASE_URL` | Matches the skills-library convention — the platform deployment URL the `formio-api` skill documents under its platform-scope references. |
-| Written into `.mcp.json` `env` block                         | `FORMIO_BASE_URL`     | Matches the existing `.mcp.json` / `example/.mcp.json` precedent that already ships in this repo.            |
-
-They are two names for the **same concept** (the platform deployment URL, e.g., `https://form.io`). This step performs the mapping: it reads `FORMIO_BASE_URL` from orchestrator state and writes it under the key `FORMIO_BASE_URL`. `FORMIO_PROJECT_URL` is the same name in both places.
+The keys written into the `.mcp.json` `env` block are exactly the orchestrator-state names captured in Step 2 (`DEPLOYMENT.md`): `FORMIO_PROJECT_URL` (the project URL) and `FORMIO_BASE_URL` (the platform deployment URL, e.g., `https://form.io`). No renaming happens between orchestrator state and `.mcp.json`.
 
 ## `.mcp.json` shape
 
@@ -67,7 +60,7 @@ command: "npx"
 args:    ["-y", "@formio/mcp"]
 ```
 
-This is a **placeholder** default until `@formio/mcp` publishes to npm — the command will fail to spawn until the package is published. The approval preview flags this so the user can tweak the command before approving. Once `@formio/mcp` publishes, the default JustWorks and no warning is needed.
+`@formio/mcp` is published to npm, so this default works out of the box — `npx` fetches the latest release on first spawn. The approval preview still shows the full command so the user can tweak it before approving.
 
 If an existing `./.mcp.json` already has a `formio-mcp` entry with custom `command` / `args`, preserve them — the user has chosen their setup deliberately; only the `env` block needs rewriting.
 
@@ -108,13 +101,13 @@ If `./.mcp.json` does not exist, create it with a single `formio-mcp` entry usin
 
 If the merge would produce identical content to what is already on disk — specifically, `./.mcp.json` already has a `formio-mcp` entry whose `env.FORMIO_PROJECT_URL` and `env.FORMIO_BASE_URL` match the Step-2 captures exactly — skip this step entirely. Tell the user:
 
-> Skipping MCP Config — `./.mcp.json` already points at this project. Continuing to Step 4.
+> Skipping MCP Config — `./.mcp.json` already points at this project. Continuing to Step 5 (Import).
 
-When the step is skipped, no restart is required. The skill proceeds to Step 4 (Authenticate) in the same invocation.
+When the step is skipped, no restart is required. The skill proceeds to Step 5 (Import) in the same invocation.
 
 ## Approval gate — preview then write
 
-Before writing, print the FULL merged `.mcp.json` as a fenced `json` block. If the default command was chosen because no existing entry was found, include a one-line flag in the preview noting that this is the npm placeholder default until `@formio/mcp` publishes:
+Before writing, print the FULL merged `.mcp.json` as a fenced `json` block. If the default command was chosen because no existing entry was found, include a one-line note in the preview naming the default command:
 
 ````
 About to write ./.mcp.json:
@@ -134,17 +127,13 @@ About to write ./.mcp.json:
 }
 ````
 
-(Command default: `npx -y @formio/mcp` — placeholder until the package publishes to npm. If you run the MCP server differently, edit the
-command/args after writing — the env block is what matters for routing.)
+(Command default: `npx -y @formio/mcp`. If you run the MCP server differently, edit the command/args after writing — the env block is what matters for routing.)
 
 If you approve:
 
 1. The file will be written.
-2. You must restart Claude Code (restart this session, or run `/mcp` to
-   reconnect the `formio-mcp` server if supported in your Claude Code
-   version) for the new env to take effect.
-3. Once reconnected, re-invoke this skill (or tell me to continue) — I'll
-   resume from Step 4 (Authenticate).
+2. You must restart Claude Code (restart this session, or run `/mcp` to reconnect the `formio-mcp` server if supported in your Claude Code version) for the new env to take effect.
+3. Once reconnected, re-invoke this skill (or tell me to continue) — I'll resume from Step 5 (Import).
 
 Proceed?
 
@@ -154,9 +143,9 @@ On decline, do not touch the file; exit the step without advancing.
 
 ## After approval — write, then halt
 
-Write the merged file. Print the restart/reconnect instruction (same text as in the preview). **Halt the current invocation.** Do NOT advance to Step 4 in the same session — Claude Code's MCP servers are spawned at session start; the new env will only take effect after a restart or `/mcp` reconnect.
+Write the merged file. Print the restart/reconnect instruction (same text as in the preview). **Halt the current invocation.** Do NOT advance to Step 5 in the same session — Claude Code's MCP servers are spawned at session start; the new env will only take effect after a restart or `/mcp` reconnect.
 
-If the step was skipped (see Skip rule), there is no halt — the session continues to Step 4.
+If the step was skipped (see Skip rule), there is no halt — the session continues to Step 5 (Import).
 
 ## `.gitignore` note
 

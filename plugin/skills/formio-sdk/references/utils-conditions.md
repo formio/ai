@@ -72,7 +72,7 @@ const visible = Utils.checkCustomConditional(
   data,
   null,
   'show',
-  false,
+  false
 );
 console.log(visible); // true
 ```
@@ -84,13 +84,7 @@ import { Utils } from '@formio/js/utils';
 
 Utils.eachComponent(form.components, (component) => {
   if (!component.conditional) return;
-  const show = Utils.checkCondition(
-    component,
-    submission.data,
-    submission.data,
-    form,
-    null,
-  );
+  const show = Utils.checkCondition(component, submission.data, submission.data, form, null);
   console.log(component.key, '→', show);
 });
 ```
@@ -108,7 +102,7 @@ const visible = Utils.checkSimpleConditional(
   { when: 'country', eq: 'US', show: 'true' },
   data,
   data,
-  null,
+  null
 );
 console.log(visible); // true
 ```

@@ -1,4 +1,3 @@
-
 ## Overview
 
 Stages are per-environment copies of a parent project (authoring, staging, production) used to separate development from live data. This skill covers creating a stage, retrieving stage details, listing all stages for a project, configuring a remote connection between a stage and an external Form.io deployment, and the full versioning workflow: tagging a version, listing versions, fetching a specific version, deploying a version to a stage, and deleting versions or stages. Two project-endpoint operations (`/export`, `/import`) are relevant to cross-environment template flow and are referenced here but documented in detail in `platform-projects.md`.
@@ -48,11 +47,11 @@ Get a stage by ID. Returns the stage document including its `remote` configurati
 
 List all stages under a parent project.
 
-| Query parameter | Type | Description |
-| --- | --- | --- |
-| `project` | string | Parent project ID. Required to scope the list to a single project. |
-| `type` | string | Must be `stage`. |
-| `select` | string | Optional field projection. |
+| Query parameter | Type   | Description                                                        |
+| --------------- | ------ | ------------------------------------------------------------------ |
+| `project`       | string | Parent project ID. Required to scope the list to a single project. |
+| `type`          | string | Must be `stage`.                                                   |
+| `select`        | string | Optional field projection.                                         |
 
 Response: array of stage documents.
 
@@ -70,7 +69,11 @@ Request body (abbreviated, include the full existing stage document):
   "remote": {
     "type": "Subdirectories",
     "url": "https://form.local",
-    "project": { "_id": "<remoteProjectId>", "name": "remote-project-name", "title": "Remote Project" }
+    "project": {
+      "_id": "<remoteProjectId>",
+      "name": "remote-project-name",
+      "title": "Remote Project"
+    }
   }
 }
 ```
@@ -87,11 +90,11 @@ Response: raw JWT string (not JSON).
 
 Postman shows this as a second variant of the stage update above — the functional endpoint is identical. Use to set or replace the `remote` block. The difference from "Stage Remote Connection" is semantic (initial setup vs. reconnection); the API surface is the same.
 
-### GET ${FORMIO_PROJECT_URL}/export *(project-endpoint, referenced)*
+### GET ${FORMIO_PROJECT_URL}/export _(project-endpoint, referenced)_
 
 Cross-scope: export a stage or project as a template. Used when migrating a stage's configuration to another deployment. Documented in full in [platform-projects](./platform-projects.md).
 
-### POST ${FORMIO_PROJECT_URL}/import *(project-endpoint, referenced)*
+### POST ${FORMIO_PROJECT_URL}/import _(project-endpoint, referenced)_
 
 Cross-scope: import a template into an existing stage/project. Documented in full in [platform-projects](./platform-projects.md).
 
@@ -106,7 +109,7 @@ Request body:
   "project": "<projectId>",
   "tag": "1.0.0",
   "description": "Initial Version",
-  "template": { "title": "...", "version": "2.0.0", "roles": { }, "forms": [], "resources": [] }
+  "template": { "title": "...", "version": "2.0.0", "roles": {}, "forms": [], "resources": [] }
 }
 ```
 
@@ -131,7 +134,7 @@ Request body:
 ```json
 {
   "type": "template",
-  "template": { "title": "...", "version": "2.0.0", "roles": { }, "forms": [], "resources": [] }
+  "template": { "title": "...", "version": "2.0.0", "roles": {}, "forms": [], "resources": [] }
 }
 ```
 

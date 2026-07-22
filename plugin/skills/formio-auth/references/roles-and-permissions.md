@@ -41,20 +41,24 @@ Add custom roles when the default trio is not enough — for example `salesRep`,
 - Is referenced by MongoDB ID in `access` / `submissionAccess` arrays on the Forms and Resources you want it to reach.
 - Can be mapped from an SSO provider's role claim via OAuth / SAML / LDAP Role Mapping.
 
+### Assigning roles to users — Role Assignment actions only, never direct `roles` writes
+
+A user's `roles` array lives on their submission, but the submissions API **strips the `roles` key from POST/PUT/PATCH bodies — even for the project owner**. Roles are assigned exclusively by the **Role Assignment action** (self-register forms assign the default persona unconditionally; SSO Role Mapping covers federated logins). For a multi-role application where all personas share ONE `user` resource (`student` / `collegeAdmin` / `scholarshipAdmin`) — the common default — the canonical pattern is a `role` selectboxes component on the user resource plus one CONDITIONAL Role Assignment action per persona (`condition.conditions: [{ component: "role", operator: "isEqual", value: "<persona>" }]`), so creating or editing a user in the portal (or via the API with `data.role.<persona> = true`) attaches the right role server-side. When the requirements instead call for a **resource per role** (e.g., a separate `admin` resource with the Login action's `settings.resources: ["user", "admin"]`), the selectboxes pattern is unnecessary — each user-type resource carries its own unconditional Role Assignment. Exact JSON shapes: `plugin/skills/formio-resource-planner/references/template-json.md` → "Multi-role user systems"; action mechanics: the `formio-actions` skill's `references/action-types.md` → "Role Assignment".
+
 ### The eight permission types
 
 The same eight types appear across every scope:
 
-| Type | Meaning |
-|------|---------|
-| `create_own` | Create an entity; the actor becomes the owner. |
-| `create_all` | Create an entity; the actor may set `owner` to any user. |
-| `read_own` | Read entities the actor owns. |
-| `read_all` | Read every entity, regardless of ownership. |
-| `update_own` | Update entities the actor owns. |
+| Type         | Meaning                                                                  |
+| ------------ | ------------------------------------------------------------------------ |
+| `create_own` | Create an entity; the actor becomes the owner.                           |
+| `create_all` | Create an entity; the actor may set `owner` to any user.                 |
+| `read_own`   | Read entities the actor owns.                                            |
+| `read_all`   | Read every entity, regardless of ownership.                              |
+| `update_own` | Update entities the actor owns.                                          |
 | `update_all` | Update every entity. On Submissions, also lets the actor change `owner`. |
-| `delete_own` | Delete entities the actor owns. |
-| `delete_all` | Delete every entity. |
+| `delete_own` | Delete entities the actor owns.                                          |
+| `delete_all` | Delete every entity.                                                     |
 
 Key rules:
 
@@ -66,7 +70,7 @@ Key rules:
 ### The three permission scopes
 
 | Scope | Where it lives | Controls |
-|-------|----------------|----------|
+| --- | --- | --- |
 | Project | `access[]` on the Project object | Who can create, read, update, delete forms/resources/roles inside the project. |
 | Form Definition | `access[]` on each Form/Resource | Who can read/update/delete the form's JSON definition. `read_all` is required for users to load the form's renderer. |
 | Submission Data | `submissionAccess[]` on each Form/Resource | Who can create/read/update/delete actual submission rows. This is "the real access-control story". |

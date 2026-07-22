@@ -1,4 +1,3 @@
-
 ## Overview
 
 Submissions are the backbone of any Form.io integration: they hold the data end users enter into a form. This skill documents runtime-scope CRUD for submissions — creating new submissions, validating payloads without saving, listing and filtering existing submissions, fetching a single submission by ID, checking for existence by field value, updating (full and partial via JSON Patch), reading revisions, and deleting. Form and action definitions are covered by `project-forms.md` and `project-actions.md`.
@@ -187,8 +186,8 @@ Request body (JSON array of patch operations):
 ```json
 [
   { "op": "replace", "path": "/data/firstName", "value": "James" },
-  { "op": "remove",  "path": "/data/lastName" },
-  { "op": "add",     "path": "/data/lastName", "value": "Thompson" }
+  { "op": "remove", "path": "/data/lastName" },
+  { "op": "add", "path": "/data/lastName", "value": "Thompson" }
 ]
 ```
 

@@ -1,4 +1,3 @@
-
 ## Overview
 
 This skill covers the end-user (runtime) flow for building custom user types beyond the default `user` resource: creating a custom user resource (e.g., `employee`), creating a custom role, attaching a Role Assignment action so newly registered users are granted that role automatically, building a matching custom login form, swapping the default `Save Submission` action for a `Login` action, and registering/logging in users against the custom resource. For the default `user`/`userLogin` flow, see `runtime-auth.md`.
@@ -31,10 +30,25 @@ Request body (JSON):
   "name": "employee",
   "path": "employee",
   "components": [
-    { "type": "textfield", "label": "First Name", "key": "firstName", "validate": { "required": true } },
-    { "type": "textfield", "label": "Last Name",  "key": "lastName",  "validate": { "required": true } },
-    { "type": "password",  "label": "Password",   "key": "password",  "validate": { "required": true } },
-    { "type": "email",     "label": "Email",      "key": "email",     "validate": { "required": true } }
+    {
+      "type": "textfield",
+      "label": "First Name",
+      "key": "firstName",
+      "validate": { "required": true }
+    },
+    {
+      "type": "textfield",
+      "label": "Last Name",
+      "key": "lastName",
+      "validate": { "required": true }
+    },
+    {
+      "type": "password",
+      "label": "Password",
+      "key": "password",
+      "validate": { "required": true }
+    },
+    { "type": "email", "label": "Email", "key": "email", "validate": { "required": true } }
   ]
 }
 ```
@@ -136,9 +150,22 @@ Request body (JSON):
   "name": "employeeLogin",
   "type": "form",
   "components": [
-    { "type": "email",    "key": "email",          "label": "Email",           "validate": { "required": true } },
-    { "type": "password", "key": "password",       "label": "Password",        "validate": { "required": true } },
-    { "type": "password", "key": "verifyPassword", "label": "Verify Password", "validate": { "required": true, "custom": "valid = input === data.password ? true : 'Passwords must match'" } }
+    { "type": "email", "key": "email", "label": "Email", "validate": { "required": true } },
+    {
+      "type": "password",
+      "key": "password",
+      "label": "Password",
+      "validate": { "required": true }
+    },
+    {
+      "type": "password",
+      "key": "verifyPassword",
+      "label": "Verify Password",
+      "validate": {
+        "required": true,
+        "custom": "valid = input === data.password ? true : 'Passwords must match'"
+      }
+    }
   ]
 }
 ```

@@ -1,4 +1,3 @@
-
 ## Overview
 
 Teams are Form.io's mechanism for granting a group of platform users shared access to one or more projects. This skill covers the full team lifecycle: creating and listing teams, adding and removing members, promoting members to admins, inviting users, assigning a team to a project, and deleting a team. Team CRUD is rooted at `${FORMIO_BASE_URL}/team`; the two cross-scope operations that bind a team to a project or check a member's project access live at `${FORMIO_PROJECT_URL}/...` and are labeled below.
@@ -103,7 +102,7 @@ Accept an outstanding team invitation. Called by the invited user (whose JWT is 
 
 Response: the accepted membership document.
 
-### PUT ${FORMIO_PROJECT_URL} *(project-endpoint, assign team to project)*
+### PUT ${FORMIO_PROJECT_URL} _(project-endpoint, assign team to project)_
 
 Cross-scope: grant a team access to a project by updating the project's access rules to include the team's roles. The full project body must be supplied (same shape as in `platform-projects.md` → Update Project). Add the team's access entries to the `access` array:
 
@@ -139,7 +138,7 @@ Response:
 ]
 ```
 
-### GET ${FORMIO_PROJECT_URL}/form?select=title,type,modified *(project-endpoint, member access verification)*
+### GET ${FORMIO_PROJECT_URL}/form?select=title,type,modified _(project-endpoint, member access verification)_
 
 Cross-scope: verify a team member actually has access to a project's forms by listing them with the member's JWT. A `401`/`403` response indicates the team assignment did not propagate as expected.
 

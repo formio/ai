@@ -99,7 +99,7 @@ const recent = await new Formio(`${Formio.getProjectUrl()}/intake/submission`).l
 import { Formio } from '@formio/js';
 
 await new Formio(
-  `${Formio.getProjectUrl()}/intake/submission/000000000000000000000010`,
+  `${Formio.getProjectUrl()}/intake/submission/000000000000000000000010`
 ).deleteSubmission();
 ```
 

@@ -2,17 +2,12 @@
 
 ## Overview
 
-A component's `validate.json` property holds a JSON Logic expression the
-renderer evaluates on every value change and on submit. The contract:
+A component's `validate.json` property holds a JSON Logic expression the renderer evaluates on every value change and on submit. The contract:
 
 - The expression result is **`true`** → the value is valid.
-- The expression result is a **string** → the value is invalid and that string
-  is the validation error message shown on the component.
+- The expression result is a **string** → the value is invalid and that string is the validation error message shown on the component.
 
-Expression syntax and the operations vocabulary live in
-[json-logic.md](./json-logic.md). Inside `validate.json`, `{"var": "input"}`
-resolves to the value of the component being validated, and
-`{"var": "data.<key>"}` reaches any other field for cross-field rules.
+Expression syntax and the operations vocabulary live in [json-logic.md](./json-logic.md). Inside `validate.json`, `{"var": "input"}` resolves to the value of the component being validated, and `{"var": "data.<key>"}` reaches any other field for cross-field rules.
 
 ## Canonical example
 
@@ -26,20 +21,13 @@ An `if` that returns `true` for the valid case and the error string otherwise:
   "input": true,
   "validate": {
     "json": {
-      "if": [
-        { "===": [{ "var": "input" }, "Bob"] },
-        true,
-        "Your name must be 'Bob'!"
-      ]
+      "if": [{ "===": [{ "var": "input" }, "Bob"] }, true, "Your name must be 'Bob'!"]
     }
   }
 }
 ```
 
-Typing anything but `Bob` marks the field invalid with exactly
-`Your name must be 'Bob'!`; typing `Bob` clears the error. A failed rule also
-blocks `form.submit()` — the promise rejects and the messages land on
-`form.errors` (see [javascript-api.md](./javascript-api.md)).
+Typing anything but `Bob` marks the field invalid with exactly `Your name must be 'Bob'!`; typing `Bob` clears the error. A failed rule also blocks `form.submit()` — the promise rejects and the messages land on `form.errors` (see [javascript-api.md](./javascript-api.md)).
 
 ## Cross-field rules
 
@@ -61,8 +49,7 @@ Reach other fields through `data`:
 
 ## Composing with standard validation
 
-`validate.json` runs alongside the declarative `validate` keys — it does not
-replace them. All configured rules must pass:
+`validate.json` runs alongside the declarative `validate` keys — it does not replace them. All configured rules must pass:
 
 ```json
 {
@@ -75,9 +62,7 @@ replace them. All configured rules must pass:
 }
 ```
 
-`required`, `minLength`/`maxLength`, `min`/`max`, `pattern`, and
-`customMessage` keep their standard meanings; `json` adds the escape hatch for
-everything they cannot express.
+`required`, `minLength`/`maxLength`, `min`/`max`, `pattern`, and `customMessage` keep their standard meanings; `json` adds the escape hatch for everything they cannot express.
 
 ## See also
 

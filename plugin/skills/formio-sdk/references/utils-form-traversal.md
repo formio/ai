@@ -84,7 +84,10 @@ if (email) email.label = 'Work Email';
 import { Utils } from '@formio/js/utils';
 
 const required = Utils.searchComponents(form.components, { 'validate.required': true });
-console.log('required fields:', required.map((c) => c.key));
+console.log(
+  'required fields:',
+  required.map((c) => c.key)
+);
 ```
 
 ### Flatten to a path map
@@ -133,6 +136,6 @@ Utils.eachComponent(
       return true; // skip children of hidden containers
     }
   },
-  true,
+  true
 );
 ```

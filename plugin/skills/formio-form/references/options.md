@@ -2,8 +2,7 @@
 
 ## Overview
 
-The third argument to `Formio.createForm` is an options object that changes how
-the form renders and behaves:
+The third argument to `Formio.createForm` is an options object that changes how the form renders and behaves:
 
 ```js
 const form = await Formio.createForm(el, srcOrJson, {
@@ -52,8 +51,7 @@ const form = await Formio.createForm(el, 'https://examples.form.io/example', {
 - `buttonSettings` — wizard button visibility (`showPrevious`, `showNext`, `showCancel`, `showSubmit`); see [wizards.md](./wizards.md).
 - `breadcrumbSettings` — wizard breadcrumb behavior; see [wizards.md](./wizards.md).
 
-Options apply per-instance. There is no global options registry — pass them on
-every `createForm` call that needs them.
+Options apply per-instance. There is no global options registry — pass them on every `createForm` call that needs them.
 
 ## See also
 

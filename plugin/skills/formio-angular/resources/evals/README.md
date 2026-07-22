@@ -4,11 +4,11 @@ This directory holds everything a teammate needs to run evals against the skill 
 
 ## What's here
 
-| File                                | Purpose                                                                                                                                                                                          |
-| ----------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `evals.json`                        | The test prompts + expected outcomes. Three cases: task-manager (simple), user-team-bidirectional (N:N + existing-workspace merge), complex-crm-transitive (deep hierarchy with hidden mirrors). |
-| `grade.py`                          | Converts subagent outputs → pass/fail grades (≈18 structural assertions per eval). Reads run outputs from `.eval-artifacts/`; writes `grading.json` next to each run.                            |
-| `fixtures/existing-workspace-seed/` | A minimal Angular workspace that eval-1 requires. Copy it into the eval's `with_skill/outputs/workspace/` and `without_skill/outputs/workspace/` so the subagents have something to merge into.  |
+| File | Purpose |
+| --- | --- |
+| `evals.json` | The test prompts + expected outcomes. Three cases: task-manager (simple), user-team-bidirectional (N:N + existing-workspace merge), complex-crm-transitive (deep hierarchy with hidden mirrors). |
+| `grade.py` | Converts subagent outputs → pass/fail grades (≈18 structural assertions per eval). Reads run outputs from `.eval-artifacts/`; writes `grading.json` next to each run. |
+| `fixtures/existing-workspace-seed/` | A minimal Angular workspace that eval-1 requires. Copy it into the eval's `with_skill/outputs/workspace/` and `without_skill/outputs/workspace/` so the subagents have something to merge into. |
 
 ## The iteration loop
 

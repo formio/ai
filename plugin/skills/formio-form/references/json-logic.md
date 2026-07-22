@@ -2,16 +2,9 @@
 
 ## Overview
 
-Three component properties evaluate [JSON Logic](https://jsonlogic.com)
-expressions — `validate.json`, `conditional.json`, and `calculateValue` — plus
-`logic` entries with a `json` trigger. This primer covers the operations
-vocabulary once; the consumer docs ([validation.md](./validation.md),
-[conditionals.md](./conditionals.md),
-[calculated-values.md](./calculated-values.md),
-[field-logic.md](./field-logic.md)) show where each expression plugs in.
+Three component properties evaluate [JSON Logic](https://jsonlogic.com) expressions — `validate.json`, `conditional.json`, and `calculateValue` — plus `logic` entries with a `json` trigger. This primer covers the operations vocabulary once; the consumer docs ([validation.md](./validation.md), [conditionals.md](./conditionals.md), [calculated-values.md](./calculated-values.md), [field-logic.md](./field-logic.md)) show where each expression plugs in.
 
-A JSON Logic expression is a JSON object whose single key is the operator and
-whose value is the argument list:
+A JSON Logic expression is a JSON object whose single key is the operator and whose value is the argument list:
 
 ```json
 { "===": [{ "var": "data.employed" }, "yes"] }
@@ -19,8 +12,7 @@ whose value is the argument list:
 
 ## `var` — resolving data
 
-`var` reads a value out of the evaluation context. The renderer supplies two
-roots — `data` (the whole submission) and `row` (the contextual row):
+`var` reads a value out of the evaluation context. The renderer supplies two roots — `data` (the whole submission) and `row` (the contextual row):
 
 | Path | Resolves to |
 | --- | --- |
@@ -37,21 +29,18 @@ roots — `data` (the whole submission) and `row` (the contextual row):
 
 ## Operations
 
-Full reference: [jsonlogic.com/operations.html](https://jsonlogic.com/operations.html).
-The ones that matter in form definitions:
+Full reference: [jsonlogic.com/operations.html](https://jsonlogic.com/operations.html). The ones that matter in form definitions:
 
-| Category | Operators |
-| --- | --- |
-| Comparison | `==`, `===`, `!=`, `!==`, `>`, `>=`, `<`, `<=` |
-| Logic | `if`, `and`, `or`, `!`, `!!` |
-| Numeric | `+`, `-`, `*`, `/`, `%`, `min`, `max` |
-| Array | `in`, `map`, `filter`, `reduce`, `merge`, `all`, `some`, `none` |
-| String | `cat`, `substr`, `in` |
-| Data | `var`, `missing`, `missing_some` |
+| Category   | Operators                                                       |
+| ---------- | --------------------------------------------------------------- |
+| Comparison | `==`, `===`, `!=`, `!==`, `>`, `>=`, `<`, `<=`                  |
+| Logic      | `if`, `and`, `or`, `!`, `!!`                                    |
+| Numeric    | `+`, `-`, `*`, `/`, `%`, `min`, `max`                           |
+| Array      | `in`, `map`, `filter`, `reduce`, `merge`, `all`, `some`, `none` |
+| String     | `cat`, `substr`, `in`                                           |
+| Data       | `var`, `missing`, `missing_some`                                |
 
-`if` takes `[condition, thenValue, elseValue]` — condition/value pairs chain
-for else-if. This is the backbone of `validate.json` (see
-[validation.md](./validation.md)):
+`if` takes `[condition, thenValue, elseValue]` — condition/value pairs chain for else-if. This is the backbone of `validate.json` (see [validation.md](./validation.md)):
 
 ```json
 { "if": [{ "===": [{ "var": "input" }, "Bob"] }, true, "Your name must be 'Bob'!"] }
@@ -69,8 +58,7 @@ for else-if. This is the backbone of `validate.json` (see
 }
 ```
 
-`missing` returns the listed keys that have no value — handy for "all of these
-are filled in" checks:
+`missing` returns the listed keys that have no value — handy for "all of these are filled in" checks:
 
 ```json
 { "!": { "missing": ["data.firstName", "data.lastName"] } }

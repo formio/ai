@@ -1,7 +1,8 @@
 ---
 name: formio-schema
 description: >-
-  Form.io JSON schema reference covering the document shapes for projects, forms (and resources), and submissions. Use this skill whenever constructing, editing, or interpreting any Form.io project / form / submission JSON — forms returned by MCP tools like `form_list`, `form_get`, `form_create`, `form_update`; submission bodies returned by `/submission` endpoints (including decoding `data`, reading row-level `access`, distinguishing draft vs submitted state, or inspecting submission `metadata`); or project documents returned by `/project/{projectId}` (including project-level settings, integrations such as email / captcha / SQL connector / file storage, authorization providers such as OAuth / LDAP / SAML, project-level access, the Stage and Tenant creation patterns, and project template envelopes used by `project_import` / `project_export`). Trigger whenever the user mentions form components, wizards, resources, submissions, draft submissions, submission metadata, submission data, project templates, project settings, stages, tenants, OAuth/LDAP/SAML, file storage, project access, conditional logic, validation rules, or any `type` component (textfield, select, datagrid, panel, etc.) — even when the user does not explicitly say "Form.io" if the context involves Form.io JSON schemas. Not for: calling Form.io REST endpoints (see `formio-api`); configuring server-side actions on a form (see `formio-actions`); planning a new app's resource model from scratch (see `formio-resource-planner`); orchestrating an entire app build (see `formio-application`).
+  Form.io JSON schema reference covering the document shapes for projects, forms (and resources), and submissions. Use whenever constructing, editing, or interpreting Form.io JSON — form definitions returned by `form_get` / `form_create` / `form_update`; submission bodies (decoding `data`, row-level `access`, draft state, `metadata`); and project documents (settings, integrations, auth providers (OAuth/LDAP/SAML), stages, tenants, and template envelopes for `project_import` / `project_export`). Trigger for schema-level questions about form components, wizards, resources, submissions, project templates, conditional logic, validation rules, or any component `type` (textfield, select, datagrid, panel) when the work involves Form.io JSON. Not for: calling Form.io REST endpoints (see `formio-api`); configuring server-side actions on a form (see `formio-actions`); planning a new app's resource model from scratch (see `formio-resource-planner`); orchestrating an entire app build (see `formio-application`).
+
 license: MIT
 ---
 
@@ -17,32 +18,32 @@ References are partitioned by schema domain. Pick a domain first, then pick a re
 
 ### Form definitions
 
-| Working on…                                                                                    | Load                                   |
-| ---------------------------------------------------------------------------------------------- | -------------------------------------- |
-| Top-level form properties (`title`, `path`, `display`, `access`, `settings`, etc.)             | `references/form/form-definition.md`   |
-| Properties shared by all components (`key`, `label`, `validate`, `conditional`, `logic`, etc.) | `references/form/base-component.md`    |
-| A specific input field (textfield, number, select, checkbox, file, signature, button, …)       | `references/form/input-components.md`  |
-| Visual layout containers (panel, columns, tabs, table, fieldset, well, content)                | `references/form/layout-components.md` |
-| Nested or repeatable data (container, datagrid, editgrid, datamap, nested form, address)       | `references/form/data-components.md`   |
+| Working on… | Load |
+| --- | --- |
+| Top-level form properties (`title`, `path`, `display`, `access`, `settings`, etc.) | `references/form/form-definition.md` |
+| Properties shared by all components (`key`, `label`, `validate`, `conditional`, `logic`, etc.) | `references/form/base-component.md` |
+| A specific input field (textfield, number, select, checkbox, file, signature, button, …) | `references/form/input-components.md` |
+| Visual layout containers (panel, columns, tabs, table, fieldset, well, content) | `references/form/layout-components.md` |
+| Nested or repeatable data (container, datagrid, editgrid, datamap, nested form, address) | `references/form/data-components.md` |
 
 ### Submissions
 
-| Working on…                                                                                | Load                                              |
-| ------------------------------------------------------------------------------------------ | ------------------------------------------------- |
-| Top-level submission envelope (`_id`, `form`, `owner`, `roles`, `state`, `metadata`, etc.) | `references/submission/submission-definition.md`  |
-| Lifecycle state — `draft` vs `submitted`, when each is written                             | `references/submission/submission-state.md`       |
-| The `metadata` bag (timezone, browser, headers, extension keys)                            | `references/submission/submission-metadata.md`    |
-| Row-level `access` overrides and every `AccessType` value                                  | `references/submission/submission-access.md`      |
-| Decoding the `data` envelope — key paths, nesting, address discriminated union             | `references/submission/submission-data.md`        |
+| Working on… | Load |
+| --- | --- |
+| Top-level submission envelope (`_id`, `form`, `owner`, `roles`, `state`, `metadata`, etc.) | `references/submission/submission-definition.md` |
+| Lifecycle state — `draft` vs `submitted`, when each is written | `references/submission/submission-state.md` |
+| The `metadata` bag (timezone, browser, headers, extension keys) | `references/submission/submission-metadata.md` |
+| Row-level `access` overrides and every `AccessType` value | `references/submission/submission-access.md` |
+| Decoding the `data` envelope — key paths, nesting, address discriminated union | `references/submission/submission-data.md` |
 
 ### Projects
 
-| Working on…                                                                                      | Load                                                |
-| ------------------------------------------------------------------------------------------------ | --------------------------------------------------- |
-| Top-level project envelope (`title`, `name`, `owner`, `access`, settings, etc.)                  | `references/project/project-definition.md`          |
-| `type` (`project`/`stage`/`tenant`) and `framework` discriminators; Stage / Tenant patterns      | `references/project/project-type-and-framework.md`  |
-| `ProjectSettings` keys, integrations, authorization providers, encryption-at-rest contract       | `references/project/project-settings.md`            |
-| Project-level `access` array, `ProjectRole`, `ProjectFormAccess`, `ProjectAccessInfo`            | `references/project/project-access.md`              |
+| Working on… | Load |
+| --- | --- |
+| Top-level project envelope (`title`, `name`, `owner`, `access`, settings, etc.) | `references/project/project-definition.md` |
+| `type` (`project`/`stage`/`tenant`) and `framework` discriminators; Stage / Tenant patterns | `references/project/project-type-and-framework.md` |
+| `ProjectSettings` keys, integrations, authorization providers, encryption-at-rest contract | `references/project/project-settings.md` |
+| Project-level `access` array, `ProjectRole`, `ProjectFormAccess`, `ProjectAccessInfo` | `references/project/project-access.md` |
 
 For action configs, see the dedicated `formio-actions` skill. For role objects, see `formio-api`'s `project-roles` reference directly — role JSON is shallow enough that a separate domain is not warranted.
 
@@ -92,29 +93,29 @@ Components fall into three categories. Pick a category, load its reference for f
 
 **Input components** (`references/form/input-components.md`) — collect user data:
 
-| `type`        | Purpose                                                                                                   |
-| ------------- | --------------------------------------------------------------------------------------------------------- |
-| `textfield`   | Single-line text                                                                                          |
-| `textarea`    | Multi-line text, optional WYSIWYG                                                                         |
-| `number`      | Numeric input                                                                                             |
-| `password`    | Masked text                                                                                               |
-| `email`       | Email with optional Kickbox verification                                                                  |
-| `phoneNumber` | Phone input                                                                                               |
-| `url`         | URL input                                                                                                 |
-| `datetime`    | Date and/or time picker                                                                                   |
-| `day`         | Separate day/month/year fields                                                                            |
-| `time`        | Time-only input                                                                                           |
-| `checkbox`    | Single boolean                                                                                            |
-| `radio`       | Single-select radio group                                                                                 |
-| `selectboxes` | Multi-select checkbox group                                                                               |
-| `select`      | Dropdown (values can be static, fetched from a URL, or loaded from a Form.io resource, or from custom JS) |
-| `resource`    | Select referencing a Form.io resource                                                                     |
-| `hidden`      | Stored data without UI                                                                                    |
-| `button`      | Submit / reset / event / OAuth / URL action                                                               |
-| `signature`   | Signature pad                                                                                             |
-| `file`        | File upload                                                                                               |
-| `tags`        | Tag input                                                                                                 |
-| `survey`      | Matrix-style survey grid                                                                                  |
+| `type` | Purpose |
+| --- | --- |
+| `textfield` | Single-line text |
+| `textarea` | Multi-line text, optional WYSIWYG |
+| `number` | Numeric input |
+| `password` | Masked text |
+| `email` | Email with optional Kickbox verification |
+| `phoneNumber` | Phone input |
+| `url` | URL input |
+| `datetime` | Date and/or time picker |
+| `day` | Separate day/month/year fields |
+| `time` | Time-only input |
+| `checkbox` | Single boolean |
+| `radio` | Single-select radio group |
+| `selectboxes` | Multi-select checkbox group |
+| `select` | Dropdown (values can be static, fetched from a URL, or loaded from a Form.io resource, or from custom JS) |
+| `resource` | Select referencing a Form.io resource |
+| `hidden` | Stored data without UI |
+| `button` | Submit / reset / event / OAuth / URL action |
+| `signature` | Signature pad |
+| `file` | File upload |
+| `tags` | Tag input |
+| `survey` | Matrix-style survey grid |
 
 **Layout components** (`references/form/layout-components.md`) — structure the form visually, set `input: false`:
 

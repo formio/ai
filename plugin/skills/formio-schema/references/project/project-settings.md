@@ -15,32 +15,32 @@ This matters when you're reading project documents out-of-band (e.g., from a dat
 
 ## ProjectSettings keys
 
-| Key                  | Type                       | Role                                                                                                          |
-| -------------------- | -------------------------- | ------------------------------------------------------------------------------------------------------------- |
-| `appOrigin`          | `string`                   | The project's canonical application origin (`https://app.example.com`).                                       |
-| `keys`               | `Array<{ key: string }>`   | API key entries used for server-to-server / API-key authentication mode.                                      |
-| `cors`               | `string`                   | CORS allowed-origins value the server returns. `"*"` for permissive; comma-separated for explicit allowlist.  |
-| `csp`                | `string`                   | Content-Security-Policy header value the server attaches to project responses.                                |
-| `secret`             | `string`                   | Project-level shared secret used by signing flows.                                                            |
-| `remoteSecret`       | `string`                   | Secret set after this project is connected to a remote stage. It is the PORTAL_SECRET of the remove env.      |
-| `pdfserver`          | `string`                   | URL of the PDF server this project routes PDF operations to.                                                  |
-| `filetoken`          | `string`                   | Signing token used by the file upload / download flow.                                                        |
-| `allowConfig`        | `boolean`                  | Surface `config` to portal UI callers.                                                                        |
-| `allowConfigToForms` | `boolean`                  | Surface `config` to form renderers (forms can read public config values).                                     |
-| `custom`             | `{ css?, js? }`            | Custom global CSS / JS injected into project-rendered forms.                                                  |
-| `formModule`         | `string`                   | URL or module identifier for a custom form-module bundle to load.                                             |
-| `email`              | `ProjectEmailConfig`       | Email provider config — one of `smtp`, `sendgrid`, `mailgun`. See `integrations/email.ts` upstream.           |
-| `captcha`            | `ProjectCaptchaConfig`     | reCAPTCHA / Cloudflare Turnstile config — `{ siteKey, secretKey }`.                                                       |
-| `recaptcha`          | `ProjectCaptchaConfig`     | Legacy reCAPTCHA configuration alongside `captcha`. Same shape.                                               |
-| `esign`              | `ProjectESignConfig`       | Box e-sign configuration including enterprise ID and Box app credentials. See `integrations/eSign.ts`.        |
-| `google`             | `ProjectGoogleDriveConfig` | Google Drive integration — `{ clientId, cskey, refreshtoken }`. See `integrations/dataConnections.ts`.        |
-| `kickbox`            | `ProjectKickboxConfig`     | Kickbox email-verification API key — `{ apikey }`.                                                            |
-| `sqlconnector`       | `ProjectSQLConnectorConfig`| SQL Connector config — `{ host, password, type: 'mysql'\|'mssql'\|'postgres', user }`.                        |
-| `storage`            | `ProjectFileStorageConfig` | File-storage provider config — one of `azure`, `s3` (or MinIO), `dropbox`, `google`. See `integrations/fileStorage.ts`. |
-| `tokenParse`         | `string`                   | Custom JWT-claim parser expression for resolving the authenticated user.                                      |
-| `oauth`              | `ProjectOauthConfig`       | OAuth providers — one or more of `openid`, `github`, `google`. See `authorization/oauth.ts` for per-provider shape. |
-| `ldap`               | `ProjectLdapConfig`        | LDAP bind / search config — `{ bindDn, bindCredentials, searchBase, searchFilter, url }`. See `authorization/ldap.ts`. |
-| `saml`               | `ProjectSamlConfig`        | SAML IdP / SP configuration including `idp`, `issuer`, `callbackUrl`, roles mapping. See `authorization/saml.ts`. |
+| Key | Type | Role |
+| --- | --- | --- |
+| `appOrigin` | `string` | The project's canonical application origin (`https://app.example.com`). |
+| `keys` | `Array<{ key: string }>` | API key entries used for server-to-server / API-key authentication mode. |
+| `cors` | `string` | CORS allowed-origins value the server returns. `"*"` for permissive; comma-separated for explicit allowlist. |
+| `csp` | `string` | Content-Security-Policy header value the server attaches to project responses. |
+| `secret` | `string` | Project-level shared secret used by signing flows. |
+| `remoteSecret` | `string` | Secret set after this project is connected to a remote stage. It is the PORTAL_SECRET of the remove env. |
+| `pdfserver` | `string` | URL of the PDF server this project routes PDF operations to. |
+| `filetoken` | `string` | Signing token used by the file upload / download flow. |
+| `allowConfig` | `boolean` | Surface `config` to portal UI callers. |
+| `allowConfigToForms` | `boolean` | Surface `config` to form renderers (forms can read public config values). |
+| `custom` | `{ css?, js? }` | Custom global CSS / JS injected into project-rendered forms. |
+| `formModule` | `string` | URL or module identifier for a custom form-module bundle to load. |
+| `email` | `ProjectEmailConfig` | Email provider config — one of `smtp`, `sendgrid`, `mailgun`. See `integrations/email.ts` upstream. |
+| `captcha` | `ProjectCaptchaConfig` | reCAPTCHA / Cloudflare Turnstile config — `{ siteKey, secretKey }`. |
+| `recaptcha` | `ProjectCaptchaConfig` | Legacy reCAPTCHA configuration alongside `captcha`. Same shape. |
+| `esign` | `ProjectESignConfig` | Box e-sign configuration including enterprise ID and Box app credentials. See `integrations/eSign.ts`. |
+| `google` | `ProjectGoogleDriveConfig` | Google Drive integration — `{ clientId, cskey, refreshtoken }`. See `integrations/dataConnections.ts`. |
+| `kickbox` | `ProjectKickboxConfig` | Kickbox email-verification API key — `{ apikey }`. |
+| `sqlconnector` | `ProjectSQLConnectorConfig` | SQL Connector config — `{ host, password, type: 'mysql'\|'mssql'\|'postgres', user }`. |
+| `storage` | `ProjectFileStorageConfig` | File-storage provider config — one of `azure`, `s3` (or MinIO), `dropbox`, `google`. See `integrations/fileStorage.ts`. |
+| `tokenParse` | `string` | Custom JWT-claim parser expression for resolving the authenticated user. |
+| `oauth` | `ProjectOauthConfig` | OAuth providers — one or more of `openid`, `github`, `google`. See `authorization/oauth.ts` for per-provider shape. |
+| `ldap` | `ProjectLdapConfig` | LDAP bind / search config — `{ bindDn, bindCredentials, searchBase, searchFilter, url }`. See `authorization/ldap.ts`. |
+| `saml` | `ProjectSamlConfig` | SAML IdP / SP configuration including `idp`, `issuer`, `callbackUrl`, roles mapping. See `authorization/saml.ts`. |
 
 ## Integration and authorization details
 

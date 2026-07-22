@@ -2,8 +2,7 @@
 
 ## Overview
 
-What a page needs before `Formio.createForm` can render anything: the renderer
-script, its CSS, a bootstrap-compatible stylesheet, and a target element.
+What a page needs before `Formio.createForm` can render anything: the renderer script, its CSS, a bootstrap-compatible stylesheet, and a target element.
 
 ## CDN inclusion (plain HTML pages)
 
@@ -15,10 +14,7 @@ script, its CSS, a bootstrap-compatible stylesheet, and a target element.
 <div id="formio"></div>
 
 <script>
-  Formio.createForm(
-    document.getElementById('formio'),
-    'https://examples.form.io/example'
-  );
+  Formio.createForm(document.getElementById('formio'), 'https://examples.form.io/example');
 </script>
 ```
 
@@ -36,15 +32,11 @@ const form = await Formio.createForm(
 );
 ```
 
-These are the only two supported inclusion modes. Never import from
-`@formio/core`, never deep-import from `@formio/js/lib/`, and never use CommonJS
-`require`.
+These are the only two supported inclusion modes. Never import from `@formio/core`, never deep-import from `@formio/js/lib/`, and never use CommonJS `require`.
 
 ## Target element
 
-`Formio.createForm` renders into any block element you hand it — conventionally
-an empty `<div>`. The renderer owns that element's contents; do not manage its
-children from your own code.
+`Formio.createForm` renders into any block element you hand it — conventionally an empty `<div>`. The renderer owns that element's contents; do not manage its children from your own code.
 
 ## Hosted vs SaaS URL configuration
 
@@ -54,7 +46,7 @@ children from your own code.
 ```js
 import { Formio } from '@formio/js';
 
-Formio.setBaseUrl('https://forms.mysite.com');       // FORMIO_BASE_URL
+Formio.setBaseUrl('https://forms.mysite.com'); // FORMIO_BASE_URL
 Formio.setProjectUrl('https://forms.mysite.com/myproject'); // FORMIO_PROJECT_URL
 ```
 

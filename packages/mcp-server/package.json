@@ -4,6 +4,17 @@
   "description": "Form.io MCP Server",
   "type": "module",
   "license": "MIT",
+  "keywords": [
+    "formio",
+    "form.io",
+    "mcp",
+    "model-context-protocol",
+    "mcp-server",
+    "forms",
+    "claude",
+    "ai",
+    "agent"
+  ],
   "homepage": "https://github.com/formio/ai#readme",
   "bugs": {
     "url": "https://github.com/formio/ai/issues"

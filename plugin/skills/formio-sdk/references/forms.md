@@ -111,7 +111,7 @@ await formio.saveForm(form);
 import { Formio } from '@formio/js';
 
 const forms = await new Formio(`${Formio.getProjectUrl()}/form`).loadForms({
-  params: { type: 'form', 'tags__in': 'published', limit: 50, skip: 0 },
+  params: { type: 'form', tags__in: 'published', limit: 50, skip: 0 },
 });
 ```
 
@@ -127,11 +127,11 @@ await new Formio(`${Formio.getProjectUrl()}/form/000000000000000000000001`).dele
 
 Inside this workspace, prefer the first-party MCP tools over raw SDK calls:
 
-| Operation | MCP tool | SDK fallback |
-| --- | --- | --- |
-| Create a form | `form_create` | `new Formio(formsUrl).saveForm(form)` |
-| Load a form | `form_get` | `new Formio(formUrl).loadForm()` |
-| List forms | `form_list` | `new Formio(formsUrl).loadForms(query)` |
-| Update a form | `form_update` | `new Formio(formUrl).saveForm(form)` |
+| Operation     | MCP tool      | SDK fallback                            |
+| ------------- | ------------- | --------------------------------------- |
+| Create a form | `form_create` | `new Formio(formsUrl).saveForm(form)`   |
+| Load a form   | `form_get`    | `new Formio(formUrl).loadForm()`        |
+| List forms    | `form_list`   | `new Formio(formsUrl).loadForms(query)` |
+| Update a form | `form_update` | `new Formio(formUrl).saveForm(form)`    |
 
 The MCP tools handle auth implicitly via the portal-login flow. Reach for the SDK when authoring code that runs in a consumer application (browser, Node script, plugin).

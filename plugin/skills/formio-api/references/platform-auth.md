@@ -1,7 +1,6 @@
-
 ## Overview
 
-Platform-scope authentication covers the operations a *platform administrator* performs against the Form.io portal user base: logging in to the platform as an admin, provisioning a new platform user, retrieving the currently logged-in user, logging out, and redirecting to configured identity providers (OIDC/SAML). These are distinct from `project-auth.md` (project admin login) and `runtime-auth.md` (end-user auth for a specific project).
+Platform-scope authentication covers the operations a _platform administrator_ performs against the Form.io portal user base: logging in to the platform as an admin, provisioning a new platform user, retrieving the currently logged-in user, logging out, and redirecting to configured identity providers (OIDC/SAML). These are distinct from `project-auth.md` (project admin login) and `runtime-auth.md` (end-user auth for a specific project).
 
 ## Root URL
 
@@ -11,7 +10,7 @@ All endpoints below are rooted at `${FORMIO_BASE_URL}` — the platform deployme
 
 Every request to these endpoints MUST include an `x-jwt-token` header holding the user JWT issued by the MCP server's browser-based portal-login flow. The MCP server attaches this header automatically via `formioFetch`; external clients must obtain the JWT through the same portal-login flow. Do not use any other authentication mechanism with these endpoints.
 
-Note: `POST ${FORMIO_BASE_URL}/formio/user/login` is the endpoint that *issues* a JWT. Clients that already hold a valid platform-admin JWT via the portal-login flow do not need to call it; only call it when you are exchanging email/password for a fresh JWT outside the portal-login flow. The returned JWT is delivered in the `x-jwt-token` response header.
+Note: `POST ${FORMIO_BASE_URL}/formio/user/login` is the endpoint that _issues_ a JWT. Clients that already hold a valid platform-admin JWT via the portal-login flow do not need to call it; only call it when you are exchanging email/password for a fresh JWT outside the portal-login flow. The returned JWT is delivered in the `x-jwt-token` response header.
 
 ## MCP Tool Preference
 

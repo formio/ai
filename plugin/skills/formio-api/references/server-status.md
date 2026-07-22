@@ -1,4 +1,3 @@
-
 ## Overview
 
 The Server API exposes a small set of unauthenticated, platform-wide endpoints intended for monitoring, liveness probes, and lightweight diagnostics. They return enough information to verify that the Form.io deployment is up and to identify its software/schema version — but nothing project- or tenant-specific. Use them from uptime monitors, CI smoke tests, or troubleshooting flows where attaching a JWT is inconvenient or impossible.
@@ -49,11 +48,11 @@ Response (JSON):
 }
 ```
 
-| Field | Type | Description |
-| --- | --- | --- |
-| `version` | string | Semantic version of the Form.io platform binary. |
-| `schema` | string | Semantic version of the database schema the platform expects. |
-| `environmentId` | string | Opaque MongoDB ID identifying the deployment environment. |
+| Field           | Type   | Description                                                   |
+| --------------- | ------ | ------------------------------------------------------------- |
+| `version`       | string | Semantic version of the Form.io platform binary.              |
+| `schema`        | string | Semantic version of the database schema the platform expects. |
+| `environmentId` | string | Opaque MongoDB ID identifying the deployment environment.     |
 
 Errors: a non-`200` response indicates the platform is not fully initialized (for example, during a schema migration). There are no structured error payloads.
 

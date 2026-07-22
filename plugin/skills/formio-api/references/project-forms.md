@@ -1,4 +1,3 @@
-
 ## Overview
 
 The Forms API covers everything a project admin does with form and resource definitions: listing, filtering by type/name/tag, retrieving by ID or alias, creating new forms, updating existing forms, and exporting form data as JSON or CSV. It does NOT cover form submissions (see `runtime-submissions.md`) or form revisions (see `project-form-revisions.md`).
@@ -15,12 +14,12 @@ Every request to these endpoints MUST include an `x-jwt-token` header holding th
 
 Prefer the MCP server's first-party tools when they cover the requested operation. Call the HTTP endpoint directly only when no MCP tool applies.
 
-| Operation | Preferred MCP tool | Fallback endpoint |
-| --- | --- | --- |
-| Create a form | `form_create` | `POST ${FORMIO_PROJECT_URL}/form` |
-| Get a form by ID or name | `form_get` | `GET ${FORMIO_PROJECT_URL}/form/:idOrName` |
-| List forms | `form_list` | `GET ${FORMIO_PROJECT_URL}/form` |
-| Update a form | `form_update` | `PUT ${FORMIO_PROJECT_URL}/form/:idOrName` |
+| Operation                | Preferred MCP tool | Fallback endpoint                          |
+| ------------------------ | ------------------ | ------------------------------------------ |
+| Create a form            | `form_create`      | `POST ${FORMIO_PROJECT_URL}/form`          |
+| Get a form by ID or name | `form_get`         | `GET ${FORMIO_PROJECT_URL}/form/:idOrName` |
+| List forms               | `form_list`        | `GET ${FORMIO_PROJECT_URL}/form`           |
+| Update a form            | `form_update`      | `PUT ${FORMIO_PROJECT_URL}/form/:idOrName` |
 
 ## Endpoints
 
@@ -85,7 +84,12 @@ Request body (JSON):
   "path": "example-form",
   "tags": ["example"],
   "components": [
-    { "type": "textfield", "label": "First Name", "key": "firstName", "validate": { "required": true } },
+    {
+      "type": "textfield",
+      "label": "First Name",
+      "key": "firstName",
+      "validate": { "required": true }
+    },
     { "type": "email", "label": "Email", "key": "email", "validate": { "required": true } }
   ]
 }
@@ -125,9 +129,9 @@ Alias-based update. Equivalent to the ID-based PUT but addressed by `path`. Usef
 
 Export all submission data for a form as JSON (default) or CSV.
 
-| Query parameter | Type | Description |
-| --- | --- | --- |
-| `format` | string | `json` (default) or `csv`. |
+| Query parameter | Type   | Description                |
+| --------------- | ------ | -------------------------- |
+| `format`        | string | `json` (default) or `csv`. |
 
 Response: streamed file. `Content-Type` is `application/json` or `text/csv`. For large forms, expect streaming — consume via a streaming HTTP client rather than buffering in memory.
 

@@ -2,8 +2,7 @@
 
 ## Overview
 
-Set `display: "wizard"` on the form definition and every top-level `panel`
-component becomes a page:
+Set `display: "wizard"` on the form definition and every top-level `panel` component becomes a page:
 
 ```json
 {
@@ -16,33 +15,29 @@ component becomes a page:
 }
 ```
 
-`Formio.createForm` returns a Wizard instance — everything in
-[javascript-api.md](./javascript-api.md) applies, plus the page API below.
+`Formio.createForm` returns a Wizard instance — everything in [javascript-api.md](./javascript-api.md) applies, plus the page API below.
 
 ## Page API
 
-| Member | Meaning |
-| --- | --- |
-| `wizard.page` | current page index (0-based) |
-| `wizard.pages` | the currently visible pages (conditional pages excluded) |
-| `wizard.nextPage()` | validate the current page, then advance; returns a promise |
-| `wizard.prevPage()` | go back; returns a promise |
-| `wizard.setPage(index)` | jump straight to a visible page |
+| Member                  | Meaning                                                    |
+| ----------------------- | ---------------------------------------------------------- |
+| `wizard.page`           | current page index (0-based)                               |
+| `wizard.pages`          | the currently visible pages (conditional pages excluded)   |
+| `wizard.nextPage()`     | validate the current page, then advance; returns a promise |
+| `wizard.prevPage()`     | go back; returns a promise                                 |
+| `wizard.setPage(index)` | jump straight to a visible page                            |
 
 ```js
 const wizard = await Formio.createForm(el, wizardDefinition);
-await wizard.nextPage();  // page 0 → 1 (validates page 0 first)
-await wizard.prevPage();  // back to 0
+await wizard.nextPage(); // page 0 → 1 (validates page 0 first)
+await wizard.prevPage(); // back to 0
 ```
 
-`nextPage()` rejects when the current page fails validation — the wizard stays
-put and errors render on the offending components.
+`nextPage()` rejects when the current page fails validation — the wizard stays put and errors render on the offending components.
 
 ## Conditional wizard pages
 
-A page is a `panel`, so it takes the same `conditional` shapes as any
-component (see [conditionals.md](./conditionals.md)). Skip the Extras page
-unless the user wants it:
+A page is a `panel`, so it takes the same `conditional` shapes as any component (see [conditionals.md](./conditionals.md)). Skip the Extras page unless the user wants it:
 
 ```json
 {
@@ -58,10 +53,7 @@ unless the user wants it:
 }
 ```
 
-Hidden pages drop out of `wizard.pages` and the breadcrumb entirely —
-navigation flows straight from the page before to the page after, and the
-page's components stop validating. Flip the driving value back and the page
-rejoins in place.
+Hidden pages drop out of `wizard.pages` and the breadcrumb entirely — navigation flows straight from the page before to the page after, and the page's components stop validating. Flip the driving value back and the page rejoins in place.
 
 ## Custom navigation
 
@@ -82,11 +74,7 @@ document.getElementById('myBack').addEventListener('click', () => wizard.prevPag
 document.getElementById('myFinish').addEventListener('click', () => wizard.submit());
 ```
 
-Track progress from wizard events: `wizard.on('nextPage')`,
-`wizard.on('prevPage')`, and `wizard.on('wizardPageSelected')` fire as the user
-moves; pair with `wizard.page`/`wizard.pages.length` to render a progress bar.
-`breadcrumbSettings: { clickable: false }` locks the breadcrumb when users must
-move strictly forward.
+Track progress from wizard events: `wizard.on('nextPage')`, `wizard.on('prevPage')`, and `wizard.on('wizardPageSelected')` fire as the user moves; pair with `wizard.page`/`wizard.pages.length` to render a progress bar. `breadcrumbSettings: { clickable: false }` locks the breadcrumb when users must move strictly forward.
 
 ## See also
 

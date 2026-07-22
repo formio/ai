@@ -63,8 +63,7 @@ One block per resource. Terse — one sentence per purpose, one clause per field
 For transitive group access, call out the hidden mirror on every grandchild:
 
 ```markdown
-  - team: select (resource=Team, hidden, calculated from account.team, field-based access) —
-    **invisible mirror that propagates group access from Account's team**
+- team: select (resource=Team, hidden, calculated from account.team, field-based access) — **invisible mirror that propagates group access from Account's team**
 ```
 
 ## Forms section (conditional)
@@ -76,15 +75,10 @@ Auth forms (login / register) are NOT listed here — they belong under `## User
 One block per form. Call out which Resource (if any) the form **references** (a record established earlier in the flow) and how. A bespoke form references an existing record — it never creates that record on submit; see `SKILL.md` → "Resources vs. Forms" and `formio-application` → "Using Resources within Forms" for the anti-pattern.
 
 ```markdown
-- <FormName> (type: form)
-  Purpose: <1 sentence — the specific interaction this form captures>
-  References: <ResourceName via disabled pre-selected Select | owner (1:1 with the user) | none>
-  Fields:
-    - <key>: <component> — <bespoke field specific to this form>
-    - ...
-  Access: <who can submit / who can read>
-  Actions:
-    - <action name>: <key settings>   ← Save to its OWN submission only; never a Save that creates the referenced Resource
+- <FormName> (type: form) Purpose: <1 sentence — the specific interaction this form captures> References: <ResourceName via disabled pre-selected Select | owner (1:1 with the user) | none> Fields:
+  - <key>: <component> — <bespoke field specific to this form>
+  - ... Access: <who can submit / who can read> Actions:
+  - <action name>: <key settings> ← Save to its OWN submission only; never a Save that creates the referenced Resource
 ```
 
 Forms may also appear in the ER Diagram (wired to any Resource they reference) and in the Access Flow Diagram when their submission access is non-trivial, but this is optional — the grader does not require forms to appear in either diagram.
@@ -118,26 +112,26 @@ One bullet per role. Include the three Form.io defaults (`administrator`, `authe
 
 A truth table of CRUD capability per resource × actor. Actors are roles and groups (where a group-based rule is in play). Cell values use this vocabulary — keep it small and consistent so consumers can match on exact strings:
 
-| Token       | Meaning                                                             |
-| ----------- | ------------------------------------------------------------------- |
-| `all`       | Unrestricted across every submission of this resource.              |
-| `own`       | Only submissions the actor owns (Form.io Owner rule).               |
-| `group`     | Only submissions whose group the actor belongs to (group-via-join). |
+| Token        | Meaning                                                                        |
+| ------------ | ------------------------------------------------------------------------------ |
+| `all`        | Unrestricted across every submission of this resource.                         |
+| `own`        | Only submissions the actor owns (Form.io Owner rule).                          |
+| `group`      | Only submissions whose group the actor belongs to (group-via-join).            |
 | `group(<j>)` | Group access specifically through join `<j>` — use when multiple groups apply. |
-| `role(<r>)` | Gated by role `<r>` layered on top of another rule.                 |
-| `—`         | No access.                                                          |
+| `role(<r>)`  | Gated by role `<r>` layered on top of another rule.                            |
+| `—`          | No access.                                                                     |
 
 Layout:
 
 ```markdown
-| Resource       | Actor           | create | read  | update | delete | Notes                         |
-| -------------- | --------------- | ------ | ----- | ------ | ------ | ----------------------------- |
-| Project        | administrator  | all    | all   | all    | all    | full admin                    |
-| Project        | authenticated  | —      | group | group  | —      | group-via-ProjectUser         |
-| Task           | administrator  | all    | all   | all    | all    |                               |
-| Task           | authenticated  | group  | group | group  | —      | inherits via Task.project     |
-| ProjectUser    | administrator  | all    | all   | all    | all    | admin-managed membership      |
-| ProjectUser    | authenticated  | —      | own   | —      | —      | user sees their own memberships |
+| Resource    | Actor         | create | read  | update | delete | Notes                           |
+| ----------- | ------------- | ------ | ----- | ------ | ------ | ------------------------------- |
+| Project     | administrator | all    | all   | all    | all    | full admin                      |
+| Project     | authenticated | —      | group | group  | —      | group-via-ProjectUser           |
+| Task        | administrator | all    | all   | all    | all    |                                 |
+| Task        | authenticated | group  | group | group  | —      | inherits via Task.project       |
+| ProjectUser | administrator | all    | all   | all    | all    | admin-managed membership        |
+| ProjectUser | authenticated | —      | own   | —      | —      | user sees their own memberships |
 ```
 
 One row per (resource, actor) pair with a non-trivial rule. Do not enumerate irrelevant actors — if a resource is admin-only, two rows (administrator + `authenticated: — / — / — / —`) are sufficient.
@@ -146,12 +140,12 @@ One row per (resource, actor) pair with a non-trivial rule. Do not enumerate irr
 
 Mermaid `erDiagram`. Every resource is an entity. Relationships use Mermaid's cardinality syntax:
 
-| Cardinality        | Mermaid syntax |
-| ------------------ | -------------- |
-| 1:1 mandatory      | `||--||`       |
-| 1:N, one required  | `||--o{`       |
-| N:N, via join      | `}o--o{`       |
-| 1:N, child optional | `o|--o{`      |
+| Cardinality         | Mermaid syntax |
+| ------------------- | -------------- |
+| 1:1 mandatory       | `\|\|--\|\|`   |
+| 1:N, one required   | `\|\|--o{`     |
+| N:N, via join       | `}o--o{`       |
+| 1:N, child optional | `\|o--o{`      |
 
 Every entity declaration gets its key fields listed in the body — at minimum any reference selects and whether they are `reference=true`, `hidden`, or `calculated`. This is what downstream skills parse to know which fields are real vs plumbing.
 
@@ -300,7 +294,7 @@ flowchart TD
 
 `template.md` is consumed primarily by downstream skills and humans viewing the file in GitHub / IDE preview / Obsidian / any modern Markdown renderer. Mermaid scales beyond what ASCII handles cleanly (7+ resources, transitive mirrors, multiple joins) and gives downstream LLMs deterministic cardinality semantics (`||--o{`, `}o--o{`) instead of free-form ASCII labels.
 
-But the Phase A approval gate happens in the terminal, where the user must review and approve BEFORE Phase B writes any files. Mermaid is unrenderable in a terminal — the user would be approving a wall of code. So Phase A uses the ASCII-diagram shape documented in `SKILL.md`'s "Phase A" section, and Phase B's `template.md` file uses Mermaid. Both diagrams show the same topology — planner generates them from the same internal model in one run, so drift is bounded to a single emission.
+But the Phase A approval gate happens in the terminal, where the user must review and approve BEFORE Phase B writes any files. Mermaid is unrenderable in a terminal — the user would be approving a wall of code. So Phase A uses the ASCII-diagram shape documented in [`interview-guide.md`](interview-guide.md)'s "Phase A — Resource Map for review" section, and Phase B's `template.md` file uses Mermaid. Both diagrams show the same topology — planner generates them from the same internal model in one run, so drift is bounded to a single emission.
 
 When a planner iteration emits Mermaid that is syntactically wrong (e.g., missing closing brace), the companion `## Access Matrix` table is still authoritative — downstream skills can fall back to reading the matrix and the Resources section.
 
@@ -311,9 +305,7 @@ Closing pointer so a consumer who opened `template.md` first knows where to find
 ```markdown
 ## Companion artifact
 
-`template.json` in this directory is the structured Form.io project-export
-companion to this document. Use this `.md` for architectural intent; use the
-`.json` for exact field shapes, component JSON, and action settings.
+`template.json` in this directory is the structured Form.io project-export companion to this document. Use this `.md` for architectural intent; use the `.json` for exact field shapes, component JSON, and action settings.
 ```
 
 ## File pairing rules
@@ -330,7 +322,7 @@ Two surfaces, two rendering strategies:
 **Phase A (chat, approval gate):**
 
 1. Full Resource Map with ASCII ER Diagram and ASCII Access Flow Diagram rendered inline. This is what the user visually reviews and approves.
-2. The ASCII shapes used here are documented in `SKILL.md`'s "Phase A — Resource Map for review" section.
+2. The ASCII shapes used here are documented in [`interview-guide.md`](interview-guide.md)'s "Phase A — Resource Map for review" section.
 3. No file write yet.
 
 **Phase B (file + chat, after approval):**

@@ -2,15 +2,12 @@
 
 ## Overview
 
-A component's `conditional` property controls its visibility from other
-fields' values. Two mechanisms:
+A component's `conditional` property controls its visibility from other fields' values. Two mechanisms:
 
 - **Simple** — `show` / `when` / `eq`: one driver field, one comparison value.
-- **JSON Logic** — `conditional.json`: any expression; truthy shows the
-  component. Syntax and operations live in [json-logic.md](./json-logic.md).
+- **JSON Logic** — `conditional.json`: any expression; truthy shows the component. Syntax and operations live in [json-logic.md](./json-logic.md).
 
-Hidden components are removed from validation and (by default) their values
-are cleared on submit (`clearOnHide`).
+Hidden components are removed from validation and (by default) their values are cleared on submit (`clearOnHide`).
 
 ## Simple conditional
 
@@ -34,8 +31,7 @@ Show `employer` only while `employed` equals `yes`:
 
 ## JSON Logic conditional
 
-The same rule as an expression — and the doorway to multi-field, negated, or
-computed conditions:
+The same rule as an expression — and the doorway to multi-field, negated, or computed conditions:
 
 ```json
 {
@@ -49,9 +45,7 @@ computed conditions:
 }
 ```
 
-Inside `conditional.json`, `data` is the submission data and `row` is the
-contextual row (see [json-logic.md](./json-logic.md)). A multi-field example —
-show only for employed residents of Texas:
+Inside `conditional.json`, `data` is the submission data and `row` is the contextual row (see [json-logic.md](./json-logic.md)). A multi-field example — show only for employed residents of Texas:
 
 ```json
 {
@@ -68,11 +62,9 @@ show only for employed residents of Texas:
 
 ## Behavior notes
 
-- Visibility re-evaluates on every data change; the component's `visible`
-  property reflects the current state (`form.getComponent('employer').visible`).
+- Visibility re-evaluates on every data change; the component's `visible` property reflects the current state (`form.getComponent('employer').visible`).
 - Set `"clearOnHide": false` on the component to keep its value while hidden.
-- Wizard pages accept the same `conditional` shapes to skip whole pages — see
-  [wizards.md](./wizards.md).
+- Wizard pages accept the same `conditional` shapes to skip whole pages — see [wizards.md](./wizards.md).
 
 ## See also
 

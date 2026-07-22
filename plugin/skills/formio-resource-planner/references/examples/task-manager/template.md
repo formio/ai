@@ -4,41 +4,25 @@ A multi-user task manager where each Project has a set of Tasks and a team of Us
 
 ## Resources
 
-- Project (type: resource)
-  Purpose: container for tasks assigned to a team of users.
-  Fields:
-    - name: textfield — human-readable project name
-  Access: read/update limited to members (group-via-ProjectUser)
-  Actions:
-    - Save Submission (default)
+- Project (type: resource) Purpose: container for tasks assigned to a team of users. Fields:
+  - name: textfield — human-readable project name Access: read/update limited to members (group-via-ProjectUser) Actions:
+  - Save Submission (default)
 
-- Task (type: resource)
-  Purpose: a unit of work within a Project.
-  Fields:
-    - description: textfield — what needs doing
-    - project: select (resource=Project, reference=true, field-based access) — parent project; carries the group ACL
-  Access: read/update limited to members of the task's project (inherited via Task.project)
-  Actions:
-    - Save Submission (default)
+- Task (type: resource) Purpose: a unit of work within a Project. Fields:
+  - description: textfield — what needs doing
+  - project: select (resource=Project, reference=true, field-based access) — parent project; carries the group ACL Access: read/update limited to members of the task's project (inherited via Task.project) Actions:
+  - Save Submission (default)
 
-- ProjectUser (type: resource, join)
-  Purpose: many-to-many between Project and User; registers project memberships.
-  Fields:
-    - project: select (resource=Project)
-    - user: select (resource=User)
-  Access: admins only (managing membership is an admin operation)
-  Actions:
-    - Save Submission (default)
-    - Group Assignment: group=project, user=user
+- ProjectUser (type: resource, join) Purpose: many-to-many between Project and User; registers project memberships. Fields:
+  - project: select (resource=Project)
+  - user: select (resource=User) Access: admins only (managing membership is an admin operation) Actions:
+  - Save Submission (default)
+  - Group Assignment: group=project, user=user
 
-- User (type: resource)
-  Purpose: default Form.io user resource; holds login credentials for authenticated users.
-  Fields:
-    - email: email — login identifier (unique)
-    - password: password — login secret
-  Access: admin CRUD; owner can read/update their own record
-  Actions:
-    - Save Submission (default)
+- User (type: resource) Purpose: default Form.io user resource; holds login credentials for authenticated users. Fields:
+  - email: email — login identifier (unique)
+  - password: password — login secret Access: admin CRUD; owner can read/update their own record Actions:
+  - Save Submission (default)
 
 ## Users & Auth
 
@@ -55,16 +39,16 @@ A multi-user task manager where each Project has a set of Tasks and a team of Us
 
 ## Access Matrix
 
-| Resource    | Actor          | create | read  | update | delete | Notes                            |
-| ----------- | -------------- | ------ | ----- | ------ | ------ | -------------------------------- |
-| Project     | administrator  | all    | all   | all    | all    | full admin                       |
-| Project     | authenticated  | —      | group | group  | —      | group-via-ProjectUser            |
-| Task        | administrator  | all    | all   | all    | all    |                                  |
-| Task        | authenticated  | group  | group | group  | —      | inherits via Task.project        |
-| ProjectUser | administrator  | all    | all   | all    | all    | admin-managed membership         |
-| ProjectUser | authenticated  | —      | own   | —      | —      | user sees their own memberships  |
-| User        | administrator  | all    | all   | all    | all    |                                  |
-| User        | authenticated  | —      | own   | own    | —      | owner-level access to own record |
+| Resource | Actor | create | read | update | delete | Notes |
+| --- | --- | --- | --- | --- | --- | --- |
+| Project | administrator | all | all | all | all | full admin |
+| Project | authenticated | — | group | group | — | group-via-ProjectUser |
+| Task | administrator | all | all | all | all |  |
+| Task | authenticated | group | group | group | — | inherits via Task.project |
+| ProjectUser | administrator | all | all | all | all | admin-managed membership |
+| ProjectUser | authenticated | — | own | — | — | user sees their own memberships |
+| User | administrator | all | all | all | all |  |
+| User | authenticated | — | own | own | — | owner-level access to own record |
 
 ## ER Diagram
 
@@ -105,6 +89,4 @@ flowchart TD
 
 ## Companion artifact
 
-`template.json` in this directory is the structured Form.io project-export
-companion to this document. Use this `.md` for architectural intent; use the
-`.json` for exact field shapes, component JSON, and action settings.
+`template.json` in this directory is the structured Form.io project-export companion to this document. Use this `.md` for architectural intent; use the `.json` for exact field shapes, component JSON, and action settings.

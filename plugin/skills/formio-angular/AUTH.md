@@ -22,12 +22,12 @@ If only a subset is already wired, run the phase and regenerate ONLY the missing
 
 If the `formio-resource-planner` artifact pair is in scope, derive the auth configuration from it — do not invent values. Prefer `template.md` for the human-readable answer (its `## Users & Auth` and `## Roles` sections name every value in plain text) and cross-check against `template.json` for exact machine names and action settings. Extract four things:
 
-| Field                            | How to find it in the artifact pair                                                                                                                                                                                                                                                           |
-| -------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **user resource** (machine name) | `template.md` `## Users & Auth` → `User resource:` line names it (default `user` or a custom name). Confirm in `template.json.forms` or `template.json.resources` — the form whose `type` is `resource` and whose `name` matches.                                                            |
-| **login form path** (URL path)   | `template.md` `## Users & Auth` → `Login form:` line names the form. Then open `template.json.forms` (or `template.json.resources`) and read the matching entry's **`path`** property — THIS is the value that goes into `FormioAuthConfig.login.form`. Typically kebab-case and namespaced under the user resource (e.g. `user/login`); NEVER use the form's `name` / `machineName` in this field. |
-| **register form path** (URL path)| Same rule as login. `template.md` names the register form; `template.json.<form-entry>.path` is the URL segment that goes into `FormioAuthConfig.register.form` (e.g. `user/register`). If `template.md` states `admin-invite only` / `none`, omit the `register` block entirely rather than guessing a path. |
-| **role list**                    | `template.md` `## Roles` → bulleted list with capability summaries. Cross-check against `template.json.roles` — keys are machine names.                                                                                                                                                       |
+| Field | How to find it in the artifact pair |
+| --- | --- |
+| **user resource** (machine name) | `template.md` `## Users & Auth` → `User resource:` line names it (default `user` or a custom name). Confirm in `template.json.forms` or `template.json.resources` — the form whose `type` is `resource` and whose `name` matches. |
+| **login form path** (URL path) | `template.md` `## Users & Auth` → `Login form:` line names the form. Then open `template.json.forms` (or `template.json.resources`) and read the matching entry's **`path`** property — THIS is the value that goes into `FormioAuthConfig.login.form`. Typically kebab-case and namespaced under the user resource (e.g. `user/login`); NEVER use the form's `name` / `machineName` in this field. |
+| **register form path** (URL path) | Same rule as login. `template.md` names the register form; `template.json.<form-entry>.path` is the URL segment that goes into `FormioAuthConfig.register.form` (e.g. `user/register`). If `template.md` states `admin-invite only` / `none`, omit the `register` block entirely rather than guessing a path. |
+| **role list** | `template.md` `## Roles` → bulleted list with capability summaries. Cross-check against `template.json.roles` — keys are machine names. |
 
 ### `FormioAuthConfig.login.form` / `.register.form` MUST equal `template.json.<form>.path`
 
@@ -57,18 +57,14 @@ Write this file when the extraction produced a user resource, login form, and re
 import { NgModule } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterModule } from '@angular/router';
-import {
-  FormioAuth,
-  FormioAuthConfig,
-  FormioAuthRoutes,
-} from '@formio/angular/auth';
+import { FormioAuth, FormioAuthConfig, FormioAuthRoutes } from '@formio/angular/auth';
 
 export const AuthConfig: FormioAuthConfig = {
   login: {
-    form: 'user/login' // === template.json login form's `path` — typically 'user/login'
+    form: 'user/login', // === template.json login form's `path` — typically 'user/login'
   },
   register: {
-    form: 'user/register' // === template.json register form's `path` — typically 'user/register'
+    form: 'user/register', // === template.json register form's `path` — typically 'user/register'
   },
 };
 
@@ -97,26 +93,19 @@ import { AppConfig } from './config';
 import { AuthModule, AuthConfig } from './auth/auth.module';
 
 @NgModule({
-  declarations: [
-    App
-  ],
-  imports: [
-    BrowserModule,
-    AppRoutingModule,
-    FormioModule,
-    AuthModule
-  ],
+  declarations: [App],
+  imports: [BrowserModule, AppRoutingModule, FormioModule, AuthModule],
   providers: [
     // provideZonelessChangeDetection() is added by BOOTSTRAP — see BOOTSTRAP.md Step 6.
     provideBrowserGlobalErrorListeners(),
     { provide: FormioAppConfig, useValue: AppConfig },
     { provide: FormioAuthConfig, useValue: AuthConfig },
     FormioAuthService,
-    FormioResources
+    FormioResources,
   ],
-  bootstrap: [App]
+  bootstrap: [App],
 })
-export class AppModule { }
+export class AppModule {}
 ```
 
 **Config wiring:** the `{ provide: FormioAppConfig, useValue: AppConfig }` provider is all that is needed — `FormioModule` reads it in its constructor and configures the SDK (`Formio.setBaseUrl`/`setProjectUrl`) at bootstrap. See CONFIG.md.
@@ -128,7 +117,7 @@ export class AppModule { }
 ```ts
 export const AuthConfig: FormioAuthConfig = {
   login: {
-    form: 'user/login',    // === template.json.forms[userLogin].path
+    form: 'user/login', // === template.json.forms[userLogin].path
   },
   register: {
     form: 'user/register', // === template.json.forms[userRegister].path
@@ -160,7 +149,7 @@ import { AuthModule, AuthConfig } from './auth/auth.module';
     // ...existing providers including `{ provide: FormioAppConfig, useValue: AppConfig }`
     { provide: FormioAuthConfig, useValue: AuthConfig },
     FormioAuthService,
-  ]
+  ],
   // ...
 })
 export class AppModule {}
@@ -211,7 +200,7 @@ The canonical reference for the event surface is the Form.io Angular wiki: https
 
 ### Canonical `app.component.ts`
 
-Edit the file `src/app/app.component.ts`  (or `src/app/app.ts`) the Angular CLI generated. Add the `FormioAuthService` dependency, subscribe in `ngOnInit`, and navigate with Angular's `Router`. Unsubscribe in `ngOnDestroy` so hot-reload / test teardown does not leak the subscription.
+Edit the file `src/app/app.component.ts` (or `src/app/app.ts`) the Angular CLI generated. Add the `FormioAuthService` dependency, subscribe in `ngOnInit`, and navigate with Angular's `Router`. Unsubscribe in `ngOnDestroy` so hot-reload / test teardown does not leak the subscription.
 
 ```ts
 import { Component, OnDestroy, OnInit } from '@angular/core';
@@ -228,7 +217,10 @@ import { Subscription } from 'rxjs';
 export class AppComponent implements OnInit, OnDestroy {
   private subs = new Subscription();
 
-  constructor(public auth: FormioAuthService, private router: Router) {}
+  constructor(
+    public auth: FormioAuthService,
+    private router: Router
+  ) {}
 
   ngOnInit(): void {
     // Event names per https://github.com/formio/angular/wiki/User-Authentication#authentication-events
@@ -236,19 +228,19 @@ export class AppComponent implements OnInit, OnDestroy {
       this.auth.onLogin.subscribe(() => {
         // Success — leave the login form and go to the app shell.
         this.router.navigate(['/']);
-      }),
+      })
     );
     this.subs.add(
       this.auth.onRegister.subscribe(() => {
         // Self-register ends with an auto-login → same destination as onLogin.
         this.router.navigate(['/']);
-      }),
+      })
     );
     this.subs.add(
       this.auth.onLogout.subscribe(() => {
         // Session gone — back to the login form.
         this.router.navigate(['/auth/login']);
-      }),
+      })
     );
 
     // Once auth has finished restoring any cached JWT, send anonymous visitors to the login screen
@@ -352,7 +344,7 @@ The custom register component follows the identical pattern against `FormioAuthR
 
 ## `src/app/auth/auth.guard.ts` — REQUIRED route guard for authenticated routes
 
-**This file is not optional whenever any route requires an authenticated user.** Subscribing to `onLogin` / `onLogout` in `app.component.ts` only redirects on auth *events* — it does NOT stop an anonymous visitor from clicking a `routerLink` (or deep-linking) straight into a route that needs a JWT. Without a `canActivate` guard, the anonymous user lands on the resource page, `FormioResourceService` fires its load request, the backend returns `401` / `403`, and the user sees a broken or empty screen instead of being sent to the login form. A guard is the only thing that gates navigation *before* the route activates.
+**This file is not optional whenever any route requires an authenticated user.** Subscribing to `onLogin` / `onLogout` in `app.component.ts` only redirects on auth _events_ — it does NOT stop an anonymous visitor from clicking a `routerLink` (or deep-linking) straight into a route that needs a JWT. Without a `canActivate` guard, the anonymous user lands on the resource page, `FormioResourceService` fires its load request, the backend returns `401` / `403`, and the user sees a broken or empty screen instead of being sent to the login form. A guard is the only thing that gates navigation _before_ the route activates.
 
 Write this functional guard whenever the app has any non-public resource route (i.e. the Access Matrix shows the `anonymous` actor has no access — almost every authenticated app):
 

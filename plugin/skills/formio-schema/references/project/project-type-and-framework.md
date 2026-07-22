@@ -4,11 +4,11 @@ Two discriminators sit on the `Project` envelope: `type` distinguishes a regular
 
 ## ProjectType
 
-| Value       | Meaning                                                                                                                                                                  |
-| ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `'project'` | A regular standalone project. Default value. Used for any project that isn't a derived environment.                                                                     |
-| `'stage'`   | A Stage of a parent project — a deployment environment (Dev / Staging / etc.) that branches from the parent project. Requires `project` to be set to the parent project's ObjectId. |
-| `'tenant'`  | A tenant of the deployment — a multi-tenant child project that inherits its parent's plan at runtime. Tenants are server-keyed differently from stages.                  |
+| Value | Meaning |
+| --- | --- |
+| `'project'` | A regular standalone project. Default value. Used for any project that isn't a derived environment. |
+| `'stage'` | A Stage of a parent project — a deployment environment (Dev / Staging / etc.) that branches from the parent project. Requires `project` to be set to the parent project's ObjectId. |
+| `'tenant'` | A tenant of the deployment — a multi-tenant child project that inherits its parent's plan at runtime. Tenants are server-keyed differently from stages. |
 
 ### Stage creation pattern
 
@@ -55,17 +55,17 @@ A tenant inherits the `plan` of its parent project at read time — the server's
 
 Declares the target client framework for the project — used by the portal UI to pick the right SDK / starter template suggestions.
 
-| Value         | Meaning                                                                                                |
-| ------------- | ------------------------------------------------------------------------------------------------------ |
-| `'angular'`   | Modern Angular (the default).                                                                          |
-| `'angular2'`  | Angular 2.x — historical alias retained for backward compatibility with older project documents.       |
-| `'react'`     | React.                                                                                                 |
-| `'vue'`       | Vue.                                                                                                   |
-| `'html5'`     | Plain HTML5 / vanilla JS.                                                                              |
-| `'simple'`    | "Simple" template — minimal UI, suitable for embedded or non-SPA use cases.                            |
-| `'custom'`    | Custom integration — the framework is unspecified or out-of-band.                                      |
-| `'aurelia'`   | Aurelia.                                                                                               |
-| `'javascript'`| Generic JavaScript SDK without a specific framework wrapper.                                           |
+| Value | Meaning |
+| --- | --- |
+| `'angular'` | Modern Angular (the default). |
+| `'angular2'` | Angular 2.x — historical alias retained for backward compatibility with older project documents. |
+| `'react'` | React. |
+| `'vue'` | Vue. |
+| `'html5'` | Plain HTML5 / vanilla JS. |
+| `'simple'` | "Simple" template — minimal UI, suitable for embedded or non-SPA use cases. |
+| `'custom'` | Custom integration — the framework is unspecified or out-of-band. |
+| `'aurelia'` | Aurelia. |
+| `'javascript'` | Generic JavaScript SDK without a specific framework wrapper. |
 
 The server's Mongoose schema enforces this enum and defaults to `'angular'`.
 

@@ -142,7 +142,7 @@ def grade_eval_0(out_dir):
 
     auth_mod = next((p for p in ts_files if p.name == "auth.module.ts"), None)
     auth_content = read(auth_mod) if auth_mod else ""
-    config_file = next((p for p in ts_files if p.name == "app.config.ts"), None)
+    config_file = next((p for p in ts_files if p.name in ("config.ts", "app.config.ts")), None)
     config_content = read(config_file) if config_file else ""
     combined = auth_content + app_content + config_content
     references_auth_forms = "userLogin" in combined and "userRegister" in combined

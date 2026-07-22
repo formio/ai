@@ -22,12 +22,12 @@ A symlink `.claude/skills/formio-application` SHALL exist and resolve to `skills
 
 ### Requirement: formio-application description claims plain-language triggers and names the framework skills
 
-The `formio-application` `SKILL.md` frontmatter `description` SHALL claim plain-language build-an-app and extend-an-app triggers WITHOUT requiring the user to know any UI framework or Form.io terminology. Example triggers the description MUST claim include:
+The `formio-application` `SKILL.md` frontmatter `description` SHALL claim plain-language build-an-app and extend-an-app triggers WITHOUT requiring the user to know any UI framework or Form.io terminology, and SHALL fit the library's description budget (see the `skill-description-budget` capability). Example triggers the description MUST claim include:
 
-- Build-new: "build me an app", "create a CRM", "I need a tool to track X", "spin up a system for Y", bare domain archetypes ("task manager", "help desk").
-- Extend-existing: "also track X", "add a way to see Y", "each Z should have a list of W", "let users also submit V".
+- Build-new: "build me an app", "create a CRM", bare domain archetypes ("task manager", "help desk").
+- Extend-existing: "also track X", "add a way to see Y".
 
-The description MUST state that this skill is the library's default build-an-app entry point; that it picks a UI framework automatically when only one is installed and asks the user when multiple are installed; that the user does NOT need to mention "Angular", "React", "framework", "resource", or "NgModule".
+The description MUST state that this skill is the library's default build-an-app entry point. The framework-selection behavior (auto-pick with one installed framework, ask with several) is a body concern and is NOT required in the description.
 
 The description MUST include `Not for:` clauses pointing at:
 
@@ -36,7 +36,7 @@ The description MUST include `Not for:` clauses pointing at:
 - `formio-resource-planner` for data-model-only planning requests without building an app.
 - `formio-api` for endpoint lookups.
 - `formio-form` for embedding or rendering a single form in an existing page or application (no app build or orchestration).
-- `formio-form-builder` for standalone single-form creation requests — "build/create a form", surveys, contact forms, intake forms, registration forms, questionnaires, wizards, PDF forms — where the user wants one form, not a data model, resources, or an app around the data.
+- `formio-form-builder` for standalone single-form creation requests — one form to collect responses, not a data model, resources, or an app around the data.
 
 The description MUST also state that the skill writes a `.mcp.json` file in the workspace root as part of the flow (so users know a file will be created and why) and that the flow pauses for a Claude Code restart after the `.mcp.json` write.
 
@@ -81,6 +81,11 @@ The description MUST also state that the skill writes a `.mcp.json` file in the 
 
 - **WHEN** the `formio-application` `SKILL.md` frontmatter is inspected
 - **THEN** its `description` mentions restarting Claude Code (or an equivalent "pause and restart" phrasing) so the user knows the flow is multi-invocation
+
+#### Scenario: Description fits the budget
+
+- **WHEN** the `formio-application` `SKILL.md` frontmatter is inspected
+- **THEN** its `description`, whitespace-normalized, is ≤ 1,024 characters
 
 ### Requirement: formio-application runs a six-step orchestration
 

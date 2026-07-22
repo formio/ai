@@ -1,4 +1,3 @@
-
 ## Overview
 
 The Project Roles API lets a project admin manage the roles that govern access inside a single Form.io project. Roles are referenced by `access` and `submissionAccess` entries on forms, and they are assigned to user submissions (for example, to admin submissions or to authenticated end users). This skill covers listing, creating, and updating roles. Every project is seeded with built-in roles such as `Administrator`, `Authenticated`, and `Anonymous`.
@@ -15,11 +14,11 @@ Every request to these endpoints MUST include an `x-jwt-token` header holding th
 
 Prefer the MCP server's first-party tools when they cover the requested operation. Call the HTTP endpoint directly only when no MCP tool applies.
 
-| Operation | Preferred MCP tool | Fallback endpoint |
-| --- | --- | --- |
-| List all roles | `role_list` | `GET ${FORMIO_PROJECT_URL}/role` |
-| Create a role | `role_create` | `POST ${FORMIO_PROJECT_URL}/role` |
-| Update a role | `role_update` | `PUT ${FORMIO_PROJECT_URL}/role/:roleId` |
+| Operation      | Preferred MCP tool | Fallback endpoint                        |
+| -------------- | ------------------ | ---------------------------------------- |
+| List all roles | `role_list`        | `GET ${FORMIO_PROJECT_URL}/role`         |
+| Create a role  | `role_create`      | `POST ${FORMIO_PROJECT_URL}/role`        |
+| Update a role  | `role_update`      | `PUT ${FORMIO_PROJECT_URL}/role/:roleId` |
 
 ## Endpoints
 
@@ -97,9 +96,9 @@ curl -X POST -H "x-jwt-token: $FORMIO_JWT" -H "Content-Type: application/json" \
 
 Update an existing role. This is a full replacement — include every field you want to preserve.
 
-| Path parameter | Type | Description |
-| --- | --- | --- |
-| `roleId` | string | The MongoDB `_id` of the role to update. |
+| Path parameter | Type   | Description                              |
+| -------------- | ------ | ---------------------------------------- |
+| `roleId`       | string | The MongoDB `_id` of the role to update. |
 
 Request body (JSON):
 

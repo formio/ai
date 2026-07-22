@@ -2,10 +2,10 @@
 
 `state` records where a submission sits in its lifecycle. Two values appear in production data and in the Form.io user guide:
 
-| Value         | When it's written                                                                                            | Meaning                                                                                                                                  |
-| ------------- | ------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------- |
-| `"draft"`     | A user opens a form, fills in some fields, and the platform persists the in-progress data without finalizing it (Save Draft action / SaveState button / form-level draft setting). | The submission is incomplete and can still be edited by the user before final submit. Validation rules that require values are NOT enforced on a draft. |
-| `"submitted"` | The user completes the form and submits. The server runs all validations, executes Submit-time actions, and writes the final record. | The submission is finalized. Subsequent edits go through `PUT /submission/{_id}` (with permission) but the state stays `"submitted"`.    |
+| Value | When it's written | Meaning |
+| --- | --- | --- |
+| `"draft"` | A user opens a form, fills in some fields, and the platform persists the in-progress data without finalizing it (Save Draft action / SaveState button / form-level draft setting). | The submission is incomplete and can still be edited by the user before final submit. Validation rules that require values are NOT enforced on a draft. |
+| `"submitted"` | The user completes the form and submits. The server runs all validations, executes Submit-time actions, and writes the final record. | The submission is finalized. Subsequent edits go through `PUT /submission/{_id}` (with permission) but the state stays `"submitted"`. |
 
 A submission record may transition `draft` → `submitted` exactly once during its lifetime. There is no reverse transition; reopening a submitted record for editing does NOT move it back to `draft`.
 

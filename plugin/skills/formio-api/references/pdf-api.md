@@ -1,4 +1,3 @@
-
 ## Overview
 
 The PDF API covers everything a project admin does with PDF-backed forms: uploading PDF templates, listing and retrieving uploaded PDFs, creating PDF-display forms, submitting data against a PDF form, generating temporary download tokens, and downloading rendered submission PDFs. All traffic goes through the project's PDF proxy — never directly to the standalone PDF server.
@@ -31,7 +30,12 @@ Response (JSON):
   "file": "7b45f38b-dc26-5b1d-aa33-947522157c57",
   "formfields": {
     "components": [
-      { "type": "textfield", "key": "f1010", "label": "f1_01[0]", "overlay": { "width": 317.28, "height": 24.92, "top": 167.3 } }
+      {
+        "type": "textfield",
+        "key": "f1010",
+        "label": "f1_01[0]",
+        "overlay": { "width": 317.28, "height": 24.92, "top": 167.3 }
+      }
     ]
   }
 }
@@ -81,9 +85,9 @@ curl -H "x-jwt-token: $FORMIO_JWT" \
 
 Retrieve the rendered HTML representation of a specific uploaded PDF — used by the form builder to overlay components on the PDF visually.
 
-| Path parameter | Type | Description |
-| --- | --- | --- |
-| `:projectId` | string | Project MongoDB ID. |
+| Path parameter | Type   | Description                                    |
+| -------------- | ------ | ---------------------------------------------- |
+| `:projectId`   | string | Project MongoDB ID.                            |
 | `:pdfFileName` | string | The `file` UUID returned from the upload call. |
 
 Response: `text/html` document.

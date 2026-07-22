@@ -6,82 +6,54 @@ This app exercises **transitive group access**: the group (`Team`) sits two leve
 
 ## Resources
 
-- Team (type: resource)
-  Purpose: the group that owns Accounts; drives group-based access for every account-scoped record.
-  Fields:
-    - name: textfield — team name (required)
-  Access: admin-full; all logged-in users can read the Team definition itself
-  Actions:
-    - (save only)
+- Team (type: resource) Purpose: the group that owns Accounts; drives group-based access for every account-scoped record. Fields:
+  - name: textfield — team name (required) Access: admin-full; all logged-in users can read the Team definition itself Actions:
+  - (save only)
 
-- TeamUser (type: resource, join)
-  Purpose: many-to-many between Team and User; registers per-team memberships and triggers the Group Assignment ACL write.
-  Fields:
-    - team: select (resource=Team) — the team
-    - user: select (resource=User) — the member
-  Access: admin-only (memberships managed by admins)
-  Actions:
-    - Group Assignment: group=team, user=user
+- TeamUser (type: resource, join) Purpose: many-to-many between Team and User; registers per-team memberships and triggers the Group Assignment ACL write. Fields:
+  - team: select (resource=Team) — the team
+  - user: select (resource=User) — the member Access: admin-only (memberships managed by admins) Actions:
+  - Group Assignment: group=team, user=user
 
-- Account (type: resource; direct child of Team)
-  Purpose: an organization the sales team works with; directly references its owning Team.
-  Fields:
-    - name: textfield — company name (required)
-    - industry: select (static values: technology, finance, healthcare, retail, other)
-    - website: textfield
-    - team: select (resource=Team, reference=true, field-based access) —
-      **owning team; group access propagates from here**
-    - primaryContact: select (resource=Contact, optional) — main point of contact at this account
-    - notes: textarea
-  Access: admin-full; authenticated users see only Accounts whose Team they belong to (field-based submissionAccess on `team`)
-  Actions:
-    - (save only)
+- Account (type: resource; direct child of Team) Purpose: an organization the sales team works with; directly references its owning Team. Fields:
+  - name: textfield — company name (required)
+  - industry: select (static values: technology, finance, healthcare, retail, other)
+  - website: textfield
+  - team: select (resource=Team, reference=true, field-based access) — **owning team; group access propagates from here**
+  - primaryContact: select (resource=Contact, optional) — main point of contact at this account
+  - notes: textarea Access: admin-full; authenticated users see only Accounts whose Team they belong to (field-based submissionAccess on `team`) Actions:
+  - (save only)
 
-- Contact (type: resource; 2 levels below Team)
-  Purpose: an individual person at an Account.
-  Fields:
-    - firstName: textfield (required)
-    - lastName: textfield (required)
-    - email: email
-    - phone: phoneNumber
-    - notes: textarea
-    - account: select (resource=Account, reference=true) — parent account (user-visible)
-    - team: select (resource=Team, hidden, calculated from account.team, field-based access) —
-      **invisible mirror; `value = data.account.data.team;` propagates group access**
-  Access: admin-full; group access via the hidden team mirror
-  Actions:
-    - (save only)
+- Contact (type: resource; 2 levels below Team) Purpose: an individual person at an Account. Fields:
+  - firstName: textfield (required)
+  - lastName: textfield (required)
+  - email: email
+  - phone: phoneNumber
+  - notes: textarea
+  - account: select (resource=Account, reference=true) — parent account (user-visible)
+  - team: select (resource=Team, hidden, calculated from account.team, field-based access) — **invisible mirror; `value = data.account.data.team;` propagates group access** Access: admin-full; group access via the hidden team mirror Actions:
+  - (save only)
 
-- Deal (type: resource; 2 levels below Team)
-  Purpose: a sales opportunity attached to an Account.
-  Fields:
-    - title: textfield (required)
-    - amount: number
-    - stage: select (static values: prospect, qualified, proposal, won, lost)
-    - closeDate: datetime (date only)
-    - notes: textarea
-    - account: select (resource=Account, reference=true) — parent account
-    - team: select (resource=Team, hidden, calculated, field-based access) —
-      **invisible mirror for group access**
-  Access: admin-full; group access via the hidden team mirror
-  Actions:
-    - (save only)
+- Deal (type: resource; 2 levels below Team) Purpose: a sales opportunity attached to an Account. Fields:
+  - title: textfield (required)
+  - amount: number
+  - stage: select (static values: prospect, qualified, proposal, won, lost)
+  - closeDate: datetime (date only)
+  - notes: textarea
+  - account: select (resource=Account, reference=true) — parent account
+  - team: select (resource=Team, hidden, calculated, field-based access) — **invisible mirror for group access** Access: admin-full; group access via the hidden team mirror Actions:
+  - (save only)
 
-- Activity (type: resource; 2 levels below Team)
-  Purpose: a touchpoint (call, email, meeting, task) logged against an Account and optionally a specific Deal.
-  Fields:
-    - subject: textfield (required)
-    - type: select (static values: call, email, meeting, task)
-    - dueDate: datetime
-    - completed: checkbox
-    - notes: textarea
-    - account: select (resource=Account, reference=true) — parent account
-    - deal: select (resource=Deal, reference=true, optional) — specific deal this activity relates to
-    - team: select (resource=Team, hidden, calculated, field-based access) —
-      **invisible mirror for group access**
-  Access: admin-full; group access via the hidden team mirror
-  Actions:
-    - (save only)
+- Activity (type: resource; 2 levels below Team) Purpose: a touchpoint (call, email, meeting, task) logged against an Account and optionally a specific Deal. Fields:
+  - subject: textfield (required)
+  - type: select (static values: call, email, meeting, task)
+  - dueDate: datetime
+  - completed: checkbox
+  - notes: textarea
+  - account: select (resource=Account, reference=true) — parent account
+  - deal: select (resource=Deal, reference=true, optional) — specific deal this activity relates to
+  - team: select (resource=Team, hidden, calculated, field-based access) — **invisible mirror for group access** Access: admin-full; group access via the hidden team mirror Actions:
+  - (save only)
 
 ## Users & Auth
 
@@ -99,20 +71,20 @@ This app exercises **transitive group access**: the group (`Team`) sits two leve
 
 ## Access Matrix
 
-| Resource | Actor          | create | read  | update | delete | Notes                                              |
-| -------- | -------------- | ------ | ----- | ------ | ------ | -------------------------------------------------- |
-| Team     | administrator  | all    | all   | all    | all    | admin creates teams                                |
-| Team     | salesRep       | —      | all   | —      | —      | read-only; needed to render team names             |
-| TeamUser | administrator  | all    | all   | all    | all    | admin manages memberships                          |
-| TeamUser | salesRep       | —      | own   | —      | —      | rep sees their own membership rows                 |
-| Account  | administrator  | all    | all   | all    | all    |                                                    |
-| Account  | salesRep       | group  | group | group  | —      | group-via-TeamUser (field-based on Account.team)   |
-| Contact  | administrator  | all    | all   | all    | all    |                                                    |
-| Contact  | salesRep       | group  | group | group  | —      | transitive via hidden `team` mirror                |
-| Deal     | administrator  | all    | all   | all    | all    |                                                    |
-| Deal     | salesRep       | group  | group | group  | —      | transitive via hidden `team` mirror                |
-| Activity | administrator  | all    | all   | all    | all    |                                                    |
-| Activity | salesRep       | group  | group | group  | —      | transitive via hidden `team` mirror                |
+| Resource | Actor | create | read | update | delete | Notes |
+| --- | --- | --- | --- | --- | --- | --- |
+| Team | administrator | all | all | all | all | admin creates teams |
+| Team | salesRep | — | all | — | — | read-only; needed to render team names |
+| TeamUser | administrator | all | all | all | all | admin manages memberships |
+| TeamUser | salesRep | — | own | — | — | rep sees their own membership rows |
+| Account | administrator | all | all | all | all |  |
+| Account | salesRep | group | group | group | — | group-via-TeamUser (field-based on Account.team) |
+| Contact | administrator | all | all | all | all |  |
+| Contact | salesRep | group | group | group | — | transitive via hidden `team` mirror |
+| Deal | administrator | all | all | all | all |  |
+| Deal | salesRep | group | group | group | — | transitive via hidden `team` mirror |
+| Activity | administrator | all | all | all | all |  |
+| Activity | salesRep | group | group | group | — | transitive via hidden `team` mirror |
 
 ## ER Diagram
 
@@ -198,6 +170,4 @@ Owner rules: none — all row-level access is group- or role-driven.
 
 ## Companion artifact
 
-`template.json` in this directory is the structured Form.io project-export
-companion to this document. Use this `.md` for architectural intent; use the
-`.json` for exact field shapes, component JSON, and action settings.
+`template.json` in this directory is the structured Form.io project-export companion to this document. Use this `.md` for architectural intent; use the `.json` for exact field shapes, component JSON, and action settings.

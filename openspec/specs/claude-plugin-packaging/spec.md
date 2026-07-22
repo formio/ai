@@ -94,20 +94,20 @@ The plugin source tree SHALL include `plugin/README.md` — copied by the build 
 - **WHEN** the plugin-build test runs
 - **THEN** it verifies `plugin/README.md` references every environment variable declared in the `server-config` capability (`FORMIO_PROJECT_URL`, `FORMIO_API_KEY`, `FORMIO_LOGIN_FORM`) and fails if any are missing
 
-### Requirement: Example app demonstrates plugin configuration
+### Requirement: Example prompts demonstrate the skills library
 
-The repository SHALL ship `examples/basic-app/` with a `README.md`, a `.claude/settings.json`, and an `.env.example` that together demonstrate how a Claude Code project enables the `formio-ai` plugin and supplies the required Form.io environment variables.
+The repository SHALL ship an `examples/` directory containing a `README.md` (how to run a prompt against the symlinked skills and the local MCP server) and per-entry-point subfolders of copy-paste prompt files. Each prompt file SHALL open with the target skill's slash tag (e.g. `/formio-application`) and document what the run should exercise.
 
-#### Scenario: Example app is consistent with plugin manifest
+#### Scenario: Application prompts are present
 
-- **WHEN** the plugin-example-app test runs
-- **THEN** it verifies that `examples/basic-app/.claude/settings.json` references the plugin name declared in `plugin/.claude-plugin/plugin.json` and that `.env.example` documents the environment variables the bundled MCP server requires
+- **WHEN** a contributor opens `examples/apps/`
+- **THEN** it contains at least one prompt file whose prompt begins with `/formio-application` and names an output folder under `examples/`
 
-### Requirement: Plugin build and example app are covered by Vitest
+### Requirement: Plugin build is covered by Vitest
 
-Vitest suites under `packages/mcp-server/src/__tests__/` SHALL include `plugin-build.test.ts` asserting the `dist/plugin/` layout produced by `buildPlugin()` and `plugin-example-app.test.ts` asserting the example app stays consistent with the plugin manifest. Both tests MUST run as part of `pnpm test`.
+Vitest suites under `packages/mcp-server/src/__tests__/` SHALL include `plugin-build.test.ts` asserting the `dist/plugin/` layout produced by `buildPlugin()`. It MUST run as part of `pnpm test`.
 
 #### Scenario: Plugin build regressions are caught by CI
 
 - **WHEN** `pnpm test` runs
-- **THEN** `plugin-build.test.ts` and `plugin-example-app.test.ts` execute and fail if the plugin build output or example-app wiring drifts from the manifest
+- **THEN** `plugin-build.test.ts` executes and fails if the plugin build output drifts from the manifest
