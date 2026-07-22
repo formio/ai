@@ -59,10 +59,10 @@ Then finish with a short "Next steps" section:
 ```
 ### Next steps
 
-- **Import directly**: `curl -X POST -H "x-jwt-token: $JWT" -H "Content-Type: application/json" -d "{\"template\": $(cat template.json)}" $FORMIO_PROJECT_URL/import`
+- **Import directly**: `project_import` (MCP tool) with the contents of `template.json`; fall back to `curl -X POST -H "x-jwt-token: $JWT" -H "Content-Type: application/json" -d "{\"template\": $(cat template.json)}" $FORMIO_PROJECT_URL/import` only when the MCP server is unavailable
 - **Or pass the pair to another skill / tool**:
   - `form_create` (MCP tool) for each entry under `resources` and `forms` in `template.json`
-  - `formio-api/references/project-actions` for each entry under `actions`
-  - `formio-api/references/project-roles` to create the non-default roles listed under `roles`
+  - `action_create` (MCP tool) for each entry under `actions`; the REST shapes live in `formio-api/references/project-actions` if the MCP server is unavailable
+  - `role_create` (MCP tool) for the non-default roles listed under `roles`; REST fallback in `formio-api/references/project-roles`
   - Framework scaffolders (`formio-angular/resources`, future `formio-react`, …) — hand them BOTH `template.md` (architectural intent) and `template.json` (structured reference). The `.md` is the seed they reason from; the `.json` is the structured companion they consult for field-level shapes.
 ```
