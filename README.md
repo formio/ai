@@ -1,4 +1,4 @@
-# The Form.io Agentic Coding Toolset
+# The Form.io Agentic Coding Toolset <!-- omit from toc -->
 
 [![CI](https://github.com/formio/ai/actions/workflows/ci.yml/badge.svg)](https://github.com/formio/ai/actions/workflows/ci.yml)
 [![npm: @formio/ai](https://img.shields.io/npm/v/%40formio%2Fai?label=%40formio%2Fai)](https://www.npmjs.com/package/@formio/ai)
@@ -6,6 +6,30 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](./LICENSE)
 
 `@formio/ai` is what brings Form.io into your agentic coding environment. It provides a series of tools that enable any developer to perform a number of complex actions against the Form.io Enterprise Server using their favorite Agentic Coding toolsets (starting with Claude Code). This turns the Form.io Enterprise Server into a **Composable Backend for Agentically Coded Applications**.
+
+- [Getting Started](#getting-started)
+- [What you get](#what-you-get)
+- [Why this exists](#why-this-exists)
+- [Agentic Skill Library](#agentic-skill-library)
+  - [Orchestration skills](#orchestration-skills)
+  - [All skills](#all-skills)
+- [Examples and Use Cases](#examples-and-use-cases)
+  - [Build complete applications](#build-complete-applications)
+  - [Build forms and wizards](#build-forms-and-wizards)
+  - [Embed forms in existing applications](#embed-forms-in-existing-applications)
+  - [Work the REST API via prompt](#work-the-rest-api-via-prompt)
+- [Using the MCP server without the skills](#using-the-mcp-server-without-the-skills)
+- [MCP server tools](#mcp-server-tools)
+  - [Forms](#forms)
+  - [Roles](#roles)
+  - [Actions](#actions)
+  - [Project](#project)
+  - [Diagnostic](#diagnostic)
+- [Authentication](#authentication)
+  - [Login-form auto-resolution](#login-form-auto-resolution)
+- [Environment variables](#environment-variables)
+- [Contributing](#contributing)
+- [License](#license)
 
 ## Getting Started
 Getting started is easy.  First install Claude Code as follows:
@@ -24,7 +48,7 @@ Claude Code prompts for the `Project URL` and the `Base URL` on install. These a
  - **Project URL**: This is the endpoint for your 'project'. If you are using our SaaS environment (https://portal.form.io), then your project URL will be a sub-domain, such as https://myproject.form.io. However, for most use cases, when Form.io is deployed in your own environment, then the project url is typically a 'sub-directory' structure like https://forms.mysite.com/myproject.
  - **Base URL**: This is the endpoint for the deployment. If you are using the SaaS environment (https://portal.form.io), then this is always going to be https://api.form.io. However, for most use cases, when Form.io is deployed in your own environment, then this is the URL of the deployment like https://forms.mysite.com.
 
- ## What you get
+## What you get
 
 - **Claude Code plugin: `@formio/ai`.** One-command install. Bundles the MCP server and skill library, registers them with Claude Code.
 - **MCP server: `@formio/mcp`.** Form.io operations (`form_*`, `role_*`, `action_*`, `project_*`) as MCP tools. Works with any MCP-aware client: Claude Code, Claude Desktop, VS Copilot, and whatever comes next.
@@ -70,31 +94,6 @@ Orchestration skills are special skills that serve as the **entry point** for mo
 
 ## Examples and Use Cases
 
-- [The Form.io Agentic Coding Toolset](#the-formio-agentic-coding-toolset)
-  - [Getting Started](#getting-started)
-  - [What you get](#what-you-get)
-  - [Why this exists](#why-this-exists)
-  - [Agentic Skill Library](#agentic-skill-library)
-    - [Orchestration skills](#orchestration-skills)
-    - [All skills](#all-skills)
-  - [Examples and Use Cases](#examples-and-use-cases)
-    - [Build complete applications](#build-complete-applications)
-    - [Build forms and wizards](#build-forms-and-wizards)
-    - [Embed forms in existing applications](#embed-forms-in-existing-applications)
-    - [Work the REST API via prompt](#work-the-rest-api-via-prompt)
-  - [Using the MCP server without the skills](#using-the-mcp-server-without-the-skills)
-  - [MCP server tools](#mcp-server-tools)
-    - [Forms](#forms)
-    - [Roles](#roles)
-    - [Actions](#actions)
-    - [Project](#project)
-    - [Diagnostic](#diagnostic)
-  - [Authentication](#authentication)
-    - [Login-form auto-resolution](#login-form-auto-resolution)
-  - [Environment variables](#environment-variables)
-  - [Contributing](#contributing)
-  - [License](#license)
-
 Ready-to-paste example prompts live in [`examples/`](./examples/) — each file is one self-contained prompt plus notes on what it should exercise. To try one, create a new folder, start Claude Code inside it, and paste the prompt:
 
 ```bash
@@ -111,7 +110,7 @@ Create a brand-new 'greenfield' form-based application — or introduce a new fo
 - [Help Desk](./examples/apps/help-desk.md) — customer tickets, agent workflows, internal notes, and email notifications.
 - [Storyboard](./examples/apps/storyboard.md) — production → scene → shot hierarchy with collaborative crew access.
 
-***This library currently only supports the Angular application framework for new 'greenfield' applications. Other frameworks are coming soon.***
+***This library currently only supports the Angular application framework for new 'greenfield' applications. It generally supports other frameworks using the Vanilla JS `@formio/js` javascript renderer. Full support for other frameworks are coming soon.***
 
 ### Build forms and wizards
 

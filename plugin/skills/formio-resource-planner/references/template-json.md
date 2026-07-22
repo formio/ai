@@ -625,6 +625,66 @@ Grants a role when a submission is created. Typically on a register form.
 }
 ```
 
+### Multi-role user systems — role selectboxes + one conditional Role Assignment per role
+
+**Scope: this pattern applies only when all personas share ONE user collection (a single user resource).** That is the common default, but it is a requirements decision, not a law — when the application calls for a **resource per role** (e.g., a separate `admin` resource alongside `user`, with the Login action's `settings.resources` listing both), this section does not apply: each user-type resource simply carries its own unconditional Role Assignment (assigning that resource's single role on create), exactly like a register form. Decide the shape in the interview (see `interview-guide.md` round 4) before reaching for selectboxes.
+
+When the plan DOES share one user resource across **more than one assignable persona** (e.g., `student` / `collegeAdmin` / `scholarshipAdmin`), the register form's single unconditional Role Assignment only covers the self-register persona. The other personas need a role-selection mechanism ON the user resource itself, because **a submission's `roles` array cannot be written directly through the API** — the server filters `roles` out of POST/PUT/PATCH bodies even for the project owner, so "create the user, then PATCH `roles`" is a dead end that strands the user with no working way to create staff accounts. The Role Assignment action is the only supported writer of submission roles.
+
+The canonical pattern is: (1) a `selectboxes` component keyed `role` on the user resource, one value per assignable persona; (2) one **conditional** Role Assignment action per persona, executing only when its box is checked. Whoever creates or edits a user (the admin in the Form.io portal, or an authorized API caller setting `data.role.<value> = true`) picks the persona on the form, and the matching action attaches the real role server-side.
+
+Example selectboxes component on the `user` resource:
+
+```jsonc
+{
+  "label": "Role",
+  "key": "role",
+  "type": "selectboxes",
+  "input": true,
+  "inputType": "checkbox",
+  "optionsLabelPosition": "right",
+  "tableView": false,
+  "values": [
+    { "label": "Student", "value": "student", "shortcut": "" },
+    { "label": "College Admin", "value": "collegeAdmin", "shortcut": "" },
+    { "label": "Scholarship Admin", "value": "scholarshipAdmin", "shortcut": "" },
+  ],
+  "defaultValue": { "student": false, "collegeAdmin": false, "scholarshipAdmin": false },
+}
+```
+
+One action per persona, keyed `user:role<Persona>`, identical except for the `condition.conditions[0].value` and `settings.role`:
+
+```jsonc
+"user:roleAdmissions": {
+  "title": "Role Assignment (College Admin)",
+  "name": "role",
+  "form": "user",
+  "priority": 1,
+  "method": ["create"],
+  "handler": ["after"],
+  "condition": {
+    "conjunction": "all",
+    "conditions": [
+      { "component": "role", "operator": "isEqual", "value": "collegeAdmin" }
+    ],
+    "custom": ""
+  },
+  "settings": {
+    "association": "new",
+    "type": "add",
+    "role": "collegeAdmin"   // role's machineName key from `roles`; resolves to the role id on import
+  }
+}
+```
+
+Rules:
+
+- **Shared collection vs. resource-per-role is a deliberate choice.** Default to ONE `user` resource with personas as roles (one login form, one owner story) and use this selectboxes pattern. A resource per role is equally valid WHEN the requirements call for it (separate credential pools, separate registration flows, `settings.resources: ["user", "admin"]` on Login) — in that shape, skip the selectboxes and give each user-type resource its own unconditional Role Assignment instead. What is NOT valid is a shared user resource whose non-default personas have no assignment mechanism at all.
+- The `condition` object uses the conjunction shape above (`conjunction` + `conditions[{ component, operator, value }]` + `custom: ""`). For a `selectboxes` component, `operator: "isEqual"` with the box's `value` string matches when that box is checked.
+- Emit one conditional `user:role<Persona>` action for EVERY assignable role in the plan, including the self-register persona — the register form's own unconditional Role Assignment still covers self-registration, and the conditional set covers users created or edited on the resource directly (portal or API).
+- Never plan a step that writes `submission.roles` directly (POST body, PUT, PATCH) — the API silently strips it, and a PUT that includes a `roles` key can wipe the existing roles.
+
 ### Group Assignment (Group Permissions) — has two halves
 
 Group-based access is configured in **two places** that must be in sync. Missing either half leaves the group permissions broken:
@@ -676,6 +736,7 @@ Before emitting the Phase B JSON, walk through this list:
 - [ ] Every `select` with `dataSrc: "resource"` has `"reference": true` and does **not** have `"valueProperty"`. Bare `valueProperty: "_id"` breaks multi-level resource hierarchies at read time.
 - [ ] Every login-action `settings.resources` array equals `["user"]`. If the application requires "admins" to access the application, then `"admin"` can also be included in the resources array. In most cases, however, administrator tasks are performed via the Form.io project portal, not via the app login form.
 - [ ] Every Role Assignment action references a role that exists in `roles`.
+- [ ] **When `roles` declares 2+ assignable personas, the `user` resource has the `role` selectboxes component and one conditional `user:role<Persona>` action per persona** (see "Multi-role user systems"). Direct `roles` writes are stripped by the API, so without these actions the non-self-register personas cannot be assigned at all.
 - [ ] Every Group Assignment action's `settings.group` and `settings.user` match field keys on the join resource it's attached to.
 - [ ] **Every child resource whose access flows from a group has a four-entry `submissionAccess` (`read`, `create`, `update`, `delete`, roles: `[]`) on the `select` component that references the group.** Missing this block silently breaks group permissions on the child.
 - [ ] **Every resource 2+ levels below the group has a hidden, calculated mirror of the group select** (`hidden: true`, `calculateValue: "value = data.<parent>.data.<group>;"`, `refreshOn: "<parent>"`, `reference: true`) carrying the same four-entry `submissionAccess` block. Without the mirror, group access stops at the direct child and grandchildren are invisible to group members.

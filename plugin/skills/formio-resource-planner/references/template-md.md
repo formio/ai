@@ -41,15 +41,23 @@ Sections appear in this exact order. Skills and graders rely on section headings
 One block per resource. Terse — one sentence per purpose, one clause per field. Join resources are tagged inline. Transitive group-access mirror fields are called out so consumers know which reference selects are user-facing vs plumbing.
 
 ```markdown
-- <ResourceName> (type: resource) Purpose: <1 sentence> Fields:
-  - <key>: <component> — <description>
-  - ... Access: <owner | group-via-<join> | role(<roles>) | public> Actions:
-  - <action name>: <key settings>
+- <ResourceName> (type: resource)
+  Purpose: <1 sentence>
+  Fields:
+    - <key>: <component> — <description>
+    - ...
+  Access: <owner | group-via-<join> | role(<roles>) | public>
+  Actions:
+    - <action name>: <key settings>
 
-- <JoinResourceName> (type: resource, join) Purpose: <which relationship this implements> Fields:
-  - <leftKey>: select (resource=<Left>)
-  - <rightKey>: select (resource=<Right>) Access: <who can read/write the join rows> Actions:
-  - Group Assignment: group=<leftKey>, user=<rightKey> ← only when this join governs access
+- <JoinResourceName> (type: resource, join)
+  Purpose: <which relationship this implements>
+  Fields:
+    - <leftKey>: select (resource=<Left>)
+    - <rightKey>: select (resource=<Right>)
+  Access: <who can read/write the join rows>
+  Actions:
+    - Group Assignment: group=<leftKey>, user=<rightKey>   ← only when this join governs access
 ```
 
 For transitive group access, call out the hidden mirror on every grandchild:
@@ -133,11 +141,11 @@ One row per (resource, actor) pair with a non-trivial rule. Do not enumerate irr
 Mermaid `erDiagram`. Every resource is an entity. Relationships use Mermaid's cardinality syntax:
 
 | Cardinality         | Mermaid syntax |
-| ------------------- | -------------- | ----- | ----- | --- | --- |
-| 1:1 mandatory       | `              |       | --    |     | `   |
-| 1:N, one required   | `              |       | --o{` |
+| ------------------- | -------------- |
+| 1:1 mandatory       | `\|\|--\|\|`   |
+| 1:N, one required   | `\|\|--o{`     |
 | N:N, via join       | `}o--o{`       |
-| 1:N, child optional | `o             | --o{` |
+| 1:N, child optional | `\|o--o{`      |
 
 Every entity declaration gets its key fields listed in the body — at minimum any reference selects and whether they are `reference=true`, `hidden`, or `calculated`. This is what downstream skills parse to know which fields are real vs plumbing.
 

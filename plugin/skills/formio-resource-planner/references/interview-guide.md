@@ -30,6 +30,8 @@ Ask (together):
 - Self-register vs admin-invite-only?
 - SSO (OIDC/SAML) or email/password?
 
+When the app has **multiple personas** (e.g., applicants + reviewers + finance staff), decide deliberately between the two valid shapes — it is a requirements question, so ask when unclear: (a) **one shared `user` resource** with personas as roles (the common default — one login form, one owner story); this REQUIRES the multi-role assignment pattern, a `role` selectboxes component on the user resource plus one conditional Role Assignment action per persona, because direct `roles` writes are stripped by the API; or (b) **a resource per role** (e.g., separate `admin` resource, Login `settings.resources: ["user", "admin"]`) when the requirements call for separate credential pools or registration flows — then no selectboxes are needed and each user-type resource assigns its single role unconditionally. See [`template-json.md`](template-json.md) → "Multi-role user systems".
+
 If the user has no authentication, say so explicitly and skip access rules — not every app needs login.
 
 ### 5. Determine the access / permission model
@@ -96,7 +98,7 @@ When the interview has enough signal, emit the resource map as a single fenced m
 - User resource: <default `user` | custom `<name>`>
 - Login form: <form name> (Login action)
 - Login resources: `user`
-- Admin operations: <if any admin-only workflow in this plan, list each one in one line — e.g., "Seed initial Project rows; create ProjectUser membership rows; assign `administrator` role to specific users." — and note they are performed via the Form.io portal for this project, not via the app's login form.>
+- Admin operations: <if any admin-only workflow in this plan, list each one in one line — e.g., "Seed initial Project rows; create ProjectUser membership rows; assign `administrator` role to specific users." — and note they are performed via the Form.io portal for this project, not via the app.>
 - Registration: <self-register via form `<name>` with Role Assignment action | admin-invite only>
 - SSO: <none | OIDC | SAML | LDAP>
 - Custom JWT: <yes | no>
@@ -257,4 +259,5 @@ Use these as structural references when deciding how to shape a new app's output
 - **When the user says "only see their team's / project's / tenant's data"**, that's group-based access. Reach for the join + Group Permissions pattern automatically and confirm.
 - **When the user says "only see their own data"**, that's owner-based access. Submission Access owner rules alone are enough — no join needed.
 - **When the user says "admins see everything"**, call out role-based layering on top of whichever group/owner rule is primary.
+- **When the plan has 2+ assignable personas on one SHARED user resource**, the map must include the `role` selectboxes component on the user resource and one conditional Role Assignment per persona — "assign staff roles via the portal" is only true BECAUSE those actions exist; without them no persona beyond self-register can ever be assigned (the API strips direct `roles` writes). When the plan instead uses a resource per role, skip the selectboxes — each user-type resource assigns its single role unconditionally.
 - **When the user skips auth entirely**, say so explicitly in the output (`Users & Auth: none`). Not every plan needs a user resource.

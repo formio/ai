@@ -29,7 +29,7 @@ AskUserQuestion({
       header: "frontend-design",
       multiSelect: false,
       options: [
-        { label: "Install it first (recommended)", description: "I'll guide you to install frontend-design, then you restart Claude Code (or run /plugin) and we resume the build with it active." },
+        { label: "Install it first (recommended)", description: "I'll guide you to install frontend-design, then you restart Claude Code (or run /reload-plugins) and we resume the build with it active." },
         { label: "Proceed without it", description: "Continue now. The UI will be generated without frontend-design, and every UI file will be flagged as such so you can review it critically." }
       ]
     }

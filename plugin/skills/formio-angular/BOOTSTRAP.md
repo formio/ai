@@ -213,7 +213,7 @@ A clean build confirms the `polyfills` shape matches the builder and the CD prov
 
 ### Why this step exists
 
-Every downstream phase in `formio-angular` that authors a user-facing surface (the AUTH phase's `app.component.html` nav chrome, the Resources phase's `resource.component.html` / `view/view.component.html` / per-resource SCSS, any custom login/register component override, any dashboard or landing template) should consult Claude's `frontend-design` plugin before writing output — that is how the generated UI ends up polished instead of generic. "User-facing surface" means anything touching: HTML templates, SCSS/CSS, component layout, spacing, typography, color, nav chrome, empty states, loading states, error states, list-vs-card layouts, form styling beyond `form-control` defaults, responsive behavior, and accessibility (focus order, ARIA, contrast). Form-field styling that comes directly from the Form.io renderer's default Bootstrap 5 template is exempt — you do not override what the renderer already provides — but anything the skill itself authors outside the renderer's output is NOT exempt. `frontend-design` is **strongly recommended but NOT required**. BOOTSTRAP only **detects** its availability and records the status; it does NOT run its own install prompt. The strong recommendation + install prompt is owned by the orchestrator `formio-application` (Step 6a) — keeping it in one place avoids two skills nagging the user about the same plugin.
+Every downstream phase in `formio-angular` that authors a user-facing surface (the AUTH phase's `app.component.html` nav UI, the Resources phase's `resource.component.html` / `view/view.component.html` / per-resource SCSS, any custom login/register component override, any dashboard or landing template) should consult Claude's `frontend-design` plugin before writing output — that is how the generated UI ends up polished instead of generic. "User-facing surface" means anything touching: HTML templates, SCSS/CSS, component layout, spacing, typography, color, nav UI, empty states, loading states, error states, list-vs-card layouts, form styling beyond `form-control` defaults, responsive behavior, and accessibility (focus order, ARIA, contrast). Form-field styling that comes directly from the Form.io renderer's default Bootstrap 5 template is exempt — you do not override what the renderer already provides — but anything the skill itself authors outside the renderer's output is NOT exempt. `frontend-design` is **strongly recommended but NOT required**. BOOTSTRAP only **detects** its availability and records the status; it does NOT run its own install prompt. The strong recommendation + install prompt is owned by the orchestrator `formio-application` (Step 6a) — keeping it in one place avoids two skills nagging the user about the same plugin.
 
 ### 7a. Detect whether `frontend-design` is available — match the namespaced name
 
@@ -225,7 +225,7 @@ Do NOT only look for the bare `frontend-design` — that is the historical bug t
 
 - **Invoked via `formio-application` handoff:** the orchestrator already ran its `frontend-design` pre-check (Step 6a) and passed `frontendDesignStatus`.
   - `frontendDesignStatus: 'available'` → consult `frontend-design` (with the brief from 7d) on every UI surface, as the Stance requires.
-  - `frontendDesignStatus: 'declined'` → the user was already offered the plugin and chose to proceed without it. Do NOT re-prompt. Generate UI as best you can, but disclose on **every** UI approval gate (AUTH nav chrome, each Resources Phase A plan) that the file was generated **without** `frontend-design` consultation, so the user can review it critically.
+  - `frontendDesignStatus: 'declined'` → the user was already offered the plugin and chose to proceed without it. Do NOT re-prompt. Generate UI as best you can, but disclose on **every** UI approval gate (AUTH nav UI, each Resources Phase A plan) that the file was generated **without** `frontend-design` consultation, so the user can review it critically.
 - **Invoked directly (no handoff):** run the 7a detection yourself.
   - Available → consult it normally.
   - Missing → it is strongly recommended, not required. Surface a one-line strong recommendation that the user install it — interactively via `/plugin` (Browse → `claude-plugins-official` → `frontend-design` → Install) or by running `claude plugin install frontend-design@claude-plugins-official`, then restarting Claude Code so the plugin loads — and let them choose to install-then-resume or proceed without it. If they proceed without it, disclose on every later UI gate that the output was generated without `frontend-design`. Do NOT hard-block, and do NOT silently fall back to plain Bootstrap.
@@ -236,7 +236,7 @@ Note in BOOTSTRAP's working context whether `frontend-design` is available, decl
 
 ### 7d. Record the Bootstrap-5 design brief for later phases
 
-Once `frontend-design` is available, write (or update) a short design-brief block in the skill's working context that every later phase pastes into the `frontend-design` invocation verbatim. This keeps the brief consistent across AUTH's nav chrome, the Resources sub-skill's per-resource templates, and any future skill that also asks `frontend-design` for advice in this workspace. Stash the brief as `FRONTEND_DESIGN_BRIEF`:
+Once `frontend-design` is available, write (or update) a short design-brief block in the skill's working context that every later phase pastes into the `frontend-design` invocation verbatim. This keeps the brief consistent across AUTH's nav UI, the Resources sub-skill's per-resource templates, and any future skill that also asks `frontend-design` for advice in this workspace. Stash the brief as `FRONTEND_DESIGN_BRIEF`:
 
 ```
 ## frontend-design brief — Bootstrap 5 Form.io Angular app
@@ -287,7 +287,7 @@ Output shape `frontend-design` should produce:
   for why no Bootstrap utility covered the case.
 ```
 
-Every later phase that invokes `frontend-design` prepends this brief to the prompt it passes. AUTH's `app.component.html` section references it (see `AUTH.md`'s nav-chrome section). The Resources sub-skill's Phase A plan cites the brief in its `frontend-design consulted:` line (see `resources/SKILL.md`). Keeping the brief in one place avoids drift: update BOOTSTRAP Step 7d once and every downstream phase picks up the new wording.
+Every later phase that invokes `frontend-design` prepends this brief to the prompt it passes. AUTH's `app.component.html` section references it (see `AUTH.md`'s nav section). The Resources sub-skill's Phase A plan cites the brief in its `frontend-design consulted:` line (see `resources/SKILL.md`). Keeping the brief in one place avoids drift: update BOOTSTRAP Step 7d once and every downstream phase picks up the new wording.
 
 ## The approval gate
 

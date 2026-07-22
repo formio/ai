@@ -17,5 +17,5 @@ Only the latest published version of each package receives security fixes.
 
 ## Scope notes
 
-- The MCP server runs locally and authenticates against your own Form.io deployment; it never proxies credentials through third parties. JWTs are cached in memory for the session, and API keys are read from environment variables only.
+- The MCP server runs locally and authenticates against your own Form.io deployment; it never proxies credentials through third parties. JWTs are written to disk under ~/.formio/mcp-tokens.json and persist between sessions. The MCP server also creates an ephemeral in-memory JWT cache.
 - `FORMIO_INSECURE_TLS=true` disables TLS certificate verification and is intended solely for self-hosted development environments — never use it against production.

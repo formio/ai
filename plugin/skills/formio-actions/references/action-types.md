@@ -132,6 +132,38 @@ Adds or removes a role from a user's submission. The target user is determined b
 - `remove`: Filters the role ID out
 - Saves directly via MongoDB update (bypasses the normal submission pipeline)
 
+### Roles cannot be written directly — this action is the only writer
+
+The submissions API **strips the `roles` key from POST/PUT/PATCH bodies**, even for the project owner. "Create the user, then PATCH `roles`" does not work, and a PUT that includes a `roles` key can wipe the user's existing roles. Any workflow that sets or changes a user's role must go through a Role Assignment action.
+
+### Multi-role user systems — one conditional action per role
+
+This pattern applies when all personas share ONE user collection (a single user resource) — the common default. If the application's requirements instead call for a resource per role (e.g., a separate `admin` resource, with the Login action's `settings.resources` listing both), it is unnecessary: each user-type resource carries its own unconditional Role Assignment.
+
+When one shared user resource serves several personas (e.g., `applicant` / `admissions` / `finance`), give the user form a `selectboxes` component (key `role`, one value per persona) and attach **one Role Assignment action per persona**, each gated by a condition on its box:
+
+```json
+{
+  "title": "Role Assignment (Admissions)",
+  "name": "role",
+  "handler": ["after"],
+  "method": ["create"],
+  "priority": 1,
+  "condition": {
+    "conjunction": "all",
+    "conditions": [{ "component": "role", "operator": "isEqual", "value": "admissions" }],
+    "custom": ""
+  },
+  "settings": {
+    "association": "new",
+    "type": "add",
+    "role": "<admissions-role-id>"
+  }
+}
+```
+
+Whoever creates or edits the user (portal admin, or an API caller setting `data.role.admissions = true`) checks the box; the matching action attaches the role server-side. The planner-side emission rules for this pattern live in `formio-resource-planner`'s `references/template-json.md` → "Multi-role user systems".
+
 ---
 
 ## Email
