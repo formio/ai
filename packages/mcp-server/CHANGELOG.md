@@ -1,5 +1,11 @@
 # @formio/mcp
 
+## 0.5.1
+
+### Patch Changes
+
+- f0ff32d: Register the server in the official MCP Registry as `io.form/formio-mcp`. Adds the `mcpName` field that the registry uses to verify npm ownership, a root `server.json` describing the stdio transport and supported environment variables, and a release-workflow step that publishes to the registry after npm.
+
 ## 0.5.0
 
 ### Minor Changes
