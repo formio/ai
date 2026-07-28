@@ -1,0 +1,59 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "io.form/formio-mcp",
+  "description": "Create and manage Form.io forms, resources, actions, roles, and projects from your AI agent.",
+  "repository": {
+    "url": "https://github.com/formio/ai",
+    "source": "github",
+    "subfolder": "packages/mcp-server"
+  },
+  "version": "0.5.0",
+  "websiteUrl": "https://form.io",
+  "packages": [
+    {
+      "registryType": "npm",
+      "identifier": "@formio/mcp",
+      "version": "0.5.0",
+      "transport": {
+        "type": "stdio"
+      },
+      "environmentVariables": [
+        {
+          "name": "FORMIO_PROJECT_URL",
+          "description": "Full URL of the Form.io project to target (e.g. https://api.form.io/my-project, or https://your-host/project-name for self-hosted).",
+          "isRequired": true,
+          "format": "string",
+          "isSecret": false
+        },
+        {
+          "name": "FORMIO_BASE_URL",
+          "description": "Base URL of your Form.io deployment — the parent of FORMIO_PROJECT_URL (default: https://api.form.io). Set this when self-hosting or using Form.io Enterprise.",
+          "isRequired": false,
+          "format": "string",
+          "isSecret": false
+        },
+        {
+          "name": "FORMIO_API_KEY",
+          "description": "Form.io project API key. Optional — when omitted the server uses a browser-based portal login flow to obtain a JWT.",
+          "isRequired": false,
+          "format": "string",
+          "isSecret": true
+        },
+        {
+          "name": "FORMIO_LOGIN_FORM",
+          "description": "URL of a custom login form used by the browser-based portal login flow. Defaults to the deployment's portal login form.",
+          "isRequired": false,
+          "format": "string",
+          "isSecret": false
+        },
+        {
+          "name": "FORMIO_INSECURE_TLS",
+          "description": "Set to 1 to skip TLS certificate verification. For local development against self-signed certificates only — never enable in production.",
+          "isRequired": false,
+          "format": "string",
+          "isSecret": false
+        }
+      ]
+    }
+  ]
+}

@@ -32,9 +32,40 @@ jobs:
       - run: pnpm install --frozen-lockfile
 
       - uses: changesets/action@v1
+        id: changesets
         with:
           version: pnpm changeset:version
           publish: pnpm release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           NODE_AUTH_TOKEN: ${{ secrets.PUBLIC_NPM_TOKEN }}
+
+      ### Publish the MCP server to the official MCP Registry.
+      # Runs only when this release actually published @formio/mcp — the
+      # registry verifies ownership by reading "mcpName" from the npm tarball,
+      # so npm must land first.
+      - name: Resolve published @formio/mcp version
+        id: mcp
+        if: steps.changesets.outputs.published == 'true'
+        run: |
+          VERSION=$(jq -r '.[] | select(.name == "@formio/mcp") | .version' <<<'${{ steps.changesets.outputs.publishedPackages }}')
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
+      - name: Install mcp-publisher
+        if: steps.mcp.outputs.version != ''
+        run: |
+          curl -L "https://github.com/modelcontextprotocol/registry/releases/latest/download/mcp-publisher_$(uname -s | tr '[:upper:]' '[:lower:]')_$(uname -m | sed 's/x86_64/amd64/;s/aarch64/arm64/').tar.gz" | tar xz mcp-publisher
+
+      - name: Set version in server.json
+        if: steps.mcp.outputs.version != ''
+        run: |
+          jq --arg v "${{ steps.mcp.outputs.version }}" \
+            '.version = $v | .packages[0].version = $v' server.json > server.tmp && mv server.tmp server.json
+
+      - name: Authenticate to MCP Registry
+        if: steps.mcp.outputs.version != ''
+        run: ./mcp-publisher login dns --domain form.io --private-key ${{ secrets.MCP_PRIVATE_KEY }}
+
+      - name: Publish server to MCP Registry
+        if: steps.mcp.outputs.version != ''
+        run: ./mcp-publisher publish
