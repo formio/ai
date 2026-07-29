@@ -177,11 +177,29 @@ jobs:
       # Docker Hub full-text searches the overview, and it does not sync itself.
       # Kept in its own file rather than reusing the README, whose relative links
       # would all break once rendered on Docker Hub.
-      - name: Sync the Docker Hub overview
+      #
+      # Requires an account password: Docker Hub's description endpoint answers
+      # 403 to a personal access token, however broadly scoped. Gated on an
+      # optional DOCKERHUB_PASSWORD so a docs sync can never fail a release — the
+      # image is already pushed by this point. Without it, edit the overview by
+      # hand from packages/mcp-server/DOCKERHUB.md.
+      - name: Check for Docker Hub description credentials
+        id: hubdesc
         if: steps.dockerhub.outputs.version != ''
+        env:
+          DOCKERHUB_PASSWORD: ${{ secrets.DOCKERHUB_PASSWORD }}
+        run: |
+          if [ -n "${DOCKERHUB_PASSWORD:-}" ]; then
+            echo "enabled=yes" >> "$GITHUB_OUTPUT"
+          else
+            echo "No DOCKERHUB_PASSWORD — skipping the overview sync (the image published fine)."
+          fi
+
+      - name: Sync the Docker Hub overview
+        if: steps.hubdesc.outputs.enabled == 'yes'
         uses: peter-evans/dockerhub-description@v4
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_TOKEN }}
+          password: ${{ secrets.DOCKERHUB_PASSWORD }}
           repository: formio/mcp
           readme-filepath: packages/mcp-server/DOCKERHUB.md
