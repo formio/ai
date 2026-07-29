@@ -109,13 +109,24 @@ jobs:
 
       ### Publish the container image to Docker Hub.
       # Same idempotent shape as the registry publish: only when npm already has
-      # the version and Docker Hub does not. Guarded on DOCKERHUB_USERNAME so the
-      # release still succeeds in a repo where the credentials are absent.
+      # the version and Docker Hub does not. Skips cleanly when credentials are absent
+      # so a release in a fork or an unconfigured repo still succeeds.
       - name: Decide whether to publish to Docker Hub
         id: dockerhub
-        if: steps.pkg.outputs.version != '' && vars.DOCKERHUB_USERNAME != ''
+        if: steps.pkg.outputs.version != ''
+        # Credentials are read through env rather than referenced in `if:` — the
+        # secrets context is not dependable in step conditionals, and this also
+        # keeps them out of the interpolated command line.
+        env:
+          DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+          DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
         run: |
           set -euo pipefail
+          if [ -z "${DOCKERHUB_USERNAME:-}" ] || [ -z "${DOCKERHUB_TOKEN:-}" ]; then
+            echo "Docker Hub credentials are not configured — skipping the image publish."
+            exit 0
+          fi
+
           VERSION='${{ steps.pkg.outputs.version }}'
           CODE=$(curl -s -o /dev/null -w '%{http_code}' \
             "https://hub.docker.com/v2/repositories/formio/mcp/tags/${VERSION}")
@@ -139,7 +150,7 @@ jobs:
         if: steps.dockerhub.outputs.version != ''
         uses: docker/login-action@v4
         with:
-          username: ${{ vars.DOCKERHUB_USERNAME }}
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
       - name: Build and push formio/mcp
@@ -161,7 +172,7 @@ jobs:
         if: steps.dockerhub.outputs.version != ''
         uses: peter-evans/dockerhub-description@v4
         with:
-          username: ${{ vars.DOCKERHUB_USERNAME }}
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
           repository: formio/mcp
           readme-filepath: packages/mcp-server/DOCKERHUB.md
