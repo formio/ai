@@ -4,12 +4,12 @@ import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 import { FormioConfig, ResolvedFormioConfig } from '../config.js';
 import { writeProjectEntry } from '../project-map.js';
 
-export const TEST_PROJECT_URL = 'https://form.local/example';
+export const TEST_PROJECT_URL = 'https://formio.invalid/example';
 
 // Shape that tool handlers see AFTER resolveProjectConfig merges the mapped
 // projectUrl into the baseConfig — asserted against by tests that inspect
 // formioFetch call args.
-export const TEST_BASE_URL = 'https://form.local';
+export const TEST_BASE_URL = 'https://formio.invalid';
 
 export const TEST_CONFIG: ResolvedFormioConfig = {
   baseUrl: TEST_BASE_URL,

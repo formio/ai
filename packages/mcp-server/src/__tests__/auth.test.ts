@@ -5,8 +5,8 @@ import { ResolvedFormioConfig } from '../config.js';
 vi.mock('child_process', () => ({ exec: vi.fn() }));
 
 const DEFAULT_CONFIG: ResolvedFormioConfig = {
-  baseUrl: 'https://form.local',
-  projectUrl: 'https://form.local/example',
+  baseUrl: 'https://formio.invalid',
+  projectUrl: 'https://formio.invalid/example',
 };
 
 function postCallback(port: number, token: string): Promise<Response> {
@@ -62,13 +62,13 @@ describe('authenticate', () => {
 
     expect(html).toContain('formio.form.min.js');
     expect(html).toContain('Formio.createForm');
-    expect(html).toContain('https://form.local/formio/user/login');
+    expect(html).toContain('https://formio.invalid/formio/user/login');
   });
 
   it('uses custom loginFormUrl when set instead of the default', async () => {
     const config: ResolvedFormioConfig = {
-      baseUrl: 'https://form.local',
-      projectUrl: 'https://form.local/example',
+      baseUrl: 'https://formio.invalid',
+      projectUrl: 'https://formio.invalid/example',
       loginFormUrl: 'https://custom.form.io/mylogin',
     };
 
@@ -84,6 +84,6 @@ describe('authenticate', () => {
     await authPromise;
 
     expect(html).toContain('https://custom.form.io/mylogin');
-    expect(html).not.toContain('https://form.local/formio/user/login');
+    expect(html).not.toContain('https://formio.invalid/formio/user/login');
   });
 });

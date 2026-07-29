@@ -98,11 +98,17 @@ Wired into a client, that becomes:
 
 Passing `-e KEY` without a value forwards the variable from the client's environment, which keeps the key out of the config file.
 
-#### `FORMIO_API_KEY` is required in a container
+#### Authentication in a container
 
-The browser portal-login flow **cannot** work inside a container. It binds an ephemeral port on `127.0.0.1` and shells out to `open`/`xdg-open`, so the host never sees the callback and neither binary exists in a slim image. Set `FORMIO_API_KEY` instead — this is the one behavioural difference between the image and the npm package.
+`FORMIO_API_KEY` is the recommended path — no browser, nothing interactive. Browser login also works if you publish the auth port; see [Headless environments](#headless-environments) for both.
 
-For the same reason, prefer `FORMIO_PROJECT_URL` over the `project_set` tool. `project_set` persists its per-directory mapping to `~/.formio/projects.json`, which lives inside the container and is discarded when it exits. Note also that the `cwd` argument every tool takes refers to a path *inside* the container, not on your host.
+Two container-specific notes regardless of auth mode. Prefer `FORMIO_PROJECT_URL` over the `project_set` tool: `project_set` persists its per-directory mapping to `~/.formio/projects.json`, which lives inside the container and is discarded when it exits. And the `cwd` argument every tool takes refers to a path *inside* the container, not on your host.
+
+To reuse a token across container runs, mount the cache directory — it must be writable, since the server rewrites the file when a token is refreshed or cleared:
+
+```bash
+-v "$HOME/.formio:/root/.formio"
+```
 
 #### Self-hosted deployments
 
@@ -200,6 +206,33 @@ The MCP server supports two authentication modes:
 
 - **JWT mode (default).** A short-lived local Express server renders the Form.io portal login form; the user signs in once, the JWT comes back via a `/callback` endpoint, and `formioFetch` attaches `x-jwt-token` on every subsequent request. The flow is implicit — the **first authenticated tool call** triggers it on a cache miss. No explicit `authenticate` tool exists.
 - **API-key mode.** Set `FORMIO_API_KEY`. All requests attach `x-token`; the browser flow is skipped entirely.
+
+The JWT is cached in `~/.formio/mcp-tokens.json` (mode `0600`), keyed by `FORMIO_BASE_URL` — one token covers every project on the same deployment. Tokens are valid for roughly seven days; on a cache hit the server checks expiry locally, then revalidates against the server, and falls back to a fresh login if either check fails.
+
+> **What the agent is granted.** JWT mode hands the agent **the JWT of whoever logs in**, so the agent acts with that person's permissions for the token's lifetime — sign in as an administrator and the agent inherits administrator access to the deployment. An API key is scoped to its project instead. Prefer API-key mode for unattended or shared environments, and sign in as a least-privileged user when using JWT mode.
+
+### Headless environments
+
+By default the login page is served on an ephemeral port bound to `127.0.0.1` and the server shells out to `open`/`start`/`xdg-open`, which assumes a desktop browser on the same machine.
+
+Where that assumption doesn't hold — a container, an SSH session, CI — you have three options:
+
+1. **Set `FORMIO_API_KEY`** and skip the browser entirely. Simplest for unattended use.
+2. **Complete the login manually.** The login URL is written to stderr on **every** login attempt, before any browser launch is tried — not only when something fails. If the launch does fail, that is reported as an additional line rather than swallowed. The URL also appears in the timeout error, which the client surfaces as tool output, so it reaches you even if you never see the server's logs.
+
+   stderr is used because with stdio transport **stdout carries the MCP protocol itself** — writing anything else there corrupts the stream.
+3. **Bind somewhere reachable.** Set `FORMIO_AUTH_HOST=0.0.0.0` and `FORMIO_AUTH_PORT` to a fixed, published port, then open the URL from your own machine:
+
+   ```bash
+   docker run -i --rm -p 43117:43117 \
+     -e FORMIO_PROJECT_URL=https://your-project.form.io \
+     -e FORMIO_AUTH_HOST=0.0.0.0 -e FORMIO_AUTH_PORT=43117 \
+     mcp/formio
+   ```
+
+   `FORMIO_AUTH_HOST=0.0.0.0` exposes the login page on every interface for the duration of the login. Only use it where that is acceptable.
+
+If no login arrives within `FORMIO_AUTH_TIMEOUT` seconds (default 300) the call fails with an error naming these options, rather than hanging until the client gives up.
 
 ### Login-form auto-resolution
 

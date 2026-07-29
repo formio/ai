@@ -7,6 +7,9 @@ export interface AuthenticateOptions {
   onReady?: (port: number) => void;
 }
 
+const DEFAULT_AUTH_HOST = '127.0.0.1';
+const DEFAULT_AUTH_TIMEOUT_MS = 5 * 60 * 1000;
+
 function buildLoginPage(loginFormUrl: string): string {
   const domain = new URL(loginFormUrl).hostname;
   return `<!DOCTYPE html>
@@ -158,25 +161,60 @@ export async function authenticate(
     resolveJwt(token);
   });
 
-  const server = app.listen(0, '127.0.0.1', () => {
+  const host = config.authHost ?? DEFAULT_AUTH_HOST;
+  // Captured so the timeout error can name it. stderr reaches logs, but the
+  // error reaches the user, and the URL is the one thing they need.
+  let loginUrl: string | undefined;
+  const server = app.listen(config.authPort ?? 0, host, () => {
     const addr = server.address();
     if (addr && typeof addr !== 'string') {
       const port = addr.port;
-      const loginUrl = `http://127.0.0.1:${port}/`;
+      // A wildcard bind is not a usable address to visit, so advertise loopback.
+      const reachableHost = host === '0.0.0.0' || host === '::' ? '127.0.0.1' : host;
+      loginUrl = `http://${reachableHost}:${port}/`;
+
+      // Always print the URL. It is the only recourse where no browser can be
+      // launched — a container, an SSH session, CI — and without it the user has
+      // no way to reach the login page.
+      process.stderr.write(`Form.io login required: ${loginUrl}\n`);
+
       const openCmd =
         process.platform === 'darwin'
           ? 'open'
           : process.platform === 'win32'
             ? 'start'
             : 'xdg-open';
-      exec(`${openCmd} "${loginUrl}"`);
+      exec(`${openCmd} "${loginUrl}"`, (err) => {
+        if (err) {
+          process.stderr.write(
+            `Could not open a browser automatically (${err.message}). ` +
+              `Open the URL above manually to finish signing in.\n`
+          );
+        }
+      });
       options?.onReady?.(port);
     }
   });
 
+  const timeoutMs = config.authTimeoutMs ?? DEFAULT_AUTH_TIMEOUT_MS;
+  const timer = setTimeout(() => {
+    rejectJwt(
+      new Error(
+        `Timed out after ${Math.round(timeoutMs / 1000)}s waiting for the Form.io login to complete. ` +
+          (loginUrl ? `Open ${loginUrl} to sign in, then retry. ` : '') +
+          `If this environment has no browser — a container, a remote shell, or CI — set FORMIO_API_KEY ` +
+          `instead, or set FORMIO_AUTH_HOST=0.0.0.0 and FORMIO_AUTH_PORT to a published port so the login ` +
+          `page is reachable from your machine.`
+      )
+    );
+  }, timeoutMs);
+  // Do not hold the event loop open on this timer alone.
+  timer.unref();
+
   try {
     return await jwtPromise;
   } finally {
+    clearTimeout(timer);
     server.close();
   }
 }

@@ -41,8 +41,8 @@ describe('ensureAuthenticated', () => {
 
   it('sets config.jwt from a valid cached token without launching the login flow', async () => {
     const config: ResolvedFormioConfig = {
-      baseUrl: 'https://form.local',
-      projectUrl: 'https://form.local/example',
+      baseUrl: 'https://formio.invalid',
+      projectUrl: 'https://formio.invalid/example',
     };
     mockReadToken.mockResolvedValue('cached-jwt');
     mockValidateToken.mockResolvedValue(true);
@@ -55,8 +55,8 @@ describe('ensureAuthenticated', () => {
 
   it('launches the login flow when no cached token and no API key, then saves the new JWT', async () => {
     const config: ResolvedFormioConfig = {
-      baseUrl: 'https://form.local',
-      projectUrl: 'https://form.local/example',
+      baseUrl: 'https://formio.invalid',
+      projectUrl: 'https://formio.invalid/example',
     };
     mockReadToken.mockResolvedValue(null);
     mockAuthenticate.mockResolvedValue('new-jwt');
@@ -64,14 +64,14 @@ describe('ensureAuthenticated', () => {
     await ensureAuthenticated(config);
 
     expect(mockAuthenticate).toHaveBeenCalledOnce();
-    expect(mockSaveToken).toHaveBeenCalledWith('https://form.local', 'new-jwt');
+    expect(mockSaveToken).toHaveBeenCalledWith('https://formio.invalid', 'new-jwt');
     expect(config.jwt).toBe('new-jwt');
   });
 
   it('clears the cached token and launches login when the cached token fails validation', async () => {
     const config: ResolvedFormioConfig = {
-      baseUrl: 'https://form.local',
-      projectUrl: 'https://form.local/example',
+      baseUrl: 'https://formio.invalid',
+      projectUrl: 'https://formio.invalid/example',
     };
     mockReadToken.mockResolvedValue('expired-jwt');
     mockValidateToken.mockResolvedValue(false);
@@ -79,15 +79,15 @@ describe('ensureAuthenticated', () => {
 
     await ensureAuthenticated(config);
 
-    expect(mockClearToken).toHaveBeenCalledWith('https://form.local');
+    expect(mockClearToken).toHaveBeenCalledWith('https://formio.invalid');
     expect(mockAuthenticate).toHaveBeenCalledOnce();
     expect(config.jwt).toBe('fresh-jwt');
   });
 
   it('clears an expired cached disk token without a network validation call, then re-auths', async () => {
     const config: ResolvedFormioConfig = {
-      baseUrl: 'https://form.local',
-      projectUrl: 'https://form.local/example',
+      baseUrl: 'https://formio.invalid',
+      projectUrl: 'https://formio.invalid/example',
     };
     mockReadToken.mockResolvedValue(makeJwt(-60));
     mockAuthenticate.mockResolvedValue('fresh-jwt');
@@ -95,15 +95,15 @@ describe('ensureAuthenticated', () => {
     await ensureAuthenticated(config);
 
     expect(mockValidateToken).not.toHaveBeenCalled();
-    expect(mockClearToken).toHaveBeenCalledWith('https://form.local');
+    expect(mockClearToken).toHaveBeenCalledWith('https://formio.invalid');
     expect(mockAuthenticate).toHaveBeenCalledOnce();
     expect(config.jwt).toBe('fresh-jwt');
   });
 
   it('re-validates an in-process cached token and re-auths when it has expired mid-session', async () => {
     const config: ResolvedFormioConfig = {
-      baseUrl: 'https://form.local',
-      projectUrl: 'https://form.local/example',
+      baseUrl: 'https://formio.invalid',
+      projectUrl: 'https://formio.invalid/example',
     };
     // First call: a still-valid JWT gets cached in-process.
     const validJwt = makeJwt(3600);
@@ -114,8 +114,8 @@ describe('ensureAuthenticated', () => {
 
     // Simulate the cached token having expired: reads now return an expired one.
     const second: ResolvedFormioConfig = {
-      baseUrl: 'https://form.local',
-      projectUrl: 'https://form.local/example',
+      baseUrl: 'https://formio.invalid',
+      projectUrl: 'https://formio.invalid/example',
     };
     // Seed the in-process cache with an expired token by going through a fresh flow.
     resetAuthState();
@@ -130,8 +130,8 @@ describe('ensureAuthenticated', () => {
 
   it('is a no-op when an API key is configured — tool calls surface invalid keys via 401', async () => {
     const config: ResolvedFormioConfig = {
-      baseUrl: 'https://form.local',
-      projectUrl: 'https://form.local/example',
+      baseUrl: 'https://formio.invalid',
+      projectUrl: 'https://formio.invalid/example',
       apiKey: 'any-key',
     };
 
@@ -145,8 +145,8 @@ describe('ensureAuthenticated', () => {
 
   it('short-circuits subsequent calls for the same project from an in-process cache', async () => {
     const config: ResolvedFormioConfig = {
-      baseUrl: 'https://form.local',
-      projectUrl: 'https://form.local/example',
+      baseUrl: 'https://formio.invalid',
+      projectUrl: 'https://formio.invalid/example',
     };
     mockReadToken.mockResolvedValue('cached-jwt');
     mockValidateToken.mockResolvedValue(true);
@@ -156,8 +156,8 @@ describe('ensureAuthenticated', () => {
     mockValidateToken.mockClear();
 
     const second: ResolvedFormioConfig = {
-      baseUrl: 'https://form.local',
-      projectUrl: 'https://form.local/example',
+      baseUrl: 'https://formio.invalid',
+      projectUrl: 'https://formio.invalid/example',
     };
     await ensureAuthenticated(second);
 
@@ -169,8 +169,8 @@ describe('ensureAuthenticated', () => {
 
   it('concurrent calls resolve via a single login flow', async () => {
     const config: ResolvedFormioConfig = {
-      baseUrl: 'https://form.local',
-      projectUrl: 'https://form.local/example',
+      baseUrl: 'https://formio.invalid',
+      projectUrl: 'https://formio.invalid/example',
     };
     mockReadToken.mockResolvedValue(null);
     mockAuthenticate.mockImplementation(
@@ -190,8 +190,8 @@ describe('ensureAuthenticated', () => {
 
   it('after rejection, a subsequent call retries fresh', async () => {
     const config: ResolvedFormioConfig = {
-      baseUrl: 'https://form.local',
-      projectUrl: 'https://form.local/example',
+      baseUrl: 'https://formio.invalid',
+      projectUrl: 'https://formio.invalid/example',
     };
     mockReadToken.mockResolvedValue(null);
     mockAuthenticate
@@ -207,8 +207,8 @@ describe('ensureAuthenticated', () => {
 
   it('resetAuthState() clears the internal pendingAuth reference', async () => {
     const config: ResolvedFormioConfig = {
-      baseUrl: 'https://form.local',
-      projectUrl: 'https://form.local/example',
+      baseUrl: 'https://formio.invalid',
+      projectUrl: 'https://formio.invalid/example',
     };
     mockReadToken.mockResolvedValue(null);
 

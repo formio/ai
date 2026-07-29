@@ -36,8 +36,8 @@ describe('formioFetch + ensureAuthenticated integration', () => {
 
   it('two concurrent first-time calls trigger exactly one authenticate and one saveToken', async () => {
     const config: ResolvedFormioConfig = {
-      baseUrl: 'https://form.local',
-      projectUrl: 'https://form.local/example',
+      baseUrl: 'https://formio.invalid',
+      projectUrl: 'https://formio.invalid/example',
     };
 
     mockReadToken.mockResolvedValue(null);
@@ -60,8 +60,8 @@ describe('formioFetch + ensureAuthenticated integration', () => {
 
   it('a 401 re-auth concurrent with a second call triggers authenticate exactly once', async () => {
     const config: ResolvedFormioConfig = {
-      baseUrl: 'https://form.local',
-      projectUrl: 'https://form.local/example',
+      baseUrl: 'https://formio.invalid',
+      projectUrl: 'https://formio.invalid/example',
     };
 
     // Disk has an initial token that passes validation.

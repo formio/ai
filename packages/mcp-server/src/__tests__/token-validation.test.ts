@@ -15,8 +15,8 @@ describe('validateToken', () => {
 
   it('returns true when GET /current responds 200', async () => {
     const config: FormioConfig = {
-      baseUrl: 'https://form.local',
-      projectUrl: 'https://form.local/example',
+      baseUrl: 'https://formio.invalid',
+      projectUrl: 'https://formio.invalid/example',
       jwt: 'valid-token',
     };
     mockFetch.mockResolvedValue({ ok: true, status: 200 });
@@ -28,8 +28,8 @@ describe('validateToken', () => {
 
   it('returns false when GET /current responds 401', async () => {
     const config: FormioConfig = {
-      baseUrl: 'https://form.local',
-      projectUrl: 'https://form.local/example',
+      baseUrl: 'https://formio.invalid',
+      projectUrl: 'https://formio.invalid/example',
       jwt: 'expired-token',
     };
     mockFetch.mockResolvedValue({ ok: false, status: 401 });
@@ -41,8 +41,8 @@ describe('validateToken', () => {
 
   it('sends x-jwt-token header when config has JWT', async () => {
     const config: FormioConfig = {
-      baseUrl: 'https://form.local',
-      projectUrl: 'https://form.local/example',
+      baseUrl: 'https://formio.invalid',
+      projectUrl: 'https://formio.invalid/example',
       jwt: 'my-jwt',
     };
     mockFetch.mockResolvedValue({ ok: true, status: 200 });
@@ -52,14 +52,14 @@ describe('validateToken', () => {
     expect(mockFetch).toHaveBeenCalledOnce();
     const calledUrl = mockFetch.mock.calls[0][0] as URL | string;
     const calledOptions = mockFetch.mock.calls[0][1] as RequestInit;
-    expect(calledUrl.toString()).toBe('https://form.local/current');
+    expect(calledUrl.toString()).toBe('https://formio.invalid/current');
     expect(calledOptions.headers).toEqual(expect.objectContaining({ 'x-jwt-token': 'my-jwt' }));
   });
 
   it('sends x-token header when config has API key', async () => {
     const config: FormioConfig = {
-      baseUrl: 'https://form.local',
-      projectUrl: 'https://form.local/example',
+      baseUrl: 'https://formio.invalid',
+      projectUrl: 'https://formio.invalid/example',
       apiKey: 'my-api-key',
     };
     mockFetch.mockResolvedValue({ ok: true, status: 200 });
@@ -69,7 +69,7 @@ describe('validateToken', () => {
     expect(mockFetch).toHaveBeenCalledOnce();
     const calledUrl = mockFetch.mock.calls[0][0] as URL | string;
     const calledOptions = mockFetch.mock.calls[0][1] as RequestInit;
-    expect(calledUrl.toString()).toBe('https://form.local/current');
+    expect(calledUrl.toString()).toBe('https://formio.invalid/current');
     expect(calledOptions.headers).toEqual(expect.objectContaining({ 'x-token': 'my-api-key' }));
   });
 });

@@ -4,6 +4,12 @@ export interface FormioConfig {
   apiKey?: string;
   loginFormUrl?: string;
   jwt?: string;
+  // Browser-login server binding. Defaults suit a desktop: an ephemeral port on
+  // loopback. A container needs a known port, and a bind address the host can
+  // reach through a published port.
+  authHost?: string;
+  authPort?: number;
+  authTimeoutMs?: number;
 }
 
 // After resolveProjectConfig has merged in the cwd's mapped project URL.
@@ -43,5 +49,20 @@ export function getConfig(): FormioConfig {
     apiKey: apiKey || undefined,
     loginFormUrl: loginFormUrl || undefined,
     jwt: undefined,
+    authHost: process.env.FORMIO_AUTH_HOST || undefined,
+    authPort: parsePositiveInt(process.env.FORMIO_AUTH_PORT),
+    authTimeoutMs: toMilliseconds(parsePositiveInt(process.env.FORMIO_AUTH_TIMEOUT)),
   };
+}
+
+function parsePositiveInt(raw: string | undefined): number | undefined {
+  if (!raw) {
+    return undefined;
+  }
+  const value = Number(raw);
+  return Number.isInteger(value) && value > 0 ? value : undefined;
+}
+
+function toMilliseconds(seconds: number | undefined): number | undefined {
+  return seconds === undefined ? undefined : seconds * 1000;
 }
