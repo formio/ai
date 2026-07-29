@@ -63,6 +63,86 @@ The server starts on port 3000. Override with the `PORT` env var.
 
 In standalone (non-plugin) mode, `FORMIO_BASE_URL` and `FORMIO_PROJECT_URL` are required env vars. In plugin mode, the plugin manages both via Claude Code's user-config + per-cwd `~/.formio/projects.json` mapping.
 
+### Run in Docker
+
+The server ships a [`Dockerfile`](./Dockerfile) and is published to the Docker MCP Catalog as `mcp/formio`. The image speaks stdio, so the MCP client owns stdin/stdout and the container must be run with `-i`:
+
+```bash
+docker run -i --rm \
+  -e FORMIO_PROJECT_URL=https://your-project.form.io \
+  -e FORMIO_API_KEY=your-api-key \
+  mcp/formio
+```
+
+Wired into a client, that becomes:
+
+```json
+{
+  "mcpServers": {
+    "formio-mcp": {
+      "command": "docker",
+      "args": [
+        "run", "-i", "--rm",
+        "-e", "FORMIO_PROJECT_URL",
+        "-e", "FORMIO_API_KEY",
+        "mcp/formio"
+      ],
+      "env": {
+        "FORMIO_PROJECT_URL": "https://your-project.form.io",
+        "FORMIO_API_KEY": "your-api-key"
+      }
+    }
+  }
+}
+```
+
+Passing `-e KEY` without a value forwards the variable from the client's environment, which keeps the key out of the config file.
+
+#### `FORMIO_API_KEY` is required in a container
+
+The browser portal-login flow **cannot** work inside a container. It binds an ephemeral port on `127.0.0.1` and shells out to `open`/`xdg-open`, so the host never sees the callback and neither binary exists in a slim image. Set `FORMIO_API_KEY` instead — this is the one behavioural difference between the image and the npm package.
+
+For the same reason, prefer `FORMIO_PROJECT_URL` over the `project_set` tool. `project_set` persists its per-directory mapping to `~/.formio/projects.json`, which lives inside the container and is discarded when it exits. Note also that the `cwd` argument every tool takes refers to a path *inside* the container, not on your host.
+
+#### Self-hosted deployments
+
+Two things commonly bite when the deployment is not public:
+
+**Hostname resolution.** A private hostname won't resolve inside the container. Map it explicitly:
+
+```bash
+docker run -i --rm --add-host forms.internal:10.0.0.5 \
+  -e FORMIO_BASE_URL=https://forms.internal \
+  -e FORMIO_PROJECT_URL=https://forms.internal/my-project \
+  -e FORMIO_API_KEY=your-api-key \
+  mcp/formio
+```
+
+**Private or self-signed certificates.** The image trusts only the standard CA bundle. A certificate your host trusts — via the macOS keychain, say — will still fail inside the container, surfacing as a bare `fetch failed` from the tool. There are two cases, and they behave differently:
+
+*Issued by a private CA.* Mount the CA certificate and point Node at it:
+
+```bash
+-v /path/to/rootCA.pem:/certs/rootCA.pem:ro -e NODE_EXTRA_CA_CERTS=/certs/rootCA.pem
+```
+
+*A fully self-signed server certificate* — one where subject and issuer are identical and there is no `CA:TRUE` basic constraint. `NODE_EXTRA_CA_CERTS` **cannot** fix this, even if you mount the server's own certificate: Node requires a trust anchor to be a CA, and rejects the chain with `DEPTH_ZERO_SELF_SIGNED_CERT`. Confirm which case you have with:
+
+```bash
+echo | openssl s_client -connect your-host:443 -servername your-host 2>/dev/null \
+  | openssl x509 -noout -subject -issuer
+```
+
+If subject and issuer match, your only option is `FORMIO_INSECURE_TLS=1`, which skips verification entirely. Use it **for local development only** — never against a production deployment.
+
+#### Building the image locally
+
+The build context is this directory, not the repo root — the package compiles standalone because its `tsconfig` extends nothing above it and none of its dependencies are workspace packages:
+
+```bash
+docker build -t formio-mcp packages/mcp-server
+```
+
 ---
 
 ## MCP server tools
