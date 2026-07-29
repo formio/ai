@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { FormioConfig } from '../config.js';
 import { writeProjectEntry } from '../project-map.js';
-import { cwdSchema, resolveProjectConfig } from '../project-resolver.js';
+import { buildCwdSchema, cwdSchema, resolveProjectConfig } from '../project-resolver.js';
 
 describe('resolveProjectConfig', () => {
   const baseConfig: FormioConfig = {
@@ -124,7 +124,7 @@ describe('resolveProjectConfig', () => {
     });
 
     expect(() => resolveProjectConfig('/workspace/pkg-a', baseConfig)).toThrow(
-      /No Form\.io project is mapped/
+      /No Form\.io project is configured/
     );
   });
 
@@ -155,12 +155,14 @@ describe('cwdSchema', () => {
     expect(cwdSchema.safeParse('/workspace/pkg-a').success).toBe(true);
   });
 
-  it('rejects an empty string', () => {
-    expect(cwdSchema.safeParse('').success).toBe(false);
+  it('rejects an empty string in plugin context', () => {
+    process.env.FORMIO_PLUGIN_CONTEXT = '1';
+    expect(buildCwdSchema().safeParse('').success).toBe(false);
   });
 
-  it('rejects a relative path', () => {
-    const result = cwdSchema.safeParse('packages/a');
+  it('rejects a relative path in plugin context', () => {
+    process.env.FORMIO_PLUGIN_CONTEXT = '1';
+    const result = buildCwdSchema().safeParse('packages/a');
     expect(result.success).toBe(false);
   });
 });
