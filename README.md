@@ -3,6 +3,7 @@
 [![CI](https://github.com/formio/ai/actions/workflows/ci.yml/badge.svg)](https://github.com/formio/ai/actions/workflows/ci.yml)
 [![npm: @formio/ai](https://img.shields.io/npm/v/%40formio%2Fai?label=%40formio%2Fai)](https://www.npmjs.com/package/@formio/ai)
 [![npm: @formio/mcp](https://img.shields.io/npm/v/%40formio%2Fmcp?label=%40formio%2Fmcp)](https://www.npmjs.com/package/@formio/mcp)
+[![MCP Registry](https://img.shields.io/badge/MCP%20Registry-io.form%2Fformio--mcp-blue)](https://registry.modelcontextprotocol.io/v0/servers?search=io.form/formio-mcp)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](./LICENSE)
 
 `@formio/ai` is what brings Form.io into your agentic coding environment. It provides a series of tools that enable any developer to perform a number of complex actions against the Form.io Enterprise Server using their favorite Agentic Coding toolsets (starting with Claude Code). This turns the Form.io Enterprise Server into a **Composable Backend for Agentically Coded Applications**.
@@ -137,7 +138,18 @@ The `formio-api` skill knows the full REST surface of your Form.io deployment �
 
 The bundled MCP server is also published standalone as [`@formio/mcp`](https://www.npmjs.com/package/@formio/mcp) — you do not need the Claude Code plugin or the skill library to use it. Any MCP-aware client (Claude Code, Claude Desktop, Cursor, VS Code Copilot) can spawn the server directly and call the [tools below](#mcp-server-tools).
 
-To connect from Claude Code without the plugin, add a `.mcp.json` to your project root:
+It is also listed in the [official MCP Registry](https://registry.modelcontextprotocol.io/v0/servers?search=io.form/formio-mcp) as **`io.form/formio-mcp`**, so clients that browse the registry can discover and install it without any manual configuration.
+
+### One-click install <!-- omit from toc -->
+
+[![Install in Cursor](https://img.shields.io/badge/Install%20in-Cursor-000000?logo=cursor)](https://cursor.com/install-mcp?name=formio-mcp&config=eyJjb21tYW5kIjoibnB4IiwiYXJncyI6WyIteSIsIkBmb3JtaW8vbWNwIl0sImVudiI6eyJGT1JNSU9fUFJPSkVDVF9VUkwiOiJodHRwczovL3lvdXItcHJvamVjdC5mb3JtLmlvIn19)
+[![Install in VS Code](https://img.shields.io/badge/Install%20in-VS%20Code-007ACC?logo=visualstudiocode)](https://insiders.vscode.dev/redirect/mcp/install?name=formio-mcp&config=%7B%22command%22%3A%22npx%22%2C%22args%22%3A%5B%22-y%22%2C%22%40formio%2Fmcp%22%5D%2C%22env%22%3A%7B%22FORMIO_PROJECT_URL%22%3A%22https%3A%2F%2Fyour-project.form.io%22%7D%2C%22name%22%3A%22formio-mcp%22%7D)
+
+Both links pre-fill the server command and leave a placeholder `FORMIO_PROJECT_URL` for you to replace with your own project URL.
+
+### Manual configuration <!-- omit from toc -->
+
+Claude Code — add a `.mcp.json` to your project root:
 
 ```json
 {
@@ -153,6 +165,17 @@ To connect from Claude Code without the plugin, add a `.mcp.json` to your projec
   }
 }
 ```
+
+The same `mcpServers` block works in every other stdio-capable client — only the file it belongs in changes:
+
+| Client | Where the config goes |
+| ------ | --------------------- |
+| Claude Code | `.mcp.json` in the project root (above), or `claude mcp add` |
+| Claude Desktop | `claude_desktop_config.json` — macOS: `~/Library/Application Support/Claude/`, Windows: `%APPDATA%\Claude\` |
+| Cursor | `.cursor/mcp.json` in the project, or `~/.cursor/mcp.json` globally |
+| VS Code (Copilot) | `.vscode/mcp.json` in the project |
+| Windsurf | `~/.codeium/windsurf/mcp_config.json` |
+| Cline | the MCP Servers panel, or `cline_mcp_settings.json` |
 
 In standalone mode, `FORMIO_BASE_URL` and `FORMIO_PROJECT_URL` are required env vars ([full list](#environment-variables)). Authentication works the same as in plugin mode: the first authenticated tool call opens the browser portal-login flow, or set `FORMIO_API_KEY` to skip the browser entirely.
 
