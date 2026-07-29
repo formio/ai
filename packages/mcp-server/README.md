@@ -232,7 +232,7 @@ Where that assumption doesn't hold — a container, an SSH session, CI — you h
 
    `FORMIO_AUTH_HOST=0.0.0.0` exposes the login page on every interface for the duration of the login. Only use it where that is acceptable.
 
-If no login arrives within `FORMIO_AUTH_TIMEOUT` seconds (default 300) the call fails with an error naming these options, rather than hanging until the client gives up.
+If no login arrives within `FORMIO_AUTH_TIMEOUT` seconds (default 900) the call fails with an error naming these options, rather than hanging until the client gives up.
 
 ### Login-form auto-resolution
 

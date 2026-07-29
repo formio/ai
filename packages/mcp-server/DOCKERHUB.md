@@ -47,7 +47,7 @@ Passing `-e KEY` without a value forwards it from the client's environment, keep
 | `FORMIO_BASE_URL` | no | Parent of the project URL (default `https://api.form.io`). Set when self-hosting. |
 | `FORMIO_AUTH_HOST` | no | Bind address for browser login (default `127.0.0.1`). |
 | `FORMIO_AUTH_PORT` | no | Fixed port for browser login, so it can be published from a container. |
-| `FORMIO_AUTH_TIMEOUT` | no | Seconds to wait for a browser login (default `300`). |
+| `FORMIO_AUTH_TIMEOUT` | no | Seconds to wait for a browser login (default `900`). |
 | `FORMIO_INSECURE_TLS` | no | Set to `1` to skip TLS verification. Local development only. |
 
 ## Authentication

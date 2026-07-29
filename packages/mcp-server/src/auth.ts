@@ -8,7 +8,11 @@ export interface AuthenticateOptions {
 }
 
 const DEFAULT_AUTH_HOST = '127.0.0.1';
-const DEFAULT_AUTH_TIMEOUT_MS = 5 * 60 * 1000;
+// Generous on purpose. The point of the timeout is to stop an unattended hang
+// from lasting forever, not to hurry an interactive login — an SSO redirect, a
+// 2FA prompt or a password-manager detour can all take minutes. Anyone actually
+// signing in will finish well inside this.
+const DEFAULT_AUTH_TIMEOUT_MS = 15 * 60 * 1000;
 
 function buildLoginPage(loginFormUrl: string): string {
   const domain = new URL(loginFormUrl).hostname;

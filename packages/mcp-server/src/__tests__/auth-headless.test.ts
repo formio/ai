@@ -101,6 +101,29 @@ describe('authenticate in headless environments', () => {
     ).rejects.toThrow(/http:\/\/127\.0\.0\.1:43219\//);
   });
 
+  // Guards the desktop and Claude Code plugin path, which is the common case:
+  // neither sets any FORMIO_AUTH_* variable, so it must still bind an ephemeral
+  // port on loopback and launch a browser, exactly as it did before headless
+  // support was added.
+  it('still binds loopback on an ephemeral port and launches a browser by default', async () => {
+    let observedPort = 0;
+    await authenticate(DEFAULT_CONFIG, {
+      onReady: async (port) => {
+        observedPort = port;
+        await postCallback(port, 'jwt');
+      },
+    });
+
+    // Ephemeral, not a fixed port.
+    expect(observedPort).toBeGreaterThan(1024);
+
+    const opener =
+      process.platform === 'darwin' ? 'open' : process.platform === 'win32' ? 'start' : 'xdg-open';
+    const command = vi.mocked(exec).mock.calls[0]?.[0] as string;
+    expect(command).toContain(opener);
+    expect(command).toContain(`http://127.0.0.1:${observedPort}/`);
+  });
+
   it('does not reject when the login arrives before the timeout', async () => {
     const jwt = await authenticate(
       { ...DEFAULT_CONFIG, authTimeoutMs: 5000 },
