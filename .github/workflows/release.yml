@@ -16,6 +16,9 @@ jobs:
     permissions:
       contents: write
       pull-requests: write
+      # Required for npm Trusted Publishing (OIDC). Without it npm auth fails
+      # with a misleading 404 on PUT rather than a 401.
+      id-token: write
     steps:
       - uses: actions/checkout@v4
         with:
@@ -29,8 +32,14 @@ jobs:
           cache: pnpm
           registry-url: 'https://registry.npmjs.org'
 
+      # Trusted Publishing needs npm >= 11.5.1; Node 22 still bundles npm 10.x,
+      # and `pnpm publish` delegates the upload to the npm CLI.
+      - run: npm install -g npm@latest
+
       - run: pnpm install --frozen-lockfile
 
+      # No NODE_AUTH_TOKEN: OIDC supplies short-lived credentials, and leaving a
+      # token in the environment makes npm prefer it and skip Trusted Publishing.
       - uses: changesets/action@v1
         id: changesets
         with:
@@ -38,7 +47,6 @@ jobs:
           publish: pnpm release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          NODE_AUTH_TOKEN: ${{ secrets.PUBLIC_NPM_TOKEN }}
 
       ### Publish the MCP server to the official MCP Registry.
       # Runs only when this release actually published @formio/mcp — the
