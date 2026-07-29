@@ -49,14 +49,35 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       ### Publish the MCP server to the official MCP Registry.
-      # Runs only when this release actually published @formio/mcp — the
-      # registry verifies ownership by reading "mcpName" from the npm tarball,
-      # so npm must land first.
-      - name: Resolve published @formio/mcp version
+      # Deliberately does NOT gate on changesets/action's `published` output:
+      # that output is only populated when the action can parse `changeset
+      # publish` output, and this repo publishes via a custom `pnpm -r publish`,
+      # so it stays empty even on a successful release.
+      #
+      # Instead, compare the three sources of truth directly. Publish only when
+      # npm already has this version (the registry verifies ownership by reading
+      # "mcpName" from the tarball, so npm must land first) and the registry does
+      # not. That makes the step idempotent and safe to re-run.
+      - name: Decide whether to publish to the MCP Registry
         id: mcp
-        if: steps.changesets.outputs.published == 'true'
         run: |
-          VERSION=$(jq -r '.[] | select(.name == "@formio/mcp") | .version' <<<'${{ steps.changesets.outputs.publishedPackages }}')
+          set -euo pipefail
+          VERSION=$(jq -r .version packages/mcp-server/package.json)
+          NAME=$(jq -r .mcpName packages/mcp-server/package.json)
+
+          if ! npm view "@formio/mcp@${VERSION}" version >/dev/null 2>&1; then
+            echo "npm does not have @formio/mcp@${VERSION} yet — nothing to register."
+            exit 0
+          fi
+
+          PUBLISHED=$(curl -fsS "https://registry.modelcontextprotocol.io/v0/servers?search=${NAME}" \
+            | jq -r --arg n "$NAME" '[.servers[]? | select(.server.name == $n) | .server.version] | max // ""')
+          if [ "$PUBLISHED" = "$VERSION" ]; then
+            echo "Registry already has ${NAME}@${VERSION} — skipping."
+            exit 0
+          fi
+
+          echo "Publishing ${NAME}@${VERSION} (registry currently at '${PUBLISHED:-none}')."
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
 
       - name: Install mcp-publisher
