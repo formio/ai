@@ -37,23 +37,7 @@ The same stdio entry works everywhere; only the file the config goes in changes 
 }
 ```
 
-The container is a drop-in replacement for that entry — `docker run -i` speaks the same stdio, so only `command` and `args` change:
-
-```json
-{
-  "mcpServers": {
-    "formio-mcp": {
-      "command": "docker",
-      "args": ["run", "-i", "--rm", "-e", "FORMIO_PROJECT_URL", "formio/mcp"],
-      "env": {
-        "FORMIO_PROJECT_URL": "https://your-project.form.io"
-      }
-    }
-  }
-}
-```
-
-`-i` is required — without it the client gets no stdin to write to. Each `-e KEY` with no value forwards that variable from the `env` block above, so a key never has to be written into the args. [Run in Docker](#run-in-docker) covers the rest: authenticating inside a container, reusing a cached token, and reaching a self-hosted deployment.
+The container is a drop-in replacement for that entry: `docker run -i` speaks the same stdio, so only `command` and `args` change. [Run in Docker](#run-in-docker) has that config, along with authenticating inside a container, reusing a cached token, and reaching a self-hosted deployment.
 
 Standalone (non-plugin) mode requires `FORMIO_PROJECT_URL`; `FORMIO_BASE_URL` is optional and defaults to `https://api.form.io`, so set it when self-hosting. In plugin mode the plugin manages both, via Claude Code's user-config plus the per-cwd `~/.formio/projects.json` mapping.
 
@@ -105,7 +89,7 @@ docker run -i --rm \
   formio/mcp
 ```
 
-Wired into a client, that becomes:
+Wired into a client — the same `mcpServers` entry as [Connect a client](#connect-a-client), with `command` and `args` pointed at Docker — that becomes:
 
 ```json
 {
