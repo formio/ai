@@ -1,50 +1,27 @@
 ## Formio MCP server
 
-The MCP server (`@formio/mcp`) is independently usable from any MCP-aware client. From a clone of this repo:
+The MCP server (`@formio/mcp`) is independently usable from any MCP-aware client. It speaks **stdio**: the client spawns it and owns stdin/stdout. There is no port to open and nothing to start by hand.
+
+From a clone of this repo, the entry point is `src/stdio.ts`:
 
 ```bash
 pnpm install
-pnpm --filter @formio/mcp dev
+pnpm --filter @formio/mcp exec tsx src/stdio.ts
 ```
 
-The server starts on port 3000. Override with the `PORT` env var.
+Run that way it waits for MCP traffic on stdin, which only tells you it starts cleanly — point a client at the command instead. A built package exposes the same entry point as the `formio-mcp` bin and as `dist/stdio.js`.
 
-### Transports
+### Transport
 
-| Transport | Endpoint | Compatible with |
+| Transport | Command | Compatible with |
 | --- | --- | --- |
-| Streamable HTTP | `POST /mcp` | Claude Code, VS Copilot, modern MCP clients |
-| SSE | `GET /sse` + `POST /messages` | Claude Desktop, legacy MCP clients |
-| stdio | `node dist/stdio.js` | `.mcp.json` spawn-mode clients |
+| stdio | `npx -y @formio/mcp` (or `node dist/stdio.js`) | Claude Code, Claude Desktop, Cursor, VS Code, Windsurf, Cline — anything that speaks MCP over stdio |
 
-### Connect to Claude Code
+There is no HTTP or SSE transport. The server's only HTTP listener is the temporary browser-login page described under [Authentication](#authentication), which carries no MCP traffic.
 
-```json
-{
-  "mcpServers": {
-    "formio-mcp": {
-      "type": "http",
-      "url": "http://localhost:3000/mcp"
-    }
-  }
-}
-```
+### Connect a client
 
-### Connect to Claude Desktop
-
-`claude_desktop_config.json`:
-
-```json
-{
-  "mcpServers": {
-    "formio-mcp": {
-      "url": "http://localhost:3000/sse"
-    }
-  }
-}
-```
-
-### Spawn via `.mcp.json` (stdio)
+The same stdio entry works everywhere; only the file the config goes in changes — `.mcp.json` in a project for Claude Code, `claude_desktop_config.json` for Claude Desktop, and each editor's own MCP settings elsewhere:
 
 ```json
 {
@@ -53,7 +30,6 @@ The server starts on port 3000. Override with the `PORT` env var.
       "command": "npx",
       "args": ["-y", "@formio/mcp"],
       "env": {
-        "FORMIO_BASE_URL": "https://api.form.io",
         "FORMIO_PROJECT_URL": "https://your-project.form.io"
       }
     }
@@ -61,17 +37,54 @@ The server starts on port 3000. Override with the `PORT` env var.
 }
 ```
 
-In standalone (non-plugin) mode, `FORMIO_BASE_URL` and `FORMIO_PROJECT_URL` are required env vars. In plugin mode, the plugin manages both via Claude Code's user-config + per-cwd `~/.formio/projects.json` mapping.
+Standalone (non-plugin) mode requires `FORMIO_PROJECT_URL`; `FORMIO_BASE_URL` is optional and defaults to `https://api.form.io`, so set it when self-hosting. In plugin mode the plugin manages both, via Claude Code's user-config plus the per-cwd `~/.formio/projects.json` mapping.
+
+### Inspect it with MCP Inspector
+
+The [MCP Inspector](https://github.com/modelcontextprotocol/inspector) is the quickest way to see the tool list and call a tool without wiring up a client. From the repo root, where `.mcp.json` already defines a `formio-mcp` server:
+
+```bash
+npx @modelcontextprotocol/inspector --web --config .mcp.json
+```
+
+It prints a URL with an auth token in the query string and opens a browser. Port 6274 is the default; if something already holds it, move both ports with `CLIENT_PORT=6284 SERVER_PORT=6285`. `--server <name>` is accepted but currently has no effect on the web UI — it lists every server in the file, and you pick one there.
+
+For a one-shot answer, use CLI mode. **The target command must come before the flags:**
+
+```bash
+cd packages/mcp-server
+npx @modelcontextprotocol/inspector --cli npx tsx src/stdio.ts \
+  --method tools/list \
+  -e FORMIO_PROJECT_URL=https://your-project.form.io
+```
+
+Put `-e` ahead of the command and the parser swallows the target, then falls back to the inspector's own catalog at `~/.mcp-inspector/mcp.json`. The failure names sample servers you never configured, which reads as a config problem rather than the argument-order problem it is:
+
+```
+{"error":{"code":"error","message":"Multiple servers found in config file. Please specify one with --server. Available servers: everything-server-default, filesystem-server-default"}}
+```
+
+The inspector does **not** pass your shell environment to the server it spawns, so exporting `FORMIO_PROJECT_URL` before the command is not enough — it fails with `FORMIO_PROJECT_URL is required`. Configuration has to arrive through `-e` (or through the `env` block of a `--config` file).
+
+Start with `hello`, the one tool that touches no credentials:
+
+```bash
+npx @modelcontextprotocol/inspector --cli node dist/stdio.js \
+  --method tools/call --tool-name hello \
+  -e FORMIO_PROJECT_URL=https://your-project.form.io
+```
+
+Any other tool triggers the browser login on a cache miss, so add `-e FORMIO_API_KEY=...` to skip it. A standalone server reports 19 tools — the 20 below minus `project_set`, which only registers in plugin context.
 
 ### Run in Docker
 
-The server ships a [`Dockerfile`](./Dockerfile) and is published to the Docker MCP Catalog as `mcp/formio`. The image speaks stdio, so the MCP client owns stdin/stdout and the container must be run with `-i`:
+The server ships a [`Dockerfile`](./Dockerfile) and is published to Docker Hub as [`formio/mcp`](https://hub.docker.com/r/formio/mcp) for `linux/amd64` and `linux/arm64`. The image speaks stdio, so the MCP client owns stdin/stdout and the container must be run with `-i`:
 
 ```bash
 docker run -i --rm \
   -e FORMIO_PROJECT_URL=https://your-project.form.io \
   -e FORMIO_API_KEY=your-api-key \
-  mcp/formio
+  formio/mcp
 ```
 
 Wired into a client, that becomes:
@@ -85,7 +98,7 @@ Wired into a client, that becomes:
         "run", "-i", "--rm",
         "-e", "FORMIO_PROJECT_URL",
         "-e", "FORMIO_API_KEY",
-        "mcp/formio"
+        "formio/mcp"
       ],
       "env": {
         "FORMIO_PROJECT_URL": "https://your-project.form.io",
@@ -121,7 +134,7 @@ docker run -i --rm --add-host forms.internal:10.0.0.5 \
   -e FORMIO_BASE_URL=https://forms.internal \
   -e FORMIO_PROJECT_URL=https://forms.internal/my-project \
   -e FORMIO_API_KEY=your-api-key \
-  mcp/formio
+  formio/mcp
 ```
 
 **Private or self-signed certificates.** The image trusts only the standard CA bundle. A certificate your host trusts — via the macOS keychain, say — will still fail inside the container, surfacing as a bare `fetch failed` from the tool. There are two cases, and they behave differently:
@@ -163,6 +176,8 @@ The bundled `@formio/mcp` server exposes these tools. Skills prefer these over r
 | `form_get` | Fetch a single form definition by ID or path. |
 | `form_list` | List forms with optional filtering and pagination. |
 | `form_update` | Update an existing form. Call `form_get` first, edit with `formio-form`, then update. |
+| `form_revisions_list` | List a form's saved revisions. |
+| `form_revision_get` | Fetch one revision of a form by revision id. |
 
 ### Roles
 
@@ -227,7 +242,7 @@ Where that assumption doesn't hold — a container, an SSH session, CI — you h
    docker run -i --rm -p 43117:43117 \
      -e FORMIO_PROJECT_URL=https://your-project.form.io \
      -e FORMIO_AUTH_HOST=0.0.0.0 -e FORMIO_AUTH_PORT=43117 \
-     mcp/formio
+     formio/mcp
    ```
 
    `FORMIO_AUTH_HOST=0.0.0.0` exposes the login page on every interface for the duration of the login. Only use it where that is acceptable.
@@ -250,10 +265,16 @@ The probe runs lazily — only when the local auth page is actually served.
 
 | Name | Required | Default | Purpose | Hosted SaaS example | Self-hosted example |
 | --- | :-: | --- | --- | --- | --- |
-| `FORMIO_BASE_URL` | yes | — | Full base URL of your Form.io deployment. | `https://api.form.io` | `https://forms.example.com` |
 | `FORMIO_PROJECT_URL` | yes\* | — | Full URL of your Form.io project. In plugin mode, only used as the pre-filled default offered when prompting for an unmapped cwd. | `https://myproject.form.io` | `https://forms.example.com/myproject` |
+| `FORMIO_BASE_URL` | no\*\* | `https://api.form.io` | Full base URL of your Form.io deployment. Set it when self-hosting. | `https://api.form.io` | `https://forms.example.com` |
 | `FORMIO_API_KEY` | no | `undefined` | Long-lived project API key. When set, the server skips the browser login flow. | `CHANGEME` | `CHANGEME` |
 | `FORMIO_LOGIN_FORM` | no | Auto-resolved | Override the portal login form URL used by the JWT login flow. | `https://formio.form.io/user/login` | `https://forms.example.com/formio/user/login` |
+| `FORMIO_AUTH_HOST` | no | `127.0.0.1` | Bind address for the browser-login page. `0.0.0.0` makes it reachable from outside a container. |  |  |
+| `FORMIO_AUTH_PORT` | no | ephemeral | Fixed port for the browser-login page, so a container can publish it. | `43117` | `43117` |
+| `FORMIO_AUTH_TIMEOUT` | no | `900` | Seconds to wait for a browser login before failing the call. |  |  |
+| `FORMIO_INSECURE_TLS` | no | `undefined` | Set to `1` to skip TLS verification. Local development only — never against production. |  |  |
 | `FORMIO_PLUGIN_CONTEXT` | no | `0` | Set by the plugin manifest. When `1`, the server enables `project_set` and reads `FORMIO_PROJECT_URL` from `~/.formio/projects.json` per cwd instead of env. |  |  |
 
-\* In plugin context, `FORMIO_PROJECT_URL` is captured per-cwd by the `project_set` tool and persisted to `~/.formio/projects.json`. The `verify-project-url` `SessionStart`/`PreToolUse` hook offers `formio_default_project_url` (from plugin user-config) as the default the first time you enter a workspace.
+\* Standalone only, where the server refuses to start without it. In plugin context, `FORMIO_PROJECT_URL` is captured per-cwd by the `project_set` tool and persisted to `~/.formio/projects.json`. The `verify-project-url` `SessionStart`/`PreToolUse` hook offers `formio_default_project_url` (from plugin user-config) as the default the first time you enter a workspace.
+
+\*\* Reversed in plugin context: the plugin always collects `FORMIO_BASE_URL` through user-config, so it is required there and the hosted-cloud default does not apply.

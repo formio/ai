@@ -39,8 +39,8 @@
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
     "build:dev": "tsc",
-    "dev": "tsx watch src/index.ts",
-    "start": "node dist/index.js",
+    "dev": "tsx watch src/stdio.ts",
+    "start": "node dist/stdio.js",
     "test": "vitest run",
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit",
