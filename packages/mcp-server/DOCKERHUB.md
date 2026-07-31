@@ -36,8 +36,6 @@ Works with Claude Code, Claude Desktop, Cursor, VS Code, Windsurf, Cline, and an
 }
 ```
 
-Passing `-e KEY` without a value forwards it from the client's environment, keeping the key out of the config file.
-
 ## Configuration
 
 | Variable | Required | Purpose |

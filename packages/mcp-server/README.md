@@ -37,46 +37,7 @@ The same stdio entry works everywhere; only the file the config goes in changes 
 }
 ```
 
-The container is a drop-in replacement for that entry: `docker run -i` speaks the same stdio, so only `command` and `args` change. [Run in Docker](#run-in-docker) has that config, along with authenticating inside a container, reusing a cached token, and reaching a self-hosted deployment.
-
 Standalone (non-plugin) mode requires `FORMIO_PROJECT_URL`; `FORMIO_BASE_URL` is optional and defaults to `https://api.form.io`, so set it when self-hosting. In plugin mode the plugin manages both, via Claude Code's user-config plus the per-cwd `~/.formio/projects.json` mapping.
-
-### Inspect it with MCP Inspector
-
-The [MCP Inspector](https://github.com/modelcontextprotocol/inspector) is the quickest way to see the tool list and call a tool without wiring up a client. From the repo root, where `.mcp.json` already defines a `formio-mcp` server:
-
-```bash
-npx @modelcontextprotocol/inspector --web --config .mcp.json
-```
-
-It prints a URL with an auth token in the query string and opens a browser. Port 6274 is the default; if something already holds it, move both ports with `CLIENT_PORT=6284 SERVER_PORT=6285`. `--server <name>` is accepted but currently has no effect on the web UI — it lists every server in the file, and you pick one there.
-
-For a one-shot answer, use CLI mode. **The target command must come before the flags:**
-
-```bash
-cd packages/mcp-server
-npx @modelcontextprotocol/inspector --cli npx tsx src/stdio.ts \
-  --method tools/list \
-  -e FORMIO_PROJECT_URL=https://your-project.form.io
-```
-
-Put `-e` ahead of the command and the parser swallows the target, then falls back to the inspector's own catalog at `~/.mcp-inspector/mcp.json`. The failure names sample servers you never configured, which reads as a config problem rather than the argument-order problem it is:
-
-```
-{"error":{"code":"error","message":"Multiple servers found in config file. Please specify one with --server. Available servers: everything-server-default, filesystem-server-default"}}
-```
-
-The inspector does **not** pass your shell environment to the server it spawns, so exporting `FORMIO_PROJECT_URL` before the command is not enough — it fails with `FORMIO_PROJECT_URL is required`. Configuration has to arrive through `-e` (or through the `env` block of a `--config` file).
-
-Start with `hello`, the one tool that touches no credentials:
-
-```bash
-npx @modelcontextprotocol/inspector --cli node dist/stdio.js \
-  --method tools/call --tool-name hello \
-  -e FORMIO_PROJECT_URL=https://your-project.form.io
-```
-
-Any other tool triggers the browser login on a cache miss, so add `-e FORMIO_API_KEY=...` to skip it. A standalone server reports 19 tools — the 20 below minus `project_set`, which only registers in plugin context.
 
 ### Run in Docker
 
@@ -110,8 +71,6 @@ Wired into a client — the same `mcpServers` entry as [Connect a client](#conne
   }
 }
 ```
-
-Passing `-e KEY` without a value forwards the variable from the client's environment, which keeps the key out of the config file.
 
 #### Authentication in a container
 
@@ -163,6 +122,44 @@ The build context is this directory, not the repo root — the package compiles 
 ```bash
 docker build -t formio-mcp packages/mcp-server
 ```
+
+### Inspect it with MCP Inspector
+
+The [MCP Inspector](https://github.com/modelcontextprotocol/inspector) connects to the server and lets you browse and call its tools by hand — useful for confirming a config works before wiring it into an agent. Start the web portal:
+
+```bash
+npx @modelcontextprotocol/inspector
+```
+
+It prints a URL carrying an auth token and opens a browser. The default port is 6274; if something already holds it, move both with `CLIENT_PORT=6284 SERVER_PORT=6285`.
+
+Copy [`inspector-config.example.json`](./inspector-config.example.json) to `inspector-config.json`, fill in your project URL and API key, and you have the file the next step asks for. That name is gitignored, so a filled-in copy cannot be committed by accident.
+
+**1. Choose Add Servers → Import from client config.**
+
+![Add Servers menu with Import from client config highlighted](https://raw.githubusercontent.com/formio/ai/main/packages/mcp-server/docs/images/inspector-1-add-servers.jpg)
+
+**2. Click "From file…".** The dialog takes a client config file or a client installed on this machine — there is nowhere to paste JSON.
+
+![Import from client config dialog offering a client dropdown and a From file button](https://raw.githubusercontent.com/formio/ai/main/packages/mcp-server/docs/images/inspector-2-import-dialog.jpg)
+
+**3. Select your `inspector-config.json`,** and the server it defines is listed as new. Confirm with "Import 1 server".
+
+![Dialog listing formio-mcp under New servers with an Import 1 server button](https://raw.githubusercontent.com/formio/ai/main/packages/mcp-server/docs/images/inspector-3-new-servers.jpg)
+
+**4. Enable the server with the toggle on its card.** It turns green and reports the negotiated protocol version once the container is up; the first connection is slower because Docker has to start it.
+
+![Server card for formio-mcp showing Connected and the docker command it runs](https://raw.githubusercontent.com/formio/ai/main/packages/mcp-server/docs/images/inspector-4-connected.jpg)
+
+**5. Open the Tools tab** for the tools this server exposes. A standalone server lists 19 — every tool below except `project_set`, which only registers in plugin context.
+
+![Tools tab listing hello, form_create, form_get, form_list and the rest](https://raw.githubusercontent.com/formio/ai/main/packages/mcp-server/docs/images/inspector-5-tools.jpg)
+
+**6. Pick a tool, fill in its arguments, and press "Execute Tool".** The result appears in the middle pane and the JSON-RPC exchange in the right-hand Protocol panel. `hello` is the one tool that touches no credentials, so it isolates transport problems from auth problems; `form_list` below is a real call against a project.
+
+![form_list results showing form definitions returned from a Form.io project](https://raw.githubusercontent.com/formio/ai/main/packages/mcp-server/docs/images/inspector-6-tool-result.jpg)
+
+Importing writes the server into the inspector's own catalog at `~/.mcp-inspector/mcp.json`, so it is still there next time — remove it from the card when you are done. A tool that fails with a bare `fetch failed` is usually the deployment, not the server: see [Self-hosted deployments](#self-hosted-deployments) for hostname resolution and certificate trust inside a container.
 
 ---
 

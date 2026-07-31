@@ -17,3 +17,8 @@ __pycache__/
 
 # Local IDE/editor settings (personal, not project-shared)
 .vscode/
+
+# Filled-in copy of inspector-config.example.json — carries a real project URL and
+# API key, so it must never be committed. The .example.json alongside it is what
+# ships.
+inspector-config.json

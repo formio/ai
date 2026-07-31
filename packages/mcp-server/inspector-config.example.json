@@ -1,0 +1,21 @@
+{
+  "mcpServers": {
+    "formio-mcp": {
+      "command": "docker",
+      "args": [
+        "run",
+        "-i",
+        "--rm",
+        "-e",
+        "FORMIO_PROJECT_URL",
+        "-e",
+        "FORMIO_API_KEY",
+        "formio/mcp"
+      ],
+      "env": {
+        "FORMIO_PROJECT_URL": "https://your-project.form.io",
+        "FORMIO_API_KEY": "your-api-key"
+      }
+    }
+  }
+}
