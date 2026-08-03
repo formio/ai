@@ -1,0 +1,59 @@
+# Smithery configuration for @formio/mcp — https://smithery.ai/docs
+#
+# The server speaks stdio: the client spawns it and owns stdin/stdout. It needs a
+# Form.io project to talk to, so FORMIO_PROJECT_URL is the one required setting.
+#
+# FORMIO_API_KEY is optional but recommended here. Without it the server falls
+# back to a browser login flow, which cannot complete in a hosted or headless
+# environment — see "Headless environments" in packages/mcp-server/README.md.
+startCommand:
+  type: stdio
+  configSchema:
+    type: object
+    required:
+      - formioProjectUrl
+    properties:
+      formioProjectUrl:
+        type: string
+        title: Project URL
+        description: >-
+          Full URL of your Form.io project, e.g. https://myproject.form.io or
+          https://forms.example.com/myproject
+      formioBaseUrl:
+        type: string
+        title: Base URL
+        default: https://api.form.io
+        description: >-
+          Base URL of the deployment. Leave as the default for Form.io SaaS; set it
+          when self-hosting.
+      formioApiKey:
+        type: string
+        title: Project API key
+        description: >-
+          Project API key. Recommended: without it the server attempts an
+          interactive browser login, which cannot complete without a desktop
+          browser on the same machine.
+      formioInsecureTls:
+        type: boolean
+        default: false
+        title: Skip TLS verification
+        description: >-
+          Local development only. Needed when a self-hosted deployment uses a
+          self-signed certificate, which Node cannot trust via a CA bundle.
+  commandFunction: |-
+    (config) => ({
+      command: 'npx',
+      args: ['-y', '@formio/mcp'],
+      env: Object.assign(
+        {
+          FORMIO_PROJECT_URL: config.formioProjectUrl,
+          FORMIO_BASE_URL: config.formioBaseUrl || 'https://api.form.io',
+        },
+        config.formioApiKey ? { FORMIO_API_KEY: config.formioApiKey } : {},
+        config.formioInsecureTls ? { FORMIO_INSECURE_TLS: '1' } : {}
+      ),
+    })
+  exampleConfig:
+    formioProjectUrl: https://myproject.form.io
+    formioBaseUrl: https://api.form.io
+    formioApiKey: your-api-key
