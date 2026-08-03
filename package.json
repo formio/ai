@@ -6,6 +6,7 @@
   "scripts": {
     "build": "turbo run build",
     "build:plugin": "tsx scripts/build-plugin.ts",
+    "build:mcpb": "tsx scripts/build-mcpb.ts",
     "dev": "turbo run dev",
     "test": "turbo run test",
     "test:plugin": "tsx scripts/test-plugin.ts",
@@ -20,6 +21,7 @@
     "release": "pnpm -r publish --tag $(pnpm -s release:get-tag)"
   },
   "devDependencies": {
+    "@anthropic-ai/mcpb": "^2.1.2",
     "@changesets/cli": "^2.30.0",
     "@eslint/js": "^9.24.0",
     "esbuild": "^0.27.7",
