@@ -133,7 +133,11 @@ npx @modelcontextprotocol/inspector
 
 It prints a URL carrying an auth token and opens a browser. The default port is 6274; if something already holds it, move both with `CLIENT_PORT=6284 SERVER_PORT=6285`.
 
+![Importing inspector-config.json into the MCP Inspector, connecting the server, and calling form_list against a real project](https://raw.githubusercontent.com/formio/ai/main/packages/mcp-server/docs/formio-mcp-inspector.gif)
+
 Copy [`inspector-config.example.json`](./inspector-config.example.json) to `inspector-config.json`, fill in your project URL and API key, and you have the file the next step asks for. That name is gitignored, so a filled-in copy cannot be committed by accident.
+
+The same run, step by step:
 
 **1. Choose Add Servers → Import from client config.**
 

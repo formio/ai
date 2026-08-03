@@ -22,3 +22,13 @@ __pycache__/
 # API key, so it must never be committed. The .example.json alongside it is what
 # ships.
 inspector-config.json
+
+# Raw screen recordings behind the demo GIFs. Tens of MB each and regenerable
+# from examples/demos/build-demo-gif.py, so only the GIFs are committed.
+*.mov
+
+# Playwright profile used by the demo recorder. Holds real logged-in sessions for
+# the portals the demos walk through, so it must stay local.
+examples/demos/.profile/
+# Raw Playwright captures, converted to GIFs by build-demo-gif.py
+examples/demos/recordings/

@@ -26,6 +26,7 @@
     "eslint": "^9.24.0",
     "eslint-config-prettier": "^10.1.2",
     "husky": "^9.1.7",
+    "playwright": "^1.62.1",
     "prettier": "^3.5.3",
     "tsx": "^4.19.3",
     "turbo": "^2.9.18",
