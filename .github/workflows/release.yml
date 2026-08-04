@@ -13,6 +13,10 @@ concurrency:
 jobs:
   plugin-changeset:
     runs-on: ubuntu-latest
+    outputs:
+      # Consumed by the image jobs below, which run on their own runners and so
+      # cannot see this job's step outputs.
+      image_version: ${{ steps.dockerhub.outputs.version }}
     permissions:
       contents: write
       pull-requests: write
@@ -168,18 +172,18 @@ jobs:
           fi
           npx -y @smithery/cli@latest mcp publish ./dist/formio-mcp.smithery.mcpb -n formio/mcp
 
-      ### Publish the container image to Docker Hub.
+      ### Decide whether the container image needs publishing.
       # Same idempotent shape as the registry publish: only when npm already has
       # the version and Docker Hub does not. Skips cleanly when credentials are absent
       # so a release in a fork or an unconfigured repo still succeeds.
       #
-      # Deliberately last. A failed step fails the job and skips every step after it,
-      # and this is the flakiest one here: the arm64 image is built under QEMU
-      # emulation, where `npm install` has died with SIGILL (exit 132) on an
-      # otherwise healthy release. When it sat ahead of the bundle steps, one such
-      # crash silently withheld the .mcpb, the GitHub release and the Smithery
-      # publish. Each channel is independent, so the fragile one goes at the end
-      # where a re-run costs nothing already shipped.
+      # The decision lives here, in the job that knows the released version; the
+      # build itself runs in docker-image below, on one runner per architecture.
+      # Keeping it a separate job is what stops an image failure from touching the
+      # npm, registry, bundle and Smithery publishes above — it used to sit in this
+      # job, where a single QEMU crash silently withheld the .mcpb, the GitHub
+      # release and the Smithery publish. Each channel is independent, so an image
+      # failure now costs only the image.
       - name: Decide whether to publish to Docker Hub
         id: dockerhub
         if: steps.pkg.outputs.version != ''
@@ -205,34 +209,129 @@ jobs:
             echo "version=$VERSION" >> "$GITHUB_OUTPUT"
           fi
 
-      # arm64 as well as amd64: a large share of developers run Apple Silicon,
-      # where an amd64-only image is emulated and noticeably slower to start.
-      - name: Set up QEMU
-        if: steps.dockerhub.outputs.version != ''
-        uses: docker/setup-qemu-action@v3
+  ### Build the container image, one architecture per native runner.
+  # arm64 as well as amd64: a large share of developers run Apple Silicon, where an
+  # amd64-only image is emulated and noticeably slower to start.
+  #
+  # Emulation is exactly what this job exists to avoid. Building both platforms in
+  # one step meant arm64 ran under QEMU, where `npm install` died with SIGILL
+  # (exit 132) on two of three releases — leaving Docker Hub a version behind while
+  # every other channel was current. GitHub's ARM runners are free for public
+  # repositories, so each architecture builds on its own hardware and no QEMU is
+  # involved at all.
+  #
+  # Each build pushes an untagged manifest by digest; docker-manifest joins them
+  # into the tags people actually pull.
+  docker-image:
+    needs: plugin-changeset
+    if: needs.plugin-changeset.outputs.image_version != ''
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      # One architecture failing should not cancel the other: with fail-fast the
+      # surviving digest would be discarded and a re-run would rebuild both.
+      fail-fast: false
+      matrix:
+        include:
+          - arch: amd64
+            platform: linux/amd64
+            runner: ubuntu-latest
+          - arch: arm64
+            platform: linux/arm64
+            runner: ubuntu-24.04-arm
+    steps:
+      - uses: actions/checkout@v4
 
-      - name: Set up Buildx
-        if: steps.dockerhub.outputs.version != ''
-        uses: docker/setup-buildx-action@v3
+      - uses: docker/setup-buildx-action@v3
 
-      - name: Log in to Docker Hub
-        if: steps.dockerhub.outputs.version != ''
-        uses: docker/login-action@v4
+      - uses: docker/login-action@v4
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      - name: Build and push formio/mcp
-        if: steps.dockerhub.outputs.version != ''
+      # provenance is off deliberately. With push-by-digest an attestation turns the
+      # pushed digest into an index rather than a single-platform manifest, which is
+      # not what imagetools expects to combine.
+      - name: Build and push formio/mcp by digest
+        id: build
         uses: docker/build-push-action@v6
         with:
           context: packages/mcp-server
-          platforms: linux/amd64,linux/arm64
-          push: true
-          provenance: true
-          tags: |
-            formio/mcp:${{ steps.dockerhub.outputs.version }}
-            formio/mcp:latest
+          platforms: ${{ matrix.platform }}
+          provenance: false
+          outputs: type=image,name=formio/mcp,push-by-digest=true,name-canonical=true,push=true
+
+      - name: Record the digest
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/digests
+          echo '${{ steps.build.outputs.digest }}' > "/tmp/digests/${{ matrix.arch }}"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: digest-${{ matrix.arch }}
+          path: /tmp/digests/${{ matrix.arch }}
+          # A silently missing digest would produce a half-built manifest below.
+          if-no-files-found: error
+          retention-days: 1
+
+  ### Join the per-architecture digests into the published tags.
+  docker-manifest:
+    needs: [plugin-changeset, docker-image]
+    if: needs.plugin-changeset.outputs.image_version != ''
+    runs-on: ubuntu-latest
+    steps:
+      # Checked out for packages/mcp-server/DOCKERHUB.md, read by the overview sync.
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          path: /tmp/digests
+          pattern: digest-*
+          merge-multiple: true
+
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/login-action@v4
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Create the multi-architecture tags
+        env:
+          VERSION: ${{ needs.plugin-changeset.outputs.image_version }}
+        run: |
+          set -euo pipefail
+
+          # Refuse to publish a tag covering fewer architectures than intended: an
+          # image quietly missing arm64 is worse than a failed release, because it
+          # looks fine until someone on Apple Silicon pulls it.
+          COUNT=$(ls -1 /tmp/digests | wc -l | tr -d ' ')
+          if [ "$COUNT" != "2" ]; then
+            echo "Expected 2 digests (amd64, arm64), found ${COUNT}:"
+            ls -l /tmp/digests
+            exit 1
+          fi
+
+          REFS=$(for f in /tmp/digests/*; do printf 'formio/mcp@%s ' "$(cat "$f")"; done)
+          echo "Combining: ${REFS}"
+
+          # Retried: this is a pure registry operation, and it fails independently
+          # of the builds that produced the digests.
+          for attempt in 1 2 3; do
+            if docker buildx imagetools create \
+              --tag "formio/mcp:${VERSION}" \
+              --tag formio/mcp:latest \
+              ${REFS}; then
+              echo "Tags published on attempt ${attempt}."
+              docker buildx imagetools inspect "formio/mcp:${VERSION}"
+              exit 0
+            fi
+            echo "imagetools create failed (attempt ${attempt}); retrying in 15s…"
+            sleep 15
+          done
+
+          echo "Could not publish the tags after 3 attempts."
+          exit 1
 
       # Docker Hub full-text searches the overview, and it does not sync itself.
       # Kept in its own file rather than reusing the README, whose relative links
@@ -245,7 +344,6 @@ jobs:
       # hand from packages/mcp-server/DOCKERHUB.md.
       - name: Check for Docker Hub description credentials
         id: hubdesc
-        if: steps.dockerhub.outputs.version != ''
         env:
           DOCKERHUB_PASSWORD: ${{ secrets.DOCKERHUB_PASSWORD }}
         run: |
