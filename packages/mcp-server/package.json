@@ -1,6 +1,6 @@
 {
   "name": "@formio/mcp",
-  "version": "0.8.3",
+  "version": "0.8.4",
   "mcpName": "io.form/formio-mcp",
   "description": "Form.io MCP Server",
   "type": "module",
