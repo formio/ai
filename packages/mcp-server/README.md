@@ -1,5 +1,9 @@
 ## Formio MCP server
 
+[![npm: @formio/mcp](https://img.shields.io/npm/v/%40formio%2Fmcp?label=%40formio%2Fmcp)](https://www.npmjs.com/package/@formio/mcp)
+[![smithery badge](https://smithery.ai/badge/formio/mcp)](https://smithery.ai/servers/formio/mcp)
+[![MCP Registry](https://img.shields.io/badge/MCP%20Registry-io.form%2Fformio--mcp-blue)](https://registry.modelcontextprotocol.io/v0/servers?search=io.form/formio-mcp)
+
 The MCP server (`@formio/mcp`) is independently usable from any MCP-aware client. It speaks **stdio**: the client spawns it and owns stdin/stdout. There is no port to open and nothing to start by hand.
 
 From a clone of this repo, the entry point is `src/stdio.ts`:
