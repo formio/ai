@@ -31,7 +31,8 @@ type Manifest = {
     { type: string; title: string; description?: string; required?: boolean; sensitive?: boolean }
   >;
   compatibility?: { runtimes?: Record<string, string>; platforms?: string[] };
-  tools?: { name: string }[];
+  tools?: { name: string; description?: string }[];
+  tools_generated?: boolean;
 };
 
 function readManifest(): Manifest {
@@ -129,4 +130,45 @@ describe('pnpm build:mcpb', () => {
     expect(result.stdout).toContain('"serverInfo"');
     expect(result.stdout).toContain('Hello from formio-mcp, MCPB!');
   }, 90_000);
+
+  // Directories that ingest the bundle read this list instead of launching the
+  // server — Smithery's listing showed no tools at all while the manifest
+  // declared none. It is generated from the built server rather than hand-written,
+  // so it cannot drift from what the server actually serves.
+  it('1.9 declares every tool the bundled server serves, with descriptions', () => {
+    const declared = readManifest().tools ?? [];
+    expect(declared.length).toBeGreaterThan(0);
+
+    const request = [
+      '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{},"clientInfo":{"name":"mcpb-test","version":"1"}}}',
+      '{"jsonrpc":"2.0","method":"notifications/initialized"}',
+      '{"jsonrpc":"2.0","id":2,"method":"tools/list","params":{}}',
+      '',
+    ].join('\n');
+    // No project URL: the manifest must describe the surface a fresh install
+    // exposes, which is exactly what a crawler sees.
+    const result = spawnSync('node', [SERVER_BUNDLE], {
+      input: request,
+      encoding: 'utf8',
+      timeout: 60_000,
+      env: { PATH: process.env.PATH },
+    });
+    const listed = (
+      result.stdout
+        .split('\n')
+        .filter(Boolean)
+        .map((line) => JSON.parse(line) as { id?: number; result?: { tools?: { name: string }[] } })
+        .find((m) => m.id === 2)?.result?.tools ?? []
+    ).map((t) => t.name);
+
+    expect(listed.length).toBeGreaterThan(0);
+    expect(declared.map((t) => t.name).sort()).toEqual([...listed].sort());
+    for (const tool of declared) {
+      expect(tool.description, `${tool.name} declared without a description`).toBeTruthy();
+    }
+  }, 90_000);
+
+  it('1.10 does not claim its tools are generated at runtime once they are declared', () => {
+    expect(readManifest().tools_generated).toBe(false);
+  });
 });
