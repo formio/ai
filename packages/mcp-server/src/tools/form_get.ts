@@ -2,24 +2,31 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 import { FormioConfig } from '../config.js';
 import { formioFetch, isMongoId } from '../formio-client.js';
-import { toMcpTextResult, toMcpError } from '../mcp-responses.js';
+import { toMcpStructuredResult, toMcpError } from '../mcp-responses.js';
+import { formShape } from '../output-schemas.js';
+import { reads } from '../tool-annotations.js';
 import { cwdSchema, resolveProjectConfig } from '../project-resolver.js';
 
 export function registerFormGetTool(server: McpServer, config: FormioConfig) {
-  server.tool(
+  server.registerTool(
     'form_get',
-    "Fetch a single form definition from the Form.io project mapped to the user's current working directory, by form ID or path. Pass `draft: true` to fetch the form's current in-flight draft instead of the published form.",
     {
-      cwd: cwdSchema,
-      formIdOrPath: z.string().describe('Form ID (_id) or path (e.g. "user/login")'),
-      select: z
-        .string()
-        .optional()
-        .describe('Comma-separated fields to return (omit for full form JSON)'),
-      draft: z
-        .boolean()
-        .optional()
-        .describe("When true, fetch the form's current draft (GET /<form>/draft)"),
+      description:
+        "Fetch a single form definition from the Form.io project mapped to the user's current working directory, by form ID or path. Pass `draft: true` to fetch the form's current in-flight draft instead of the published form.",
+      inputSchema: {
+        cwd: cwdSchema,
+        formIdOrPath: z.string().describe('Form ID (_id) or path (e.g. "user/login")'),
+        select: z
+          .string()
+          .optional()
+          .describe('Comma-separated fields to return (omit for full form JSON)'),
+        draft: z
+          .boolean()
+          .optional()
+          .describe("When true, fetch the form's current draft (GET /<form>/draft)"),
+      },
+      outputSchema: formShape,
+      annotations: reads('Get a form'),
     },
     async ({ cwd, formIdOrPath, select, draft }) => {
       try {
@@ -35,7 +42,7 @@ export function registerFormGetTool(server: McpServer, config: FormioConfig) {
             `No draft exists for form "${formIdOrPath}". Create one via form_update with draft: true.`
           );
         }
-        return toMcpTextResult(form);
+        return toMcpStructuredResult(form);
       } catch (error) {
         return toMcpError(error);
       }

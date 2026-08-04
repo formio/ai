@@ -1,19 +1,26 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { FormioConfig } from '../config.js';
 import { formioFetch } from '../formio-client.js';
-import { toMcpTextResult, toMcpError } from '../mcp-responses.js';
+import { toMcpStructuredResult, toMcpError } from '../mcp-responses.js';
+import { actionShape } from '../output-schemas.js';
+import { creates } from '../tool-annotations.js';
 import { actionDefinitionSchema } from './action-schema.js';
 import { cwdSchema, resolveProjectConfig } from '../project-resolver.js';
 import { z } from 'zod';
 
 export function registerActionCreateTool(server: McpServer, config: FormioConfig) {
-  server.tool(
+  server.registerTool(
     'action_create',
-    'Create a new action on a form. Call action_type_get first to discover the required settings schema for the action type.',
     {
-      cwd: cwdSchema,
-      formId: z.string().describe('The form ID to attach the action to'),
-      action: actionDefinitionSchema,
+      description:
+        'Create a new action on a form. Call action_type_get first to discover the required settings schema for the action type.',
+      inputSchema: {
+        cwd: cwdSchema,
+        formId: z.string().describe('The form ID to attach the action to'),
+        action: actionDefinitionSchema,
+      },
+      outputSchema: actionShape,
+      annotations: creates('Create a form action'),
     },
     async ({ cwd, formId, action }) => {
       try {
@@ -34,11 +41,11 @@ export function registerActionCreateTool(server: McpServer, config: FormioConfig
           };
         }
 
-        const created = await formioFetch(`form/${formId}/action`, {}, cfg, {
+        const created = (await formioFetch(`form/${formId}/action`, {}, cfg, {
           method: 'POST',
           body: action,
-        });
-        return toMcpTextResult(created);
+        })) as Record<string, unknown>;
+        return toMcpStructuredResult(created);
       } catch (error) {
         return toMcpError(error);
       }

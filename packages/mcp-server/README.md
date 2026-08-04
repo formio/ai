@@ -37,7 +37,9 @@ The same stdio entry works everywhere; only the file the config goes in changes 
 }
 ```
 
-Standalone (non-plugin) mode requires `FORMIO_PROJECT_URL`; `FORMIO_BASE_URL` is optional and defaults to `https://api.form.io`, so set it when self-hosting. In plugin mode the plugin manages both, via Claude Code's user-config plus the per-cwd `~/.formio/projects.json` mapping.
+Standalone (non-plugin) mode needs `FORMIO_PROJECT_URL` before any tool that reaches Form.io will work; `FORMIO_BASE_URL` is optional and defaults to `https://api.form.io`, so set it when self-hosting. In plugin mode the plugin manages both, via Claude Code's user-config plus the per-cwd `~/.formio/projects.json` mapping.
+
+The server starts without either one, so a client can connect and list the tools before anything is configured — the project URL is only demanded at the point a tool needs it, and `hello` works regardless.
 
 ### Run in Docker
 

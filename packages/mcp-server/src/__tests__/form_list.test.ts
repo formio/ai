@@ -37,14 +37,19 @@ describe('form_list tool', () => {
     );
   });
 
-  it('returns JSON array as MCP text content', async () => {
+  // The array is wrapped in a named field because structuredContent must be an
+  // object, and the text view mirrors it so the two do not disagree.
+  it('returns the forms as structured content and matching text', async () => {
     const forms = [{ _id: '1', title: 'Test Form' }];
     mockFormioFetch.mockResolvedValue(forms);
     const { client } = await createTestClient(registerFormListTool);
 
     const result = await client.callTool({ name: 'form_list', arguments: { cwd: TEST_CWD } });
 
-    expect(result.content).toEqual([{ type: 'text', text: JSON.stringify(forms, null, 2) }]);
+    expect(result.structuredContent).toEqual({ forms, count: 1 });
+    expect(result.content).toEqual([
+      { type: 'text', text: JSON.stringify({ forms, count: 1 }, null, 2) },
+    ]);
   });
 
   it('passes type parameter', async () => {

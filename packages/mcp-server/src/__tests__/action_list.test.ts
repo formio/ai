@@ -42,7 +42,10 @@ describe('action_list tool', () => {
     });
 
     expect(mockFormioFetch).toHaveBeenCalledWith(`form/${formId}/action`, {}, TEST_CONFIG);
-    expect(result.content).toEqual([{ type: 'text', text: JSON.stringify(actions, null, 2) }]);
+    expect(result.structuredContent).toEqual({ actions, count: 2 });
+    expect(result.content).toEqual([
+      { type: 'text', text: JSON.stringify({ actions, count: 2 }, null, 2) },
+    ]);
   });
 
   it('returns MCP error on API failure', async () => {

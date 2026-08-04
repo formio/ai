@@ -31,7 +31,10 @@ describe('role_list tool', () => {
     const result = await client.callTool({ name: 'role_list', arguments: { cwd: TEST_CWD } });
 
     expect(mockFormioFetch).toHaveBeenCalledWith('role', { select: undefined }, TEST_CONFIG);
-    expect(result.content).toEqual([{ type: 'text', text: JSON.stringify(roles, null, 2) }]);
+    expect(result.structuredContent).toEqual({ roles, count: 2 });
+    expect(result.content).toEqual([
+      { type: 'text', text: JSON.stringify({ roles, count: 2 }, null, 2) },
+    ]);
   });
 
   it('forwards custom select as query parameter', async () => {

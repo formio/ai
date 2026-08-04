@@ -37,11 +37,13 @@ export function getConfig(): FormioConfig {
     throw new Error('FORMIO_BASE_URL is required');
   }
   // standalone mcp server (outside of claude plugin) needs to set project url from process.env
+  //
+  // Deliberately not required here. Clients and directory crawlers launch the
+  // server with no configuration to read tools/list, so failing at startup made
+  // it look like a server with no tools. resolveProjectConfig raises the error
+  // instead, at the point the project URL is actually needed and with guidance
+  // the caller can act on.
   const projectUrl = pluginContext ? null : process.env.FORMIO_PROJECT_URL;
-
-  if (!projectUrl && !pluginContext) {
-    throw new Error('FORMIO_PROJECT_URL is required');
-  }
 
   return {
     baseUrl: baseUrl.replace(/\/+$/, ''),

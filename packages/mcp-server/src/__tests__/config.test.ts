@@ -48,8 +48,14 @@ describe('getConfig', () => {
   });
 
   describe('standalone context (FORMIO_PLUGIN_CONTEXT unset)', () => {
-    it('throws when FORMIO_PROJECT_URL is not set', () => {
-      expect(() => getConfig()).toThrow(/FORMIO_PROJECT_URL is required/);
+    // A missing project URL must not stop the server from starting. Clients (and
+    // directory crawlers) launch it with no configuration at all to read
+    // tools/list; throwing here killed the process before it could answer, so the
+    // server appeared to expose no tools. resolveProjectConfig raises a far more
+    // actionable error at call time, which is where the value is actually needed.
+    it('does not throw when FORMIO_PROJECT_URL is not set — tools stay discoverable', () => {
+      expect(() => getConfig()).not.toThrow();
+      expect(getConfig().projectUrl).toBeUndefined();
     });
 
     it('reads FORMIO_PROJECT_URL from env and strips trailing slash', () => {

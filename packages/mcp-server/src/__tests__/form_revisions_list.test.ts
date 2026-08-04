@@ -17,7 +17,7 @@ describe('form_revisions_list tool', () => {
     mockFormioFetch.mockReset();
   });
 
-  it('fetches /form/{id}/v for a Mongo id and returns the body as MCP text', async () => {
+  it('fetches /form/{id}/v for a Mongo id and returns the revisions', async () => {
     const id = '67890abcdef012345678abcd';
     const revisions = [{ _vid: 1, _vnote: 'first' }];
     mockFormioFetch.mockResolvedValue(revisions);
@@ -29,7 +29,10 @@ describe('form_revisions_list tool', () => {
     });
 
     expect(mockFormioFetch).toHaveBeenCalledWith(`form/${id}/v`, {}, TEST_CONFIG);
-    expect(result.content).toEqual([{ type: 'text', text: JSON.stringify(revisions, null, 2) }]);
+    expect(result.structuredContent).toEqual({ revisions, count: 1 });
+    expect(result.content).toEqual([
+      { type: 'text', text: JSON.stringify({ revisions, count: 1 }, null, 2) },
+    ]);
   });
 
   it('fetches /{alias}/v for a path alias', async () => {
