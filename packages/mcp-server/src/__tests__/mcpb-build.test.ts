@@ -9,6 +9,8 @@ const MANIFEST = path.join(DIST_MCPB, 'manifest.json');
 const SERVER_BUNDLE = path.join(DIST_MCPB, 'server/index.mjs');
 const ICON = path.join(DIST_MCPB, 'icon.png');
 const BUNDLE = path.join(REPO_ROOT, 'dist/formio-mcp.mcpb');
+// Same server bytes, a manifest Smithery accepts and `mcpb pack` does not.
+const SMITHERY_BUNDLE = path.join(REPO_ROOT, 'dist/formio-mcp.smithery.mcpb');
 const SERVER_PACKAGE_JSON = path.join(REPO_ROOT, 'packages/mcp-server/package.json');
 
 type Manifest = {
@@ -31,7 +33,13 @@ type Manifest = {
     { type: string; title: string; description?: string; required?: boolean; sensitive?: boolean }
   >;
   compatibility?: { runtimes?: Record<string, string>; platforms?: string[] };
-  tools?: { name: string; description?: string }[];
+  tools?: {
+    name: string;
+    description?: string;
+    inputSchema?: { type?: string; properties?: Record<string, { description?: string }> };
+    outputSchema?: { type?: string };
+    annotations?: { title?: string; readOnlyHint?: boolean };
+  }[];
   tools_generated?: boolean;
 };
 
@@ -171,4 +179,49 @@ describe('pnpm build:mcpb', () => {
   it('1.10 does not claim its tools are generated at runtime once they are declared', () => {
     expect(readManifest().tools_generated).toBe(false);
   });
+
+  // The MCPB schema is strict: it permits only name and description per tool and
+  // rejects an inputSchema outright ("Unrecognized key(s)"), which is why the
+  // Smithery variant exists separately.
+  it('1.11 keeps the spec bundle within what the MCPB schema permits', () => {
+    for (const tool of readManifest().tools ?? []) {
+      expect(Object.keys(tool).sort()).toEqual(['description', 'name']);
+    }
+    const mcpb = path.join(REPO_ROOT, 'node_modules/.bin/mcpb');
+    const result = spawnSync(mcpb, ['validate', MANIFEST], { encoding: 'utf8', timeout: 60_000 });
+    expect(result.stdout + result.stderr).toContain('validation passes');
+  }, 90_000);
+
+  // Smithery's CLI copies manifest.tools verbatim into the serverCard it uploads
+  // and validates against the MCP Tool type: entries with no inputSchema object
+  // were refused with a 400, once per tool. A manifest that satisfies it cannot be
+  // packed by `mcpb pack`, so it ships as its own archive.
+  it('1.12 gives Smithery the full tool definitions in its own bundle', () => {
+    expect(fs.existsSync(SMITHERY_BUNDLE)).toBe(true);
+    const manifest = JSON.parse(
+      execSync(`unzip -p "${SMITHERY_BUNDLE}" manifest.json`, { encoding: 'utf8' })
+    ) as Manifest;
+
+    const declared = manifest.tools ?? [];
+    // Same tools as the spec bundle — the two differ only in how much they say.
+    expect(declared.map((t) => t.name).sort()).toEqual(
+      (readManifest().tools ?? []).map((t) => t.name).sort()
+    );
+    expect(manifest.version).toBe(readManifest().version);
+
+    for (const tool of declared) {
+      expect(tool.description, `${tool.name} declared without a description`).toBeTruthy();
+      expect(tool.inputSchema?.type, `${tool.name} declared without an inputSchema`).toBe('object');
+      expect(tool.outputSchema?.type, `${tool.name} declared without an outputSchema`).toBe(
+        'object'
+      );
+      expect(
+        tool.annotations?.title,
+        `${tool.name} declared without an annotation title`
+      ).toBeTruthy();
+      for (const [param, schema] of Object.entries(tool.inputSchema?.properties ?? {})) {
+        expect(schema.description, `${tool.name}.${param} has no description`).toBeTruthy();
+      }
+    }
+  }, 90_000);
 });

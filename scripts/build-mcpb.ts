@@ -8,6 +8,21 @@
  *
  * The server is bundled the same way as the Claude Code plugin (esbuild, ESM,
  * CJS-globals shim) so the bundle carries no node_modules.
+ *
+ * Two bundles come out of this, because the two consumers disagree about what a
+ * declared tool looks like and no single manifest satisfies both:
+ *
+ *   - formio-mcp.mcpb — the spec-valid bundle, packed by `mcpb pack` (which
+ *     validates on the way through). The MCPB schema permits only `name` and
+ *     `description` per tool and rejects anything else outright.
+ *   - formio-mcp.smithery.mcpb — for Smithery, whose CLI copies `manifest.tools`
+ *     verbatim into the serverCard it uploads and validates against the MCP Tool
+ *     type. Entries without an `inputSchema` object are refused with a 400, so
+ *     this manifest carries the full definitions and therefore cannot be packed
+ *     by `mcpb pack`. It is zipped directly; .mcpb is a zip.
+ *
+ * Both wrap identical server bytes. If the MCPB schema ever admits full tool
+ * definitions, the two collapse back into one.
  */
 
 import { build } from 'esbuild';
@@ -31,6 +46,9 @@ const README_SRC = path.join(REPO_ROOT, 'packages/mcp-server/README.md');
 const README_OUT = path.join(DIST_MCPB, 'README.md');
 const SERVER_PACKAGE_JSON = path.join(REPO_ROOT, 'packages/mcp-server/package.json');
 const BUNDLE_OUT = path.join(DIST, 'formio-mcp.mcpb');
+const DIST_SMITHERY = path.join(DIST, 'mcpb-smithery');
+const SMITHERY_MANIFEST_OUT = path.join(DIST_SMITHERY, 'manifest.json');
+const SMITHERY_BUNDLE_OUT = path.join(DIST, 'formio-mcp.smithery.mcpb');
 
 function serverVersion(): string {
   const { version } = JSON.parse(fs.readFileSync(SERVER_PACKAGE_JSON, 'utf8')) as {
@@ -39,9 +57,20 @@ function serverVersion(): string {
   return version;
 }
 
+/**
+ * A tool exactly as `tools/list` returns it.
+ *
+ * `inputSchema` is required, not optional: Smithery rejected a manifest whose
+ * entries carried only a name and description with "expected object, received
+ * undefined" once per tool. Consumers want the whole definition, so the whole
+ * definition is what gets written.
+ */
 interface DeclaredTool {
   name: string;
   description: string;
+  inputSchema: Record<string, unknown>;
+  outputSchema?: Record<string, unknown>;
+  annotations?: Record<string, unknown>;
 }
 
 /**
@@ -95,11 +124,18 @@ function readToolsFromServer(): DeclaredTool[] {
     );
   }
 
-  return listed.map(({ name, description }) => ({ name, description }));
+  const incomplete = listed.filter((tool) => !tool.name || !tool.description || !tool.inputSchema);
+  if (incomplete.length) {
+    throw new Error(
+      `Tools missing a name, description or inputSchema: ${incomplete.map((t) => t.name || '(unnamed)').join(', ')}`
+    );
+  }
+
+  return listed;
 }
 
-function writeManifest(version: string, tools: DeclaredTool[]) {
-  const manifest = {
+function manifestObject(version: string, tools: object[]) {
+  return {
     manifest_version: '0.3',
     name: 'formio-mcp',
     display_name: 'Form.io',
@@ -168,9 +204,11 @@ function writeManifest(version: string, tools: DeclaredTool[]) {
     tools,
     tools_generated: false,
   };
+}
 
-  fs.mkdirSync(path.dirname(MANIFEST_OUT), { recursive: true });
-  fs.writeFileSync(MANIFEST_OUT, `${JSON.stringify(manifest, null, 2)}\n`);
+function writeManifest(target: string, version: string, tools: object[]) {
+  fs.mkdirSync(path.dirname(target), { recursive: true });
+  fs.writeFileSync(target, `${JSON.stringify(manifestObject(version, tools), null, 2)}\n`);
 }
 
 async function bundleServer() {
@@ -213,19 +251,44 @@ function pack() {
   execFileSync(mcpb, ['pack', DIST_MCPB, BUNDLE_OUT], { cwd: REPO_ROOT, stdio: 'pipe' });
 }
 
+/**
+ * Packs the Smithery variant: same files, but a manifest carrying full tool
+ * definitions. `mcpb pack` would reject that manifest, so this zips the staging
+ * directory itself — an .mcpb is a zip, and the Smithery CLI only unzips and reads
+ * manifest.json.
+ */
+function packSmithery(version: string, tools: DeclaredTool[]) {
+  fs.cpSync(DIST_MCPB, DIST_SMITHERY, { recursive: true });
+  writeManifest(SMITHERY_MANIFEST_OUT, version, tools);
+  // -X drops extra file attributes so the archive is reproducible across machines.
+  execFileSync('zip', ['-qrX', SMITHERY_BUNDLE_OUT, '.'], { cwd: DIST_SMITHERY, stdio: 'pipe' });
+}
+
 export async function buildMcpb() {
   fs.rmSync(DIST_MCPB, { recursive: true, force: true });
+  fs.rmSync(DIST_SMITHERY, { recursive: true, force: true });
   fs.rmSync(BUNDLE_OUT, { force: true });
+  fs.rmSync(SMITHERY_BUNDLE_OUT, { force: true });
   const version = serverVersion();
   // Bundle first: the manifest's tool list is read from the built server.
   await bundleServer();
-  writeManifest(version, readToolsFromServer());
+  const tools = readToolsFromServer();
+  // The MCPB schema allows nothing but a name and description per tool.
+  writeManifest(
+    MANIFEST_OUT,
+    version,
+    tools.map(({ name, description }) => ({ name, description }))
+  );
   copyAssets();
   pack();
-  const size = fs.statSync(BUNDLE_OUT).size;
-  console.log(
-    `built ${path.relative(REPO_ROOT, BUNDLE_OUT)} (v${version}, ${Math.round(size / 1024)} KB)`
-  );
+  packSmithery(version, tools);
+
+  for (const bundle of [BUNDLE_OUT, SMITHERY_BUNDLE_OUT]) {
+    const size = fs.statSync(bundle).size;
+    console.log(
+      `built ${path.relative(REPO_ROOT, bundle)} (v${version}, ${Math.round(size / 1024)} KB, ${tools.length} tools)`
+    );
+  }
 }
 
 if (process.argv[1] && __filename === path.resolve(process.argv[1])) {

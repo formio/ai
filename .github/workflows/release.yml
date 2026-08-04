@@ -238,6 +238,11 @@ jobs:
       # Smithery lists the bundle under the formio namespace. Skips cleanly when the
       # token is absent, matching the Docker Hub step, so forks and unconfigured
       # repos still release successfully.
+      #
+      # Publishes the .smithery.mcpb variant, not the one attached to the GitHub
+      # release: Smithery validates manifest.tools against the MCP Tool type and
+      # rejects entries with no inputSchema, which is more than the MCPB schema
+      # permits. See scripts/build-mcpb.ts.
       - name: Publish the bundle to Smithery
         if: steps.pkg.outputs.version != ''
         env:
@@ -249,4 +254,4 @@ jobs:
             echo "SMITHERY_API_KEY is not configured — skipping the Smithery publish."
             exit 0
           fi
-          npx -y @smithery/cli@latest mcp publish ./dist/formio-mcp.mcpb -n formio/mcp
+          npx -y @smithery/cli@latest mcp publish ./dist/formio-mcp.smithery.mcpb -n formio/mcp
