@@ -116,10 +116,70 @@ jobs:
         if: steps.mcp.outputs.version != ''
         run: ./mcp-publisher publish
 
+      ### Publish the desktop bundle (.mcpb) and the GitHub release that carries it.
+      # An .mcpb is the one-click install path for desktop hosts such as Claude
+      # Desktop: no npm, no CLI, no hand-edited JSON. It is also the artifact the
+      # Smithery CLI can publish, since that accepts a URL or a bundle but not a
+      # stdio npm package.
+      #
+      # This repo has no tags or GitHub releases — `pnpm release` is a custom
+      # publish, so changesets/action never creates them — hence the release is
+      # created here, and the bundle attached to it.
+      - name: Build the .mcpb bundle
+        if: steps.pkg.outputs.version != ''
+        run: pnpm build:mcpb
+
+      - name: Create the GitHub release and attach the bundle
+        if: steps.pkg.outputs.version != ''
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VERSION: ${{ steps.pkg.outputs.version }}
+        run: |
+          set -euo pipefail
+          TAG="v${VERSION}"
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            echo "Release ${TAG} already exists — replacing the bundle asset."
+            gh release upload "$TAG" dist/formio-mcp.mcpb --clobber
+          else
+            gh release create "$TAG" dist/formio-mcp.mcpb \
+              --title "@formio/mcp ${VERSION}" \
+              --notes "Install with \`npx -y @formio/mcp\`, \`docker run formio/mcp\`, or download the attached \`.mcpb\` for one-click installation in Claude Desktop." \
+              --target "${GITHUB_SHA}"
+          fi
+
+      # Smithery lists the bundle under the formio namespace. Skips cleanly when the
+      # token is absent, matching the Docker Hub step, so forks and unconfigured
+      # repos still release successfully.
+      #
+      # Publishes the .smithery.mcpb variant, not the one attached to the GitHub
+      # release: Smithery validates manifest.tools against the MCP Tool type and
+      # rejects entries with no inputSchema, which is more than the MCPB schema
+      # permits. See scripts/build-mcpb.ts.
+      - name: Publish the bundle to Smithery
+        if: steps.pkg.outputs.version != ''
+        env:
+          SMITHERY_API_KEY: ${{ secrets.SMITHERY_API_KEY }}
+          VERSION: ${{ steps.pkg.outputs.version }}
+        run: |
+          set -euo pipefail
+          if [ -z "${SMITHERY_API_KEY:-}" ]; then
+            echo "SMITHERY_API_KEY is not configured — skipping the Smithery publish."
+            exit 0
+          fi
+          npx -y @smithery/cli@latest mcp publish ./dist/formio-mcp.smithery.mcpb -n formio/mcp
+
       ### Publish the container image to Docker Hub.
       # Same idempotent shape as the registry publish: only when npm already has
       # the version and Docker Hub does not. Skips cleanly when credentials are absent
       # so a release in a fork or an unconfigured repo still succeeds.
+      #
+      # Deliberately last. A failed step fails the job and skips every step after it,
+      # and this is the flakiest one here: the arm64 image is built under QEMU
+      # emulation, where `npm install` has died with SIGILL (exit 132) on an
+      # otherwise healthy release. When it sat ahead of the bundle steps, one such
+      # crash silently withheld the .mcpb, the GitHub release and the Smithery
+      # publish. Each channel is independent, so the fragile one goes at the end
+      # where a re-run costs nothing already shipped.
       - name: Decide whether to publish to Docker Hub
         id: dockerhub
         if: steps.pkg.outputs.version != ''
@@ -203,55 +263,3 @@ jobs:
           password: ${{ secrets.DOCKERHUB_PASSWORD }}
           repository: formio/mcp
           readme-filepath: packages/mcp-server/DOCKERHUB.md
-
-      ### Publish the desktop bundle (.mcpb) and the GitHub release that carries it.
-      # An .mcpb is the one-click install path for desktop hosts such as Claude
-      # Desktop: no npm, no CLI, no hand-edited JSON. It is also the artifact the
-      # Smithery CLI can publish, since that accepts a URL or a bundle but not a
-      # stdio npm package.
-      #
-      # This repo has no tags or GitHub releases — `pnpm release` is a custom
-      # publish, so changesets/action never creates them — hence the release is
-      # created here, and the bundle attached to it.
-      - name: Build the .mcpb bundle
-        if: steps.pkg.outputs.version != ''
-        run: pnpm build:mcpb
-
-      - name: Create the GitHub release and attach the bundle
-        if: steps.pkg.outputs.version != ''
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          VERSION: ${{ steps.pkg.outputs.version }}
-        run: |
-          set -euo pipefail
-          TAG="v${VERSION}"
-          if gh release view "$TAG" >/dev/null 2>&1; then
-            echo "Release ${TAG} already exists — replacing the bundle asset."
-            gh release upload "$TAG" dist/formio-mcp.mcpb --clobber
-          else
-            gh release create "$TAG" dist/formio-mcp.mcpb \
-              --title "@formio/mcp ${VERSION}" \
-              --notes "Install with \`npx -y @formio/mcp\`, \`docker run formio/mcp\`, or download the attached \`.mcpb\` for one-click installation in Claude Desktop." \
-              --target "${GITHUB_SHA}"
-          fi
-
-      # Smithery lists the bundle under the formio namespace. Skips cleanly when the
-      # token is absent, matching the Docker Hub step, so forks and unconfigured
-      # repos still release successfully.
-      #
-      # Publishes the .smithery.mcpb variant, not the one attached to the GitHub
-      # release: Smithery validates manifest.tools against the MCP Tool type and
-      # rejects entries with no inputSchema, which is more than the MCPB schema
-      # permits. See scripts/build-mcpb.ts.
-      - name: Publish the bundle to Smithery
-        if: steps.pkg.outputs.version != ''
-        env:
-          SMITHERY_API_KEY: ${{ secrets.SMITHERY_API_KEY }}
-          VERSION: ${{ steps.pkg.outputs.version }}
-        run: |
-          set -euo pipefail
-          if [ -z "${SMITHERY_API_KEY:-}" ]; then
-            echo "SMITHERY_API_KEY is not configured — skipping the Smithery publish."
-            exit 0
-          fi
-          npx -y @smithery/cli@latest mcp publish ./dist/formio-mcp.smithery.mcpb -n formio/mcp
