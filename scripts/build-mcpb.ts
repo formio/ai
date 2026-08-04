@@ -169,13 +169,18 @@ function manifestObject(version: string, tools: object[]) {
       },
     },
     user_config: {
+      // Not marked required, because it is not: the server starts, lists its tools
+      // and answers `hello` without it, and the tools that do need a project say so
+      // when called. Declaring it required told hosts to block on a value the
+      // server can run without, which makes the server harder to try than it is.
       formio_project_url: {
         type: 'string',
         title: 'Project URL',
         description:
           'Full URL of your Form.io project, e.g. https://myproject.form.io or ' +
-          'https://forms.example.com/myproject',
-        required: true,
+          'https://forms.example.com/myproject. Needed by every tool that reads or ' +
+          'writes Form.io data; leave it blank only to look around first.',
+        required: false,
       },
       formio_base_url: {
         type: 'string',

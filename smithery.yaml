@@ -1,7 +1,8 @@
 # Smithery configuration for @formio/mcp — https://smithery.ai/docs
 #
-# The server speaks stdio: the client spawns it and owns stdin/stdout. It needs a
-# Form.io project to talk to, so FORMIO_PROJECT_URL is the one required setting.
+# The server speaks stdio: the client spawns it and owns stdin/stdout. It starts
+# with no configuration at all, so nothing below is required — but every tool that
+# touches Form.io data needs FORMIO_PROJECT_URL, so a useful install sets it.
 #
 # FORMIO_API_KEY is optional but recommended here. Without it the server falls
 # back to a browser login flow, which cannot complete in a hosted or headless
@@ -10,15 +11,17 @@ startCommand:
   type: stdio
   configSchema:
     type: object
-    required:
-      - formioProjectUrl
+    # Nothing is required: the server starts with no configuration at all and
+    # serves its full tool list, and the tools that need a project raise an
+    # actionable error when called without one.
     properties:
       formioProjectUrl:
         type: string
         title: Project URL
         description: >-
           Full URL of your Form.io project, e.g. https://myproject.form.io or
-          https://forms.example.com/myproject
+          https://forms.example.com/myproject. Needed by every tool that reads or
+          writes Form.io data; leave it blank only to look around first.
       formioBaseUrl:
         type: string
         title: Base URL

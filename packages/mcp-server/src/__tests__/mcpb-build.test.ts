@@ -87,8 +87,12 @@ describe('pnpm build:mcpb', () => {
       'formio_base_url',
       'formio_project_url',
     ]);
-    // The project URL is the one setting the server cannot start without.
-    expect(cfg.formio_project_url.required).toBe(true);
+    // Nothing here is required. The server starts with an empty environment and
+    // serves its whole tool list; the tools that need a project raise an
+    // actionable error at call time. A host that blocks installation on a value
+    // the server runs without is describing a constraint that does not exist.
+    expect(cfg.formio_project_url.required).toBeFalsy();
+    expect(cfg.formio_project_url.description).toMatch(/https/);
     expect(cfg.formio_base_url.required).toBeFalsy();
     // An API key is a credential: it must never be stored in plain text by the host.
     expect(cfg.formio_api_key.sensitive).toBe(true);
