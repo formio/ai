@@ -41,6 +41,7 @@ type Manifest = {
     annotations?: { title?: string; readOnlyHint?: boolean };
   }[];
   tools_generated?: boolean;
+  privacy_policies?: string[];
 };
 
 function readManifest(): Manifest {
@@ -182,6 +183,28 @@ describe('pnpm build:mcpb', () => {
 
   it('1.10 does not claim its tools are generated at runtime once they are declared', () => {
     expect(readManifest().tools_generated).toBe(false);
+  });
+
+  // The Anthropic Software Directory requires all three of a README section, this
+  // manifest array, and HTTPS URLs — "missing or incomplete privacy policies
+  // result in immediate rejection". Asserting the trio here is what stops a
+  // submission failing on a field nobody remembers to set.
+  it('1.13 declares a privacy policy the way the directory requires', () => {
+    const policies = readManifest().privacy_policies ?? [];
+    expect(policies.length).toBeGreaterThan(0);
+    for (const url of policies) {
+      expect(url, `${url} must be served over HTTPS`).toMatch(/^https:\/\//);
+    }
+    // manifest_version 0.2+ is the floor for the field.
+    expect(Number(readManifest().manifest_version)).toBeGreaterThanOrEqual(0.2);
+  });
+
+  it('1.14 ships a Privacy Policy section inside the bundle README', () => {
+    const readme = execSync(`unzip -p "${BUNDLE}" README.md`, { encoding: 'utf8' });
+    expect(readme).toMatch(/^#{1,4}\s*Privacy Policy\s*$/m);
+    // The section is only useful if it points somewhere.
+    const section = readme.slice(readme.search(/^#{1,4}\s*Privacy Policy\s*$/m));
+    expect(section).toContain('https://form.io/privacy');
   });
 
   // The MCPB schema is strict: it permits only name and description per tool and
