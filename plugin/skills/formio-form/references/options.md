@@ -24,7 +24,7 @@ const form = await Formio.createForm(el, srcOrJson, {
 ## Combined example
 
 ```js
-const form = await Formio.createForm(el, 'https://examples.form.io/example', {
+const form = await Formio.createForm(el, 'https://myproject.form.io/myform', {
   readOnly: false,
   noAlerts: true,
   hooks: {
