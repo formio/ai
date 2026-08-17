@@ -18,8 +18,6 @@
 9. [LDAP Login](#ldap-login)
 10. [2FA Login](#2fa-login)
 11. [2FA Recovery Login](#2fa-recovery-login)
-12. [Google Sheets](#google-sheets)
-13. [SQL Connector](#sql-connector)
 
 ---
 
@@ -184,7 +182,7 @@ Sends an email notification when a submission event occurs.
 | Cc | `cc` | string[] | No | — | Carbon copy |
 | Bcc | `bcc` | string[] | No | — | Blind carbon copy |
 | Subject | `subject` | string | No | `New submission for {{ form.title }}.` | Subject line |
-| Template URL | `template` | string | No | `https://pro.formview.io/assets/email.html` | External HTML template |
+| Template URL | `template` | string | No | Form.io's hosted default wrapper | External HTML template — see "External Templates" below |
 | Message | `message` | string | No | `{{ submission(data, form.components) }}` | Email body |
 | Rendering Method | `renderingMethod` | string | No | `dynamic` | `dynamic` (formio.js) or `static` (legacy) |
 
@@ -230,6 +228,8 @@ Set it with a `PUT` to the project endpoint, passing a `config` object:
 ### External Templates
 
 If `template` is set to a URL, the server fetches that HTML and uses it as the email wrapper. The `message` content is injected into the template. If the fetch fails, the message is sent directly without a template wrapper.
+
+Leave `template` unset to use Form.io's default wrapper. When you do set it, point it at a URL on a host you control and serve it over HTTPS: the server re-fetches it at send time, so whoever controls that URL controls the markup of every email the action sends, and a URL that later expires or changes hands becomes a phishing vector inside your own mail. Do not set it to a third-party or user-supplied URL.
 
 ---
 
@@ -278,6 +278,8 @@ The webhook sends a JSON POST/PUT/DELETE (matching the submission's HTTP method)
 ### URL Interpolation
 
 The URL supports template variables: `https://api.example.com/{{ data.type }}/{{ data._id }}`
+
+Keep the scheme and host literal. A submitter controls every `{{ data.* }}` value, so interpolating one into the host — or into a path that a `..` segment can escape — lets a submission redirect the request, and with it the Basic Auth credentials in `username`/`password`, to a server of their choosing. Interpolate only into path or query positions whose value you constrain (a select with fixed options, a validated pattern), and send webhooks only to HTTPS endpoints you own.
 
 ---
 
@@ -468,53 +470,6 @@ Handles login with a 2FA recovery code when the user has lost access to their au
 
 ---
 
-## Google Sheets
+## Action types this reference does not cover
 
-**Name:** `googlesheet` | **Priority:** 0 | **Handler:** `after` | **Method:** `create`, `update`, `delete`
-
-Syncs submission data to a Google Sheets spreadsheet. Requires Google Sheets integration to be configured on the server.
-
-### Settings
-
-| Field | Key | Type | Required | Default | Description |
-| --- | --- | --- | --- | --- | --- |
-| Sheet ID | `sheetID` | string | Yes | — | The Google Sheets spreadsheet ID |
-| Worksheet Name | `worksheetName` | string | Yes | — | The worksheet tab name (e.g., `"Sheet1"`) |
-| Start Row | `spreadSheetStartRow` | string | No | `"2"` | First data row (row 1 is typically headers) |
-| Field Mappings | (dynamic) | textfield | No | — | One field per form component; enter the column letter (e.g., `"A"`, `"B"`, `"C"`) |
-| External ID Type | `externalIdType` | string | No | — | Name for the external ID reference stored on the submission |
-
-### How It Works
-
-- **Create**: Appends a new row to the spreadsheet, stores the row ID in `submission.externalIds`
-- **Update**: Updates the existing row using the stored external ID
-- **Delete**: Removes the row from the spreadsheet
-- Handles Google Drive file references by extracting the original URL
-- Runs asynchronously (non-blocking)
-
----
-
-## SQL Connector
-
-**Name:** `sqlconnector` | **Priority:** 0 | **Handler:** `after` | **Method:** `create`, `update`, `delete`
-
-Executes SQL operations against a remote database via Resquel. Only available when the server is not in hosted mode.
-
-### Settings
-
-| Field | Key | Type | Required | Default | Description |
-| --- | --- | --- | --- | --- | --- |
-| Block Request | `block` | boolean | No | false | Wait for SQL response before completing submission |
-| Table Name | `table` | string | Yes | — | Target database table |
-| Primary Key | `primary` | string | Yes | `"id"` | Must be auto-incrementing |
-| Fields | `fields` | datagrid | No | — | Map form component keys to database column names |
-
-### How It Works
-
-- **Create**: INSERTs a new row, stores the remote ID in `submission.externalIds` (type: `sqlconnector`)
-- **Update**: UPDATEs the row using the stored primary key
-- **Delete**: DELETEs the row using the stored primary key
-- **Blocking mode**: Waits for the SQL response; if it fails, soft-deletes the submission
-- **Non-blocking mode**: Fires the SQL query asynchronously and continues immediately
-- Strips protected fields before sending to the external database
-- Supports basic auth if user/password are configured in project SQL settings
+Some Enterprise deployments expose action types beyond the eleven above — a server's catalog is dynamic, so `action_types_list` may return names documented nowhere here. Action types whose job is to copy submissions into an external system of record — a database, a spreadsheet, a third-party SaaS — are deliberately out of scope for this skill: configuring one is a server-administration task that needs credentials, a target schema, and grants belonging to whoever owns that system, not to a form-configuration flow. When a user asks for one, say it is not covered here and point them at their Form.io administrator or the Form.io documentation. Do not infer its settings from `action_type_get` output and configure it anyway.

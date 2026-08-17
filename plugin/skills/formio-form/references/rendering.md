@@ -17,7 +17,7 @@ Point `createForm` at a form living under your project URL (`{FORMIO_PROJECT_URL
 ```js
 const form = await Formio.createForm(
   document.getElementById('formio'),
-  'https://examples.form.io/example'
+  'https://myproject.form.io/myform'
 );
 ```
 
@@ -65,7 +65,7 @@ Two ways to render a form with existing data.
 ```js
 const form = await Formio.createForm(
   document.getElementById('formio'),
-  'https://examples.form.io/example'
+  'https://myproject.form.io/myform'
 );
 form.submission = {
   data: {
@@ -93,7 +93,7 @@ Point `createForm` at a specific submission and the renderer loads both the form
 ```js
 const form = await Formio.createForm(
   document.getElementById('formio'),
-  'https://examples.form.io/example/submission/{submissionId}'
+  'https://myproject.form.io/myform/submission/{submissionId}'
 );
 ```
 

@@ -154,6 +154,10 @@ function manifestObject(version: string, tools: object[]) {
     support: 'https://github.com/formio/ai/issues',
     icon: 'icon.png',
     license: 'MIT',
+    // Required by the Anthropic Software Directory for local connectors, alongside
+    // a "Privacy Policy" section in the bundled README: a missing or incomplete
+    // policy is an immediate rejection. HTTPS is part of the requirement.
+    privacy_policies: ['https://form.io/privacy'],
     keywords: ['formio', 'forms', 'form-builder', 'data-collection', 'workflow'],
     server: {
       type: 'node',

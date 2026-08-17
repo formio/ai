@@ -284,6 +284,30 @@ The probe runs lazily — only when the local auth page is actually served.
 | `FORMIO_INSECURE_TLS` | no | `undefined` | Set to `1` to skip TLS verification. Local development only — never against production. |  |  |
 | `FORMIO_PLUGIN_CONTEXT` | no | `0` | Set by the plugin manifest. When `1`, the server enables `project_set` and reads `FORMIO_PROJECT_URL` from `~/.formio/projects.json` per cwd instead of env. |  |  |
 
-\* Standalone only, where the server refuses to start without it. In plugin context, `FORMIO_PROJECT_URL` is captured per-cwd by the `project_set` tool and persisted to `~/.formio/projects.json`. The `verify-project-url` `SessionStart`/`PreToolUse` hook offers `formio_default_project_url` (from plugin user-config) as the default the first time you enter a workspace.
+\* Standalone only. The server starts without it and still lists its tools and answers `hello`; the tools that read or write Form.io data raise an error naming the variable. In plugin context, `FORMIO_PROJECT_URL` is captured per-cwd by the `project_set` tool and persisted to `~/.formio/projects.json`. The `verify-project-url` `SessionStart`/`PreToolUse` hook offers `formio_default_project_url` (from plugin user-config) as the default the first time you enter a workspace.
 
 \*\* Reversed in plugin context: the plugin always collects `FORMIO_BASE_URL` through user-config, so it is required there and the hosted-cloud default does not apply.
+## Privacy Policy
+
+Form.io's privacy policy covers the Form.io Services this server talks to: **https://form.io/privacy**
+
+What the server itself does with data, which is the part the policy above cannot describe:
+
+**Where your data goes.** Only to the Form.io deployment you configure. Every request targets `FORMIO_BASE_URL` / `FORMIO_PROJECT_URL` — your own SaaS project or your self-hosted server. The server sends nothing to Form.io when you are self-hosted, and there is no telemetry, analytics, or usage reporting of any kind.
+
+**What is stored on your machine.** Two files under `~/.formio/`, both written with mode `0600`:
+
+| File | Contents | Written when |
+| --- | --- | --- |
+| `mcp-tokens.json` | The JWT from the browser login, keyed by `FORMIO_BASE_URL` | You sign in through the browser |
+| `projects.json` | A per-directory map of project and base URLs | `project_set` runs (plugin context only) |
+
+Form data and submissions are never written to disk — they pass through in memory to answer a tool call.
+
+**Credentials.** `FORMIO_API_KEY`, when set, is read from the environment and sent to your deployment as an authentication header; it is never written to disk. The cached JWT is valid for roughly seven days, after which the server re-authenticates. Delete `~/.formio/mcp-tokens.json` to sign out immediately.
+
+**Third parties.** The server contacts no third-party service. One exception is worth naming: the browser sign-in page is rendered from a local page that loads styling and the Form.io renderer from `cdn.form.io`, `cdn.jsdelivr.net`, and `fonts.googleapis.com`, so those hosts see your browser's IP address while that page is open. Set `FORMIO_API_KEY` to skip the browser flow entirely and avoid it.
+
+**Retention.** The files above persist until you delete them. Data held in your Form.io project is governed by your own deployment's retention rules, and by the policy linked above for Form.io-hosted projects.
+
+Questions about data handling: support@form.io
