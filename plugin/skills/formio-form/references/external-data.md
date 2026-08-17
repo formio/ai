@@ -95,7 +95,7 @@ Component definition:
 The moving parts:
 
 - `fetch.url` — the endpoint; supports `{{ data.<key> }}` interpolation like select URLs. `fetch.method` is `get` or `post`.
-- `fetch.authenticate` — attach the Form.io auth token to the request; `fetch.forwardHeaders` forwards the incoming request's headers.
+- `fetch.authenticate` — attach the Form.io auth token to the request; `fetch.forwardHeaders` forwards the incoming request's headers. **Both leak credentials to whatever host `fetch.url` names.** Set `authenticate: true` only when the URL is on your own Form.io deployment; for a third-party API leave it `false` (as in the example above) and put the credential in a server-side proxy you own. A form definition that pairs an external `fetch.url` with `authenticate: true` is a token-exfiltration path, which is why definitions must only come from a project you control — see the Security section in [../SKILL.md](../SKILL.md).
 - `allowCaching` — cache the request result (on by default).
 - Triggers — fetch on form init, on the server during validation, when a watched component's value changes, on blur of a target component, or on a named event. A triggered event can fire when data arrives so other components know it is available.
 - Other components reference the result as `data.dataSource` (the component's key) in calculated values, validations, and logic — e.g. a text field with `"calculateValue": "value = data.dataSource.firstName"`.
