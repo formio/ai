@@ -4,50 +4,20 @@ This document is loaded by the parent `formio-form-builder` skill during Step 1.
 
 ## The interview
 
-Ask everything in **one** batched `AskUserQuestion` call — two questions, one round trip. Never split them into two calls, and never ask the embed question later as a separate round.
+Ask everything in **ONE** question round — two questions, one round trip — using the client's structured question mechanism (in Claude Code, `AskUserQuestion`). Never split them into two rounds, and never ask the embed question later as a separate round.
 
 The form-type question's options come from the inference rules below: when the phrasing already signals a type, put that type first with "(Recommended)" so the user confirms rather than decides cold. The distinguishing signals live in [`FORM_TYPES.md`](./FORM_TYPES.md) — read its "Phrasing signals" table before asking.
 
-```
-AskUserQuestion({
-  questions: [
-    {
-      question: "What kind of form should this be?",
-      header: "Form type",
-      multiSelect: false,
-      options: [
-        {
-          label: "Single-page form (Recommended)",   // reorder so the inferred type is first
-          description: "A webform — every field on one page, completed and submitted in one view. Best for shorter forms."
-        },
-        {
-          label: "Multi-page wizard",
-          description: "Fields broken into bite-size pages with Previous/Next navigation. Best for long or staged forms."
-        },
-        {
-          label: "PDF form",
-          description: "Interactive fields overlaid on an existing PDF document you upload. Best for reproducing an official/paper form."
-        }
-      ]
-    },
-    {
-      question: "After the form is saved to your Form.io project, do you also want it embedded into an application?",
-      header: "Embed?",
-      multiSelect: false,
-      options: [
-        {
-          label: "No — just create the form",
-          description: "The flow ends after saving, with your form's URL. You can embed it any time later."
-        },
-        {
-          label: "Yes — embed it in my app",
-          description: "After saving, hand off to the embedding skill to put the form into your page or application."
-        }
-      ]
-    }
-  ]
-})
-```
+**Question 1 — "What kind of form should this be?"** Three options, reordered so the inferred type is first:
+
+- **Single-page form** — "A webform — every field on one page, completed and submitted in one view. Best for shorter forms."
+- **Multi-page wizard** — "Fields broken into bite-size pages with Previous/Next navigation. Best for long or staged forms."
+- **PDF form** — "Interactive fields overlaid on an existing PDF document you upload. Best for reproducing an official/paper form."
+
+**Question 2 — "After the form is saved to your Form.io project, do you also want it embedded into an application?"** Two options:
+
+- **No — just create the form** — "The flow ends after saving, with your form's URL. You can embed it any time later."
+- **Yes — embed it in my app** — "After saving, hand off to the embedding skill to put the form into your page or application."
 
 ## Inferring the form type
 

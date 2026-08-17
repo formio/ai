@@ -1,5 +1,6 @@
 {
   "name": "formio-ai",
+  "version": "0.8.0",
   "description": "Form.io MCP server + skill library. Bundles the Form.io MCP server and a skill library covering every endpoint in the Form.io API, plus form JSON schema guidance for generating and editing Form.io forms and resources.",
   "repository": "https://github.com/formio/ai",
   "license": "MIT",
@@ -11,23 +12,17 @@
     "formio_base_url": {
       "type": "string",
       "title": "Form.io base URL",
-      "description": "Base URL of your Form.io deployment (e.g. https://api.form.io for Form.io SaaS, or your self-hosted host). Used as the parent of FORMIO_PROJECT_URL.",
-      "required": true
-    },
-    "formio_default_project_url": {
-      "type": "string",
-      "title": "Form.io default project URL (override per directory with project_set tool)",
-      "description": "Full URL of the default Form.io project the MCP server should target (e.g. https://api.form.io/my-project). Acts as the initial value on first run in a directory; once you call project_set there, the chosen URL is persisted to ~/.formio/projects.json for that directory and overrides this default in future sessions.",
-      "required": true
+      "description": "Base URL of your Form.io deployment. Leave the default for Form.io SaaS; set it to your host when self-hosting or running Form.io Enterprise. It is the parent of the project URL, it builds the portal-login URL, and it keys the cached token.",
+      "default": "https://api.form.io",
+      "required": false
     }
   },
   "mcpServers": {
     "formio-mcp": {
-      "command": "node",
-      "args": ["${CLAUDE_PLUGIN_ROOT}/server/stdio.mjs"],
+      "command": "npx",
+      "args": ["-y", "@formio/mcp"],
       "env": {
-        "FORMIO_BASE_URL": "${user_config.formio_base_url}",
-        "FORMIO_PLUGIN_CONTEXT": "1"
+        "FORMIO_BASE_URL": "${user_config.formio_base_url}"
       }
     }
   }

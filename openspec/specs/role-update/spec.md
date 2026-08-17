@@ -1,4 +1,8 @@
-## ADDED Requirements
+## Purpose
+
+Defines the `role_update` MCP tool: validating the role ID, sending the `PUT` request, and the MCP content it returns.
+
+## Requirements
 
 ### Requirement: role_update tool is registered
 

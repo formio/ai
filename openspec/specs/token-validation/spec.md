@@ -1,4 +1,8 @@
-## ADDED Requirements
+## Purpose
+
+Defines how a token is checked before use — validated against `GET /current` rather than trusted because it exists.
+
+## Requirements
 
 ### Requirement: Token is validated on startup via GET /current
 

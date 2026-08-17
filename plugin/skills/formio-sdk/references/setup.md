@@ -14,11 +14,22 @@ The `Formio` class is a static singleton. URLs are global and must be set once a
 
 ### Hosted (self-deployed Form.io)
 
+A hosted deployment routes projects one of two ways, and the pair has to match how that deployment is configured. Sub-directories:
+
 ```ts
 import { Formio } from '@formio/js';
 
 Formio.setBaseUrl('https://forms.mysite.com');
 Formio.setProjectUrl('https://forms.mysite.com/myproject');
+```
+
+Sub-domains — the project is a sibling subdomain of the same parent domain, not a path under the base URL:
+
+```ts
+import { Formio } from '@formio/js';
+
+Formio.setBaseUrl('https://forms.mysite.com');
+Formio.setProjectUrl('https://myproject.mysite.com');
 ```
 
 ### SaaS (`portal.form.io`)

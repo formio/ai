@@ -1,5 +1,7 @@
-## ADDED Requirements
+## Purpose
 
+Defines the `formio-application` skill: the library's default build-an-app entry point — its trigger surface, the orchestration it runs from plain-language intent through import, and the registry it routes framework work through.
+## Requirements
 ### Requirement: New skill `formio-application` exists as the library's build-an-app entry point
 
 The skills library SHALL contain a new skill at `skills/formio-application/SKILL.md` with frontmatter `name: formio-application`. The skill directory SHALL contain the following sibling reference documents, none of which have YAML frontmatter:
@@ -87,76 +89,46 @@ The description MUST also state that the skill writes a `.mcp.json` file in the 
 - **WHEN** the `formio-application` `SKILL.md` frontmatter is inspected
 - **THEN** its `description`, whitespace-normalized, is ≤ 1,024 characters
 
-### Requirement: formio-application runs a six-step orchestration
-
-The `formio-application` `SKILL.md` body SHALL describe six ordered steps with approval gates between destructive operations:
-
-1. **Intent** — ask whether this is a new app or an existing app being extended. Documented in `INTENT.md`.
-2. **Deployment** — batched `AskUserQuestion` capturing Base URL and Project URL, with plain-language descriptions. Documented in `DEPLOYMENT.md`. Skipped on the modify-existing branch.
-3. **MCP Config** — write `.mcp.json` in the workspace root with `FORMIO_PROJECT_URL` and `FORMIO_BASE_URL` env vars populated from Step 2. Documented in `MCP_CONFIG.md`. Halts the current invocation after writing so the user can restart Claude Code. Skipped on the modify-existing branch (no MCP call needed there) and when a matching entry already exists.
-4. **Authenticate** — call the `authenticate` MCP tool explicitly. Warn the user a browser window may open. Silent when the tool returns `cached: true`. Skipped on the modify-existing branch.
-5. **Import** — invoke the `project_import` MCP tool with the planner-emitted `template.json` and the captured Project URL. Preceded by an approval gate. Skipped on the modify-existing branch.
-6. **Framework routing** — consult the registry in `FRAMEWORK.md`. If exactly one framework is installed, route silently. If multiple, ask the user.
-
-The body MUST reference the five sibling docs (`INTENT.md`, `DEPLOYMENT.md`, `MCP_CONFIG.md`, `IMPORT.md`, `FRAMEWORK.md`) by relative link. The body MUST describe the build-new branch driving `formio-resource-planner` before Step 2.
-
-#### Scenario: Build-new branch drives the full six-step pipeline (across a restart)
-
-- **WHEN** the user says "build me a CRM" (no existing workspace)
-- **THEN** Steps 1 and 2 run
-- **AND** the planner runs between Step 1 and Step 2
-- **AND** Step 3 writes `./.mcp.json` with the captured URLs and halts the invocation with a restart/reconnect message
-- **AND** after the user restarts and re-invokes the skill, Steps 4, 5, 6 run with the approval gates specified in their respective docs
-
-#### Scenario: Modify-existing branch skips Steps 2–5
-
-- **WHEN** the user says "also track attendees in each event" in an existing Angular workspace
-- **THEN** Step 1 determines intent = modify-existing
-- **AND** Steps 2, 3, 4, 5 are skipped
-- **AND** Step 6 routes to the framework's extend sub-skill (`formio-angular-resources` today)
-
-#### Scenario: Existing .mcp.json with matching URLs lets Step 3 skip in-invocation
-
-- **WHEN** Steps 1 and 2 run in a workspace whose `./.mcp.json` already matches the captured URLs
-- **THEN** Step 3 surfaces a short "skipping — already configured" message
-- **AND** Steps 4, 5, 6 run in the same invocation (no restart required because the MCP server is already pointing at the right project)
-
-#### Scenario: User bails at the Import approval gate
-
-- **WHEN** Step 5's approval gate shows the URLs + template summary + merge-overwrite warning and the user declines
-- **THEN** `project_import` is not called
-- **AND** the skill continues with Step 6 (framework routing) so the user can still scaffold against an existing project
-
 ### Requirement: FRAMEWORK.md defines a registry with single- and multi-framework routing
 
 `FRAMEWORK.md` SHALL contain a table of installed UI-framework skills in the following shape:
 
-| Framework | Entry skill | Extend sub-skill | Detection signal |
-|---|---|---|---|
-| Angular | `formio-angular` | `formio-angular-resources` | `angular.json` in workspace root OR `@angular/core` in `package.json` |
+| Framework | Entry skill      | Extend sub-skill           | Detection signal                                                         |
+| --------- | ---------------- | -------------------------- | ------------------------------------------------------------------------ |
+| Angular   | `formio-angular` | `formio-angular-resources` | `angular.json` in workspace root OR `@angular/core` in `package.json`     |
 
 `FRAMEWORK.md` body MUST document:
 
 - That routing is driven by this table.
-- That when the table has exactly one active row, Step 6 routes silently (no user question).
-- That when the table has multiple active rows, Step 6 uses `AskUserQuestion` to let the user pick.
+- That when the table has exactly one active row, Step 5 routes silently (no user question).
+- That when the table has multiple active rows, Step 5 asks the user to pick, in one question round, using the client's structured question mechanism — which it MAY name as a parenthetical example only.
 - That modify-existing workspaces are detected via the "Detection signal" column, and if exactly one signal matches the routing is direct.
+- The Step 5a `frontend-design` pre-check: detect the skill by name, accepting more than one registered form rather than a single client's prefix; when it is missing, offer the install in one question round, naming where the skill ships and deferring the mechanism to the running client's own skill-install route; on decline, apply the Bootstrap 5 brief from `formio-angular/BOOTSTRAP.md` Step 7d inline, disclose that on each UI approval gate, and hand `frontendDesignStatus` downstream. The document MUST NOT instruct a client-specific plugin-install command, plugin browser, or reload command.
 - How to add a new framework entry — the concrete instruction for whoever is adding `formio-react` later.
 
 #### Scenario: Single-framework registry routes silently
 
 - **WHEN** `FRAMEWORK.md`'s table contains exactly one row (Angular) and intent = build-new
-- **THEN** Step 6 routes to `formio-angular` without asking the user
+- **THEN** Step 5 routes to `formio-angular` without asking the user
 
 #### Scenario: Multi-framework registry asks the user
 
 - **WHEN** a future change adds a second row to the table (e.g., React) and intent = build-new
-- **THEN** Step 6 presents the available frameworks via `AskUserQuestion` before routing
+- **THEN** Step 5 presents the available frameworks in one question round before routing
+- **AND** the instruction names no client tool as the mechanism
 
 #### Scenario: Existing-workspace detection routes directly
 
 - **WHEN** intent = modify-existing and the workspace contains `angular.json`
-- **THEN** Step 6 routes to `formio-angular-resources` without asking the user
+- **THEN** Step 5 routes to `formio-angular-resources` without asking the user
+
+#### Scenario: Pre-check degrades when frontend-design is declined
+
+- **WHEN** Step 5a finds `frontend-design` unavailable and the user proceeds without it
+- **THEN** `FRAMEWORK.md` instructs applying the Bootstrap 5 brief inline
+- **AND** it instructs disclosing that on each UI approval gate
+- **AND** it names where `frontend-design` ships without prescribing a client-specific install command
+- **AND** it contains no `claude plugin install`, `claude-plugins-official`, or `/reload-plugins`
 
 ### Requirement: IMPORT.md documents the import flow and error branches
 
@@ -179,33 +151,31 @@ The body MUST reference the five sibling docs (`INTENT.md`, `DEPLOYMENT.md`, `MC
 
 ### Requirement: DEPLOYMENT.md uses plain-language URL descriptions and batches the interview
 
-`skills/formio-application/DEPLOYMENT.md` SHALL instruct the skill to ask for the Base URL and Project URL in a single batched `AskUserQuestion`, not two sequential prompts. The document MUST contain plain-language descriptions of each URL that do not assume Form.io deployment knowledge, plus at least one example value per URL for both hosted-cloud and self-hosted contexts.
+`skills/formio-application/DEPLOYMENT.md` SHALL instruct the skill to ask for the Base URL and Project URL in a single batched question round using the client's structured question mechanism, not two sequential prompts. It MAY name a client's tool as a parenthetical example of that mechanism, never as the mechanism itself. The document MUST contain plain-language descriptions of each URL that do not assume Form.io deployment knowledge, plus at least one example value per URL for both hosted-cloud and self-hosted contexts.
 
 `DEPLOYMENT.md` MUST name `FORMIO_PROJECT_URL` for the project URL and `FORMIO_BASE_URL` for the base URL (matching the terminology rule in `CLAUDE.md`).
+
+`DEPLOYMENT.md` SHALL instruct the skill to check for an existing working-directory → project mapping **before** interviewing, and to confirm the resolved URLs in one line instead of asking when one is found. The project configuration is captured once, wherever the user first lands — `formio-mcp-setup`'s configuration step or this step — and never re-asked. `DEPLOYMENT.md` remains the single source of the plain-language URL descriptions and example values; `formio-mcp-setup` references it by file path rather than duplicating it.
+
+#### Scenario: DEPLOYMENT.md checks for a mapping before interviewing
+
+- **WHEN** `DEPLOYMENT.md` is read
+- **THEN** it instructs resolving an existing mapping first
+- **AND** it instructs confirming rather than interviewing when one resolves
+- **AND** it states that the interview is the fallback, not the default
 
 #### Scenario: DEPLOYMENT.md batches URL interview
 
 - **WHEN** `DEPLOYMENT.md` is read
-- **THEN** it contains the literal substring `AskUserQuestion`
-- **AND** it contains the terms "batched", "single", or equivalent language that distinguishes one batched call from two sequential ones
+- **THEN** it instructs asking for both URLs in one round
+- **AND** it contains the terms "batched", "single", or equivalent language that distinguishes one round from two sequential prompts
 - **AND** it contains plain-language descriptions for both URLs
 - **AND** it names `FORMIO_PROJECT_URL` and `FORMIO_BASE_URL`
 
-### Requirement: INTENT.md captures build-vs-modify with a single AskUserQuestion
+#### Scenario: DEPLOYMENT.md names no client tool as the mechanism
 
-`skills/formio-application/INTENT.md` SHALL instruct the skill to present Step 1 as a single `AskUserQuestion` with exactly two explicit options — "Build a new app" and "Modify / extend an existing app" — plus the default "Other" that `AskUserQuestion` always offers.
-
-`INTENT.md` MUST define the downstream consequence of each answer:
-
-- Build-new → run the planner, then Steps 2–6.
-- Modify-existing → skip Steps 2–5, go directly to framework detection (Step 6 with detection path).
-
-#### Scenario: INTENT.md defines the two-option question and routing
-
-- **WHEN** `INTENT.md` is read
-- **THEN** it names `AskUserQuestion`
-- **AND** it contains both "Build" and "Modify" or "Extend" as explicit options
-- **AND** it documents the skip-steps-2-through-5 behavior for the modify branch
+- **WHEN** `DEPLOYMENT.md` is read
+- **THEN** any client tool name appears only as a parenthetical example attached to a portable instruction
 
 ### Requirement: formio-application invokes formio-resource-planner internally on the build-new branch
 
@@ -218,81 +188,6 @@ On the build-new branch, the `formio-application` skill SHALL invoke `formio-res
 - **WHEN** the user says "build me a CRM" and chooses build-new in Step 1
 - **THEN** the `formio-application` skill runs `formio-resource-planner` before asking for URLs
 - **AND** the user is not asked "have you run the planner yet?"
-
-### Requirement: New sibling doc MCP_CONFIG.md
-
-The `formio-application` skill directory SHALL contain a new sibling reference document `skills/formio-application/MCP_CONFIG.md` that has NO YAML frontmatter and documents the Step 3 `.mcp.json` write. The document MUST include:
-
-- The exact `.mcp.json` shape written by the skill, including the `formio-mcp` server entry shape, the `env` block with keys `FORMIO_PROJECT_URL` and `FORMIO_BASE_URL`, and example values.
-- An explicit note that the orchestrator's internal state uses `FORMIO_BASE_URL` for the platform deployment URL but the env-var key written into `.mcp.json` is `FORMIO_BASE_URL` (two names for the same concept; this doc is the authoritative mapping).
-- The collision-handling algorithm for when `./.mcp.json` already exists (preserve `command`/`args` of any existing `formio-mcp` entry; rewrite only `env.FORMIO_PROJECT_URL` and `env.FORMIO_BASE_URL`; preserve other env keys; preserve unrelated `mcpServers` entries).
-- The default-command selection rule: a single npm-based default — `"command": "npx"` with `"args": ["-y", "@formio/mcp"]`. The document MUST explicitly flag that this default is a placeholder until `@formio/mcp` publishes to npm. The document MUST NOT present `pnpm` as a supported default command. The document MUST document an npm-only escape-hatch for contributors pointing `.mcp.json` at a local clone (either `npx -y tsx <path>/packages/mcp-server/src/stdio.ts` or `node <path>/packages/mcp-server/dist/stdio.js` after a local build).
-- The approval-gate wording: preview the final merged `.mcp.json`, wait for user approval, write, then print restart/reconnect instructions.
-- The restart/reconnect instructions: the user must restart Claude Code (or use `/mcp` reconnect if supported in their version) for the new env to take effect. The skill MUST NOT attempt Step 4 in the same invocation after writing.
-- The skip rule: if `./.mcp.json` already contains a `formio-mcp` entry whose `env.FORMIO_PROJECT_URL` and `env.FORMIO_BASE_URL` match the Step-2 captures exactly, skip the step and tell the user why.
-
-#### Scenario: MCP_CONFIG.md exists and has no frontmatter
-
-- **WHEN** the repository is inspected
-- **THEN** `skills/formio-application/MCP_CONFIG.md` exists
-- **AND** its first line is not `---`
-
-#### Scenario: MCP_CONFIG.md names both env-var keys and documents the mapping
-
-- **WHEN** `MCP_CONFIG.md` is read
-- **THEN** it contains the literal substrings `FORMIO_PROJECT_URL` and `FORMIO_BASE_URL`
-- **AND** it documents that the orchestrator's internal `FORMIO_BASE_URL` maps to the written `FORMIO_BASE_URL`
-
-#### Scenario: MCP_CONFIG.md documents the collision and skip rules
-
-- **WHEN** `MCP_CONFIG.md` is read
-- **THEN** it documents preserving existing `command`/`args` on merge
-- **AND** it documents preserving unrelated env keys and `mcpServers` entries
-- **AND** it documents the skip condition (existing entry already matches captured URLs)
-
-#### Scenario: MCP_CONFIG.md documents the restart gate
-
-- **WHEN** `MCP_CONFIG.md` is read
-- **THEN** it instructs the skill to stop after writing and print a restart/reconnect message
-- **AND** it mentions both "restart Claude Code" and "`/mcp`" reconnect phrases
-
-### Requirement: Step 3 writes .mcp.json with captured URLs
-
-Step 3 of the `formio-application` orchestration SHALL write a `.mcp.json` file in the user's current working directory whose content reflects the URLs captured in Step 2 (Deployment). The write is gated on an explicit approval preview. After the write, the skill MUST halt the current invocation and print a restart/reconnect instruction; Steps 4, 5, 6 do not run in the same invocation as Step 3.
-
-The written `formio-mcp` server entry MUST contain:
-
-- An `env` block with exactly `FORMIO_PROJECT_URL` and `FORMIO_BASE_URL` set to the Step-2 captures, plus any other env keys that were already present in a pre-existing entry (preserved on merge).
-- A `command` and `args` pair either preserved from an existing entry or defaulted per the selection rule documented in `MCP_CONFIG.md`.
-
-#### Scenario: Fresh workspace — no existing .mcp.json
-
-- **WHEN** Step 3 runs in a workspace with no `./.mcp.json`
-- **THEN** Step 3 previews a new `.mcp.json` with a single `formio-mcp` entry whose `env.FORMIO_PROJECT_URL` and `env.FORMIO_BASE_URL` match the Step-2 captures
-- **AND** on approval, the file is written
-- **AND** the skill halts with a restart/reconnect instruction
-- **AND** Steps 4, 5, 6 do not run in this invocation
-
-#### Scenario: Existing .mcp.json with formio-mcp entry — merge
-
-- **WHEN** Step 3 runs in a workspace whose `./.mcp.json` already contains a `formio-mcp` entry with custom `command` and `args`
-- **THEN** Step 3's preview shows the original `command` and `args` preserved and only `env.FORMIO_PROJECT_URL` and `env.FORMIO_BASE_URL` rewritten
-- **AND** other env keys (e.g., `FORMIO_API_KEY`) are preserved
-- **AND** unrelated `mcpServers` entries are preserved
-
-#### Scenario: Existing .mcp.json already matches — skip
-
-- **WHEN** Step 3 runs in a workspace whose `./.mcp.json` already has a `formio-mcp` entry with `env.FORMIO_PROJECT_URL` and `env.FORMIO_BASE_URL` matching the Step-2 captures exactly
-- **THEN** Step 3 is skipped entirely
-- **AND** the skill advances to Step 4 in the same invocation (no restart required)
-- **AND** the user is told why the skip happened
-
-#### Scenario: User declines the approval gate
-
-- **WHEN** Step 3's preview is shown and the user declines
-- **THEN** `./.mcp.json` is not modified
-- **AND** Step 4 does not run
-- **AND** the skill exits with no partial state
 
 ### Requirement: New `authenticate` MCP tool
 
@@ -345,3 +240,81 @@ When, during or at the start of an orchestration, the user's request turns out t
 - **WHEN** `formio-application` is active and the user's clarified intent is a single standalone form (e.g., "actually I just need a feedback form, not a whole app")
 - **THEN** `formio-application` hands off to `formio-form-builder`
 - **AND** the planner/import pipeline does not run for that request
+
+### Requirement: formio-application runs a five-step orchestration
+
+The `formio-application` `SKILL.md` body SHALL describe five ordered steps with approval gates between destructive operations:
+
+1. **Intent** — ask whether this is a new app or an existing app being extended. Documented in `INTENT.md`.
+2. **Plan** — invoke `formio-resource-planner`, which emits the paired `template.md` (Resource Map) and `template.json` to the working directory.
+3. **Deployment** — resolve the target project. When the working directory already maps to a project, confirm it in one line and proceed. Otherwise capture the Base URL and Project URL in one batched question round with plain-language descriptions, then call `project_set` to map the working directory to the Project URL. Documented in `DEPLOYMENT.md`. Skipped on the modify-existing branch, which reads both URLs from the workspace instead.
+4. **Import** — invoke the `project_import` MCP tool with the planner-emitted `template.json` and the captured Project URL. Preceded by an approval gate. Documented in `IMPORT.md`. Skipped on the modify-existing branch. Step 4.5 is the conditional `formio-auth` handoff.
+5. **Framework routing** — consult the registry in `FRAMEWORK.md`. Step 5a runs the `frontend-design` pre-check. If exactly one framework is installed, route silently. If multiple, ask the user.
+
+The body MUST reference the four sibling docs (`INTENT.md`, `DEPLOYMENT.md`, `IMPORT.md`, `FRAMEWORK.md`) by relative link.
+
+There SHALL be no MCP-configuration step and no restart boundary on either branch. Steps 3 and 4 run in the same invocation: `project_set` writes the working-directory → Project URL mapping that the server reads at tool-call time, so no configuration file and no session reload stands between the two. When the probe in the skill's preflight finds no Form.io tools available, the skill SHALL route to `formio-mcp-setup` instead of writing configuration itself, and SHALL NOT claim the user's original request is finished.
+
+#### Scenario: Build-new branch runs end to end in one invocation
+
+- **WHEN** the user says "build me a CRM" (no existing workspace) and Form.io tools are available
+- **THEN** Steps 1 through 5 run in a single invocation
+- **AND** the planner runs as Step 2
+- **AND** Step 3 calls `project_set` with the working directory and the captured Project URL
+- **AND** Step 4 reaches its import approval gate without any intervening restart or reload
+
+#### Scenario: An existing mapping is confirmed rather than re-interviewed
+
+- **WHEN** Step 3 runs in a working directory that `formio-mcp-setup` (or an earlier session) already mapped to a project
+- **THEN** the skill confirms the resolved project and base URL in one line
+- **AND** it does not ask for either URL
+- **AND** Step 4 proceeds against the resolved project
+
+#### Scenario: Modify-existing branch skips Steps 3 and 4
+
+- **WHEN** the user says "also track attendees in each event" in an existing Angular workspace
+- **THEN** Step 1 determines intent = modify-existing
+- **AND** Steps 3 and 4 are skipped
+- **AND** Step 5 routes to the framework's extend sub-skill (`formio-angular-resources` today)
+
+#### Scenario: No MCP-configuration step exists
+
+- **WHEN** `SKILL.md` is read
+- **THEN** it describes exactly five steps, none of which writes MCP configuration
+- **AND** it contains no instruction to halt, restart, or reload for MCP configuration to take effect
+- **AND** it does not link to `MCP_CONFIG.md`
+
+#### Scenario: Missing tools route to setup
+
+- **WHEN** the skill's preflight probe finds no Form.io tools available under any name
+- **THEN** the skill routes to `formio-mcp-setup`
+- **AND** the skill does not write any MCP configuration file
+- **AND** the skill does not attempt Steps 3 or 4 without tools
+
+#### Scenario: User bails at the Import approval gate
+
+- **WHEN** Step 4's approval gate shows the URLs + template summary + merge-overwrite warning and the user declines
+- **THEN** `project_import` is not called
+- **AND** the skill continues with Step 5 (framework routing) so the user can still scaffold against an existing project
+
+### Requirement: INTENT.md captures build-vs-modify in one question round
+
+`skills/formio-application/INTENT.md` SHALL instruct the skill to present Step 1 as a single question round with exactly two explicit options — "Build a new app" and "Modify / extend an existing app" — using the client's structured question mechanism, which it MAY name as a parenthetical example only. Where the client's mechanism offers a free-text answer alongside fixed options, `INTENT.md` SHALL describe that affordance in portable terms rather than by naming it.
+
+`INTENT.md` MUST define the downstream consequence of each answer:
+
+- Build-new → run the planner (Step 2), then Steps 3–5.
+- Modify-existing → skip Steps 3 and 4, go directly to framework detection (Step 5 with detection path).
+
+#### Scenario: INTENT.md defines the two-option question and routing
+
+- **WHEN** `INTENT.md` is read
+- **THEN** it instructs asking Step 1 as one question round
+- **AND** it contains both "Build" and "Modify" or "Extend" as explicit options
+- **AND** it documents the skip-Steps-3-and-4 behavior for the modify branch
+
+#### Scenario: INTENT.md names no client tool as the mechanism
+
+- **WHEN** `INTENT.md` is read
+- **THEN** any client tool name appears only as a parenthetical example attached to a portable instruction
+

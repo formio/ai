@@ -4,10 +4,10 @@
 [![npm: @formio/ai](https://img.shields.io/npm/v/%40formio%2Fai?label=%40formio%2Fai)](https://www.npmjs.com/package/@formio/ai)
 [![npm: @formio/mcp](https://img.shields.io/npm/v/%40formio%2Fmcp?label=%40formio%2Fmcp)](https://www.npmjs.com/package/@formio/mcp)
 [![MCP Registry](https://img.shields.io/badge/MCP%20Registry-io.form%2Fformio--mcp-blue)](https://registry.modelcontextprotocol.io/v0/servers?search=io.form/formio-mcp)
-[![smithery badge](https://smithery.ai/badge/formio/mcp)](https://smithery.ai/servers/formio/mcp)
+[![Smithery](https://img.shields.io/badge/Smithery-formio%2Fmcp-blue)](https://smithery.ai/servers/formio/mcp)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](./LICENSE)
 
-`@formio/ai` is what brings Form.io into your agentic coding environment. It provides a series of tools that enable any developer to perform a number of complex actions against the Form.io Enterprise Server using their favorite Agentic Coding toolsets (starting with Claude Code). This turns the Form.io Enterprise Server into a **Composable Backend for Agentically Coded Applications**.
+`@formio/ai` is what brings Form.io into your agentic coding environment. It provides a series of tools that enable any developer to perform a number of complex actions against the Form.io Enterprise Server using their favorite Agentic Coding toolsets. This turns the Form.io Enterprise Server into a **Composable Backend for Agentically Coded Applications**.
 
 - [Getting Started](#getting-started)
 - [What you get](#what-you-get)
@@ -34,27 +34,51 @@
 - [License](#license)
 
 ## Getting Started
-Getting started is easy.  First install Claude Code as follows:
 
- 1. [Install Claude Code](https://github.com/anthropics/claude-code#get-started)
- 2. Run `claude` in your Terminal.
- 3. Run the following command within **Claude Code**.
+Works in any agent that supports Agent Skills:
 
 ```bash
-/plugin marketplace add https://github.com/formio/ai.git
-/plugin install formio-ai@formio
+npx skills add formio/ai
 ```
 
-Claude Code prompts for the `Project URL` and the `Base URL` on install. These are described as follows:
+Then open the folder in your agent and describe what you want:
 
- - **Project URL**: This is the endpoint for your 'project'. If you are using our SaaS environment (https://portal.form.io), then your project URL will be a sub-domain, such as https://myproject.form.io. However, for most use cases, when Form.io is deployed in your own environment, then the project url is typically a 'sub-directory' structure like https://forms.mysite.com/myproject.
- - **Base URL**: This is the endpoint for the deployment. If you are using the SaaS environment (https://portal.form.io), then this is always going to be https://api.form.io. However, for most use cases, when Form.io is deployed in your own environment, then this is the URL of the deployment like https://forms.mysite.com.
+```
+Build me an app for tracking client engagements — clients, engagements, and time
+entries. Consultants should only see engagements they're assigned to.
+```
+
+That is the whole setup. The command installs the skill library into `.agents/skills/`, which every skills-capable agent reads. It installs **skills only** — the Form.io MCP server, which is what gives the agent tools like `form_create`, `form_list`, and `project_import`, is connected on first use by the bundled `formio-mcp-setup` skill: it writes the MCP configuration for your client, asks you to approve it, and tells you to reload. You never hand-write a config file.
+
+### Prefer a one-click plugin? <!-- omit from toc -->
+
+If your agent has a plugin marketplace, installing the plugin is an **alternative** to the command above — not a second step. A plugin install already includes the skills *and* the MCP server, and it prompts for your Base URL — the deployment, not a project — up front:
+
+| Agent | Install | Includes |
+| --- | --- | --- |
+| Claude Code | `/plugin marketplace add https://github.com/formio/ai.git` then `/plugin install formio-ai@formio` | skills + MCP + Base URL prompt |
+| Cursor | Coming Soon | skills + MCP + Base URL prompt |
+| GitHub Copilot CLI | Coming Soon | skills + MCP |
+| VS Code | Coming Soon | skills + MCP |
+| Codex / ChatGPT | Coming Soon | skills + MCP |
+| Anything else | `npx skills add formio/ai` | skills; MCP installed on first use. |
+
+Either way you end up in the same place: the skills loaded, and 20 Form.io tools available.
+
+### Pointing it at your Form.io project <!-- omit from toc -->
+
+Nothing above asks for a URL, because the server starts with no configuration and asks when it first needs one. Two values exist when you want to set them explicitly:
+
+- **Project URL** — the endpoint for your project. On our SaaS environment (https://portal.form.io) that is a sub-domain such as `https://myproject.form.io`. Self-hosted, it depends on how your deployment routes projects: a sub-directory (`https://forms.mysite.com/myproject`) or a sub-domain of your own domain (`https://myproject.mysite.com`).
+- **Base URL** — the endpoint for the deployment. On our SaaS environment it is **always** `https://api.form.io` — never your project's `*.form.io` sub-domain. Self-hosted, it is the deployment host, often a sub-domain of your own domain, e.g. `https://forms.mysite.com`. In the sub-domain routing case the project host and the base host differ by design, so neither can be worked out from the other.
+
+A plugin install prompts for the Base URL only. The Project URL is never an install-time question: a deployment is shared across your projects, but a Form.io project is one-to-one with the application built against it, so the agent asks for it in the directory it belongs to and records both values there with the `project_set` tool. One server, one mapping per workspace.
 
 ## What you get
 
-- **Claude Code plugin: `@formio/ai`.** One-command install. Bundles the MCP server and skill library, registers them with Claude Code.
+- **Agent plugin: `@formio/ai`.** One-command install wherever the agent has a marketplace — Claude Code, Cursor, GitHub Copilot CLI, VS Code, Codex. Bundles the MCP server and the skill library, and each client reads the manifest it understands.
 - **MCP server: `@formio/mcp`.** Form.io operations (`form_*`, `role_*`, `action_*`, `project_*`) as MCP tools. Works with any MCP-aware client: Claude Code, Claude Desktop, VS Copilot, and whatever comes next.
-- **Skills library:** Ten activatable skills covering app orchestration, form building (webforms and wizards), form embedding, resource planning, JSON-schema authoring, action configuration, authentication & authorization, the `@formio/js` SDK surface, and the full Form.io REST surface.
+- **Skills library:** Eleven activatable skills covering app orchestration, form building (webforms and wizards), form embedding, resource planning, JSON-schema authoring, action configuration, authentication & authorization, the `@formio/js` SDK surface, and the full Form.io REST surface.
 
 ## Why this exists
 
@@ -92,6 +116,7 @@ Orchestration skills are special skills that serve as the **entry point** for mo
 | `formio-auth` | Authentication and authorization specialist — login/registration, RBAC, SSO (OIDC/SAML/LDAP), Token Swap, Custom JWT, passwordless email tokens, and JWT/session mechanics. |
 | `formio-api` | Comprehensive Form.io REST API reference — every endpoint across platform admin, project admin, runtime, and PDF scopes. |
 | `formio-sdk` | Reference for the `@formio/js` JavaScript SDK and `@formio/js/utils` Utilities — static and instance methods, VanillaJS rendering, plugins, and helpers. |
+| `formio-mcp-setup` | Connects the Form.io MCP server to whichever coding agent is running, and captures the project URL, when the skills were installed without it. |
 | `formio-angular` | Angular framework implementor. Turns an approved `template.json` plus a target project into a working Angular app using `@formio/angular`. Delegated to by `formio-application`. |
 
 ## Examples and Use Cases
@@ -101,6 +126,7 @@ Ready-to-paste example prompts live in [`examples/`](./examples/) — each file 
 ```bash
 mkdir form-app
 cd form-app
+npx skills add formio/ai
 claude
 ```
 
@@ -110,7 +136,7 @@ Create a brand-new 'greenfield' form-based application — or introduce a new fo
 
 - [CRM Application](./examples/apps/crm.md) — clients, deals, and activity logs with owner-scoped access.
 - [Help Desk](./examples/apps/help-desk.md) — customer tickets, agent workflows, internal notes, and email notifications.
-- [Storyboard](./examples/apps/storyboard.md) — production → scene → shot hierarchy with collaborative crew access.
+- [Storyboard](./examples/apps/storyboard.md) — Trello-style board → swimlane → story kanban with drag-and-drop ordering and team-based access.
 
 ***This library currently only supports the Angular application framework for new 'greenfield' applications. It generally supports other frameworks using the Vanilla JS `@formio/js` javascript renderer. Full support for other frameworks are coming soon.***
 
@@ -137,48 +163,47 @@ The `formio-api` skill knows the full REST surface of your Form.io deployment �
 
 ## Using the MCP server without the skills
 
-The bundled MCP server is also published standalone as [`@formio/mcp`](https://www.npmjs.com/package/@formio/mcp) — you do not need the Claude Code plugin or the skill library to use it. Any MCP-aware client (Claude Code, Claude Desktop, Cursor, VS Code Copilot) can spawn the server directly and call the [tools below](#mcp-server-tools).
+The bundled MCP server is also published standalone as [`@formio/mcp`](https://www.npmjs.com/package/@formio/mcp) — you do not need the agent plugin or the skill library to use it. Any MCP-aware client (Claude Code, Claude Desktop, Cursor, VS Code Copilot) can spawn the server directly and call the [tools below](#mcp-server-tools).
 
 It is also listed in the [official MCP Registry](https://registry.modelcontextprotocol.io/v0/servers?search=io.form/formio-mcp) as **`io.form/formio-mcp`**, so clients that browse the registry can discover and install it without any manual configuration.
 
-### One-click install <!-- omit from toc -->
-
-[![Install in Cursor](https://img.shields.io/badge/Install%20in-Cursor-000000?logo=cursor)](https://cursor.com/install-mcp?name=formio-mcp&config=eyJjb21tYW5kIjoibnB4IiwiYXJncyI6WyIteSIsIkBmb3JtaW8vbWNwIl0sImVudiI6eyJGT1JNSU9fUFJPSkVDVF9VUkwiOiJodHRwczovL3lvdXItcHJvamVjdC5mb3JtLmlvIn19)
-[![Install in VS Code](https://img.shields.io/badge/Install%20in-VS%20Code-007ACC?logo=visualstudiocode)](https://insiders.vscode.dev/redirect/mcp/install?name=formio-mcp&config=%7B%22command%22%3A%22npx%22%2C%22args%22%3A%5B%22-y%22%2C%22%40formio%2Fmcp%22%5D%2C%22env%22%3A%7B%22FORMIO_PROJECT_URL%22%3A%22https%3A%2F%2Fyour-project.form.io%22%7D%2C%22name%22%3A%22formio-mcp%22%7D)
-
-Both links pre-fill the server command and leave a placeholder `FORMIO_PROJECT_URL` for you to replace with your own project URL.
-
 ### Manual configuration <!-- omit from toc -->
-
-Claude Code — add a `.mcp.json` to your project root:
 
 ```json
 {
   "mcpServers": {
     "formio-mcp": {
       "command": "npx",
-      "args": ["-y", "@formio/mcp"],
-      "env": {
-        "FORMIO_BASE_URL": "https://api.form.io",
-        "FORMIO_PROJECT_URL": "https://your-project.form.io"
-      }
+      "args": ["-y", "@formio/mcp"]
     }
   }
 }
 ```
 
-The same `mcpServers` block works in every other stdio-capable client — only the file it belongs in changes:
+That is the **JSON `mcpServers`** shape — what Claude Code (`.mcp.json`), Cursor (`.cursor/mcp.json`), Claude Desktop, Windsurf, and Cline expect. Both the filename and the top-level key vary by client, so there is **no universal `.mcp.json`**.
 
-| Client | Where the config goes |
-| ------ | --------------------- |
-| Claude Code | `.mcp.json` in the project root (above), or `claude mcp add` |
-| Claude Desktop | `claude_desktop_config.json` — macOS: `~/Library/Application Support/Claude/`, Windows: `%APPDATA%\Claude\` |
-| Cursor | `.cursor/mcp.json` in the project, or `~/.cursor/mcp.json` globally |
-| VS Code (Copilot) | `.vscode/mcp.json` in the project |
-| Windsurf | `~/.codeium/windsurf/mcp_config.json` |
-| Cline | the MCP Servers panel, or `cline_mcp_settings.json` |
+**Copilot uses `servers`, not `mcpServers`.** In `.vscode/mcp.json` the top-level key is **`servers`** — everything inside the entry is identical.
 
-In standalone mode, `FORMIO_BASE_URL` and `FORMIO_PROJECT_URL` are required env vars ([full list](#environment-variables)). Authentication works the same as in plugin mode: the first authenticated tool call opens the browser portal-login flow, or set `FORMIO_API_KEY` to skip the browser entirely.
+```json
+{
+  "servers": {
+    "formio-mcp": {
+      "command": "npx",
+      "args": ["-y", "@formio/mcp"]
+    }
+  }
+}
+```
+
+**Codex takes TOML**, and has no JSON equivalent:
+
+```toml
+[mcp_servers.formio-mcp]
+command = "npx"
+args = ["-y", "@formio/mcp"]
+```
+
+Authentication is the same everywhere: the first authenticated tool call opens the browser portal-login flow, or set `FORMIO_API_KEY` to skip the browser entirely — required on any host with no browser, such as a cloud agent, a container, or CI.
 
 Once connected, prompt the tools directly — no skill activation involved:
 
@@ -235,7 +260,7 @@ The bundled `@formio/mcp` server exposes these tools. Skills prefer these over r
 | --- | --- |
 | `project_export` | Export the project's complete template (roles, resources, forms, actions) as a portable JSON document. Use before `project_import` to snapshot. |
 | `project_import` | Import a template JSON — additively merges roles, resources, forms, and actions in one call. **Same-machine-name items are overwritten in place; everything else is preserved.** |
-| `project_set` | Plugin-mode only — persist a per-cwd Project URL mapping in `~/.formio/projects.json`. Never exposed standalone (the standalone server binds to `FORMIO_PROJECT_URL` via env instead). |
+| `project_set` | Persist a per-cwd Project URL mapping in `~/.formio/projects.json`, so one server can serve several workspaces. Registered in every client. An explicit `FORMIO_PROJECT_URL` in the server environment takes precedence over the mapping. |
 
 ### Diagnostic
 
@@ -268,20 +293,22 @@ The probe runs lazily — only when the local auth page is actually served.
 
 | Name | Required | Default | Purpose | Hosted SaaS example | Self-hosted example |
 | --- | :-: | --- | --- | --- | --- |
-| `FORMIO_BASE_URL` | yes | — | Full base URL of your Form.io deployment. | `https://api.form.io` | `https://forms.example.com` |
-| `FORMIO_PROJECT_URL` | yes\* | — | Full URL of your Form.io project. In plugin mode, only used as the pre-filled default offered when prompting for an unmapped cwd. | `https://myproject.form.io` | `https://forms.example.com/myproject` |
-| `FORMIO_API_KEY` | no | `undefined` | Long-lived project API key. When set, the server skips the browser login flow. | `CHANGEME` | `CHANGEME` |
+| `FORMIO_BASE_URL` | no | `https://api.form.io` | Full base URL of your Form.io deployment — always `https://api.form.io` on the hosted cloud, never a project's `*.form.io` sub-domain. | `https://api.form.io` | `https://forms.example.com` |
+| `FORMIO_PROJECT_URL` | yes\* | — | Full URL of your Form.io project. Takes precedence over any per-directory mapping written by `project_set`. Self-hosted, it is a sub-directory of the deployment or a sub-domain of your own domain (`https://myproject.example.com`), depending on how that deployment routes projects. | `https://myproject.form.io` | `https://forms.example.com/myproject` |
+| `FORMIO_DEFAULT_PROJECT_URL` | no | — | A project URL to **offer**, not to apply. When set and the working directory has no mapping, the server names it as the suggested project so the agent can confirm it and persist it with `project_set`. It never changes what a tool resolves — the opposite of `FORMIO_PROJECT_URL`, which pins the server and cannot be redirected by `project_set`. |
+| `FORMIO_API_KEY` | no | `undefined` | Long-lived project API key. When set, the server skips the browser login flow — the only way to authenticate on a host with no browser. | `CHANGEME` | `CHANGEME` |
 | `FORMIO_LOGIN_FORM` | no | Auto-resolved | Override the portal login form URL used by the JWT login flow. | `https://formio.form.io/user/login` | `https://forms.example.com/formio/user/login` |
-| `FORMIO_PLUGIN_CONTEXT` | no | `0` | Set by the plugin manifest. When `1`, the server enables `project_set` and reads `FORMIO_PROJECT_URL` from `~/.formio/projects.json` per cwd instead of env. |  |  |
+| `FORMIO_FORCE_BROWSER` | no | `0` | When `1`, attempt the browser login even where the server detects no browser is available (CI, a container, SSH with no display). | — | — |
+| `FORMIO_AUTH_HOST` / `FORMIO_AUTH_PORT` | no | `127.0.0.1` / ephemeral | Bind address and port for the login server. Set both when running in a container so the login page is reachable through a published port. | — | `0.0.0.0` / `43117` |
 | `FORMIO_INSECURE_TLS` | no | `false` | When `true`, skips TLS certificate verification (sets `NODE_TLS_REJECT_UNAUTHORIZED=0`) — for self-hosted deployments behind self-signed certs. Do not use against production. | — | `true` |
 
-\* In plugin context, `FORMIO_PROJECT_URL` is captured per-cwd by the `project_set` tool and persisted to `~/.formio/projects.json`. The `verify-project-url` `SessionStart`/`PreToolUse` hook offers `formio_default_project_url` (from plugin user-config) as the default the first time you enter a workspace.
+<sub>\* Not at startup — the server starts and lists every tool without it, and only errors when a tool actually needs a project. The alternative is the `project_set` tool, which maps a working directory to a project in `~/.formio/projects.json` so one server can serve several workspaces. Resolution order: `FORMIO_PROJECT_URL`, then the mapping for the caller's `cwd`, then the error. Map a directory before any client connects with `npx -y @formio/mcp project set --project-url <url> --base-url <url> --cwd <path>`; `project get --cwd <path>` prints what resolves and which source won, exiting `0` when it resolved, `1` when nothing is mapped, and `2` when the command itself failed.</sub>
 
 ---
 
 ## Contributing
 
-This is a pnpm + Turborepo monorepo: the `@formio/mcp` MCP server (`packages/mcp-server/`), the `@formio/ai` Claude Code plugin (`plugin/`, bundling the server + skill library), and the skill test suite (`packages/skill-tests/`). Setup, conventions, skill-authoring guidelines, and the release flow are in [CONTRIBUTING.md](./CONTRIBUTING.md). Security reports: [SECURITY.md](./SECURITY.md).
+This is a pnpm + Turborepo monorepo: the `@formio/mcp` MCP server (`packages/mcp-server/`), the `@formio/ai` agent plugin (`plugin/`, bundling the server + skill library), and the skill test suite (`packages/skill-tests/`). Setup, conventions, skill-authoring guidelines, and the release flow are in [CONTRIBUTING.md](./CONTRIBUTING.md). Security reports: [SECURITY.md](./SECURITY.md).
 
 ## License
 

@@ -64,5 +64,5 @@ Then finish with a short "Next steps" section:
   - `form_create` (MCP tool) for each entry under `resources` and `forms` in `template.json`
   - `action_create` (MCP tool) for each entry under `actions`; the REST shapes live in `formio-api/references/project-actions` if the MCP server is unavailable
   - `role_create` (MCP tool) for the non-default roles listed under `roles`; REST fallback in `formio-api/references/project-roles`
-  - Framework scaffolders (`formio-angular/resources`, future `formio-react`, …) — hand them BOTH `template.md` (architectural intent) and `template.json` (structured reference). The `.md` is the seed they reason from; the `.json` is the structured companion they consult for field-level shapes.
+  - Framework scaffolders (`formio-angular/formio-angular-resources`, future `formio-react`, …) — hand them BOTH `template.md` (architectural intent) and `template.json` (structured reference). The `.md` is the seed they reason from; the `.json` is the structured companion they consult for field-level shapes.
 ```

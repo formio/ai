@@ -1,4 +1,8 @@
-## ADDED Requirements
+## Purpose
+
+Defines the MCP tools that create, list, read, update, and delete Form.io actions on a form: `action_create`, `action_list`, `action_get`, `action_update`, and `action_delete`, including validation of the action type against the server's own catalog.
+
+## Requirements
 
 ### Requirement: action_create tool is registered
 

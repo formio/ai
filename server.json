@@ -20,8 +20,15 @@
       "environmentVariables": [
         {
           "name": "FORMIO_PROJECT_URL",
-          "description": "Full URL of the Form.io project to target (e.g. https://api.form.io/my-project, or https://your-host/project-name for self-hosted).",
-          "isRequired": true,
+          "description": "Optional. Pins every directory to one Form.io project (e.g. https://examples.form.io on the hosted cloud; self-hosted it is either https://your-project.your-domain.com or https://your-host/project-name, depending on how that deployment routes projects). It takes precedence over the per-directory mapping and project_set cannot redirect it — set it only for a launch that must always target the same project, such as CI or a container. Leave it unset and the agent asks for a project and records it per directory.",
+          "isRequired": false,
+          "format": "string",
+          "isSecret": false
+        },
+        {
+          "name": "FORMIO_DEFAULT_PROJECT_URL",
+          "description": "Optional. A project URL to offer, not to apply. When a working directory has no mapping, the server names it as the suggested project for the agent to confirm and persist with project_set. It never changes what a tool resolves — the opposite of FORMIO_PROJECT_URL.",
+          "isRequired": false,
           "format": "string",
           "isSecret": false
         },
@@ -42,6 +49,13 @@
         {
           "name": "FORMIO_LOGIN_FORM",
           "description": "URL of a custom login form used by the browser-based portal login flow. Defaults to the deployment's portal login form.",
+          "isRequired": false,
+          "format": "string",
+          "isSecret": false
+        },
+        {
+          "name": "FORMIO_FORCE_BROWSER",
+          "description": "Set to 1 to attempt the browser login even where the server detects it cannot present one (CI, a container, a remote shell with no display). Use it when the login page is reachable from a browser elsewhere.",
           "isRequired": false,
           "format": "string",
           "isSecret": false

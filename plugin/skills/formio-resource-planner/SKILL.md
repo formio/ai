@@ -8,12 +8,22 @@ description: >-
 
 Turn a natural-language application description into a concrete Form.io resource map — the minimum plan needed to actually build the app.
 
+## Preflight — the Form.io MCP server
+
+Before your first Form.io tool call, check that the Form.io MCP tools are available to you — `form_list`, `form_create`, `project_import`, `project_set`.
+
+**If they are missing, stop and connect the server before doing anything else.** Load the `formio-mcp-setup` skill and follow it; it writes the MCP configuration for every client and tells the user how to reload. If that skill is not installed either, tell the user:
+
+> I have no Form.io tools, so the Form.io MCP server isn't connected. Run `npx skills add formio/ai` to get the setup skill, or add the server to your agent's MCP configuration as `npx -y @formio/mcp`.
+
+Do **not** work around missing tools by making direct HTTP requests against a Form.io deployment, and do not write code that does. This library documents the whole Form.io REST surface, which makes hand-rolling requests tempting and wrong — it bypasses the guardrails the tools enforce and can write to a live deployment unreviewed. Stop and report what is blocking instead.
+
 ## Stance
 
 You are a thinking partner that plans before it builds. Two distinct phases with a hard approval gate between them.
 
 - **Curious, not prescriptive.** The user's domain words are signal; the Form.io vocabulary is yours to translate.
-- **Batch your questions.** When multiple related questions come up (e.g., all relationship cardinalities), ask them together in one `AskUserQuestion` call. Peppering the user one question at a time burns trust.
+- **Batch your questions.** When multiple related questions come up (e.g., all relationship cardinalities), ask them together in ONE question round, using the client's structured question mechanism (in Claude Code, `AskUserQuestion`). Peppering the user one question at a time burns trust.
 - **Visualize twice, in two formats.** The map is visualised by two diagrams: an ER diagram (who relates to whom) AND an Access Flow diagram (how the runtime ACL reaches each resource). Phase A (chat approval gate) renders both as ASCII so the user can review them in the terminal. Phase B (file on disk) renders both as Mermaid (`erDiagram` + `flowchart TD`) so downstream skills and GitHub/IDE readers get semantic edges + native rendering. Both surfaces describe the same topology — generated from one internal model per run.
 - **Ground in Form.io primitives.** Every output claim must map to a real Form.io construct: resource, form, component, action, role, field-based access, group permission.
 - **Pick the right kind per entity.** Classify every entity as a **Resource** (a stored, reusable data model) or a **Form** (bespoke, purpose-specific data collection) BEFORE modeling its fields. Most entities are Resources, and an app that is all Resources is perfectly valid — just make the call deliberately rather than reflexively, and reach for a Form only when the entity is genuinely bespoke collection. See ["Resources vs. Forms"](#resources-vs-forms--the-core-modeling-decision) below.
@@ -24,7 +34,7 @@ You are a thinking partner that plans before it builds. Two distinct phases with
 
 ## Resources vs. Forms — the core modeling decision
 
-Form.io has two kinds of entries — **Resources** (stored, reusable data models; the nouns of the app, each auto-generating a REST API) and **Forms** (bespoke, purpose-specific data collection — a job application, a survey, an RSVP). Classify every entity BEFORE modeling its fields with the litmus test: a record the app stores and reuses → Resource; a response to a specific ask, possibly wrapping a record → Form. A bespoke Form *references* an already-established Resource (disabled pre-selected Select, or the submission `owner`) — never create the Resource from inside the Form. The full decision guide — definitions, the Job Application worked example, the quick classification table, and the anti-pattern — is in [`references/planning-rules.md`](references/planning-rules.md) → "Resources vs. Forms"; read it before classifying, and when in doubt, ask the user rather than silently defaulting to Resource.
+Form.io has two kinds of entries — **Resources** (stored, reusable data models; the nouns of the app, each auto-generating a REST API) and **Forms** (bespoke, purpose-specific data collection — a job application, a survey, an RSVP). Classify every entity BEFORE modeling its fields with the litmus test: a record the app stores and reuses → Resource; a response to a specific ask, possibly wrapping a record → Form. A bespoke Form _references_ an already-established Resource (disabled pre-selected Select, or the submission `owner`) — never create the Resource from inside the Form. The full decision guide — definitions, the Job Application worked example, the quick classification table, and the anti-pattern — is in [`references/planning-rules.md`](references/planning-rules.md) → "Resources vs. Forms"; read it before classifying, and when in doubt, ask the user rather than silently defaulting to Resource.
 
 ## The interview
 
@@ -50,7 +60,7 @@ When the interview has enough signal, emit the Resource Map as a single fenced m
 
 ## The approval gate
 
-After emitting the Resource Map, stop. Ask the user one question with `AskUserQuestion`:
+After emitting the Resource Map, stop. Ask the user one question, in one round:
 
 > "Does this map look right? I can write `template.md` + `template.json` once you approve it, or revise the map based on your feedback."
 
@@ -70,7 +80,7 @@ Only when the user has approved the map, emit the artifact PAIR — always both,
 Each file is emitted in TWO forms at the same time:
 
 - **As a fenced block in the chat transcript** (`markdown` for `template.md`, `json` for `template.json`) — so the user sees both ASCII diagrams and the structure inline.
-- **As files on disk using the `Write` tool** — so downstream skills (like `formio-application`'s Import step, or `formio-angular/resources`) can pass real file paths.
+- **As files on disk using the `Write` tool** — so downstream skills (like `formio-application`'s Import step, or `formio-angular/formio-angular-resources`) can pass real file paths.
 
 ### File-write rules
 

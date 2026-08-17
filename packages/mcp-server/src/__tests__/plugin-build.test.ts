@@ -13,6 +13,7 @@ const DIST_README = path.join(DIST_PLUGIN, 'README.md');
 const REQUIRED_ENV_VARS = [
   'FORMIO_BASE_URL',
   'FORMIO_PROJECT_URL',
+  'FORMIO_DEFAULT_PROJECT_URL',
   'FORMIO_API_KEY',
   'FORMIO_LOGIN_FORM',
 ] as const;
@@ -96,6 +97,133 @@ describe('pnpm build:plugin', () => {
     expect(srcReadme).toMatch(/\/user\/login/);
   });
 
+  // The server no longer reads any host-mode variable, so the manifest must not
+  // set one: a launcher that still injects it would suggest a behaviour that no
+  // longer exists.
+  it('1.6 sets no FORMIO_PLUGIN_CONTEXT in the MCP server environment', () => {
+    const manifest = JSON.parse(fs.readFileSync(PLUGIN_JSON, 'utf8')) as {
+      mcpServers: Record<string, { env?: Record<string, string> }>;
+    };
+
+    for (const [name, server] of Object.entries(manifest.mcpServers)) {
+      expect(
+        Object.keys(server.env ?? {}),
+        `${name} must not set FORMIO_PLUGIN_CONTEXT`
+      ).not.toContain('FORMIO_PLUGIN_CONTEXT');
+    }
+  });
+
+  it('1.7 ships the Angular resources sub-skill at its spec-conformant path', () => {
+    const subSkill = path.join(SKILLS_DIR, 'formio-angular/formio-angular-resources/SKILL.md');
+
+    expect(fs.existsSync(subSkill)).toBe(true);
+    expect(fs.existsSync(path.join(SKILLS_DIR, 'formio-angular/resources'))).toBe(false);
+    expect(fs.readFileSync(subSkill, 'utf8')).toMatch(/^name: formio-angular-resources$/m);
+  });
+
+  it('1.8 answers tools/list including project_set with an empty environment', () => {
+    const request = `${JSON.stringify({
+      jsonrpc: '2.0',
+      id: 1,
+      method: 'initialize',
+      params: {
+        protocolVersion: '2024-11-05',
+        capabilities: {},
+        clientInfo: { name: 'plugin-build-test', version: '0.0.0' },
+      },
+    })}\n${JSON.stringify({ jsonrpc: '2.0', id: 2, method: 'tools/list' })}\n`;
+
+    const result = spawnSync('node', [SERVER_BUNDLE], {
+      input: request,
+      encoding: 'utf8',
+      env: {
+        PATH: process.env.PATH,
+        HOME: process.env.HOME,
+      } as NodeJS.ProcessEnv,
+      timeout: 30_000,
+    });
+
+    expect(result.stdout).toContain('project_set');
+    expect(result.stdout).toContain('form_list');
+  }, 60_000);
+
+  // Every client reads its own manifest, so all three must ship and all three
+  // must carry the same version — clients display it and marketplaces key
+  // updates on it.
+  it('1.9 ships all three manifests plus mcp.json over one skills tree', () => {
+    for (const rel of [
+      'plugin.json',
+      'mcp.json',
+      '.cursor-plugin/plugin.json',
+      '.claude-plugin/plugin.json',
+    ]) {
+      expect(fs.existsSync(path.join(DIST_PLUGIN, rel)), `dist/plugin/${rel}`).toBe(true);
+    }
+    expect(fs.existsSync(SKILLS_DIR)).toBe(true);
+    expect(fs.existsSync(path.join(DIST_PLUGIN, 'assets/formio-logo.png'))).toBe(true);
+  });
+
+  it('1.10 stamps every manifest version from plugin/package.json', () => {
+    const { version } = JSON.parse(
+      fs.readFileSync(path.join(REPO_ROOT, 'plugin/package.json'), 'utf8')
+    ) as { version: string };
+
+    for (const rel of ['plugin.json', '.cursor-plugin/plugin.json', '.claude-plugin/plugin.json']) {
+      const manifest = JSON.parse(fs.readFileSync(path.join(DIST_PLUGIN, rel), 'utf8')) as {
+        version?: string;
+      };
+      expect(manifest.version, `dist/plugin/${rel} version`).toBe(version);
+    }
+  });
+
+  // Three manifests that all lack a version agree with each other, which is
+  // exactly what the agreement guard must not accept: an unversioned bundle is
+  // the drift it exists to catch, not the absence of drift.
+  it('1.11 fails the smoke test when no manifest carries a version', () => {
+    const manifests = [
+      'plugin.json',
+      '.cursor-plugin/plugin.json',
+      '.claude-plugin/plugin.json',
+    ].map((rel) => path.join(DIST_PLUGIN, rel));
+    const originals = manifests.map((file) => fs.readFileSync(file, 'utf8'));
+
+    try {
+      for (const file of manifests) {
+        const manifest = JSON.parse(fs.readFileSync(file, 'utf8')) as Record<string, unknown>;
+        delete manifest.version;
+        fs.writeFileSync(file, `${JSON.stringify(manifest, null, 2)}\n`);
+      }
+
+      const result = runSmokeTest();
+
+      expect(result.status).not.toBe(0);
+      expect(`${result.stdout}${result.stderr}`).toMatch(/version/i);
+    } finally {
+      manifests.forEach((file, index) => fs.writeFileSync(file, originals[index]));
+    }
+  }, 120_000);
+
+  // A build is a read of the source tree, not a write to it. `prepublishOnly`
+  // runs this build, so a build that stamps versions mutates committed manifests
+  // during a release — and after any hand-edit of plugin/package.json, outside
+  // any `changeset:version` run. Verification belongs to `pnpm sync:versions`.
+  it('1.12 leaves the committed source manifests byte-identical', () => {
+    const sources = ['plugin.json', '.cursor-plugin/plugin.json', '.claude-plugin/plugin.json'].map(
+      (rel) => path.join(REPO_ROOT, 'plugin', rel)
+    );
+    const before = sources.map((file) => fs.readFileSync(file, 'utf8'));
+
+    runBuild();
+
+    sources.forEach((file, index) => {
+      expect(fs.readFileSync(file, 'utf8'), path.relative(REPO_ROOT, file)).toBe(before[index]);
+    });
+  }, 120_000);
+
+  // Silently shipping a bundle that omits one client's manifest is worse than a
+  // failed build: it installs fine everywhere else and breaks in exactly one
+  // tool. Asserted through the exported guard rather than by renaming a file in
+  // the shared source tree, which raced with every other suite reading it.
   it('1.5 cleans dist/plugin/ before assembling (stale file does not survive rebuild)', () => {
     const stalePath = path.join(DIST_PLUGIN, 'stale-sentinel.txt');
     fs.writeFileSync(stalePath, 'should be removed by next build');
@@ -103,6 +231,50 @@ describe('pnpm build:plugin', () => {
     expect(fs.existsSync(stalePath)).toBe(false);
     expect(fs.existsSync(PLUGIN_JSON)).toBe(true);
   }, 120_000);
+});
+
+describe('plugin/package.json files list', () => {
+  // A manifest present in the repo but missing from the tarball installs cleanly
+  // from git and breaks from npm — the failure mode this guards.
+  it('4.5 covers every manifest that ships', () => {
+    const { files } = JSON.parse(
+      fs.readFileSync(path.join(REPO_ROOT, 'plugin/package.json'), 'utf8')
+    ) as { files: string[] };
+
+    for (const entry of ['plugin.json', 'mcp.json', '.cursor-plugin', 'assets']) {
+      expect(files, `plugin/package.json files must include ${entry}`).toContain(entry);
+    }
+  });
+
+  // Every manifest launches `npx -y @formio/mcp`, so the bundled server file is
+  // dead weight in the tarball — and shipping it invites the reading that an
+  // install runs it. The build still writes it for the smoke test.
+  it('4.5c ships no server bundle no manifest launches', () => {
+    const { files } = JSON.parse(
+      fs.readFileSync(path.join(REPO_ROOT, 'plugin/package.json'), 'utf8')
+    ) as { files: string[] };
+
+    expect(files).not.toContain('server');
+  });
+
+  // `files` is a closed list, so the changelog only reaches npm by being named.
+  it('4.5d ships the changelog anyone upgrading reads', () => {
+    const { files } = JSON.parse(
+      fs.readFileSync(path.join(REPO_ROOT, 'plugin/package.json'), 'utf8')
+    ) as { files: string[] };
+
+    expect(files).toContain('CHANGELOG.md');
+  });
+
+  it('4.5b lists nothing the built tree lacks', () => {
+    const { files } = JSON.parse(
+      fs.readFileSync(path.join(REPO_ROOT, 'plugin/package.json'), 'utf8')
+    ) as { files: string[] };
+
+    for (const entry of files) {
+      expect(fs.existsSync(path.join(DIST_PLUGIN, entry)), `dist/plugin/${entry}`).toBe(true);
+    }
+  });
 });
 
 describe('pnpm test:plugin — smoke test', () => {
@@ -120,6 +292,36 @@ describe('pnpm test:plugin — smoke test', () => {
       const { status, stdout } = runSmokeTest();
       expect(status).toBe(0);
       expect(stdout).toMatch(/tools\/list|tools-list|tools list/i);
+    }, 60_000);
+
+    it('3.5 validates every manifest and exits non-zero when one is missing', () => {
+      const target = path.join(DIST_PLUGIN, 'mcp.json');
+      const stash = `${target}.stashed`;
+      fs.renameSync(target, stash);
+      try {
+        const { status, stdout, stderr } = runSmokeTest();
+        expect(status).not.toBe(0);
+        expect(`${stdout}\n${stderr}`).toMatch(/mcp\.json/);
+      } finally {
+        fs.renameSync(stash, target);
+      }
+    }, 60_000);
+
+    it('3.6 exits non-zero when the Cursor variables and placeholders disagree', () => {
+      const target = path.join(DIST_PLUGIN, '.cursor-plugin/plugin.json');
+      const original = fs.readFileSync(target, 'utf8');
+      const manifest = JSON.parse(original) as {
+        variables: { properties: Record<string, unknown> };
+      };
+      delete manifest.variables.properties.FORMIO_BASE_URL;
+      fs.writeFileSync(target, JSON.stringify(manifest, null, 2));
+      try {
+        const { status, stdout, stderr } = runSmokeTest();
+        expect(status).not.toBe(0);
+        expect(`${stdout}\n${stderr}`).toMatch(/FORMIO_BASE_URL|variable/i);
+      } finally {
+        fs.writeFileSync(target, original);
+      }
     }, 60_000);
 
     it('3.3 confirms formio-api/ and formio-schema/ skills are present', () => {

@@ -1,0 +1,15 @@
+{
+  "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
+  "name": "formio-ai",
+  "version": "0.8.0",
+  "description": "Build applications on the Form.io platform. Bundles the Form.io MCP server with a skill library covering app orchestration, form building, resource planning, JSON schema authoring, actions, authentication, the @formio/js SDK, and the full Form.io REST surface.",
+  "author": {
+    "name": "Form.io",
+    "email": "support@form.io",
+    "url": "https://form.io"
+  },
+  "homepage": "https://form.io",
+  "repository": "https://github.com/formio/ai",
+  "license": "MIT",
+  "keywords": ["formio", "form.io", "forms", "backend", "mcp", "skills", "rbac", "low-code"]
+}

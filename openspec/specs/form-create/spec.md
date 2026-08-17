@@ -1,4 +1,8 @@
-## ADDED Requirements
+## Purpose
+
+Defines the `form_create` MCP tool: the form definition it accepts, the `POST /form` call it makes, how it defaults revisions on a licensed deployment, and how it persists the caller's note.
+
+## Requirements
 
 ### Requirement: form_create tool is registered with skill-referencing description
 

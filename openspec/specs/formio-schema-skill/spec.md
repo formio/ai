@@ -1,4 +1,8 @@
-## ADDED Requirements
+## Purpose
+
+Defines the `formio-schema` skill: one consolidated router over domain-partitioned references for the form, submission, and project JSON shapes, and the scoping that keeps its bare-noun triggers inside Form.io JSON contexts.
+
+## Requirements
 
 ### Requirement: Consolidated Form.io JSON schema skill
 

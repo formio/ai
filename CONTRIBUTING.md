@@ -17,8 +17,20 @@ pnpm install
 This is a pnpm + Turborepo monorepo shipping three things:
 
 - `packages/mcp-server/` — the `@formio/mcp` Model Context Protocol server (`form_*`, `role_*`, `action_*`, `project_*` tools).
-- `plugin/` — the `@formio/ai` Claude Code plugin, bundling the MCP server plus the skill library at `plugin/skills/`.
+- `plugin/` — the `@formio/ai` agent plugin, bundling the MCP server plus the skill library at `plugin/skills/`. Everything here ships to a consumer's own project, so maintainer tooling belongs outside it.
 - `packages/skill-tests/` — structural tests for the skill library, plus executable tests that run the `formio-sdk` skill's doc examples against the real `@formio/js`.
+
+## Generated files
+
+Some agent-facing files in this repository are generated rather than committed:
+
+- **OpenSpec skill mirrors** — `.claude/skills/openspec-*`, `.claude/skills/tdd-*`, `.cursor/skills/`, and `.github/skills/`. They are gitignored, so a fresh clone will not have the `/opsx:*` skills until you regenerate them with the [OpenSpec](https://openspec.dev/) CLI (`npm install -g @fission-ai/openspec@latest`, then run it in the repo root).
+
+  They are excluded deliberately. The `skills` CLI discovers skills additively across a repository's agent directories, and its `-s` flag matches exact names rather than globs — so while those mirrors were committed, anyone running `npx skills add formio/ai` was offered this repository's OpenSpec and TDD workflow skills alongside the Form.io library, with no way to filter them out.
+
+- **`.claude/skills/formio-*`** — these are the exception: committed symlinks into `plugin/skills/`, which is how this repository's own sessions load the library. The `skills` CLI ignores them because it does not follow symlinks while discovering skills.
+
+The OpenSpec **command** mirrors (`.claude/commands/opsx/`, `.cursor/commands/`, `.github/prompts/`) stay committed on purpose: they are what makes `/opsx:*` work on a fresh clone, and the `skills` CLI never looks at them — it discovers `SKILL.md` files only.
 
 ## Definition of Done
 
@@ -46,7 +58,7 @@ TDD is the expected workflow: write a failing test first, then the minimum imple
 Skills live at `plugin/skills/<skill>/SKILL.md` (frontmatter `description` is the routing surface; the body is the playbook). Conventions:
 
 - Descriptions must fit a 1,024-character budget and end with a `Not for:` clause pointing at sibling skills — enforced by `packages/skill-tests/src/skill-descriptions/`.
-- Some skills ship an eval harness under `plugin/skills/<skill>/evals/` (see each `evals/README.md` for the run loop). Use it to measure whether a skill change helped or regressed.
+- Some skills have an eval harness at `packages/skill-tests/evals/<skill>/` (see each harness's `README.md` for the run loop). Use it to measure whether a skill change helped or regressed.
 - To add a framework implementor (e.g. `formio-react`), add the skill directory and register it as a row in `plugin/skills/formio-application/FRAMEWORK.md` — no orchestrator changes needed.
 
 ## Testing the plugin locally

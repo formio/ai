@@ -5,9 +5,13 @@ import { ResolvedFormioConfig } from '../config.js';
 
 vi.mock('child_process', () => ({ exec: vi.fn() }));
 
+// forceBrowser because these tests exercise the browser path itself: the suite
+// runs on CI, which is exactly what browserless detection refuses to launch a
+// browser in. See auth-browserless.test.ts for the detection behaviour.
 const DEFAULT_CONFIG: ResolvedFormioConfig = {
   baseUrl: 'https://formio.invalid',
   projectUrl: 'https://formio.invalid/example',
+  forceBrowser: true,
 };
 
 function postCallback(port: number, token: string): Promise<Response> {

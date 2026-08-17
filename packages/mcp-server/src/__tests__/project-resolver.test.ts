@@ -1,20 +1,29 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import fs from 'fs';
+import os from 'os';
+import path from 'path';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { FormioConfig } from '../config.js';
-import { writeProjectEntry } from '../project-map.js';
-import { buildCwdSchema, cwdSchema, resolveProjectConfig } from '../project-resolver.js';
+import { ProjectMapUnreadableError, writeProjectEntry } from '../project-map.js';
+import { cwdSchema, resolveProjectConfig } from '../project-resolver.js';
 
+// One precedence order for every agent: an environment project URL wins, then
+// the per-cwd map, then an actionable error. Nothing here reads a host-mode
+// variable, so a stale FORMIO_PLUGIN_CONTEXT cannot change any outcome.
 describe('resolveProjectConfig', () => {
   const baseConfig: FormioConfig = {
     baseUrl: 'https://api.form.io',
     apiKey: 'abc',
   };
 
+  const configWithEnvProject: FormioConfig = {
+    ...baseConfig,
+    projectUrl: 'https://from-env.form.io',
+  };
+
   const originalPluginContext = process.env.FORMIO_PLUGIN_CONTEXT;
 
   beforeEach(() => {
-    // Default tests to plugin context so map-reading behavior is exercised;
-    // standalone-specific tests override this.
-    process.env.FORMIO_PLUGIN_CONTEXT = '1';
+    delete process.env.FORMIO_PLUGIN_CONTEXT;
   });
 
   afterEach(() => {
@@ -25,144 +34,514 @@ describe('resolveProjectConfig', () => {
     }
   });
 
-  it('returns config with the project URL mapped for the cwd', () => {
-    writeProjectEntry('/workspace/pkg-a', {
-      FORMIO_PROJECT_URL: 'https://api.form.io/mapped',
+  describe('environment wins over the project map', () => {
+    it('resolves the environment project URL despite a mapped entry for the cwd', () => {
+      writeProjectEntry('/workspace/pkg-a', {
+        FORMIO_PROJECT_URL: 'https://mapped.form.io',
+      });
+
+      const cfg = resolveProjectConfig('/workspace/pkg-a', configWithEnvProject);
+
+      expect(cfg.projectUrl).toBe('https://from-env.form.io');
     });
 
-    const cfg = resolveProjectConfig('/workspace/pkg-a', baseConfig);
+    // An explicit FORMIO_BASE_URL is part of the pin, so it outranks whatever
+    // deployment the mapping names — the pair the launch configuration declared
+    // travels together.
+    it('keeps the configured base URL when the environment supplies the project', () => {
+      writeProjectEntry('/workspace/pkg-a', {
+        FORMIO_PROJECT_URL: 'https://mysite.com/mapped',
+        FORMIO_BASE_URL: 'https://mysite.com',
+      });
 
-    expect(cfg.projectUrl).toBe('https://api.form.io/mapped');
-    expect(cfg.baseUrl).toBe('https://api.form.io');
-    expect(cfg.apiKey).toBe('abc');
-  });
+      const cfg = resolveProjectConfig('/workspace/pkg-a', configWithEnvProject);
 
-  it('prefers the mapped base URL over baseConfig.baseUrl in plugin context', () => {
-    writeProjectEntry('/workspace/pkg-a', {
-      FORMIO_PROJECT_URL: 'https://mapped.form.io/mapped',
-      FORMIO_BASE_URL: 'https://mapped.form.io',
+      expect(cfg.baseUrl).toBe('https://api.form.io');
     });
 
-    const cfg = resolveProjectConfig('/workspace/pkg-a', baseConfig);
+    // A pin supplies a project, not a deployment. A self-hosted user who pins
+    // FORMIO_PROJECT_URL in .mcp.json with no FORMIO_BASE_URL, having already
+    // mapped that same project with project_set, otherwise had the login built
+    // from the api.form.io default — the wrong-deployment login the mapping
+    // exists to prevent, and silent because nothing reports which host was used.
+    it('uses the mapped base URL when the pin names the mapped project and supplies no base URL', () => {
+      writeProjectEntry('/workspace/pkg-pinned', {
+        FORMIO_PROJECT_URL: 'https://myproject.mysite.com',
+        FORMIO_BASE_URL: 'https://forms.mysite.com',
+      });
 
-    expect(cfg.baseUrl).toBe('https://mapped.form.io');
-    expect(cfg.projectUrl).toBe('https://mapped.form.io/mapped');
-  });
+      const cfg = resolveProjectConfig('/workspace/pkg-pinned', {
+        apiKey: 'abc',
+        projectUrl: 'https://myproject.mysite.com/',
+      });
 
-  it('falls back to baseConfig.baseUrl when the mapped entry has no base URL', () => {
-    writeProjectEntry('/workspace/pkg-a', {
-      FORMIO_PROJECT_URL: 'https://api.form.io/mapped',
+      expect(cfg.projectUrl).toBe('https://myproject.mysite.com');
+      expect(cfg.baseUrl).toBe('https://forms.mysite.com');
     });
 
-    const cfg = resolveProjectConfig('/workspace/pkg-a', baseConfig);
+    // The borrow is gated on the two projects being the same one. A base URL
+    // belongs to a deployment, not to a directory: lending a self-hosted
+    // deployment to a pinned hosted project sends the portal login to the wrong
+    // host and caches the token under that host's key — the same silent failure
+    // the borrow was added to prevent, reached from the other side.
+    it('refuses to lend the mapped base URL to a different pinned project', () => {
+      writeProjectEntry('/workspace/pkg-other-project', {
+        FORMIO_PROJECT_URL: 'https://proj-a.mysite.com',
+        FORMIO_BASE_URL: 'https://forms.mysite.com',
+      });
 
-    expect(cfg.baseUrl).toBe('https://api.form.io');
-  });
+      const cfg = resolveProjectConfig('/workspace/pkg-other-project', {
+        apiKey: 'abc',
+        projectUrl: 'https://examples.form.io',
+      });
 
-  it('strips a trailing slash from the mapped project URL', () => {
-    writeProjectEntry('/workspace/pkg-a', {
-      FORMIO_PROJECT_URL: 'https://api.form.io/mapped/',
+      expect(cfg.projectUrl).toBe('https://examples.form.io');
+      expect(cfg.baseUrl).toBe('https://api.form.io');
     });
 
-    const cfg = resolveProjectConfig('/workspace/pkg-a', baseConfig);
-    expect(cfg.projectUrl).toBe('https://api.form.io/mapped');
-  });
+    it('resolves the environment project URL when no cwd is supplied', () => {
+      const cfg = resolveProjectConfig(undefined, configWithEnvProject);
 
-  it('throws when the cwd is not mapped and baseConfig has no projectUrl', () => {
-    expect(() => resolveProjectConfig('/workspace/unmapped', baseConfig)).toThrow(
-      /No Form\.io project is mapped for cwd=\/workspace\/unmapped/
-    );
-  });
-
-  it('falls back to baseConfig.projectUrl when the cwd is not mapped (plugin context)', () => {
-    const baseWithEnv: FormioConfig = {
-      baseUrl: 'https://api.form.io',
-      projectUrl: 'https://api.form.io/from-env/',
-      apiKey: 'abc',
-    };
-
-    const cfg = resolveProjectConfig('/workspace/unmapped', baseWithEnv);
-
-    expect(cfg.projectUrl).toBe('https://api.form.io/from-env');
-  });
-
-  it('prefers the mapped cwd URL over baseConfig.projectUrl in plugin context', () => {
-    writeProjectEntry('/workspace/pkg-a', {
-      FORMIO_PROJECT_URL: 'https://api.form.io/mapped',
-    });
-    const baseWithEnv: FormioConfig = {
-      baseUrl: 'https://api.form.io',
-      projectUrl: 'https://api.form.io/from-env',
-      apiKey: 'abc',
-    };
-
-    const cfg = resolveProjectConfig('/workspace/pkg-a', baseWithEnv);
-
-    expect(cfg.projectUrl).toBe('https://api.form.io/mapped');
-  });
-
-  it('ignores the projects.json map entirely in standalone context — env wins over stale map entry', () => {
-    delete process.env.FORMIO_PLUGIN_CONTEXT;
-    writeProjectEntry('/workspace/pkg-a', {
-      FORMIO_PROJECT_URL: 'https://api.form.io/stale-plugin-entry',
-    });
-    const baseWithEnv: FormioConfig = {
-      baseUrl: 'https://api.form.io',
-      projectUrl: 'https://api.form.io/from-mcp-json',
-      apiKey: 'abc',
-    };
-
-    const cfg = resolveProjectConfig('/workspace/pkg-a', baseWithEnv);
-
-    expect(cfg.projectUrl).toBe('https://api.form.io/from-mcp-json');
-  });
-
-  it('throws in standalone context when map has entry but baseConfig has no projectUrl', () => {
-    delete process.env.FORMIO_PLUGIN_CONTEXT;
-    writeProjectEntry('/workspace/pkg-a', {
-      FORMIO_PROJECT_URL: 'https://api.form.io/stale-plugin-entry',
+      expect(cfg.projectUrl).toBe('https://from-env.form.io');
     });
 
-    expect(() => resolveProjectConfig('/workspace/pkg-a', baseConfig)).toThrow(
-      /No Form\.io project is configured/
-    );
-  });
+    it('strips a trailing slash from the environment project URL', () => {
+      const cfg = resolveProjectConfig(undefined, {
+        ...baseConfig,
+        projectUrl: 'https://from-env.form.io/',
+      });
 
-  it('throws when cwd is an empty string', () => {
-    expect(() => resolveProjectConfig('', baseConfig)).toThrow(/cwd is required/);
-  });
-
-  it('throws when cwd is a relative path', () => {
-    expect(() => resolveProjectConfig('packages/a', baseConfig)).toThrow(
-      /cwd must be an absolute path/
-    );
-  });
-
-  it('does not mutate baseConfig when resolving', () => {
-    writeProjectEntry('/workspace/pkg-a', {
-      FORMIO_PROJECT_URL: 'https://api.form.io/mapped',
+      expect(cfg.projectUrl).toBe('https://from-env.form.io');
     });
-    const snapshot = { ...baseConfig };
 
-    resolveProjectConfig('/workspace/pkg-a', baseConfig);
+    it('is unaffected by a stale FORMIO_PLUGIN_CONTEXT', () => {
+      process.env.FORMIO_PLUGIN_CONTEXT = '1';
+      writeProjectEntry('/workspace/pkg-a', {
+        FORMIO_PROJECT_URL: 'https://mapped.form.io',
+      });
 
-    expect(baseConfig).toEqual(snapshot);
+      const cfg = resolveProjectConfig('/workspace/pkg-a', configWithEnvProject);
+
+      expect(cfg.projectUrl).toBe('https://from-env.form.io');
+    });
+  });
+
+  describe('project map is used when the environment has no project', () => {
+    it('resolves the mapped project URL for the cwd', () => {
+      writeProjectEntry('/workspace/pkg-a', {
+        FORMIO_PROJECT_URL: 'https://mapped.form.io',
+      });
+
+      const cfg = resolveProjectConfig('/workspace/pkg-a', baseConfig);
+
+      expect(cfg.projectUrl).toBe('https://mapped.form.io');
+      expect(cfg.baseUrl).toBe('https://api.form.io');
+      expect(cfg.apiKey).toBe('abc');
+    });
+
+    // A host that prompts for an optional project URL and gets no answer passes
+    // an empty string, not an absent variable. Read as a pin, it locks the server
+    // out of every mapping project_set can write.
+    it('falls back to the map when the environment project URL is empty', () => {
+      writeProjectEntry('/workspace/pkg-empty-env', {
+        FORMIO_PROJECT_URL: 'https://mysite.com/mapped',
+        FORMIO_BASE_URL: 'https://mysite.com',
+      });
+
+      const cfg = resolveProjectConfig('/workspace/pkg-empty-env', {
+        ...baseConfig,
+        projectUrl: '',
+      });
+
+      expect(cfg.projectUrl).toBe('https://mysite.com/mapped');
+      expect(cfg.baseUrl).toBe('https://mysite.com');
+    });
+
+    // project_set falls back to the server's own process cwd when a client omits
+    // the argument, so resolution has to look there too. Keying the write and the
+    // read differently produced a mapping that reported success and could never
+    // be read back: the next tool call said "no project configured", whose remedy
+    // is project_set, which writes the same unreadable entry again.
+    it('reads the mapping keyed on the process cwd when no cwd is supplied', () => {
+      writeProjectEntry(process.cwd(), {
+        FORMIO_PROJECT_URL: 'https://server-cwd.form.io',
+        FORMIO_BASE_URL: 'https://server-cwd-deployment.example.com',
+      });
+
+      const cfg = resolveProjectConfig(undefined, baseConfig);
+
+      expect(cfg.projectUrl).toBe('https://server-cwd.form.io');
+      expect(cfg.baseUrl).toBe('https://server-cwd-deployment.example.com');
+    });
+
+    it('prefers the mapped base URL over the configured base URL', () => {
+      writeProjectEntry('/workspace/pkg-a', {
+        FORMIO_PROJECT_URL: 'https://mysite.com/mapped',
+        FORMIO_BASE_URL: 'https://mysite.com',
+      });
+
+      const cfg = resolveProjectConfig('/workspace/pkg-a', baseConfig);
+
+      expect(cfg.baseUrl).toBe('https://mysite.com');
+      expect(cfg.projectUrl).toBe('https://mysite.com/mapped');
+    });
+
+    // A customer deployment can route projects to sibling sub-domains instead of
+    // sub-directories, so the mapped project host is not under the mapped base
+    // host. Resolution must carry both through untouched — nothing here may
+    // reconstruct one URL from the other.
+    it('resolves a sub-domain-routed customer project against its own deployment host', () => {
+      writeProjectEntry('/workspace/pkg-subdomain', {
+        FORMIO_PROJECT_URL: 'https://myproject.mysite.com',
+        FORMIO_BASE_URL: 'https://forms.mysite.com',
+      });
+
+      const cfg = resolveProjectConfig('/workspace/pkg-subdomain', baseConfig);
+
+      expect(cfg.projectUrl).toBe('https://myproject.mysite.com');
+      expect(cfg.baseUrl).toBe('https://forms.mysite.com');
+    });
+
+    it('falls back to the configured base URL when the mapped entry has none', () => {
+      writeProjectEntry('/workspace/pkg-a', {
+        FORMIO_PROJECT_URL: 'https://mapped.form.io',
+      });
+
+      const cfg = resolveProjectConfig('/workspace/pkg-a', baseConfig);
+
+      expect(cfg.baseUrl).toBe('https://api.form.io');
+    });
+
+    // getConfig leaves baseUrl undefined when the environment supplies none, so
+    // the hosted-cloud default is applied here — after the mapping has had its
+    // say, which is the whole reason it moved.
+    it('defaults to the hosted cloud when neither the mapping nor the config has a base URL', () => {
+      writeProjectEntry('/workspace/pkg-no-base', {
+        FORMIO_PROJECT_URL: 'https://mapped.form.io',
+      });
+
+      const cfg = resolveProjectConfig('/workspace/pkg-no-base', { apiKey: 'abc' });
+
+      expect(cfg.baseUrl).toBe('https://api.form.io');
+    });
+
+    it('strips a trailing slash from the mapped project URL', () => {
+      writeProjectEntry('/workspace/pkg-a', {
+        FORMIO_PROJECT_URL: 'https://mapped.form.io/',
+      });
+
+      const cfg = resolveProjectConfig('/workspace/pkg-a', baseConfig);
+
+      expect(cfg.projectUrl).toBe('https://mapped.form.io');
+    });
+
+    it('reads the map without a FORMIO_PLUGIN_CONTEXT being set', () => {
+      writeProjectEntry('/workspace/pkg-a', {
+        FORMIO_PROJECT_URL: 'https://mapped.form.io',
+      });
+
+      expect(resolveProjectConfig('/workspace/pkg-a', baseConfig).projectUrl).toBe(
+        'https://mapped.form.io'
+      );
+    });
+
+    it('does not mutate baseConfig when resolving', () => {
+      writeProjectEntry('/workspace/pkg-a', {
+        FORMIO_PROJECT_URL: 'https://mapped.form.io',
+      });
+      const snapshot = { ...baseConfig };
+
+      resolveProjectConfig('/workspace/pkg-a', baseConfig);
+
+      expect(baseConfig).toEqual(snapshot);
+    });
+  });
+
+  // A pinned launch must not depend on a file it never reads. The map used to be
+  // skipped outright on that path; consulting it for the base URL made a corrupt
+  // ~/.formio/projects.json fail every tool call of a server that had been given
+  // both URLs explicitly.
+  describe('an unreadable project map', () => {
+    let cacheDir: string;
+
+    beforeEach(() => {
+      cacheDir = fs.mkdtempSync(path.join(os.tmpdir(), 'formio-resolver-'));
+      fs.writeFileSync(path.join(cacheDir, 'projects.json'), 'not json');
+      vi.spyOn(process.stderr, 'write').mockImplementation((): boolean => true);
+    });
+
+    afterEach(() => {
+      fs.rmSync(cacheDir, { recursive: true, force: true });
+      vi.restoreAllMocks();
+    });
+
+    it('is never read when the pin carries its own base URL', () => {
+      const cfg = resolveProjectConfig(
+        '/workspace/pkg-a',
+        { projectUrl: 'https://examples.form.io', baseUrl: 'https://api.form.io' },
+        { cacheDir }
+      );
+
+      expect(cfg.projectUrl).toBe('https://examples.form.io');
+      expect(cfg.baseUrl).toBe('https://api.form.io');
+    });
+
+    // Consulted here, but only as a base-URL fallback: unreadable means "no
+    // mapped base URL", the same answer as no mapping, so the pin still resolves.
+    it('does not fail a pin that has no base URL of its own', () => {
+      const cfg = resolveProjectConfig(
+        '/workspace/pkg-a',
+        { projectUrl: 'https://examples.form.io' },
+        { cacheDir }
+      );
+
+      expect(cfg.projectUrl).toBe('https://examples.form.io');
+      expect(cfg.baseUrl).toBe('https://api.form.io');
+    });
+
+    // Through the caller's sink, not the process stream: the bin's project
+    // command returns its whole outcome in a result object, and a note written
+    // to stderr from here is the one part of it no caller and no test can see.
+    it('reports the skipped map through the caller’s note sink', () => {
+      const notes: string[] = [];
+
+      resolveProjectConfig(
+        '/workspace/pkg-a',
+        { projectUrl: 'https://examples.form.io' },
+        { cacheDir, onNote: (message) => notes.push(message) }
+      );
+
+      expect(notes.join('\n')).toMatch(/projects\.json/);
+      expect(vi.mocked(process.stderr.write)).not.toHaveBeenCalled();
+    });
+
+    it('falls back to stderr when the caller supplies no sink', () => {
+      resolveProjectConfig(
+        '/workspace/pkg-a',
+        { projectUrl: 'https://examples.form.io' },
+        { cacheDir }
+      );
+
+      expect(vi.mocked(process.stderr.write).mock.calls.join('')).toMatch(/projects\.json/);
+    });
+
+    // Where the map is the source of the project, the corruption still travels:
+    // reporting it as "nothing configured" sends the caller to project_set,
+    // whose rewrite is what destroys the surviving mappings.
+    it('still fails when the map is what would supply the project', () => {
+      expect(() =>
+        resolveProjectConfig('/workspace/pkg-a', { apiKey: 'abc' }, { cacheDir })
+      ).toThrow(ProjectMapUnreadableError);
+    });
+  });
+
+  // getConfig validates every URL it reads from the environment; mapped values
+  // reached fetch unchecked. ~/.formio/projects.json is hand-editable and predates
+  // that validation, so a stored "forms.mysite.com" resolved cleanly, was reported
+  // as the answer by `project get`, and then died inside fetch as "Failed to parse
+  // URL from forms.mysite.com/current" — far from the file that caused it.
+  describe('a mapped URL that is not a URL', () => {
+    it('fails resolution rather than handing an unparseable base URL to fetch', () => {
+      writeProjectEntry('/workspace/pkg-bad-base', {
+        FORMIO_PROJECT_URL: 'https://mapped.form.io',
+        FORMIO_BASE_URL: 'forms.mysite.com',
+      });
+
+      expect(() => resolveProjectConfig('/workspace/pkg-bad-base', { apiKey: 'abc' })).toThrow(
+        ProjectMapUnreadableError
+      );
+    });
+
+    it('names the variable, the directory and the map file', () => {
+      writeProjectEntry('/workspace/pkg-bad-base-named', {
+        FORMIO_PROJECT_URL: 'https://mapped.form.io',
+        FORMIO_BASE_URL: 'forms.mysite.com',
+      });
+      const resolve = () =>
+        resolveProjectConfig('/workspace/pkg-bad-base-named', { apiKey: 'abc' });
+
+      expect(resolve).toThrow(/FORMIO_BASE_URL/);
+      expect(resolve).toThrow(/pkg-bad-base-named/);
+      expect(resolve).toThrow(/projects\.json/);
+    });
+
+    it('fails on an unusable mapped project URL', () => {
+      writeProjectEntry('/workspace/pkg-bad-project', {
+        FORMIO_PROJECT_URL: 'forms.mysite.com/myproject',
+      });
+
+      expect(() => resolveProjectConfig('/workspace/pkg-bad-project', { apiKey: 'abc' })).toThrow(
+        /FORMIO_PROJECT_URL/
+      );
+    });
+
+    it('rejects a mapped URL whose protocol is not http or https', () => {
+      writeProjectEntry('/workspace/pkg-ftp', {
+        FORMIO_PROJECT_URL: 'ftp://mapped.form.io',
+      });
+
+      expect(() => resolveProjectConfig('/workspace/pkg-ftp', { apiKey: 'abc' })).toThrow(
+        ProjectMapUnreadableError
+      );
+    });
+
+    // Normalized on the same terms as an environment value: everything downstream
+    // compares these strings — the pinned project against the mapped one, the
+    // token cache against its key — so surrounding whitespace and host case have
+    // to be gone before then.
+    it('normalizes a usable mapped URL the way an environment value is normalized', () => {
+      writeProjectEntry('/workspace/pkg-untidy', {
+        FORMIO_PROJECT_URL: '  https://Mapped.form.io/  ',
+      });
+
+      expect(resolveProjectConfig('/workspace/pkg-untidy', { apiKey: 'abc' }).projectUrl).toBe(
+        'https://mapped.form.io'
+      );
+    });
+
+    // A pin that never needed the map must not be failed by it — the same rule an
+    // unreadable projects.json already follows. Unusable means "no mapped base
+    // URL", which is the answer no mapping at all would have given.
+    it('does not fail a pinned launch that only borrows the base URL', () => {
+      writeProjectEntry('/workspace/pkg-pin-bad-base', {
+        FORMIO_PROJECT_URL: 'https://examples.form.io',
+        FORMIO_BASE_URL: 'forms.mysite.com',
+      });
+      const notes: string[] = [];
+
+      const cfg = resolveProjectConfig(
+        '/workspace/pkg-pin-bad-base',
+        { projectUrl: 'https://examples.form.io' },
+        { onNote: (message) => notes.push(message) }
+      );
+
+      expect(cfg.baseUrl).toBe('https://api.form.io');
+      expect(notes.join('\n')).toMatch(/FORMIO_BASE_URL/);
+    });
+  });
+
+  // The server's process cwd is fixed at spawn and, for a plugin- or
+  // desktop-launched server, is not where the user is. It stays the fallback —
+  // project_set writes there under the same conditions — but a resolution that
+  // silently targets a different directory's project is the one failure nothing
+  // else in this flow can surface.
+  describe('resolving with no cwd argument', () => {
+    it('says which directory supplied the mapping', () => {
+      writeProjectEntry(process.cwd(), {
+        FORMIO_PROJECT_URL: 'https://server-cwd.form.io',
+      });
+      const notes: string[] = [];
+
+      resolveProjectConfig(undefined, baseConfig, { onNote: (message) => notes.push(message) });
+
+      expect(notes.join('\n')).toContain(process.cwd());
+      expect(notes.join('\n')).toMatch(/cwd/);
+    });
+
+    it('says nothing when the caller passed a cwd', () => {
+      writeProjectEntry('/workspace/pkg-a', {
+        FORMIO_PROJECT_URL: 'https://mapped.form.io',
+      });
+      const notes: string[] = [];
+
+      resolveProjectConfig('/workspace/pkg-a', baseConfig, {
+        onNote: (message) => notes.push(message),
+      });
+
+      expect(notes).toEqual([]);
+    });
+
+    it('says nothing when the environment pinned the project', () => {
+      const notes: string[] = [];
+
+      resolveProjectConfig(undefined, configWithEnvProject, {
+        onNote: (message) => notes.push(message),
+      });
+
+      expect(notes).toEqual([]);
+    });
+
+    // Without the directory and the argument in the message, the remedy the error
+    // names is project_set — which writes another mapping the next cwd-passing
+    // call will not find, and the loop repeats.
+    it('names the searched directory and the cwd argument when nothing is mapped there', () => {
+      let message = '';
+      try {
+        resolveProjectConfig(undefined, baseConfig);
+      } catch (error) {
+        message = error instanceof Error ? error.message : String(error);
+      }
+
+      expect(message).toContain(process.cwd());
+      expect(message).toMatch(/cwd/);
+    });
+  });
+
+  describe('actionable errors when nothing resolves', () => {
+    it('names project_set, FORMIO_PROJECT_URL and the searched cwd', () => {
+      expect(() => resolveProjectConfig('/workspace/unmapped', baseConfig)).toThrow(/project_set/);
+      expect(() => resolveProjectConfig('/workspace/unmapped', baseConfig)).toThrow(
+        /FORMIO_PROJECT_URL/
+      );
+      expect(() => resolveProjectConfig('/workspace/unmapped', baseConfig)).toThrow(
+        /\/workspace\/unmapped/
+      );
+    });
+
+    it('names project_set and FORMIO_PROJECT_URL when no cwd was supplied', () => {
+      expect(() => resolveProjectConfig(undefined, baseConfig)).toThrow(/project_set/);
+      expect(() => resolveProjectConfig(undefined, baseConfig)).toThrow(/FORMIO_PROJECT_URL/);
+    });
+
+    it('rejects a relative cwd', () => {
+      expect(() => resolveProjectConfig('packages/a', baseConfig)).toThrow(
+        /cwd must be an absolute path/
+      );
+    });
+
+    it('treats an empty cwd as no cwd rather than an error about cwd itself', () => {
+      expect(() => resolveProjectConfig('', baseConfig)).toThrow(/project_set/);
+    });
   });
 });
 
 describe('cwdSchema', () => {
+  const originalPluginContext = process.env.FORMIO_PLUGIN_CONTEXT;
+
+  afterEach(() => {
+    if (originalPluginContext === undefined) {
+      delete process.env.FORMIO_PLUGIN_CONTEXT;
+    } else {
+      process.env.FORMIO_PLUGIN_CONTEXT = originalPluginContext;
+    }
+  });
+
   it('accepts an absolute path', () => {
     expect(cwdSchema.safeParse('/workspace/pkg-a').success).toBe(true);
   });
 
-  it('rejects an empty string in plugin context', () => {
-    process.env.FORMIO_PLUGIN_CONTEXT = '1';
-    expect(buildCwdSchema().safeParse('').success).toBe(false);
+  it('accepts omission', () => {
+    expect(cwdSchema.safeParse(undefined).success).toBe(true);
   });
 
-  it('rejects a relative path in plugin context', () => {
+  it('rejects a relative path', () => {
+    expect(cwdSchema.safeParse('packages/a').success).toBe(false);
+  });
+
+  it('rejects an empty string', () => {
+    expect(cwdSchema.safeParse('').success).toBe(false);
+  });
+
+  it('has one shape regardless of FORMIO_PLUGIN_CONTEXT', () => {
     process.env.FORMIO_PLUGIN_CONTEXT = '1';
-    const result = buildCwdSchema().safeParse('packages/a');
-    expect(result.success).toBe(false);
+
+    expect(cwdSchema.safeParse(undefined).success).toBe(true);
+    expect(cwdSchema.safeParse('packages/a').success).toBe(false);
+    expect(cwdSchema.safeParse('/workspace/pkg-a').success).toBe(true);
+  });
+
+  it('describes both ways to supply a project', () => {
+    expect(cwdSchema.description).toMatch(/project_set/);
+    expect(cwdSchema.description).toMatch(/FORMIO_PROJECT_URL/);
   });
 });

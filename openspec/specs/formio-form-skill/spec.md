@@ -1,4 +1,8 @@
-## ADDED Requirements
+## Purpose
+
+Defines the `formio-form` skill: the library's embed-a-form entry point — its three-clause description and embed-only triggers, the two canonical inclusion modes, the reference document each concern lives in, strict URL terminology, and the handoff to `formio-form-builder` for a form that does not exist yet.
+
+## Requirements
 
 ### Requirement: New skill `formio-form` exists as the library's embed-a-form entry point
 

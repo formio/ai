@@ -6,7 +6,7 @@ This document is loaded by the parent `formio-angular` skill during Phase 2. It 
 
 `formio-angular` does not know how to scaffold an Angular workspace on its own, and it should not try. The Angular team ships a maintained skill library at [`angular/skills`](https://github.com/angular/skills) that already encodes the current best practices for `ng new`, workspace layout, build configuration, and CLI options. The right move is to install that library the first time `formio-angular` runs, then delegate the actual workspace creation to the `angular-new-app` skill from it. `formio-angular` picks the story back up at CONFIG, where it writes the Form.io-specific files (`config.ts`, `AuthModule`, resource NgModules) into the workspace the Angular skill just created.
 
-Doing it this way keeps the framework-agnostic `formio-application` → `formio-angular` (→ its nested `./resources/SKILL.md` sub-skill) chain focused on Form.io concerns, and leans on the Angular team's own skill for the Angular concerns.
+Doing it this way keeps the framework-agnostic `formio-application` → `formio-angular` (→ its nested `./formio-angular-resources/SKILL.md` sub-skill) chain focused on Form.io concerns, and leans on the Angular team's own skill for the Angular concerns.
 
 BOOTSTRAP also installs the Form.io SDKs (`@formio/angular`, `@formio/js`) and the Bootstrap 5 + Bootstrap Icons stylesheets that the Form.io renderer's default template assumes. All four are pinned with caret ranges so ordinary `npm install` in the future picks up minor/patch releases automatically. Bootstrap can be opted out of by explicit user request; the Form.io SDK pair cannot — every downstream phase imports from them.
 
@@ -79,13 +79,13 @@ If unpkg is unreachable (offline / proxied environment), fall back to `npm view 
 Run this exactly once per session, before invoking `angular-new-app`:
 
 ```bash
-npx skills add https://github.com/angular/skills --all -a claude-code -y
+npx skills add https://github.com/angular/skills --all -a <agent> -y
 ```
 
 Notes:
 
-- `--all` installs every skill in the Angular repo. We only need `angular-new-app` for scaffolding, but the Angular team ships related skills (e.g., component and service generators) that may be useful to the nested Resources sub-skill (`./resources/SKILL.md`) later. Installing everything up front is cheaper than re-invoking `npx skills add` per phase.
-- `-a claude-code` registers the skills with the Claude Code agent so they become invokable by name from subsequent phases.
+- `--all` installs every skill in the Angular repo. We only need `angular-new-app` for scaffolding, but the Angular team ships related skills (e.g., component and service generators) that may be useful to the nested Resources sub-skill (`./formio-angular-resources/SKILL.md`) later. Installing everything up front is cheaper than re-invoking `npx skills add` per phase.
+- `-a <agent>` is the client you are actually running in — substitute it (`claude-code`, `cursor`, `codex`, `copilot`, …) so the skills register where this session will look for them. If you cannot determine the running client, omit the flag entirely: the default target is the universal `.agents/skills/` directory, which Cursor, Codex, and Copilot all read, and which Claude Code reads through a symlink. Never hardcode one client.
 - `-y` accepts the default install location and any prompts the `skills` CLI emits.
 - If `npx` is not on the user's `PATH`, surface the error verbatim — do not try to fall back to a manual install. The user almost certainly has Node.js installed (Angular requires it), and a missing `npx` means their toolchain is broken in a way that needs their attention before anything Angular-related will work.
 
@@ -100,7 +100,7 @@ What to pass to `angular-new-app`:
 - **Working directory:** the absolute path where the workspace should be created. Usually the cwd, or the `workspacePath` from `formio-application`'s handoff context.
 - **Project name (if asked):** offer a name derived from the Form.io `Project URL`'s subdomain if the user gave one (e.g., `https://foo.form.io` → `foo`). Otherwise let `angular-new-app` default to the directory name.
 - **Angular version (critical):** pass the `FORMIO_ANGULAR_TARGET_VERSION` resolved in Step 1 — the latest patch of the highest Angular major `@formio/angular` supports. If `angular-new-app` exposes a version / CLI-version option, use it; if it shells out to `@angular/cli` and takes CLI flags, pass `@angular/cli@<FORMIO_ANGULAR_SUPPORTED_MAJOR>` so `npx` resolves the matching CLI major before running `ng new`. Always target the newest Angular `@formio/angular` supports; the only thing to avoid is an even-newer Angular major that `@formio/angular` has not yet declared, which would break `npm install` at Step 4.
-- **Intent note:** "This workspace will be wired against `@formio/angular@<version>`, which supports Angular `<major>`. The Form.io integration (config, auth, resource NgModules) is generated in subsequent phases by `formio-angular` and its nested Resources sub-skill at `./resources/SKILL.md`." The Angular skill does not need this for correctness, but surfacing it keeps the flow transparent to the user watching the transcript.
+- **Intent note:** "This workspace will be wired against `@formio/angular@<version>`, which supports Angular `<major>`. The Form.io integration (config, auth, resource NgModules) is generated in subsequent phases by `formio-angular` and its nested Resources sub-skill at `./formio-angular-resources/SKILL.md`." The Angular skill does not need this for correctness, but surfacing it keeps the flow transparent to the user watching the transcript.
 
 Do not override `angular-new-app`'s approval gates — it runs its own, and layering a second one on top is confusing. When `angular-new-app` reports success and the workspace exists on disk, BOOTSTRAP is done.
 
@@ -171,7 +171,7 @@ Notes on why these exact paths:
 - `bootstrap-icons/font/bootstrap-icons.css` registers the `bi bi-*` class family and ships the webfont; this is the same entry point the Bootstrap Icons docs recommend for non-SCSS consumers.
 - Neither stylesheet goes into `main.ts` or an `@import` in `styles.css` — the `angular.json` `styles` array is the Angular-native place to add workspace-wide stylesheets and is what `angular-new-app` expects.
 
-Do NOT add Bootstrap's JavaScript bundle (`bootstrap.bundle.min.js` via `angular.json`'s `scripts` array). The Form.io renderer does not depend on Bootstrap's JS behaviors (dropdowns, modals, tooltips), and pulling the JS in would conflict with Angular's own DOM management. If a future resource module needs a Bootstrap JS feature, the Resources sub-skill (`./resources/SKILL.md`) can add it on a per-module basis.
+Do NOT add Bootstrap's JavaScript bundle (`bootstrap.bundle.min.js` via `angular.json`'s `scripts` array). The Form.io renderer does not depend on Bootstrap's JS behaviors (dropdowns, modals, tooltips), and pulling the JS in would conflict with Angular's own DOM management. If a future resource module needs a Bootstrap JS feature, the Resources sub-skill (`./formio-angular-resources/SKILL.md`) can add it on a per-module basis.
 
 After editing `angular.json`, re-run a clean `npm install` (or `ng build --configuration=development` as a smoke check) to confirm the new style paths resolve. If either path 404s, verify the package version in `node_modules` — a Bootstrap 5+ major always ships `dist/css/bootstrap.min.css`, and Bootstrap Icons always ships `font/bootstrap-icons.css`, so a 404 means the install did not land.
 
@@ -209,26 +209,26 @@ ng build --configuration=development
 
 A clean build confirms the `polyfills` shape matches the builder and the CD provider import resolves. If the app logs `NG0908` / `Zone is not defined` at runtime, a dependency still expects `zone.js` — re-check that no generated code imports `zone.js` and that `provideZonelessChangeDetection()` is actually registered.
 
-## Step 7 — confirm Claude's `frontend-design` skill is available
+## Step 7 — confirm the `frontend-design` skill is available
 
 ### Why this step exists
 
-Every downstream phase in `formio-angular` that authors a user-facing surface (the AUTH phase's `app.component.html` nav UI, the Resources phase's `resource.component.html` / `view/view.component.html` / per-resource SCSS, any custom login/register component override, any dashboard or landing template) should consult Claude's `frontend-design` plugin before writing output — that is how the generated UI ends up polished instead of generic. "User-facing surface" means anything touching: HTML templates, SCSS/CSS, component layout, spacing, typography, color, nav UI, empty states, loading states, error states, list-vs-card layouts, form styling beyond `form-control` defaults, responsive behavior, and accessibility (focus order, ARIA, contrast). Form-field styling that comes directly from the Form.io renderer's default Bootstrap 5 template is exempt — you do not override what the renderer already provides — but anything the skill itself authors outside the renderer's output is NOT exempt. `frontend-design` is **strongly recommended but NOT required**. BOOTSTRAP only **detects** its availability and records the status; it does NOT run its own install prompt. The strong recommendation + install prompt is owned by the orchestrator `formio-application` (Step 6a) — keeping it in one place avoids two skills nagging the user about the same plugin.
+Every downstream phase in `formio-angular` that authors a user-facing surface (the AUTH phase's `app.component.html` nav UI, the Resources phase's `resource.component.html` / `view/view.component.html` / per-resource SCSS, any custom login/register component override, any dashboard or landing template) should consult the `frontend-design` skill before writing output — that is how the generated UI ends up polished instead of generic. "User-facing surface" means anything touching: HTML templates, SCSS/CSS, component layout, spacing, typography, color, nav UI, empty states, loading states, error states, list-vs-card layouts, form styling beyond `form-control` defaults, responsive behavior, and accessibility (focus order, ARIA, contrast). Form-field styling that comes directly from the Form.io renderer's default Bootstrap 5 template is exempt — you do not override what the renderer already provides — but anything the skill itself authors outside the renderer's output is NOT exempt. `frontend-design` is **strongly recommended but NOT required**. BOOTSTRAP only **detects** its availability and records the status; it does NOT run its own install prompt. The strong recommendation + install offer is owned by the orchestrator `formio-application` (Step 5a) — keeping it in one place avoids two skills nagging the user about the same skill.
 
-### 7a. Detect whether `frontend-design` is available — match the namespaced name
+### 7a. Detect whether `frontend-design` is available — match the skill, not one client's prefix
 
-`frontend-design` is a Claude Code **plugin** (from the `claude-plugins-official` marketplace), so it registers under the **plugin-namespaced** name `frontend-design:frontend-design`. The bare name `frontend-design` may also appear depending on how it was installed. Check the session's skill registry for **either** form and treat a match as "available".
+`frontend-design` is a portable Agent Skill, so how it is registered depends on the client that installed it. It may appear under the bare name `frontend-design` or under a client-namespaced form such as `frontend-design:frontend-design`. Check your skill list for **any** of those forms and treat a match as "available".
 
-Do NOT only look for the bare `frontend-design` — that is the historical bug that made this step silently fail and the UI fall back to plain, unstyled Bootstrap.
+Do NOT look only for one form — matching a single client's naming is the historical bug that made this step silently fail and the UI fall back to plain, unstyled Bootstrap.
 
 ### 7b. Honor the handoff status; do not run a competing install prompt
 
-- **Invoked via `formio-application` handoff:** the orchestrator already ran its `frontend-design` pre-check (Step 6a) and passed `frontendDesignStatus`.
+- **Invoked via `formio-application` handoff:** the orchestrator already ran its `frontend-design` pre-check (Step 5a) and passed `frontendDesignStatus`.
   - `frontendDesignStatus: 'available'` → consult `frontend-design` (with the brief from 7d) on every UI surface, as the Stance requires.
-  - `frontendDesignStatus: 'declined'` → the user was already offered the plugin and chose to proceed without it. Do NOT re-prompt. Generate UI as best you can, but disclose on **every** UI approval gate (AUTH nav UI, each Resources Phase A plan) that the file was generated **without** `frontend-design` consultation, so the user can review it critically.
+  - `frontendDesignStatus: 'declined'` → the user was already offered the skill and chose to proceed without it. Do NOT re-prompt. Apply the Step 7d brief inline as your own design direction, and disclose on **every** UI approval gate (AUTH nav UI, each Resources Phase A plan) that the file was generated **without** `frontend-design` consultation, so the user can review it critically.
 - **Invoked directly (no handoff):** run the 7a detection yourself.
   - Available → consult it normally.
-  - Missing → it is strongly recommended, not required. Surface a one-line strong recommendation that the user install it — interactively via `/plugin` (Browse → `claude-plugins-official` → `frontend-design` → Install) or by running `claude plugin install frontend-design@claude-plugins-official`, then restarting Claude Code so the plugin loads — and let them choose to install-then-resume or proceed without it. If they proceed without it, disclose on every later UI gate that the output was generated without `frontend-design`. Do NOT hard-block, and do NOT silently fall back to plain Bootstrap.
+  - Missing → it is strongly recommended, not required. Surface a one-line recommendation that the user install `frontend-design` — it ships at <https://github.com/anthropics/claude-plugins-public/tree/main/plugins/frontend-design> and installs like any other Agent Skill, however this client installs them — and let them choose to install-then-resume or proceed without it. If they proceed without it, apply the Step 7d brief inline and disclose on every later UI gate that the output was generated without `frontend-design`. Do NOT hard-block, and do NOT silently fall back to plain Bootstrap.
 
 ### 7c. Record the availability for the summary
 
@@ -236,7 +236,7 @@ Note in BOOTSTRAP's working context whether `frontend-design` is available, decl
 
 ### 7d. Record the Bootstrap-5 design brief for later phases
 
-Once `frontend-design` is available, write (or update) a short design-brief block in the skill's working context that every later phase pastes into the `frontend-design` invocation verbatim. This keeps the brief consistent across AUTH's nav UI, the Resources sub-skill's per-resource templates, and any future skill that also asks `frontend-design` for advice in this workspace. Stash the brief as `FRONTEND_DESIGN_BRIEF`:
+Write (or update) a short design-brief block in the skill's working context. When `frontend-design` is available, every later phase pastes this brief into its invocation verbatim; when it is not, every later phase treats the brief itself as the design direction to follow. Either way it keeps the visual language consistent across AUTH's nav UI, the Resources sub-skill's per-resource templates, and any future skill working in this workspace. Stash the brief as `FRONTEND_DESIGN_BRIEF`:
 
 ```
 ## frontend-design brief — Bootstrap 5 Form.io Angular app
@@ -287,7 +287,7 @@ Output shape `frontend-design` should produce:
   for why no Bootstrap utility covered the case.
 ```
 
-Every later phase that invokes `frontend-design` prepends this brief to the prompt it passes. AUTH's `app.component.html` section references it (see `AUTH.md`'s nav section). The Resources sub-skill's Phase A plan cites the brief in its `frontend-design consulted:` line (see `resources/SKILL.md`). Keeping the brief in one place avoids drift: update BOOTSTRAP Step 7d once and every downstream phase picks up the new wording.
+Every later phase that invokes `frontend-design` prepends this brief to the prompt it passes. AUTH's `app.component.html` section references it (see `AUTH.md`'s nav section). The Resources sub-skill's Phase A plan cites the brief in its `frontend-design consulted:` line (see `formio-angular-resources/SKILL.md`). Keeping the brief in one place avoids drift: update BOOTSTRAP Step 7d once and every downstream phase picks up the new wording.
 
 ## The approval gate
 
@@ -310,8 +310,8 @@ Bootstrap complete
     "bootstrap":        "^<BOOTSTRAP_VERSION>"
     "bootstrap-icons":  "^<BOOTSTRAP_ICONS_VERSION>"
   change detection:         zoneless — provideZonelessChangeDetection() registered, angular.json polyfills empty (no zone.js)
-  frontend-design plugin:   available in session (strongly recommended; will be consulted on every UI surface)
-                            -- or "not installed — proceeding without it; UI gates will disclose this" if the user declined
+  frontend-design:          available in session (strongly recommended; will be consulted on every UI surface)
+                            -- or "not installed — applying the Bootstrap 5 brief inline; UI gates will disclose this"
   angular.json styles (prepended to project build target):
     node_modules/bootstrap/dist/css/bootstrap.min.css
     node_modules/bootstrap-icons/font/bootstrap-icons.css

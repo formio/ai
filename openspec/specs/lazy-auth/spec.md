@@ -1,3 +1,9 @@
+## Purpose
+
+Defines when the server authenticates: not at startup, but at the first Form.io API call — with the JWT reused afterwards, concurrent calls sharing one flow, 401s re-entering the same gate, failures surfacing as tool errors rather than crashes, and API-key mode bypassing the flow entirely.
+
+## Requirements
+
 ### Requirement: Authentication is deferred until the first Form.io API call
 
 The MCP server SHALL NOT perform any authentication work during process startup or stdio transport connection. Authentication SHALL be triggered only when a Form.io tool makes its first outbound API request.

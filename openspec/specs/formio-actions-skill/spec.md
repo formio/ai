@@ -1,4 +1,8 @@
-## ADDED Requirements
+## Purpose
+
+Defines the boundary the `formio-actions` skill holds: it claims per-form action mechanics and routes authentication architecture to `formio-auth`.
+
+## Requirements
 
 ### Requirement: formio-actions claims per-form action mechanics and routes auth architecture to formio-auth
 

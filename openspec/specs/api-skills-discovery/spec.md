@@ -1,4 +1,8 @@
-## ADDED Requirements
+## Purpose
+
+Defines the router skill as the single discovery surface for the Form.io API library: it must link every required reference group and must not carry endpoint documentation itself.
+
+## Requirements
 
 ### Requirement: Router skill is the sole discovery surface
 

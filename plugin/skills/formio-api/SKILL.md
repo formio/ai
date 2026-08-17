@@ -8,12 +8,30 @@ description: >-
 
 Single entry point for the full Form.io REST API surface. Detailed endpoint references live under [`./references/`](./references/) — one file per capability group.
 
+## Preflight — the Form.io MCP server
+
+Before your first Form.io tool call, check that the Form.io MCP tools are available to you — `form_list`, `form_create`, `project_import`, `project_set`.
+
+**If they are missing, stop and connect the server before doing anything else.** Load the `formio-mcp-setup` skill and follow it; it writes the MCP configuration for every client and tells the user how to reload. If that skill is not installed either, tell the user:
+
+> I have no Form.io tools, so the Form.io MCP server isn't connected. Run `npx skills add formio/ai` to get the setup skill, or add the server to your agent's MCP configuration as `npx -y @formio/mcp`.
+
+Do **not** work around missing tools by making direct HTTP requests against a Form.io deployment, and do not write code that does. This library documents the whole Form.io REST surface, which makes hand-rolling requests tempting and wrong — it bypasses the guardrails the tools enforce and can write to a live deployment unreviewed. Stop and report what is blocking instead.
+
 ## Terminology
 
 Two distinct endpoints exist. These references NEVER conflate them:
 
 - **`baseUrl` / `base_url` → platform deployment endpoint → `FORMIO_BASE_URL`** (the Postman `{{baseUrl}}` variable when used bare, without `{{projectName}}`)
 - **`projectUrl` / `{{baseUrl}}/{{projectName}}` → project endpoint → `FORMIO_PROJECT_URL`** (a separate environment variable — not a computed sub-path)
+
+The Postman collection composes the project endpoint as `{{baseUrl}}/{{projectName}}`, but **never build a project URL that way yourself.** A project endpoint takes one of exactly three forms, and only the third is a path under the base URL:
+
+- **Form.io SaaS** — the base URL is always `https://api.form.io`, and the project is its name as a subdomain of `form.io`: a project named `examples` is `https://examples.form.io`.
+- **A customer deployment with sub-domain project routes** — the base URL is the deployment host, often a subdomain of the customer's own domain (`https://forms.mysite.com`), and the project is a sibling subdomain of that same parent domain (`https://myproject.mysite.com`).
+- **A customer deployment with sub-directory project routes** — the base URL is that same kind of host (`https://forms.mysite.com`) and the project is a path under it (`https://forms.mysite.com/myproject`).
+
+So `https://api.form.io/examples` is not a SaaS project URL, and a project host that differs from the base URL's host is normal rather than a mistake. Read `FORMIO_PROJECT_URL` (or the working directory's mapping) rather than deriving one, and never treat a `*.form.io` host as a base URL.
 
 ## Authentication
 

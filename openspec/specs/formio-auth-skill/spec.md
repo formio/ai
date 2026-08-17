@@ -1,4 +1,8 @@
-## ADDED Requirements
+## Purpose
+
+Defines the `formio-auth` skill: its directory and entry point, its three-clause router description, the auth mechanisms it must cover, the layout and terminology its references follow, its MCP Tool Preference section, and its two-way handoff with `formio-resource-planner`.
+
+## Requirements
 
 ### Requirement: Skill directory and entry point
 

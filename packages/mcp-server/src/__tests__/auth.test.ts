@@ -4,9 +4,12 @@ import { ResolvedFormioConfig } from '../config.js';
 
 vi.mock('child_process', () => ({ exec: vi.fn() }));
 
+// forceBrowser because these tests exercise the browser login path itself, and
+// the suite runs on CI — where browserless detection refuses to launch one.
 const DEFAULT_CONFIG: ResolvedFormioConfig = {
   baseUrl: 'https://formio.invalid',
   projectUrl: 'https://formio.invalid/example',
+  forceBrowser: true,
 };
 
 function postCallback(port: number, token: string): Promise<Response> {
@@ -70,6 +73,7 @@ describe('authenticate', () => {
       baseUrl: 'https://formio.invalid',
       projectUrl: 'https://formio.invalid/example',
       loginFormUrl: 'https://custom.form.io/mylogin',
+      forceBrowser: true,
     };
 
     let html = '';

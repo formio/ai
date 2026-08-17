@@ -39,13 +39,10 @@ export function registerAllTools(
   registerFormUpdateTool(server, config);
   registerProjectExportTool(server, config);
   registerProjectImportTool(server, config);
-  // project_set is only useful when the SessionStart/PreToolUse hook drives
-  // per-cwd project mapping — i.e. plugin context. Standalone .mcp.json users
-  // bind the server to a project via FORMIO_PROJECT_URL instead, so exposing
-  // project_set there just invites drift between the env and the map.
-  if (process.env.FORMIO_PLUGIN_CONTEXT === '1') {
-    registerProjectSetTool(server, { cwd: options.cwd });
-  }
+  // The already-validated base URL, not a second read of the environment: one
+  // unusable FORMIO_BASE_URL has to be dropped once, in getConfig, or the tool
+  // that repairs a directory's mapping is the one it breaks.
+  registerProjectSetTool(server, { cwd: options.cwd, baseUrl: () => config.baseUrl });
   registerRoleCreateTool(server, config);
   registerRoleListTool(server, config);
   registerRoleUpdateTool(server, config);
