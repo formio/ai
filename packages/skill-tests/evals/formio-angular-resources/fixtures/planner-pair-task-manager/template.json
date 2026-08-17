@@ -37,7 +37,7 @@
           "label": "Email",
           "inputType": "email",
           "placeholder": "Enter your email address",
-          "persistent": false,
+          "persistent": true,
           "input": true,
           "tableView": true
         },
@@ -47,7 +47,7 @@
           "label": "Password",
           "inputType": "password",
           "placeholder": "Enter your password.",
-          "persistent": false,
+          "persistent": true,
           "protected": true,
           "input": true,
           "tableView": false

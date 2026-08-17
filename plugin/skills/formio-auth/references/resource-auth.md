@@ -39,7 +39,7 @@ On the renderer side, the response header `x-jwt-token` is persisted into the br
 
 ### Login form + Login Action
 
-The login form is a normal Form.io form with two components — `email` (type `email`) and `password` (type `password`, `persistent: false`). It needs:
+The login form is a normal Form.io form with two components — `email` (type `email`, `persistent: true`) and `password` (type `password`, `persistent: true`, `protected: true`). Nothing is stored because the form carries no Save Submission Action, so never set `persistent: false` on either field — see [`login-forms.md`](./login-forms.md) → "Login form". It needs:
 
 - `access`: `read_all` for all three default roles (Administrator, Authenticated, Anonymous), so unauthenticated visitors can load the form definition.
 - `submissionAccess`: `create_own` for `anonymous` (so visitors can submit it).

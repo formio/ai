@@ -95,6 +95,8 @@ When in doubt during the interview, ASK — present the entity and the two readi
 
 Full component reference: see the `formio-schema` skill when you need exact JSON shapes. This cheat sheet is for planning, not generation.
 
+> **Credential fields are always `persistent: true`.** Emit `persistent: true` on the identifier (`email`, `username`, `userId`) and the secret (`password`) on the user Resource AND on every login and registration form — never `persistent: false`. `persistent: false` strips the field from the submission body server-side, so a user row saved through a form carrying that flag has no credentials and the user can never log in. A login form stores nothing because it carries no Save Submission Action (only a Login Action), not because of `persistent`. Use `protected: true` on `password` to keep it out of API reads.
+
 ### Action cheat sheet
 
 - **Login** — on a form collecting an identifier + secret (email/password by default, but any pair such as userId/pin); issues a JWT on submit. `settings.username`/`settings.password` point at those two component keys. The action's `settings.resources` lists which user-type resources the form authenticates against. For most cases, emit `["user"]`, unless the prompt specifically indicates that "admins" will use the application, in which case you emit `["admin"]` for ONLY admins, and `["user", "admin"]` if both can login. In most applications, admin-only work (seeding reference data, assigning groups, inviting users, reviewing submissions) is performed by the administrator signing in to the Form.io portal for the project; see "Admin operations" in the emitted `template.md`.

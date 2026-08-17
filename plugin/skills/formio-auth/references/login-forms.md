@@ -25,9 +25,11 @@ Not for:
 
 Components:
 
-- `email` (type `email`, required).
-- `password` (type `password`, `persistent: false` so it is not stored on the submission).
+- `email` (type `email`, required, `persistent: true`).
+- `password` (type `password`, required, `persistent: true`, `protected: true`).
 - A submit `button`.
+
+> **Never set `persistent: false` on `email` or `password`.** The login form does not store what the visitor typed because it carries NO Save Submission Action — only a Login Action — not because of `persistent`. `persistent: false` strips the field from the submission body server-side, so the same component block copied onto any form that DOES save into the `user` Resource (a registration form, or a combined login/register form) writes a user row with no credentials, and that user can never log in. Emit `persistent: true` on both fields on every login and registration form, matching Form.io's default `userLogin`.
 
 Access:
 

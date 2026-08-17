@@ -27,7 +27,7 @@ Every component extends this shape. `type`, `key`, and `input` are the only univ
 | `multiple` | `boolean` | No | Allow multiple values (renders as an array). |
 | `protected` | `boolean` | No | Exclude this field's value from API responses. |
 | `unique` | `boolean` | No | Enforce unique values across all submissions. |
-| `persistent` | `boolean \| string` | No | Whether to save to the database. `false` = ephemeral. |
+| `persistent` | `boolean \| string` | No | Whether to save to the database. `false` = ephemeral (stripped from the submission server-side). Never `false` on credential fields (`email`, `username`, `password`) — a saved user row would have no credentials and could never log in. |
 | `clearOnHide` | `boolean` | No | Clear the field value when conditionally hidden. |
 | `refreshOn` | `string` | No | Component key to watch — refresh this component's data when that key changes. |
 | `redrawOn` | `string` | No | Component key to watch — redraw this component when that key changes. |
