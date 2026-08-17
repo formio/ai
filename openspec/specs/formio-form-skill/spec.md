@@ -1,4 +1,4 @@
-## ADDED Requirements
+## Requirements
 
 ### Requirement: New skill `formio-form` exists as the library's embed-a-form entry point
 

@@ -1,3 +1,5 @@
+## Requirements
+
 ### Requirement: Authentication is deferred until the first Form.io API call
 
 The MCP server SHALL NOT perform any authentication work during process startup or stdio transport connection. Authentication SHALL be triggered only when a Form.io tool makes its first outbound API request.

@@ -1,4 +1,4 @@
-## ADDED Requirements
+## Requirements
 
 ### Requirement: New skill `formio-form-builder` exists as the library's build-a-form orchestrator
 

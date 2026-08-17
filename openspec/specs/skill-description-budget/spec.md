@@ -1,4 +1,4 @@
-## ADDED Requirements
+## Requirements
 
 ### Requirement: Every top-level skill description fits the 1,024-character budget
 

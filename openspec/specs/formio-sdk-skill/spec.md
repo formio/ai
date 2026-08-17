@@ -1,4 +1,4 @@
-## ADDED Requirements
+## Requirements
 
 ### Requirement: Skill MUST exist at plugin/skills/formio-sdk/
 

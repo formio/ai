@@ -1,4 +1,4 @@
-## ADDED Requirements
+## Requirements
 
 ### Requirement: formio-resource-planner description routes standalone single-form creation to formio-form-builder
 

@@ -1,4 +1,4 @@
-## ADDED Requirements
+## Requirements
 
 ### Requirement: Router description MUST contain trigger and negative-trigger clauses
 

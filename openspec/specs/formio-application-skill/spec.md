@@ -1,4 +1,4 @@
-## ADDED Requirements
+## Requirements
 
 ### Requirement: New skill `formio-application` exists as the library's build-an-app entry point
 
