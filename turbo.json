@@ -1,5 +1,13 @@
 {
   "$schema": "https://v2-9-18.turborepo.dev/schema.json",
+  "globalDependencies": [
+    ".gitignore",
+    "plugin/**",
+    "scripts/**",
+    "openspec/**",
+    ".claude-plugin/marketplace.json",
+    "server.json"
+  ],
   "tasks": {
     "build": {
       "outputs": ["dist/**"]

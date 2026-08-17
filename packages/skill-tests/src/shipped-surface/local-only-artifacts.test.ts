@@ -16,6 +16,22 @@ const git = (...args: string[]) =>
 
 const LOCAL_ONLY = ['docs/multi-agent-portability.md', 'MARKETPLACE.md'] as const;
 
+// Naming the roadmap in order to forbid it is not a reference to it: these files
+// would be unable to state the rule without saying what the rule is about. Every
+// other tracked file must be able to stand on its own in a clone that lacks it.
+//
+// Matched by pattern rather than by literal prefix because two of them move.
+// `openspec archive` relocates a change from openspec/changes/<name>/ to
+// openspec/changes/archive/<date>-<name>/, and it derives openspec/specs/
+// <capability>/spec.md from the change's delta on the way — so an allowlist
+// written against the pre-archive path goes stale the moment the change is
+// archived, which is exactly what happened here.
+const NAMES_IT_ONLY_TO_FORBID_IT = [
+  /^packages\/skill-tests\/src\/shipped-surface\//,
+  /^openspec\/changes\/(archive\/\d{4}-\d{2}-\d{2}-)?prune-shipped-surface\//,
+  /^openspec\/specs\/shipped-surface-boundary\//,
+];
+
 describe('initiative artifacts are not committed', () => {
   it.each(LOCAL_ONLY)('%s is not tracked', (path) => {
     const tracked = git('ls-files', '--', path);
@@ -50,9 +66,7 @@ describe('no tracked file depends on the roadmap', () => {
     const offenders = hits
       .split('\n')
       .filter(Boolean)
-      // This suite names it in order to forbid it, as does the change that did the work.
-      .filter((path) => !path.startsWith('packages/skill-tests/src/shipped-surface/'))
-      .filter((path) => !path.startsWith('openspec/changes/prune-shipped-surface/'))
+      .filter((path) => !NAMES_IT_ONLY_TO_FORBID_IT.some((allowed) => allowed.test(path)))
       .filter((path) => path !== '.gitignore');
 
     expect(offenders).toEqual([]);
