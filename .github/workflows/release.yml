@@ -24,13 +24,13 @@ jobs:
       # with a misleading 404 on PUT rather than a 401.
       id-token: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
 
-      - uses: pnpm/action-setup@v4
+      - uses: pnpm/action-setup@v6
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: 22
           cache: pnpm
@@ -239,7 +239,7 @@ jobs:
             platform: linux/arm64
             runner: ubuntu-24.04-arm
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - uses: docker/setup-buildx-action@v3
 
@@ -266,7 +266,7 @@ jobs:
           mkdir -p /tmp/digests
           echo '${{ steps.build.outputs.digest }}' > "/tmp/digests/${{ matrix.arch }}"
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: digest-${{ matrix.arch }}
           path: /tmp/digests/${{ matrix.arch }}
@@ -281,9 +281,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       # Checked out for packages/mcp-server/DOCKERHUB.md, read by the overview sync.
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           path: /tmp/digests
           pattern: digest-*
