@@ -1,5 +1,51 @@
 # @formio/mcp
 
+## 0.9.0
+
+### Minor Changes
+
+- a494543: Use the Form.io toolset from any coding agent, not just Claude Code.
+
+  **Install it two ways, and they are alternatives rather than steps.**
+  1. **A plugin install** wherever the agent has a marketplace — Claude Code, Cursor, GitHub Copilot CLI, VS Code, Codex. One step, carrying the skills _and_ the MCP server. The plugin directory ships three manifests over one `skills/` tree and one `mcp.json`: `plugin.json` ([Agent Plugins 1.0.0](https://agent-plugins.org/)), `.cursor-plugin/plugin.json`, and `.claude-plugin/plugin.json`. Each client detects its own and ignores the rest.
+  2. **`npx skills add formio/ai`** for everything else — 75+ agents, installing once into `.agents/skills/` with Claude Code symlinked to the same files. That installer handles skills only, so a new **`formio-mcp-setup`** skill connects the server on first use: every skill carries a preflight that checks for its tools, hands off to setup when they are missing, and is forbidden from working around the gap with raw HTTP against a Form.io deployment.
+
+  **One server behaviour everywhere.** Project resolution follows a single documented order — `FORMIO_PROJECT_URL` from the environment, then the working-directory mapping in `~/.formio/projects.json`, then an actionable error naming `project_set`. `project_set` is registered for every client, `cwd` is one schema everywhere, and `FORMIO_BASE_URL` always defaults.
+
+  **One exit-code contract for the `project` command.** `project get` exits `0` when it resolved, `1` when nothing is mapped for that directory, and `2` when the command ran and could not answer — so a skill can tell "nothing here yet" from "this failed", and stops interviewing on the latter. No launch carries a version range: `@formio/mcp` is a 0.x line, so a floor hard-coded into a shipped manifest or skill goes stale at the next release and a ceiling would freeze installed plugins on an old server. The one silent case — a pre-0.9.0 binary ignoring the `project` arguments and exiting 0 with no output — is handled by rule: empty output is never an answer, and no skill may report a mapping it did not read.
+
+  **Configure a project before any client connects.** The `formio-mcp` bin gains a `project` command: `project set --project-url <url> --base-url <url> --cwd <path>` writes the mapping through the same module the `project_set` tool uses, and `project get --cwd <path>` prints what resolves and which source supplied it. Invoked with no arguments the bin starts the stdio server exactly as before. `formio-mcp-setup` uses this to capture the project during setup, so the first tool call after a reload works instead of failing.
+
+  **The server explains itself.** It declares MCP `instructions` at initialize describing what it needs — the Project URL, and the Base URL, which builds the portal-login URL and keys the cached token and therefore must not be assumed. Used stand-alone with no skills installed, that plus the resolution error is now the whole of what an agent needs; previously neither mentioned the base URL, so a self-hosted user could silently log in against the wrong deployment.
+
+  **A configured default is offered, not applied.** `FORMIO_DEFAULT_PROJECT_URL` is surfaced as a suggestion in the instructions and the resolution error, for the agent to confirm and persist with `project_set`. It takes no part in resolution. `FORMIO_PROJECT_URL` remains the opposite: it pins the server, and `project_set` cannot redirect it.
+
+  **BREAKING — `FORMIO_PLUGIN_CONTEXT` is removed.** It gated per-directory project routing, `project_set` registration, and a required `FORMIO_BASE_URL`, so all of that was unavailable outside the Claude Code plugin. Plugin behaviour is unchanged, and a pinned stand-alone launch stays pinned even with a stale mapping.
+
+  **BREAKING — the plugin ships no hooks.** The `verify-project-url` gate matched a Claude-namespaced tool prefix and expanded `${user_config.*}`, so it only ever fired in Claude Code with a plugin install and was inert everywhere else, including every skills-only install. It could also deny tool calls the server resolves fine. Its behaviour is carried identically for every client by the server's instructions, the resolution error, `formio-mcp-setup`, and the orchestrator's Deployment step.
+
+  **BREAKING — no client prompts for a project URL at install time.** The Cursor prompt fed its answer into `FORMIO_PROJECT_URL`, which takes precedence over every per-directory mapping, so filling it in locked the server to one project and silently defeated `project_set` — contradicting the prompt's own description. Both that prompt and Claude Code's are now gone: a deployment is shared across a developer's projects, but a Form.io project is one-to-one with the application built against it, so the one folder an install-time answer is collected in is the only folder it is right for. Install asks for `FORMIO_BASE_URL` alone; the agent captures the Project URL in the directory it belongs to and persists both with `project_set`. The `.mcpb` desktop bundle keeps its optional project prompt — a desktop host has no working directory to interview in — but that answer now reaches the server as `FORMIO_DEFAULT_PROJECT_URL` instead of `FORMIO_PROJECT_URL`, so it is offered for confirmation rather than pinned, and any `project_set` mapping overrides it. `FORMIO_DEFAULT_PROJECT_URL` (a suggestion) and `FORMIO_PROJECT_URL` (a pin) are still read from the environment for scripted and containerized launches.
+
+  **BREAKING (install path, not API)** — manifests reachable from a git clone launch the server with `npx -y @formio/mcp` rather than the bundled `${CLAUDE_PLUGIN_ROOT}/server/stdio.mjs`, because a clone contains no build output. Release ordering is what closes the window this opens: until `@formio/mcp` 0.9.0 publishes, `latest` is 0.8.4, which registers `project_set` only under the now-removed `FORMIO_PLUGIN_CONTEXT` — so publish the server with or before the marketplace change rather than pinning a floor into manifests that would outlive it. The plugin tarball ships no server bundle; the build still writes `dist/plugin/server/stdio.mjs` for the smoke test, and the `.mcpb` desktop bundle builds its own copy. `.claude-plugin/marketplace.json` declares `"source": "./plugin"`, which is also what makes the skills CLI discover the library.
+
+  **The skills read correctly in every client.** Instructions name the client's structured question mechanism rather than one client's tool, and the batching rule — everything a step needs in one round, never a sequence of prompts — is stated portably. Tool availability is a capability probe rather than a tool-name prefix match. `frontend-design` keeps its name, because it is a portable Agent Skill; what went is the assumption about how it is registered and the client-specific commands for installing it.
+
+  **No restart boundary.** The orchestrator no longer writes `.mcp.json` and no longer halts for a reload. It writes no MCP configuration at all — a missing server routes to `formio-mcp-setup` — and its Deployment step resolves an existing mapping before asking, so a project is captured once and never re-requested.
+
+  **Browser login fails fast where there is no browser.** CI, containers, and SSH sessions with no display are detected before a port is bound, with guidance to set `FORMIO_API_KEY`; `FORMIO_FORCE_BROWSER=1` overrides the check. Previously such hosts waited out the full 15-minute timeout.
+
+  Other changes: the nested Angular sub-skill moved to `formio-angular-resources/` so its directory matches its name, and its description was trimmed to fit the specification's 1,024-character budget — both were Agent Skills violations that only surfaced in clients discovering skills by recursive scan. The published bundle carries only what a consumer needs: eval harnesses moved to `packages/skill-tests/evals/`, and a test enforces the boundary by allowlist. CI validates every `SKILL.md` against the Agent Skills specification.
+
+### Patch Changes
+
+- cbb5d57: Declare a privacy policy, as the Anthropic Software Directory requires.
+
+  Local connectors must carry all three of a `"Privacy Policy"` section in the README, a `privacy_policies` array in the manifest, and HTTPS policy URLs — a missing or incomplete policy is an immediate rejection. The bundle had none of them.
+
+  The manifest now declares `https://form.io/privacy`, and the server README — the file packed into the bundle — gains a section covering what the policy cannot describe: that requests go only to the configured deployment, that the two files under `~/.formio/` are written `0600` and hold a JWT and a per-directory project map, that form data is never written to disk, that there is no telemetry, and that the browser sign-in page loads assets from `cdn.form.io`, `cdn.jsdelivr.net` and `fonts.googleapis.com`, so those hosts see the browser's IP while it is open.
+
+  Also corrects a footnote that still claimed the server "refuses to start" without `FORMIO_PROJECT_URL`, which stopped being true in 0.8.0.
+
 ## 0.8.4
 
 ### Patch Changes
