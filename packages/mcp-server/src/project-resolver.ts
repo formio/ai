@@ -4,12 +4,13 @@ import {
   DEFAULT_BASE_URL,
   FormioConfig,
   ResolvedFormioConfig,
+  normalizeHttpUrl,
   stripTrailingSlashes,
 } from './config.js';
-import { ProjectMapUnreadableError, readProjectEntry } from './project-map.js';
+import { ProjectMapUnreadableError, projectMapPath, readProjectEntry } from './project-map.js';
 
 const CWD_DESCRIPTION =
-  "User's current working directory as an absolute path. Selects the Form.io project mapped to that directory in ~/.formio/projects.json — call project_set to create the mapping. Required unless FORMIO_PROJECT_URL is set in the server environment, which takes precedence over the mapping.";
+  "User's current working directory as an absolute path. Selects the Form.io project mapped to that directory in ~/.formio/projects.json — call project_set to create the mapping. Pass it on every call whenever you know it: omitting it resolves against the MCP server's own working directory, which is fixed at spawn and may be a different directory mapped to a different project. Only a FORMIO_PROJECT_URL set in the server environment makes it unnecessary, because that pin takes precedence over every mapping.";
 
 // One schema for every client. Requiredness cannot live here: whether a cwd is
 // needed depends on the environment the server was launched with, and this
@@ -27,9 +28,23 @@ export const cwdSchema = z
 // The only configuration guidance a stand-alone server can give, so it names
 // the base URL too: omitting it defaults to api.form.io, which builds the login
 // URL and would send a self-hosted user to the wrong deployment.
-function missingProjectError(cwd: string | undefined, suggested?: string): Error {
-  const where = cwd ? ` for cwd=${cwd}` : '';
-  const how = cwd ? `project_set with cwd=${cwd} and the project URL` : 'project_set';
+interface MissingProject {
+  cwd: string | undefined;
+  mapCwd: string;
+  suggested?: string;
+}
+
+function missingProjectError({ cwd, mapCwd, suggested }: MissingProject): Error {
+  // Which directory was searched is the whole answer when no cwd was passed: the
+  // server's own is not the user's, so "nothing is configured" without it sends
+  // the caller to project_set, which writes a mapping the next cwd-passing call
+  // will not find — and the loop repeats with the cause never named.
+  const where = cwd
+    ? ` for cwd=${cwd}`
+    : ` for ${mapCwd}, the MCP server's own working directory, which is the only directory searched because no cwd argument was passed`;
+  const how = cwd
+    ? `project_set with cwd=${cwd} and the project URL`
+    : "project_set with cwd set to the user's current working directory and the project URL — and pass that same cwd on every Form.io tool call";
   // A configured default is offered here rather than applied during resolution:
   // the agent must confirm it and persist it, so nothing is written to a project
   // the user did not choose for this directory.
@@ -94,6 +109,42 @@ function chooseBaseUrl(candidates: ReadonlyArray<readonly [BaseUrlSource, string
 // default rather than failing a call that never needed the file. The reason is
 // still said out loud, because a broken map that nothing depends on today breaks
 // every unpinned directory tomorrow.
+// The two mapped values that are URLs. getConfig validates every URL it reads
+// from the environment for exactly one reason — taken raw, an unusable value keys
+// the token cache and builds the portal-login URL, and only surfaces much later as
+// an opaque "Failed to parse URL" out of fetch — and a value read from
+// ~/.formio/projects.json reaches the same places. That file is hand-editable and
+// predates the validation, so the same rule applies to both sides.
+const MAPPED_URL_KEYS: ReadonlyArray<string> = ['FORMIO_PROJECT_URL', 'FORMIO_BASE_URL'];
+
+// Reported as an unreadable ENTRY, not as an unmapped directory: the value is
+// there and it is wrong, so answering "nothing is configured" sends the caller to
+// interview the user and call project_set, which is the rewrite that destroys the
+// surviving mappings. The same distinction ProjectMapUnreadableError already draws
+// for the file as a whole, drawn one level down.
+function normalizeMappedUrls(
+  env: Record<string, string>,
+  { mapCwd, cacheDir }: { mapCwd: string; cacheDir?: string }
+): Record<string, string> {
+  return Object.fromEntries(
+    Object.entries(env).map(([key, value]) => {
+      if (!MAPPED_URL_KEYS.includes(key)) {
+        return [key, value];
+      }
+      try {
+        return [key, normalizeHttpUrl(value, key)];
+      } catch (error) {
+        throw new ProjectMapUnreadableError(
+          projectMapPath(cacheDir),
+          new Error(
+            `the entry for ${mapCwd} holds an unusable ${key}: ${error instanceof Error ? error.message : String(error)}`
+          )
+        );
+      }
+    })
+  );
+}
+
 function readMappedEnv({
   mapCwd,
   cacheDir,
@@ -101,7 +152,11 @@ function readMappedEnv({
   onNote,
 }: MappedEnvRead): Record<string, string> | undefined {
   try {
-    return readProjectEntry(mapCwd, cacheDir)?.env;
+    const env = readProjectEntry(mapCwd, cacheDir)?.env;
+    // Normalized inside the same try: an entry whose URL is unusable is as good
+    // as unreadable, so a pin that consults the map purely as a base-URL fallback
+    // tolerates it on exactly the terms below.
+    return env && normalizeMappedUrls(env, { mapCwd, cacheDir });
   } catch (error) {
     if (!tolerateUnreadable || !(error instanceof ProjectMapUnreadableError)) {
       throw error;
@@ -160,7 +215,21 @@ export function resolveProject(
   // way to fix it.
   const projectUrl = envProjectUrl || mappedEnv?.FORMIO_PROJECT_URL;
   if (!projectUrl) {
-    throw missingProjectError(cwd || undefined, baseConfig.defaultProjectUrl);
+    throw missingProjectError({
+      cwd: cwd || undefined,
+      mapCwd,
+      suggested: baseConfig.defaultProjectUrl,
+    });
+  }
+  // Said out loud for the same reason project_set warns on the write side: the
+  // server's process cwd is fixed at spawn and, for a plugin- or desktop-launched
+  // server, is not where the user is. Nothing else can surface this — an omitted
+  // cwd and a cwd that happens to match are indistinguishable from here — so a
+  // resolution against the wrong directory's project is otherwise silent.
+  if (!cwd && !envProjectUrl) {
+    onNote(
+      `No cwd argument was passed, so the project was resolved from the mapping for ${mapCwd}, the MCP server's own working directory. Pass cwd on every Form.io tool call to target the user's directory.`
+    );
   }
 
   // Which side wins depends on which side supplied the project. When the mapping

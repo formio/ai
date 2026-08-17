@@ -32,8 +32,17 @@ function describe(value: unknown): string {
   return Array.isArray(value) ? 'an array' : `a ${typeof value}`;
 }
 
+// Exported so a caller that rejects an entry's CONTENTS can name the same file
+// this module names. The URL-shape rules live in the resolver rather than here:
+// writeProjectEntry validates the entry it is about to overwrite, and that
+// rewrite is the documented repair for a mapping holding an unusable URL — so a
+// check that fails the read must not also fail the fix.
+export function projectMapPath(cacheDir: string = DEFAULT_CACHE_DIR): string {
+  return path.join(cacheDir, PROJECTS_FILE);
+}
+
 function readMap(cacheDir: string): ProjectMap {
-  const filePath = path.join(cacheDir, PROJECTS_FILE);
+  const filePath = projectMapPath(cacheDir);
   let raw: string;
   try {
     raw = fs.readFileSync(filePath, 'utf-8');
@@ -66,7 +75,7 @@ function readMap(cacheDir: string): ProjectMap {
 
 function writeMap(cacheDir: string, data: ProjectMap): void {
   fs.mkdirSync(cacheDir, { recursive: true });
-  fs.writeFileSync(path.join(cacheDir, PROJECTS_FILE), JSON.stringify(data), {
+  fs.writeFileSync(projectMapPath(cacheDir), JSON.stringify(data), {
     mode: 0o600,
   });
 }
@@ -82,7 +91,7 @@ function writeMap(cacheDir: string, data: ProjectMap): void {
 function validateEntry(cacheDir: string, cwd: string, value: unknown): ProjectEntry {
   const invalid = (reason: string): never => {
     throw new ProjectMapUnreadableError(
-      path.join(cacheDir, PROJECTS_FILE),
+      projectMapPath(cacheDir),
       new Error(`the entry for ${cwd} ${reason}`)
     );
   };

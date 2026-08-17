@@ -94,10 +94,10 @@ Wait for explicit approval. Declining returns to the skip path (Step 5 next, no 
 
 ### Call `project_import`
 
-On approval, invoke the MCP tool with the template content loaded from the planner's `template.json` file path:
+On approval, invoke the MCP tool with the template content loaded from the planner's `template.json` file path. Pass `cwd` — the same working directory Step 3 mapped with `project_set`. Every project-scoped tool resolves its project from that mapping, and omitting `cwd` resolves against the MCP server's own working directory instead, which is fixed at spawn: at best the import fails with "No Form.io project is configured", at worst it merges the template into whatever project that other directory is mapped to.
 
 ```
-mcp__formio-mcp__project_import({ template: <the template object> })
+mcp__formio-mcp__project_import({ cwd: <workspace cwd>, template: <the template object> })
 ```
 
 The tool returns the server's response text on success. Surface it to the user in one sentence ("Imported X resources, Y roles, Z forms into `<project URL>`.") and advance to the config check.

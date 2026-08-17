@@ -65,7 +65,15 @@ export function registerProjectSetTool(server: McpServer, options: ProjectSetOpt
       const entryCwd = cwd ?? getServerCwd();
       const existing = readProjectEntry(entryCwd);
       const previousMapped = existing?.env.FORMIO_PROJECT_URL;
-      const previousBase = existing?.env.FORMIO_BASE_URL;
+      // Read tolerantly, exactly like the environment global below it. A stored
+      // base URL is data rather than the caller's typing, and this call is the
+      // documented repair for a directory whose mapping the resolver now refuses:
+      // normalizing it strictly made the repair fail with the very error it was
+      // called to clear, leaving no way to fix that directory at all.
+      const previousBase = readHttpUrlEnv({
+        raw: existing?.env.FORMIO_BASE_URL,
+        name: `FORMIO_BASE_URL mapped for ${entryCwd}`,
+      });
       // Precedence: the explicit argument, then the base URL already mapped for
       // this directory, then the environment global. The mapping outranks the
       // global deliberately — it is the more specific answer for THIS directory

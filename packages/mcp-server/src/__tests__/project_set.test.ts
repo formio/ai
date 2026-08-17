@@ -5,7 +5,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import fs from 'fs';
 import path from 'path';
 import os from 'os';
-import { readProjectEntry } from '../project-map.js';
+import { readProjectEntry, writeProjectEntry } from '../project-map.js';
 import { registerProjectSetTool } from '../tools/project_set.js';
 
 async function createTestClient(options?: {
@@ -446,6 +446,51 @@ describe('project_set tool', () => {
           FORMIO_BASE_URL: 'https://forms.acme.com',
         },
       });
+    });
+  });
+
+  // The stored base URL is data, not the caller's typing, and this call is the
+  // documented repair for a directory whose mapping is unusable. Normalizing it
+  // strictly made the repair fail with the same error it was called to clear.
+  it('re-maps a directory whose stored base URL is not a URL', async () => {
+    writeProjectEntry(cwd, {
+      FORMIO_PROJECT_URL: 'https://old.form.io',
+      FORMIO_BASE_URL: 'forms.mysite.com',
+    });
+    const { client } = await createTestClient({ cwd: () => cwd, baseUrl: () => undefined });
+
+    const result = await client.callTool({
+      name: 'project_set',
+      arguments: { projectUrl: 'https://new.form.io', cwd },
+    });
+
+    expect(result.isError).toBeFalsy();
+    expect(readProjectEntry(cwd)).toEqual({
+      env: { FORMIO_PROJECT_URL: 'https://new.form.io' },
+    });
+  });
+
+  it('lets an explicit baseUrl replace an unusable stored one', async () => {
+    writeProjectEntry(cwd, {
+      FORMIO_PROJECT_URL: 'https://old.form.io',
+      FORMIO_BASE_URL: 'forms.mysite.com',
+    });
+    const { client } = await createTestClient({ cwd: () => cwd, baseUrl: () => undefined });
+
+    await client.callTool({
+      name: 'project_set',
+      arguments: {
+        projectUrl: 'https://myproject.mysite.com',
+        baseUrl: 'https://forms.mysite.com',
+        cwd,
+      },
+    });
+
+    expect(readProjectEntry(cwd)).toEqual({
+      env: {
+        FORMIO_PROJECT_URL: 'https://myproject.mysite.com',
+        FORMIO_BASE_URL: 'https://forms.mysite.com',
+      },
     });
   });
 

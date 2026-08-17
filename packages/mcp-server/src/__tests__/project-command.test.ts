@@ -328,6 +328,62 @@ describe('project command', () => {
       expect(result.exitCode).not.toBe(0);
       expect(result.stderr).toContain('--project-url');
     });
+
+    // A stored value is not the user's typing, and this rewrite is the documented
+    // repair for a directory whose mapping is unusable. Failing on it left the
+    // repair reporting the very error it was run to clear, with nothing saying the
+    // value came from the map rather than from the command line.
+    it('repairs a directory whose mapped base URL is not a URL', () => {
+      writeProjectEntry(
+        '/abs/path',
+        {
+          FORMIO_PROJECT_URL: 'https://old.form.io',
+          FORMIO_BASE_URL: 'forms.mysite.com',
+        },
+        cacheDir
+      );
+
+      const result = runProjectCommand(
+        ['project', 'set', '--project-url', 'https://new.form.io', '--cwd', '/abs/path'],
+        { cacheDir, env: {} }
+      );
+
+      expect(result.exitCode).toBe(0);
+      expect(readProjectEntry('/abs/path', cacheDir)).toEqual({
+        env: { FORMIO_PROJECT_URL: 'https://new.form.io' },
+      });
+      expect(result.stderr).toContain('FORMIO_BASE_URL');
+    });
+
+    it('lets --base-url replace an unusable mapped base URL', () => {
+      writeProjectEntry(
+        '/abs/path',
+        {
+          FORMIO_PROJECT_URL: 'https://old.form.io',
+          FORMIO_BASE_URL: 'forms.mysite.com',
+        },
+        cacheDir
+      );
+
+      const result = runProjectCommand(
+        [
+          'project',
+          'set',
+          '--project-url',
+          'https://myproject.mysite.com',
+          '--base-url',
+          'https://forms.mysite.com',
+          '--cwd',
+          '/abs/path',
+        ],
+        { cacheDir, env: {} }
+      );
+
+      expect(result.exitCode).toBe(0);
+      expect(readProjectEntry('/abs/path', cacheDir)?.env.FORMIO_BASE_URL).toBe(
+        'https://forms.mysite.com'
+      );
+    });
   });
 
   describe('project get', () => {
@@ -364,6 +420,31 @@ describe('project command', () => {
       expect(result.stdout).toContain('https://pinned.form.io');
       expect(result.stdout).toContain('environment');
       expect(result.stdout).not.toContain('https://mapped.form.io');
+    });
+
+    // Exit 0 printing an unusable value is the worst of the three outcomes: the
+    // caller reports it as the answer, and every request that follows dies inside
+    // fetch with no mention of the file the value came from. This is a failure to
+    // answer, not an answer of "nothing here", so it must not land on the
+    // interview path either.
+    it('exits 2 rather than reporting a malformed mapped URL as the answer', () => {
+      writeProjectEntry(
+        '/abs/path',
+        {
+          FORMIO_PROJECT_URL: 'https://mapped.form.io',
+          FORMIO_BASE_URL: 'forms.mysite.com',
+        },
+        cacheDir
+      );
+
+      const result = runProjectCommand(['project', 'get', '--cwd', '/abs/path'], {
+        cacheDir,
+        env: {},
+      });
+
+      expect(result.exitCode).toBe(2);
+      expect(result.stderr).toContain('FORMIO_BASE_URL');
+      expect(result.stderr).toContain('/abs/path');
     });
 
     it('exits non-zero and names project set when nothing is configured', () => {

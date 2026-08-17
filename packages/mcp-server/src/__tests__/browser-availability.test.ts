@@ -70,6 +70,24 @@ describe('browserlessReason', () => {
     expect(browserlessReason(environment({ env: { container: 'podman' } }))).toMatch(/container/i);
   });
 
+  // A dev container started with the host's X socket shared into it
+  // (docker run -e DISPLAY=:0 -v /tmp/.X11-unix:/tmp/.X11-unix) opens the user's
+  // own browser and sets none of the editor-forwarding markers. Answering
+  // "container" before the display was consulted failed the login outright on a
+  // host that can present one — and failed it before the port was bound, so the
+  // login URL never reached the user either.
+  it('accepts a container that has a display', () => {
+    expect(
+      browserlessReason(environment({ hasContainerMarker: true, env: { DISPLAY: ':0' } }))
+    ).toBeNull();
+  });
+
+  it('accepts a container declared by environment variable that has a Wayland display', () => {
+    expect(
+      browserlessReason(environment({ env: { container: 'podman', WAYLAND_DISPLAY: 'wayland-0' } }))
+    ).toBeNull();
+  });
+
   // The remedy the error text offers — publish the login port and reach it from
   // the host's browser — has to actually unblock the login, or it is advice that
   // returns the identical error.

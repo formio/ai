@@ -335,6 +335,148 @@ describe('resolveProjectConfig', () => {
     });
   });
 
+  // getConfig validates every URL it reads from the environment; mapped values
+  // reached fetch unchecked. ~/.formio/projects.json is hand-editable and predates
+  // that validation, so a stored "forms.mysite.com" resolved cleanly, was reported
+  // as the answer by `project get`, and then died inside fetch as "Failed to parse
+  // URL from forms.mysite.com/current" — far from the file that caused it.
+  describe('a mapped URL that is not a URL', () => {
+    it('fails resolution rather than handing an unparseable base URL to fetch', () => {
+      writeProjectEntry('/workspace/pkg-bad-base', {
+        FORMIO_PROJECT_URL: 'https://mapped.form.io',
+        FORMIO_BASE_URL: 'forms.mysite.com',
+      });
+
+      expect(() => resolveProjectConfig('/workspace/pkg-bad-base', { apiKey: 'abc' })).toThrow(
+        ProjectMapUnreadableError
+      );
+    });
+
+    it('names the variable, the directory and the map file', () => {
+      writeProjectEntry('/workspace/pkg-bad-base-named', {
+        FORMIO_PROJECT_URL: 'https://mapped.form.io',
+        FORMIO_BASE_URL: 'forms.mysite.com',
+      });
+      const resolve = () =>
+        resolveProjectConfig('/workspace/pkg-bad-base-named', { apiKey: 'abc' });
+
+      expect(resolve).toThrow(/FORMIO_BASE_URL/);
+      expect(resolve).toThrow(/pkg-bad-base-named/);
+      expect(resolve).toThrow(/projects\.json/);
+    });
+
+    it('fails on an unusable mapped project URL', () => {
+      writeProjectEntry('/workspace/pkg-bad-project', {
+        FORMIO_PROJECT_URL: 'forms.mysite.com/myproject',
+      });
+
+      expect(() => resolveProjectConfig('/workspace/pkg-bad-project', { apiKey: 'abc' })).toThrow(
+        /FORMIO_PROJECT_URL/
+      );
+    });
+
+    it('rejects a mapped URL whose protocol is not http or https', () => {
+      writeProjectEntry('/workspace/pkg-ftp', {
+        FORMIO_PROJECT_URL: 'ftp://mapped.form.io',
+      });
+
+      expect(() => resolveProjectConfig('/workspace/pkg-ftp', { apiKey: 'abc' })).toThrow(
+        ProjectMapUnreadableError
+      );
+    });
+
+    // Normalized on the same terms as an environment value: everything downstream
+    // compares these strings — the pinned project against the mapped one, the
+    // token cache against its key — so surrounding whitespace and host case have
+    // to be gone before then.
+    it('normalizes a usable mapped URL the way an environment value is normalized', () => {
+      writeProjectEntry('/workspace/pkg-untidy', {
+        FORMIO_PROJECT_URL: '  https://Mapped.form.io/  ',
+      });
+
+      expect(resolveProjectConfig('/workspace/pkg-untidy', { apiKey: 'abc' }).projectUrl).toBe(
+        'https://mapped.form.io'
+      );
+    });
+
+    // A pin that never needed the map must not be failed by it — the same rule an
+    // unreadable projects.json already follows. Unusable means "no mapped base
+    // URL", which is the answer no mapping at all would have given.
+    it('does not fail a pinned launch that only borrows the base URL', () => {
+      writeProjectEntry('/workspace/pkg-pin-bad-base', {
+        FORMIO_PROJECT_URL: 'https://examples.form.io',
+        FORMIO_BASE_URL: 'forms.mysite.com',
+      });
+      const notes: string[] = [];
+
+      const cfg = resolveProjectConfig(
+        '/workspace/pkg-pin-bad-base',
+        { projectUrl: 'https://examples.form.io' },
+        { onNote: (message) => notes.push(message) }
+      );
+
+      expect(cfg.baseUrl).toBe('https://api.form.io');
+      expect(notes.join('\n')).toMatch(/FORMIO_BASE_URL/);
+    });
+  });
+
+  // The server's process cwd is fixed at spawn and, for a plugin- or
+  // desktop-launched server, is not where the user is. It stays the fallback —
+  // project_set writes there under the same conditions — but a resolution that
+  // silently targets a different directory's project is the one failure nothing
+  // else in this flow can surface.
+  describe('resolving with no cwd argument', () => {
+    it('says which directory supplied the mapping', () => {
+      writeProjectEntry(process.cwd(), {
+        FORMIO_PROJECT_URL: 'https://server-cwd.form.io',
+      });
+      const notes: string[] = [];
+
+      resolveProjectConfig(undefined, baseConfig, { onNote: (message) => notes.push(message) });
+
+      expect(notes.join('\n')).toContain(process.cwd());
+      expect(notes.join('\n')).toMatch(/cwd/);
+    });
+
+    it('says nothing when the caller passed a cwd', () => {
+      writeProjectEntry('/workspace/pkg-a', {
+        FORMIO_PROJECT_URL: 'https://mapped.form.io',
+      });
+      const notes: string[] = [];
+
+      resolveProjectConfig('/workspace/pkg-a', baseConfig, {
+        onNote: (message) => notes.push(message),
+      });
+
+      expect(notes).toEqual([]);
+    });
+
+    it('says nothing when the environment pinned the project', () => {
+      const notes: string[] = [];
+
+      resolveProjectConfig(undefined, configWithEnvProject, {
+        onNote: (message) => notes.push(message),
+      });
+
+      expect(notes).toEqual([]);
+    });
+
+    // Without the directory and the argument in the message, the remedy the error
+    // names is project_set — which writes another mapping the next cwd-passing
+    // call will not find, and the loop repeats.
+    it('names the searched directory and the cwd argument when nothing is mapped there', () => {
+      let message = '';
+      try {
+        resolveProjectConfig(undefined, baseConfig);
+      } catch (error) {
+        message = error instanceof Error ? error.message : String(error);
+      }
+
+      expect(message).toContain(process.cwd());
+      expect(message).toMatch(/cwd/);
+    });
+  });
+
   describe('actionable errors when nothing resolves', () => {
     it('names project_set, FORMIO_PROJECT_URL and the searched cwd', () => {
       expect(() => resolveProjectConfig('/workspace/unmapped', baseConfig)).toThrow(/project_set/);

@@ -115,15 +115,26 @@ function runSet(flags: Record<string, string>, context: CommandContext): Project
   // variable would otherwise fail the very invocation formio-mcp-setup runs —
   // for a user who supplied no base URL of their own and cannot see why. The
   // flag stays strict, because that one is the user's own typing.
+  //
+  // The mapped link is read the same tolerant way, and for a sharper reason: this
+  // rewrite is the documented repair for a directory whose mapping the resolver
+  // now refuses, so failing on the stored value made the repair report the very
+  // error it was run to clear — and named it "baseUrl", as though the caller had
+  // typed it.
   const notes: string[] = [];
-  const mappedBaseUrl = readProjectEntry(cwd, context.cacheDir)?.env.FORMIO_BASE_URL;
+  const onIgnored = (message: string) => notes.push(message);
+  const mappedBaseUrl = readHttpUrlEnv({
+    raw: readProjectEntry(cwd, context.cacheDir)?.env.FORMIO_BASE_URL,
+    name: `FORMIO_BASE_URL mapped for ${cwd}`,
+    onIgnored,
+  });
   const declaredBaseUrl =
     flags['base-url'] ||
     mappedBaseUrl ||
     readHttpUrlEnv({
       raw: context.env.FORMIO_BASE_URL,
       name: 'FORMIO_BASE_URL',
-      onIgnored: (message) => notes.push(message),
+      onIgnored,
     });
   const baseUrl = declaredBaseUrl ? normalizeHttpUrl(declaredBaseUrl, 'baseUrl') : undefined;
 

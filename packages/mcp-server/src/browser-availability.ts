@@ -55,8 +55,15 @@ export function browserlessReason(
   if (publishedLoginEndpoint || hasEditorForwardedPorts(env)) {
     return null;
   }
-  if (hasContainerMarker || env.container) {
-    return 'this looks like a container';
+  // Displayless, like the remote-shell check below it. A container is evidence
+  // that the browser is probably elsewhere, never that it certainly is: a dev
+  // container started with the host's X socket shared in (docker run -e DISPLAY=:0
+  // -v /tmp/.X11-unix:/tmp/.X11-unix) opens the user's own browser and carries
+  // none of the editor-forwarding markers above. Answering here before the display
+  // was consulted failed that login outright — and failed it before the port was
+  // bound, so the login URL the caller prints never reached the user either.
+  if ((hasContainerMarker || env.container) && !hasDisplay(env)) {
+    return 'this looks like a container with no display';
   }
   if ((env.SSH_CONNECTION || env.SSH_TTY) && !hasDisplay(env)) {
     return 'this looks like a remote shell (SSH with no display)';
