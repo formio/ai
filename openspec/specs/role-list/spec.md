@@ -1,3 +1,7 @@
+## Purpose
+
+Defines the `role_list` MCP tool: retrieving every role on the active project and the MCP content it returns.
+
 ## Requirements
 
 ### Requirement: role_list tool is registered

@@ -1,3 +1,7 @@
+## Purpose
+
+Defines the HTTP client every tool goes through: how a request to the Form.io API is authenticated, and how errors are handled — including re-authentication on a 401.
+
 ## Requirements
 
 ### Requirement: Authenticated requests to Form.io API

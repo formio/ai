@@ -1,3 +1,7 @@
+## Purpose
+
+Defines the `form_get` MCP tool: retrieving one form by ID or path alias, selecting fields, fetching the current draft, and the MCP content it returns.
+
 ## Requirements
 
 ### Requirement: form_get tool is registered

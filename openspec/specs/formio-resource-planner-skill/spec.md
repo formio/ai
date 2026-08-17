@@ -1,3 +1,7 @@
+## Purpose
+
+Defines the trigger boundaries of the `formio-resource-planner` skill: it claims planning verbs only, routes build intents to `formio-application`, and routes standalone single-form creation to `formio-form-builder`.
+
 ## Requirements
 
 ### Requirement: formio-resource-planner description routes standalone single-form creation to formio-form-builder

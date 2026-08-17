@@ -6,10 +6,27 @@ The server SHALL read `FORMIO_BASE_URL` (optional, defaulting to `https://api.fo
 
 The defaults SHALL NOT vary by host or agent. The server SHALL NOT read any host-mode environment variable — in particular, `FORMIO_PLUGIN_CONTEXT` SHALL have no effect on configuration, on which tools are registered, or on any tool's input schema.
 
-#### Scenario: Base and project URL are set
+#### Scenario: All environment variables are set
 
-- **WHEN** `FORMIO_BASE_URL` is `https://forms.example.com` and `FORMIO_PROJECT_URL` is `https://forms.example.com/example`
-- **THEN** `getConfig()` returns a config whose `baseUrl` is `https://forms.example.com` and whose `projectUrl` is `https://forms.example.com/example`
+- **WHEN** `FORMIO_BASE_URL` is `https://forms.example.com`, `FORMIO_PROJECT_URL` is `https://forms.example.com/example`, `FORMIO_API_KEY` is `abc123`, and `FORMIO_LOGIN_FORM` is `https://forms.example.com/example/custom/login`
+- **THEN** `getConfig()` returns a config whose `baseUrl` is `https://forms.example.com`, whose `projectUrl` is `https://forms.example.com/example`, whose `apiKey` is `abc123`, whose `loginFormUrl` is `https://forms.example.com/example/custom/login`, and whose `jwt` is `undefined`
+
+#### Scenario: Only project URL is set (JWT mode)
+
+- **WHEN** `FORMIO_PROJECT_URL` is `https://forms.example.com/example` and neither `FORMIO_API_KEY` nor `FORMIO_LOGIN_FORM` is set
+- **THEN** `getConfig()` returns a config whose `projectUrl` is `https://forms.example.com/example`, whose `apiKey` is `undefined`, whose `loginFormUrl` is `undefined`, and whose `jwt` is `undefined`
+
+#### Scenario: Trailing slash is stripped from project URL
+
+- **WHEN** `FORMIO_PROJECT_URL` is `https://forms.example.com/example/`
+- **THEN** the returned `projectUrl` is `https://forms.example.com/example` (no trailing slash)
+
+#### Scenario: Login form URL defaults when not set
+
+- **WHEN** `FORMIO_LOGIN_FORM` is not set
+- **THEN** `getConfig()` returns a config whose `loginFormUrl` is `undefined`
+- **AND** the auth module resolves the login form lazily, at the point the login page is served, by probing `${baseUrl}/formio/user/login`, then `${projectUrl}/admin/login`, then `${projectUrl}/user/login`, and caching the first that responds
+- **AND** no single URL is baked in as a default at configuration time, because the correct candidate depends on the deployment
 
 #### Scenario: Base URL defaults to the hosted cloud
 
@@ -38,24 +55,25 @@ The defaults SHALL NOT vary by host or agent. The server SHALL NOT read any host
 - **WHEN** `FORMIO_BASE_URL` is `https://forms.example.com/` and `FORMIO_PROJECT_URL` is `https://forms.example.com/example/`
 - **THEN** the returned `baseUrl` is `https://forms.example.com` and the returned `projectUrl` is `https://forms.example.com/example`
 
-#### Scenario: API key is optional (JWT mode)
-
-- **WHEN** `FORMIO_API_KEY` is not set
-- **THEN** `getConfig()` returns a config whose `apiKey` is `undefined`
-
 ### Requirement: Configuration is validated at server creation
 
 The `createServer()` function SHALL call `getConfig()` before registering tools, so that every tool handler shares one configuration object. Reading configuration SHALL NOT fail for absent optional values, and SHALL NOT depend on how the process was launched.
+
+#### Scenario: Server startup with valid config
+
+- **WHEN** `createServer()` is called with `FORMIO_BASE_URL` and `FORMIO_PROJECT_URL` set
+- **THEN** the server is created and all tools are registered against that configuration
+
+#### Scenario: Server startup with missing project URL
+
+- **WHEN** `createServer()` is called without `FORMIO_PROJECT_URL`
+- **THEN** the server is created and all tools are registered
+- **AND** it does not throw, because the missing project is reported by the first project-scoped tool call rather than at startup
 
 #### Scenario: Server creation with an empty environment
 
 - **WHEN** `createServer()` is called with no `FORMIO_*` variables set
 - **THEN** the server is created and all tools are registered
-
-#### Scenario: Server creation with a full environment
-
-- **WHEN** `createServer()` is called with `FORMIO_BASE_URL` and `FORMIO_PROJECT_URL` set
-- **THEN** the server is created and all tools are registered against that configuration
 
 ## ADDED Requirements
 

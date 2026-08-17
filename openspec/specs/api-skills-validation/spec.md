@@ -1,3 +1,7 @@
+## Purpose
+
+Defines the automated validation suite for the API and SDK skill libraries: the section layout every reference must have, the canonical auth paragraph, forbidden legacy-auth tokens and deep imports, resolved Postman placeholders, PDF scope, URL terminology, and example-value rules.
+
 ## Requirements
 
 ### Requirement: Validation suite runs under pnpm test

@@ -1,3 +1,7 @@
+## Purpose
+
+Defines the structure of the consolidated Form.io API skill — one activatable router with per-capability-group reference documents beneath it.
+
 ## Requirements
 
 ### Requirement: Consolidated Form.io API skill structure

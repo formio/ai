@@ -1,3 +1,7 @@
+## Purpose
+
+Defines the `project_export` MCP tool: its description and the `GET /export` call it makes to snapshot the active project.
+
 ## Requirements
 
 ### Requirement: project_export tool is registered with descriptive text

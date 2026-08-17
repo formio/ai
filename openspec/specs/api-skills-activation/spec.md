@@ -1,3 +1,7 @@
+## Purpose
+
+Defines when the Form.io API router skill activates: the trigger and negative-trigger clauses its description must carry, and the MCP Tool Preference guidance that sends first-party operations to the MCP tools rather than to raw HTTP.
+
 ## Requirements
 
 ### Requirement: Router description MUST contain trigger and negative-trigger clauses
@@ -27,3 +31,21 @@ Because the router is the single activatable entry-point into the API reference 
 ### Requirement: Router MUST include MCP Tool Preference guidance
 
 The router `SKILL.md` body SHALL contain guidance instructing Claude to prefer first-party MCP tools (`form_create`, `form_get`, `form_list`, `form_update`, `role_create`, `role_list`, `role_update`, `project_export`, `project_import`) over raw HTTP when both paths exist. This guidance MAY be a dedicated section heading or inline text. Authentication is implicit — any authenticated MCP tool call triggers the portal-login flow on first use, so no explicit `authenticate` tool is exposed.
+
+#### Scenario: Router body carries the tool-preference guidance
+
+- **WHEN** `plugin/skills/formio-api/SKILL.md` is read
+- **THEN** its body SHALL contain guidance to prefer first-party MCP tools over raw HTTP where both reach the same operation
+- **AND** that guidance SHALL name the tools it prefers, so a reader can tell which operations have one
+
+#### Scenario: Router body omitting the guidance is non-conformant
+
+- **WHEN** the router body contains no tool-preference guidance
+- **THEN** the router SHALL be treated as non-conformant
+- **AND** the reason SHALL be that the router is the only surface a reader passes through on the way to a reference, so guidance absent here sends them to raw HTTP for an operation a first-party tool already covers
+
+#### Scenario: The guidance describes authentication as implicit rather than as a tool call
+
+- **WHEN** the tool-preference guidance explains how an authenticated call is authorized
+- **THEN** it SHALL state that the first authenticated tool call triggers the portal-login flow
+- **AND** it SHALL NOT direct the reader to call an `authenticate` tool first, because this server registers none

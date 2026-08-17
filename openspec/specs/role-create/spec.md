@@ -1,3 +1,7 @@
+## Purpose
+
+Defines the `role_create` MCP tool: creating a project role and the MCP content it returns.
+
 ## Requirements
 
 ### Requirement: role_create tool is registered

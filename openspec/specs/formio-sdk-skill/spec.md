@@ -1,3 +1,7 @@
+## Purpose
+
+Defines the `formio-sdk` skill: its location and three-clause description, the canonical imports that are the only documented ones, Hosted-vs-SaaS URL configuration, the reference documents required and the heading layout they follow, the source path each cites, and the library-wide forbidden-script-tag rule.
+
 ## Requirements
 
 ### Requirement: Skill MUST exist at plugin/skills/formio-sdk/

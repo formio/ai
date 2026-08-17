@@ -1,3 +1,7 @@
+## Purpose
+
+Defines the `form_update` MCP tool: the form ID and definition it accepts, the `PUT /form/{formId}` call it makes, the note it requires, its draft, publish, and revert flags, and the per-form tracking gate applied to standard writes.
+
 ## Requirements
 
 ### Requirement: form_update tool is registered with workflow guidance

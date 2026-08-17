@@ -1,3 +1,7 @@
+## Purpose
+
+Defines the on-disk JWT cache: keyed by project URL, readable and clearable by that key, and written with restrictive file permissions.
+
 ## Requirements
 
 ### Requirement: Tokens are cached to disk keyed by project URL

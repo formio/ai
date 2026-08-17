@@ -1,3 +1,7 @@
+## Purpose
+
+Defines the `form_list` MCP tool: retrieving form summaries for the active project and the MCP content it returns.
+
 ## Requirements
 
 ### Requirement: form_list tool is registered

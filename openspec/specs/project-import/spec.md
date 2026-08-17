@@ -1,3 +1,7 @@
+## Purpose
+
+Defines the `project_import` MCP tool: the template object it accepts and the `POST /import` call that merges roles, resources, forms, and actions into the active project.
+
 ## Requirements
 
 ### Requirement: project_import tool is registered with skill-referencing description
