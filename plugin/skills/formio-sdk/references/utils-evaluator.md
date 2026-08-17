@@ -2,6 +2,8 @@
 
 The `Utils.Evaluator` evaluates templates (`{{ data.x }}`, `{% code %}`), JavaScript expressions, and JSONLogic. The renderer (`packages/formio.js/src/utils/Evaluator.js`) extends the core evaluator with a cached underscore template compiler. The singleton is mutable — replace it with `registerEvaluator` to install a custom one (e.g., a sandboxed evaluator). Sourced from `packages/core/src/utils/Evaluator.ts` and `packages/formio.js/src/utils/Evaluator.js` in the Form.io source code.
 
+**This module compiles strings into running code.** `evaluate`, `evaluator`, and template interpolation all execute whatever expression they are handed, so the expression source must be trusted — a form definition from your own project, or a literal in your app — never a submitted value, a query parameter, or a definition fetched from a host you do not control. Two consequences worth stating up front: `interpolateString` emits raw, unescaped output, so pair it with `Utils.sanitize` before rendering (see below); and `registerEvaluator` swaps the singleton **process-wide**, so any library that overrides it changes how every later template, condition, and formula is evaluated — call it once at your own bootstrap, and treat a dependency that calls it as a supply-chain concern.
+
 ## Imports
 
 ```ts

@@ -287,6 +287,8 @@ The probe runs lazily — only when the local auth page is actually served.
 
 <sub>\* Not at startup — the server starts, lists every tool, and answers `hello` without it; only the tools that read or write Form.io data error, naming `project_set` and this variable. The alternative is the `project_set` tool, which maps a working directory to a project in `~/.formio/projects.json`. Resolution order: `FORMIO_PROJECT_URL`, then the mapping for the caller's `cwd`, then the error. Map a directory before any client connects with `npx -y @formio/mcp project set --project-url <url> --base-url <url> --cwd <path>`; `project get --cwd <path>` prints what resolves and which source won. It exits `0` when it resolved, `1` when nothing is mapped for that directory, and `2` when the command could not answer (a usage error, a malformed URL, an unreadable `~/.formio/projects.json`) — so a caller can tell "nothing here yet" from "this failed".</sub>
 
+---
+
 ## Privacy Policy
 
 Form.io's privacy policy covers the Form.io Services this server talks to: **https://form.io/privacy**
