@@ -35,7 +35,7 @@ Same rule as `FormioResourceConfig.form` in the Resources sub-skill: the `form` 
 
 ## No-artifact-pair fallback
 
-If there is no `template.md` / `template.json` pair available, pause at the start of this phase and offer two options via `AskUserQuestion`:
+If there is no `template.md` / `template.json` pair available, pause at the start of this phase and offer two options in one question round, using the client's structured question mechanism (in Claude Code, `AskUserQuestion`):
 
 1. **Run `formio-resource-planner` first** — the planner is the canonical upstream producer of the artifact pair this phase consumes. The parent will pause, hand off to the planner, and resume here once `template.md` + `template.json` are approved.
 2. **Skip AUTH with a TODO** — generate `AppModule` without importing an `AuthModule`, but insert a TODO comment that points at the endpoints the user will need to wire auth manually later:
@@ -47,7 +47,7 @@ If there is no `template.md` / `template.json` pair available, pause at the star
 // When ready, generate src/app/auth/auth.module.ts and import AuthModule into this module.
 ```
 
-Do not proceed to the Resources phase in a way that assumes authenticated access if AUTH was skipped — surface the skip clearly in the handoff to the Resources sub-skill (`./resources/SKILL.md`, a sub-folder of this skill — NOT a separately-registered top-level skill) so resource modules that require auth flag the gap.
+Do not proceed to the Resources phase in a way that assumes authenticated access if AUTH was skipped — surface the skip clearly in the handoff to the Resources sub-skill (`./formio-angular-resources/SKILL.md`, a sub-folder of this skill — NOT a separately-registered top-level skill) so resource modules that require auth flag the gap.
 
 ## `src/app/auth/auth.module.ts` template
 
@@ -130,7 +130,7 @@ Notes on why this shape:
 - `FormioAuthConfig` is imported from `@formio/angular/auth`, not from the top-level `@formio/angular` entry point.
 - `AuthConfig.login.form` and `AuthConfig.register.form` are **URL path segments**, not machine names. The auth module issues requests against `appUrl + '/' + login.form` (and similarly for register), so the value MUST equal the `path` property of the corresponding form inside `template.json`. On a default user-resource setup the planner records `user/login` and `user/register`; on custom setups (e.g., `User resource: member`) the paths follow the custom resource slug. Never substitute the form's `name` / `machineName` (e.g. `userLogin`) — that produces a 404 on sign-in.
 - `FormioAuthService` is a service the rest of the application consumes to read the current user, log out, and gate routes. It must be registered as a provider within the base `app` module.
-- The role list from `template.json.roles` does not appear in this file directly — roles are enforced at the API level and by route guards in individual resource modules. The Resources sub-skill (nested at `./resources/SKILL.md` under this skill — load the file, do NOT invoke a top-level skill) consumes the role list when it wires per-resource guards.
+- The role list from `template.json.roles` does not appear in this file directly — roles are enforced at the API level and by route guards in individual resource modules. The Resources sub-skill (nested at `./formio-angular-resources/SKILL.md` under this skill — load the file, do NOT invoke a top-level skill) consumes the role list when it wires per-resource guards.
 
 ## `src/app/app-module.ts` edits
 
@@ -276,7 +276,7 @@ Before overwriting an existing `app.component.ts`:
 
 ## `src/app/app.component.html` — auth-aware nav chrome (optional but recommended)
 
-**Consult `frontend-design` first — with the Bootstrap 5 brief from BOOTSTRAP Step 7d.** Per the parent skill's Stance, every UI-authoring step in this skill loads Claude's built-in `frontend-design` skill before writing. Prepend the `FRONTEND_DESIGN_BRIEF` that BOOTSTRAP Step 7d stashed — it pins the advice to the Bootstrap 5 + Bootstrap Icons stack already wired into `angular.json`, names the utility classes to reach for, and forbids Tailwind / Material / custom design-token systems that would clash. The nav block below is a starting skeleton that satisfies the auth-wiring requirements (`*ngIf` on `auth.authenticated`, `(click)="auth.logout()"`, `routerLink` to `/auth/login`); the visual-design decisions on top of that — spacing, typography, container width, mobile behavior, active-state styling, brand placement, empty vs. authenticated layouts — should come from `frontend-design`'s Bootstrap-5-briefed guidance, not from memory. Load `frontend-design` with the brief, let it review the skeleton, then apply its recommendations before emitting the final HTML/SCSS.
+**Consult `frontend-design` first — with the Bootstrap 5 brief from BOOTSTRAP Step 7d.** Per the parent skill's Stance, every UI-authoring step in this skill loads `frontend-design` before writing. Prepend the `FRONTEND_DESIGN_BRIEF` that BOOTSTRAP Step 7d stashed — it pins the advice to the Bootstrap 5 + Bootstrap Icons stack already wired into `angular.json`, names the utility classes to reach for, and forbids Tailwind / Material / custom design-token systems that would clash. The nav block below is a starting skeleton that satisfies the auth-wiring requirements (`*ngIf` on `auth.authenticated`, `(click)="auth.logout()"`, `routerLink` to `/auth/login`); the visual-design decisions on top of that — spacing, typography, container width, mobile behavior, active-state styling, brand placement, empty vs. authenticated layouts — should come from `frontend-design`'s Bootstrap-5-briefed guidance, not from memory. Load `frontend-design` with the brief, let it review the skeleton, then apply its recommendations before emitting the final HTML/SCSS.
 
 `FormioAuthService` exposes `authenticated` (boolean) and `user` (submission object) as properties, and `logout()` as a method. Wire them into the root template so the nav bar reacts to login state without any extra plumbing. Typical `app.component.html` addition (keep whatever shell the Angular CLI scaffolded; add this block inside your nav):
 
@@ -397,7 +397,7 @@ const routes: Routes = [
 ];
 ```
 
-Per-resource routing inside each feature module is owned by the Resources sub-skill (`./resources/SKILL.md`) — it applies the same `canActivate: [authGuard]` rule there. This file only establishes the guard file and the app-shell wiring.
+Per-resource routing inside each feature module is owned by the Resources sub-skill (`./formio-angular-resources/SKILL.md`) — it applies the same `canActivate: [authGuard]` rule there. This file only establishes the guard file and the app-shell wiring.
 
 ## The approval gate — preview then approve
 
@@ -438,7 +438,7 @@ Files to edit
   src/app/app.component.html
     + auth-aware nav chrome using *ngIf="!auth.authenticated" / *ngIf="auth.authenticated" / (click)="auth.logout()"
 
-Proceed with these writes? (Resources is next — load the nested sub-skill file `./resources/SKILL.md` under this skill.)
+Proceed with these writes? (Resources is next — load the nested sub-skill file `./formio-angular-resources/SKILL.md` under this skill.)
 ```
 
 Wait for explicit approval. If the user declines, stop — do not write partial state, do not delegate to the sub-skill. The parent skill's `## When to reset to an earlier phase` rule applies if the user wants to re-run SETUP or CONFIG with corrections.
@@ -447,6 +447,6 @@ Wait for explicit approval. If the user declines, stop — do not write partial 
 
 Write `auth.module.ts` and edit `app-module.ts`. Then tell the user what was written and what the next phase is:
 
-> Wrote `src/app/auth/auth.module.ts` (with `FormioAuthRoutes()` mounted via `RouterModule.forChild`) and `src/app/auth/auth.guard.ts` (the `authGuard` `CanActivateFn`), updated `src/app/app-module.ts`, added the `/auth` lazy-load route plus `canActivate: [authGuard]` on the authenticated app-shell routes in `src/app/app-routing-module.ts`, wired `src/app/app.component.ts` (or `src/app/app.ts`) to subscribe to `FormioAuthService.onLogin` / `onRegister` / `onLogout` (redirect to `/` on login/register, to `/auth/login` on logout), and updated `src/app/app.component.html` with auth-aware nav chrome. Loading `./resources/SKILL.md` (the nested Resources sub-skill of this skill) for per-resource NgModule scaffolding.
+> Wrote `src/app/auth/auth.module.ts` (with `FormioAuthRoutes()` mounted via `RouterModule.forChild`) and `src/app/auth/auth.guard.ts` (the `authGuard` `CanActivateFn`), updated `src/app/app-module.ts`, added the `/auth` lazy-load route plus `canActivate: [authGuard]` on the authenticated app-shell routes in `src/app/app-routing-module.ts`, wired `src/app/app.component.ts` (or `src/app/app.ts`) to subscribe to `FormioAuthService.onLogin` / `onRegister` / `onLogout` (redirect to `/` on login/register, to `/auth/login` on logout), and updated `src/app/app.component.html` with auth-aware nav chrome. Loading `./formio-angular-resources/SKILL.md` (the nested Resources sub-skill of this skill) for per-resource NgModule scaffolding.
 
-Hand off to the sub-skill with the context described in the parent `SKILL.md`'s "Handoff contract with the Resources sub-skill (`./resources/SKILL.md`)" section. The sub-skill is a sub-folder of this skill — load that file directly, do NOT attempt to invoke a top-level skill named `formio-angular-resources`.
+Hand off to the sub-skill with the context described in the parent `SKILL.md`'s "Handoff contract with the Resources sub-skill (`./formio-angular-resources/SKILL.md`)" section. The sub-skill is a sub-folder of this skill — load that file directly, do NOT attempt to invoke a top-level skill named `formio-angular-resources`.

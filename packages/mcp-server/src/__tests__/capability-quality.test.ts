@@ -45,9 +45,11 @@ describe('capability quality', () => {
 
   it('starts and enumerates its tools with no configuration at all', async () => {
     const tools = await listToolsUnconfigured();
-    // The whole standalone surface, minus project_set (plugin context only).
-    expect(tools.length).toBe(19);
+    // The whole surface, project_set included: every client can map a working
+    // directory to a project, so nothing is withheld by launch mode.
+    expect(tools.length).toBe(20);
     expect(tools.map((t) => t.name)).toContain('form_list');
+    expect(tools.map((t) => t.name)).toContain('project_set');
   });
 
   it('still reports a missing project URL clearly when a tool is called', async () => {

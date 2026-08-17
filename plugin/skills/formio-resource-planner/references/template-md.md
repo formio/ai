@@ -1,6 +1,6 @@
 # `template.md` reference
 
-Canonical shape for the Resource Map artifact emitted by `formio-resource-planner` Phase B alongside `template.json`. Downstream skills (`formio-angular/resources`, future `formio-react`, etc.) read `template.md` for architectural intent — what resources exist, how they relate, who can do what — and consult the paired `template.json` for field-level Form.io JSON shapes.
+Canonical shape for the Resource Map artifact emitted by `formio-resource-planner` Phase B alongside `template.json`. Downstream skills (`formio-angular/formio-angular-resources`, future `formio-react`, etc.) read `template.md` for architectural intent — what resources exist, how they relate, who can do what — and consult the paired `template.json` for field-level Form.io JSON shapes.
 
 Treat the two files as a pair: same basename, same timestamp on collision (`template-20260423T153000Z.md` + `template-20260423T153000Z.json`).
 

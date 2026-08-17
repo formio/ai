@@ -1,0 +1,35 @@
+{
+  "name": "formio-ai",
+  "version": "0.8.0",
+  "description": "Build applications on the Form.io platform. Bundles the Form.io MCP server with a skill library covering app orchestration, form building, resource planning, JSON schema authoring, actions, authentication, the @formio/js SDK, and the full Form.io REST surface.",
+  "author": {
+    "name": "Form.io",
+    "email": "support@form.io"
+  },
+  "homepage": "https://form.io",
+  "repository": "https://github.com/formio/ai",
+  "license": "MIT",
+  "keywords": ["formio", "form.io", "forms", "backend", "mcp", "skills", "rbac", "low-code"],
+  "logo": "assets/formio-logo.png",
+  "skills": "skills",
+  "mcpServers": {
+    "formio-mcp": {
+      "command": "npx",
+      "args": ["-y", "@formio/mcp"],
+      "env": {
+        "FORMIO_BASE_URL": "${FORMIO_BASE_URL}"
+      }
+    }
+  },
+  "variables": {
+    "type": "object",
+    "properties": {
+      "FORMIO_BASE_URL": {
+        "type": "string",
+        "title": "Form.io base URL",
+        "description": "Base URL of your Form.io deployment — the parent of the project URL. Leave the default for Form.io SaaS; set it to your host when self-hosting or running Form.io Enterprise.",
+        "default": "https://api.form.io"
+      }
+    }
+  }
+}

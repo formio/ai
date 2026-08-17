@@ -18,6 +18,14 @@ describe('stdio.ts entry point', () => {
     });
   });
 
+  // Every documented `project` invocation runs through a pipe, and a piped
+  // stdout is asynchronous: exiting the moment after writing can truncate the
+  // output the caller parses. Setting the exit code lets Node flush first.
+  it('never calls process.exit — the project command sets process.exitCode', () => {
+    expect(stdioSource).not.toContain('process.exit(');
+    expect(stdioSource).toContain('process.exitCode');
+  });
+
   it('does not call any auth or cache functions directly', () => {
     const forbiddenCalls = [
       'ensureAuthenticated',

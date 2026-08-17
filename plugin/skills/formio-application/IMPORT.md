@@ -1,15 +1,15 @@
 # IMPORT — Call `project_import`
 
-This document is loaded by the parent `formio-application` skill during Step 5. It is **not** a standalone skill — no frontmatter.
+This document is loaded by the parent `formio-application` skill during Step 4. It is **not** a standalone skill — no frontmatter.
 
 ## What this covers
 
-- **Step 5:** present an import-confirmation preview, invoke the `project_import` MCP tool, handle the three error branches.
+- **Step 4:** present an import-confirmation preview, invoke the `project_import` MCP tool, handle the three error branches.
 
-Step 5 runs on BOTH branches of the orchestrator:
+Step 4 runs on BOTH branches of the orchestrator:
 
-- **Build-new** → after Step 4 (MCP Config) has written `./.mcp.json` and the user has restarted Claude Code so the MCP server respawned against the correct Project URL. Import pushes the full-project `template.json` into a (presumably empty) project.
-- **Modify-existing** → directly after Step 2 (Plan). No `.mcp.json` rewrite and no restart — the workspace already has `.mcp.json` wired to the right project. Import pushes the delta `template.json` (only the new resources / fields / actions) into the existing project, which merges additively on top of what is already there.
+- **Build-new** → directly after Step 3 (Deployment), in the same invocation. Deployment mapped this working directory to the target project with `project_set`, and every tool resolves that mapping on each call, so the project is already live here — there is nothing to reload. Import pushes the full-project `template.json` into a (presumably empty) project.
+- **Modify-existing** → directly after Step 2 (Plan). The project URLs came from the existing workspace's `FormioAppConfig`. Import pushes the delta `template.json` (only the new resources / fields / actions) into the existing project, which merges additively on top of what is already there.
 
 ## Authentication is implicit
 
@@ -29,7 +29,7 @@ If the environment cannot open a browser (e.g., SSH session without display forw
 
 Detection hint: `process.env.DISPLAY === ""` on Linux, or failing `open` / `xdg-open` on macOS / Linux. Do not over-engineer — if the browser fails to open, the auth flow's own error will surface the URL; pass it through.
 
-## Step 5 — Import
+## Step 4 — Import
 
 ### The offer-to-import gate
 
@@ -41,9 +41,9 @@ Before any import work, ask whether to import at all.
 
 **Modify-existing:**
 
-> I have the delta plan ready — the planner wrote a delta `template.md` (architectural intent for the additions) and a delta `template.json` containing ONLY the new resources and actions for this feature. Do you want me to additively import `template.json` into your existing Form.io project now? (You can also skip this and import manually later; the framework wiring in Step 6 can still proceed, but the wired UI will 404 until the import runs. `template.md` stays on disk regardless — the framework extend sub-skill reads it for intent.)
+> I have the delta plan ready — the planner wrote a delta `template.md` (architectural intent for the additions) and a delta `template.json` containing ONLY the new resources and actions for this feature. Do you want me to additively import `template.json` into your existing Form.io project now? (You can also skip this and import manually later; the framework wiring in Step 5 can still proceed, but the wired UI will 404 until the import runs. `template.md` stays on disk regardless — the framework extend sub-skill reads it for intent.)
 
-If the user declines, mark the Import step skipped and advance to Step 6 (Framework routing). Do not call `project_import`.
+If the user declines, mark the Import step skipped and advance to Step 5 (Framework routing). Do not call `project_import`.
 
 ### The confirmation preview
 
@@ -90,7 +90,7 @@ names above before approving.
 Proceed with the additive import?
 ```
 
-Wait for explicit approval. Declining returns to the skip path (Step 6 next, no import).
+Wait for explicit approval. Declining returns to the skip path (Step 5 next, no import).
 
 ### Call `project_import`
 
@@ -118,7 +118,7 @@ After a successful import, scan the imported `template.json` for `{{ config.<som
 
    `config` merges into the project's existing public configuration. Send all discovered keys in one PUT.
 
-If no `{{ config.* }}` tokens are present, skip this step. Then advance to Step 6.
+If no `{{ config.* }}` tokens are present, skip this step. Then advance to Step 5.
 
 ### Error branches
 
@@ -129,7 +129,7 @@ Three failure modes. Handle each explicitly; do not silently retry or swallow er
 The cached JWT was invalid or rejected, or the portal-login flow was interrupted. The MCP server will already have attempted a fresh portal-login; if that failed too, the tool call errors out. Offer the user three choices:
 
 1. Re-enter the Base URL / Project URL (maybe they gave the wrong one).
-2. Skip import and continue to Step 6 — the framework app can still be scaffolded/extended against any existing project whose resources are already set up out-of-band.
+2. Skip import and continue to Step 5 — the framework app can still be scaffolded/extended against any existing project whose resources are already set up out-of-band.
 3. Bail out of the whole flow.
 
 #### 2. Project not found (404)
@@ -137,7 +137,7 @@ The cached JWT was invalid or rejected, or the portal-login flow was interrupted
 The project URL did not resolve. Tell the user plainly and offer:
 
 1. Re-enter the Project URL (typo case).
-2. Skip import and continue to Step 6.
+2. Skip import and continue to Step 5.
 3. Bail out.
 
 **Do NOT** auto-create the project. If the user needs to create one, point them at the `formio-api` skill (platform-projects reference): "You can create a new project via the `formio-api` skill's `platform-projects` reference, then re-run this flow once it exists."
@@ -147,12 +147,12 @@ The project URL did not resolve. Tell the user plainly and offer:
 The server rejected the template. Surface the server's error message verbatim (it usually identifies the offending resource / form / field). Offer:
 
 1. Re-run the planner to fix the template — the user can describe the issue and the planner can revise.
-2. Skip import and continue to Step 6 with the already-emitted `template.json` as a local artifact.
+2. Skip import and continue to Step 5 with the already-emitted `template.json` as a local artifact.
 3. Bail out.
 
-## What Step 5 hands to Step 6
+## What Step 4 hands to Step 5
 
-On successful import, Step 6 receives:
+On successful import, Step 5 receives:
 
 - `FORMIO_PROJECT_URL`, `FORMIO_BASE_URL` (captured in Step 3 for build-new, or read from workspace `FormioAppConfig` for modify-existing).
 - Path to `template.md` on disk (planner wrote it; still there — architectural-intent seed for the framework skill).
@@ -160,6 +160,6 @@ On successful import, Step 6 receives:
 - A flag: "import succeeded".
 - For modify-existing: the list of newly-imported resource names (so the framework's extend sub-skill scaffolds modules for exactly those).
 
-On skipped import (user declined or error branch chose skip), Step 6 receives the same values but with the flag set to "import skipped". Downstream framework SETUP will skip its own URL interview either way, because the URLs were captured regardless.
+On skipped import (user declined or error branch chose skip), Step 5 receives the same values but with the flag set to "import skipped". Downstream framework SETUP will skip its own URL interview either way, because the URLs were captured regardless.
 
 On "bail out", the flow stops. Partial state: the planner's `template.md` + `template.json` pair still exists on disk (by design — they are artifacts the user can use later). Nothing has been written to the Form.io project on the server.

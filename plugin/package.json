@@ -1,18 +1,23 @@
 {
   "name": "@formio/ai",
   "version": "0.8.0",
-  "description": "Form.io Claude Code plugin — MCP server and skills library",
+  "description": "Form.io agentic toolset — the Form.io MCP server plus a skill library for building applications on the Form.io platform, usable from any coding agent that reads Agent Skills or speaks MCP.",
   "type": "module",
   "license": "MIT",
   "keywords": [
     "formio",
     "form.io",
-    "claude",
-    "claude-code",
+    "forms",
+    "low-code",
     "mcp",
     "model-context-protocol",
-    "plugin",
-    "skills"
+    "agent-skills",
+    "skills",
+    "ai-agent",
+    "claude-code",
+    "cursor",
+    "codex",
+    "copilot"
   ],
   "homepage": "https://github.com/formio/ai#readme",
   "bugs": {
@@ -24,10 +29,13 @@
   },
   "files": [
     ".claude-plugin",
-    "hooks",
-    "server",
+    ".cursor-plugin",
+    "plugin.json",
+    "mcp.json",
+    "assets",
     "skills",
-    "README.md"
+    "README.md",
+    "CHANGELOG.md"
   ],
   "publishConfig": {
     "access": "public",

@@ -32,3 +32,49 @@ inspector-config.json
 examples/demos/.profile/
 # Raw Playwright captures, converted to GIFs by build-demo-gif.py
 examples/demos/recordings/
+
+# OpenSpec generates per-agent skill and command mirrors from openspec/ — they are
+# build output, not source. They are also visible to the `skills` CLI, whose
+# discovery is additive across agent directories and cannot be filtered at install
+# time (`-s` takes exact names, not globs), so committing them means anyone running
+# `npx skills add formio/ai` is offered this repo's OpenSpec and TDD workflow
+# skills alongside the Form.io library. Regenerate locally with the OpenSpec CLI.
+#
+# The .claude/skills/formio-* symlinks into plugin/skills/ are NOT ignored: they are
+# how this repo's own sessions load the library, and the skills CLI skips them
+# because it does not follow symlinks during discovery.
+.claude/skills/openspec-*/
+.claude/skills/tdd-*/
+.cursor/skills/
+.github/skills/
+
+# Output of `npx skills add <source>` run inside this working tree — third-party
+# skill libraries a maintainer installed for their own sessions (e.g.
+# `angular/skills`), never this repository's source. The CLI writes the same
+# library twice, once per frontmatter dialect: `.agents/skills/` for agents that
+# read the shared location and `agent/skills/` for those that read the singular
+# one, plus `.claude/skills/<name>` symlinks into `.agents/` and a
+# `skills-lock.json` recording each source and hash. All of it is regenerable by
+# re-running the installer, and committing it would offer someone else's skills to
+# anyone running `npx skills add formio/ai` here — the same additive-discovery
+# problem the OpenSpec mirrors above describe. `.claude/skills/formio-*` remains
+# tracked, because those symlinks point into this repository's own plugin/skills/.
+.agents/
+agent/
+.claude/skills/angular-*
+skills-lock.json
+
+# Initiative working notes — useful to whoever is doing the work, residue to
+# everyone else. Both stay on a maintainer's disk and out of the public tree.
+#
+# MARKETPLACE.md tracks third-party review queues (Cursor marketplace, Codex
+# directory, awesome-copilot, the MCP registries) whose status moves between
+# releases. The release behaviour it depends on is specified instead: review-gated
+# channels are never automated and a pending submission never fails a release.
+#
+# docs/multi-agent-portability.md is the audit and phase plan for the multi-agent
+# portability work. The durable record is the OpenSpec change set — motivation in
+# each proposal, decisions in each design — so a committed roadmap only duplicates
+# it and ages into something that reads as current planning.
+/MARKETPLACE.md
+docs/multi-agent-portability.md

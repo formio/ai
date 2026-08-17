@@ -1,5 +1,6 @@
 import express from 'express';
 import { exec } from 'child_process';
+import { browserlessReason, currentBrowserEnvironment } from './browser-availability.js';
 import { ResolvedFormioConfig } from './config.js';
 import { formioRawFetch } from './formio-client.js';
 
@@ -128,10 +129,37 @@ async function resolveDefaultLoginFormUrl(config: ResolvedFormioConfig): Promise
   return candidates[0];
 }
 
+// Checked before anything is bound or launched: on a host with no browser the
+// login can never complete, and the whole login timeout would be spent
+// discovering that.
+function assertBrowserAvailable(config: ResolvedFormioConfig): void {
+  if (config.forceBrowser) {
+    return;
+  }
+  // Configuring both a host and a port is the user saying the login page is
+  // reachable from their machine. Ignoring that would make the remedy this very
+  // error recommends return the identical error — and would newly block
+  // devcontainer and Codespaces users whose ports are forwarded.
+  const publishedLoginEndpoint = Boolean(config.authHost && config.authPort);
+  const reason = browserlessReason(currentBrowserEnvironment(), { publishedLoginEndpoint });
+  if (!reason) {
+    return;
+  }
+  throw new Error(
+    `Cannot complete the Form.io browser login: ${reason}. ` +
+      `Set FORMIO_API_KEY to authenticate without a browser. ` +
+      `If the host running your browser can reach this machine, set both FORMIO_AUTH_HOST=0.0.0.0 and ` +
+      `FORMIO_AUTH_PORT to a published port so the login page is reachable from it. ` +
+      `Set FORMIO_FORCE_BROWSER=1 to attempt the browser login anyway.`
+  );
+}
+
 export async function authenticate(
   config: ResolvedFormioConfig,
   options?: AuthenticateOptions
 ): Promise<string> {
+  assertBrowserAvailable(config);
+
   const app = express();
   app.use(express.json());
 

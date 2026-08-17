@@ -2,14 +2,29 @@ import { build } from 'esbuild';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { assertSourceManifestVersionsAgree } from './sync-manifest-versions.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const REPO_ROOT = path.resolve(path.dirname(__filename), '..');
 const PLUGIN_SRC = path.join(REPO_ROOT, 'plugin');
 const DIST_PLUGIN = path.join(REPO_ROOT, 'dist/plugin');
 const PACKAGE_JSON = path.join(PLUGIN_SRC, 'package.json');
-const MANIFEST_OUT = path.join(DIST_PLUGIN, '.claude-plugin/plugin.json');
+// One version, three manifests: Claude Code, Cursor, and the vendor-neutral
+// Agent Plugins layout. Clients display the version and marketplaces key
+// updates on it, so a manifest that drifts is a release defect.
+const MANIFESTS_OUT = [
+  path.join(DIST_PLUGIN, '.claude-plugin/plugin.json'),
+  path.join(DIST_PLUGIN, '.cursor-plugin/plugin.json'),
+  path.join(DIST_PLUGIN, 'plugin.json'),
+];
 const SERVER_ENTRY = path.join(REPO_ROOT, 'packages/mcp-server/src/stdio.ts');
+// Built, not published: `plugin/package.json`'s `files` omits `server/`, because
+// every manifest launches `npx -y @formio/mcp@…` and a second copy in the tarball
+// would invite the reading that an install runs it. What the bundle is for is the
+// smoke test — `pnpm test:plugin` spawns it and sends `tools/list`, which catches
+// bundling regressions (a missing CJS shim, a wrong entry point) that no
+// module-level test sees. The `.mcpb` desktop bundle builds its own copy at
+// dist/mcpb/server/index.mjs.
 const SERVER_OUT = path.join(DIST_PLUGIN, 'server/stdio.mjs');
 
 function cleanDist() {
@@ -24,11 +39,27 @@ function copyStatic() {
   });
 }
 
-function syncManifestVersion() {
+/**
+ * A bundle that silently omits one client's manifest installs fine everywhere
+ * else and breaks in exactly that client, so a missing manifest fails the build
+ * rather than shipping. Exported so it can be tested without mutating the
+ * shared source tree.
+ */
+export function assertManifestsPresent(manifestPaths: readonly string[]): void {
+  const missing = manifestPaths.filter((manifestPath) => !fs.existsSync(manifestPath));
+  if (missing.length > 0) {
+    throw new Error(`Expected manifests are missing from the build: ${missing.join(', ')}`);
+  }
+}
+
+function syncManifestVersions() {
+  assertManifestsPresent(MANIFESTS_OUT);
   const { version } = JSON.parse(fs.readFileSync(PACKAGE_JSON, 'utf8')) as { version: string };
-  const manifest = JSON.parse(fs.readFileSync(MANIFEST_OUT, 'utf8')) as Record<string, unknown>;
-  manifest.version = version;
-  fs.writeFileSync(MANIFEST_OUT, `${JSON.stringify(manifest, null, 2)}\n`);
+  for (const manifestPath of MANIFESTS_OUT) {
+    const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8')) as Record<string, unknown>;
+    manifest.version = version;
+    fs.writeFileSync(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`);
+  }
 }
 
 async function bundleServer() {
@@ -59,8 +90,15 @@ async function bundleServer() {
 
 export async function buildPlugin() {
   cleanDist();
+  // Verify, never write: the repository tree is itself an install source (the
+  // Claude marketplace declares `source: "./plugin"`), so the committed
+  // manifests have to carry the version — but a build is a read of the source
+  // tree. `prepublishOnly` runs this build, so stamping here would mutate
+  // tracked files during a release and after any hand-edit of
+  // plugin/package.json. `pnpm sync:versions` is the only writer.
+  assertSourceManifestVersionsAgree();
   copyStatic();
-  syncManifestVersion();
+  syncManifestVersions();
   await bundleServer();
 }
 

@@ -12,6 +12,16 @@ This skill describes the JSON schemas for the three Form.io document types whose
 
 Detail is split across reference files under `references/<domain>/`. Read only the files you need for the task at hand — the overview below is usually enough to orient yourself; load a reference file when you need a specific property list.
 
+## Preflight — the Form.io MCP server
+
+Before your first Form.io tool call, check that the Form.io MCP tools are available to you — `form_list`, `form_create`, `project_import`, `project_set`.
+
+**If they are missing, stop and connect the server before doing anything else.** Load the `formio-mcp-setup` skill and follow it; it writes the MCP configuration for every client and tells the user how to reload. If that skill is not installed either, tell the user:
+
+> I have no Form.io tools, so the Form.io MCP server isn't connected. Run `npx skills add formio/ai` to get the setup skill, or add the server to your agent's MCP configuration as `npx -y @formio/mcp`.
+
+Do **not** work around missing tools by making direct HTTP requests against a Form.io deployment, and do not write code that does. This library documents the whole Form.io REST surface, which makes hand-rolling requests tempting and wrong — it bypasses the guardrails the tools enforce and can write to a live deployment unreviewed. Stop and report what is blocking instead.
+
 ## When to load which reference
 
 References are partitioned by schema domain. Pick a domain first, then pick a reference inside that domain. Adding a new schema domain is purely additive — new subdirectory under `references/`, new row in the appropriate table below.

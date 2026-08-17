@@ -8,6 +8,16 @@ description: >-
 
 Actions are server-side behaviors attached to forms. When a submission is created, updated, read, or deleted, the server runs every action configured on that form whose handler and method match the current operation.
 
+## Preflight — the Form.io MCP server
+
+Before your first Form.io tool call, check that the Form.io MCP tools are available to you — `form_list`, `form_create`, `project_import`, `project_set`.
+
+**If they are missing, stop and connect the server before doing anything else.** Load the `formio-mcp-setup` skill and follow it; it writes the MCP configuration for every client and tells the user how to reload. If that skill is not installed either, tell the user:
+
+> I have no Form.io tools, so the Form.io MCP server isn't connected. Run `npx skills add formio/ai` to get the setup skill, or add the server to your agent's MCP configuration as `npx -y @formio/mcp`.
+
+Do **not** work around missing tools by making direct HTTP requests against a Form.io deployment, and do not write code that does. This library documents the whole Form.io REST surface, which makes hand-rolling requests tempting and wrong — it bypasses the guardrails the tools enforce and can write to a live deployment unreviewed. Stop and report what is blocking instead.
+
 ## MCP Tool Preference
 
 When the user wants to manage actions on a live Form.io project, prefer the MCP server's first-party tools:

@@ -40,8 +40,11 @@ These are the only two supported inclusion modes. Never import from `@formio/cor
 
 ## Hosted vs SaaS URL configuration
 
-- SaaS: `FORMIO_BASE_URL` is `https://api.form.io`; `FORMIO_PROJECT_URL` is `https://<project>.form.io`.
-- Self-hosted: `FORMIO_BASE_URL` is your server root (e.g. `https://forms.mysite.com`); `FORMIO_PROJECT_URL` appends the project path (e.g. `https://forms.mysite.com/myproject`).
+- SaaS: `FORMIO_BASE_URL` is always `https://api.form.io`; `FORMIO_PROJECT_URL` is `https://<project>.form.io`.
+- Self-hosted, sub-directory projects: `FORMIO_BASE_URL` is your server root (e.g. `https://forms.mysite.com`); `FORMIO_PROJECT_URL` appends the project path (e.g. `https://forms.mysite.com/myproject`).
+- Self-hosted, sub-domain projects: `FORMIO_BASE_URL` is still your server root (e.g. `https://forms.mysite.com`), but `FORMIO_PROJECT_URL` is a sibling subdomain of your own domain (e.g. `https://myproject.mysite.com`) — not a path under the base URL.
+
+Which of the two self-hosted shapes applies is a property of that deployment, so read both values rather than deriving one from the other.
 
 ```js
 import { Formio } from '@formio/js';

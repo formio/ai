@@ -1,7 +1,7 @@
 ## Formio MCP server
 
 [![npm: @formio/mcp](https://img.shields.io/npm/v/%40formio%2Fmcp?label=%40formio%2Fmcp)](https://www.npmjs.com/package/@formio/mcp)
-[![smithery badge](https://smithery.ai/badge/formio/mcp)](https://smithery.ai/servers/formio/mcp)
+[![Smithery](https://img.shields.io/badge/Smithery-formio%2Fmcp-blue)](https://smithery.ai/servers/formio/mcp)
 [![MCP Registry](https://img.shields.io/badge/MCP%20Registry-io.form%2Fformio--mcp-blue)](https://registry.modelcontextprotocol.io/v0/servers?search=io.form/formio-mcp)
 
 The MCP server (`@formio/mcp`) is independently usable from any MCP-aware client. It speaks **stdio**: the client spawns it and owns stdin/stdout. There is no port to open and nothing to start by hand.
@@ -19,13 +19,13 @@ Run that way it waits for MCP traffic on stdin, which only tells you it starts c
 
 | Transport | Command | Compatible with |
 | --- | --- | --- |
-| stdio | `npx -y @formio/mcp` (or `node dist/stdio.js`) | Claude Code, Claude Desktop, Cursor, VS Code, Windsurf, Cline — anything that speaks MCP over stdio |
+| stdio | `npx -y @formio/mcp` (or `node dist/stdio.js`) | Claude Code, Claude Desktop, Cursor, VS Code, Codex, Windsurf, Cline — anything that speaks MCP over stdio |
 
 There is no HTTP or SSE transport. The server's only HTTP listener is the temporary browser-login page described under [Authentication](#authentication), which carries no MCP traffic.
 
 ### Connect a client
 
-The same stdio entry works everywhere; only the file the config goes in changes — `.mcp.json` in a project for Claude Code, `claude_desktop_config.json` for Claude Desktop, and each editor's own MCP settings elsewhere:
+The same stdio entry works everywhere, but the file it goes in **and the key it goes under** both vary by client — `.mcp.json` under `mcpServers` for Claude Code, `.cursor/mcp.json` under `mcpServers` for Cursor, `.vscode/mcp.json` under **`servers`** for VS Code, and `.codex/config.toml` as TOML for Codex. There is no universal `.mcp.json`. The [root README](https://github.com/formio/ai#manual-configuration) carries the full per-client table; the JSON `mcpServers` shape is:
 
 ```json
 {
@@ -41,7 +41,7 @@ The same stdio entry works everywhere; only the file the config goes in changes 
 }
 ```
 
-Standalone (non-plugin) mode needs `FORMIO_PROJECT_URL` before any tool that reaches Form.io will work; `FORMIO_BASE_URL` is optional and defaults to `https://api.form.io`, so set it when self-hosting. In plugin mode the plugin manages both, via Claude Code's user-config plus the per-cwd `~/.formio/projects.json` mapping.
+Every tool that reaches Form.io needs a project: either `FORMIO_PROJECT_URL` in the environment, or a per-directory mapping written by the `project_set` tool (the environment wins when both exist). `FORMIO_BASE_URL` is optional and defaults to `https://api.form.io`, so set it when self-hosting. The Claude Code plugin collects both through user-config and the per-cwd `~/.formio/projects.json` mapping; other clients set the environment or call `project_set`.
 
 The server starts without either one, so a client can connect and list the tools before anything is configured — the project URL is only demanded at the point a tool needs it, and `hello` works regardless.
 
@@ -56,7 +56,7 @@ docker run -i --rm \
   formio/mcp
 ```
 
-Wired into a client — the same `mcpServers` entry as [Connect a client](#connect-a-client), with `command` and `args` pointed at Docker — that becomes:
+Wired into a client — the same entry as [Connect a client](#connect-a-client), with `command` and `args` pointed at Docker — that becomes (shown in the JSON `mcpServers` shape; VS Code uses `servers` and Codex uses TOML, as noted there):
 
 ```json
 {
@@ -161,7 +161,7 @@ The same run, step by step:
 
 ![Server card for formio-mcp showing Connected and the docker command it runs](https://raw.githubusercontent.com/formio/ai/main/packages/mcp-server/docs/images/inspector-4-connected.jpg)
 
-**5. Open the Tools tab** for the tools this server exposes. A standalone server lists 19 — every tool below except `project_set`, which only registers in plugin context.
+**5. Open the Tools tab** for the tools this server exposes. Every server lists all 20 — including `project_set`, which is registered for every client.
 
 ![Tools tab listing hello, form_create, form_get, form_list and the rest](https://raw.githubusercontent.com/formio/ai/main/packages/mcp-server/docs/images/inspector-5-tools.jpg)
 
@@ -214,7 +214,7 @@ The bundled `@formio/mcp` server exposes these tools. Skills prefer these over r
 | --- | --- |
 | `project_export` | Export the project's complete template (roles, resources, forms, actions) as a portable JSON document. Use before `project_import` to snapshot. |
 | `project_import` | Import a template JSON — additively merges roles, resources, forms, and actions in one call. **Same-machine-name items are overwritten in place; everything else is preserved.** |
-| `project_set` | Plugin-mode only — persist a per-cwd Project URL mapping in `~/.formio/projects.json`. Never exposed standalone (the standalone server binds to `FORMIO_PROJECT_URL` via env instead). |
+| `project_set` | Persist a per-cwd Project URL mapping in `~/.formio/projects.json`, so one server can serve several workspaces. Registered in every client. An explicit `FORMIO_PROJECT_URL` in the server environment takes precedence over the mapping. |
 
 ### Diagnostic
 
@@ -274,19 +274,19 @@ The probe runs lazily — only when the local auth page is actually served.
 
 | Name | Required | Default | Purpose | Hosted SaaS example | Self-hosted example |
 | --- | :-: | --- | --- | --- | --- |
-| `FORMIO_PROJECT_URL` | yes\* | — | Full URL of your Form.io project. In plugin mode, only used as the pre-filled default offered when prompting for an unmapped cwd. | `https://myproject.form.io` | `https://forms.example.com/myproject` |
-| `FORMIO_BASE_URL` | no\*\* | `https://api.form.io` | Full base URL of your Form.io deployment. Set it when self-hosting. | `https://api.form.io` | `https://forms.example.com` |
-| `FORMIO_API_KEY` | no | `undefined` | Long-lived project API key. When set, the server skips the browser login flow. | `CHANGEME` | `CHANGEME` |
+| `FORMIO_PROJECT_URL` | yes\* | — | Full URL of your Form.io project. Takes precedence over any per-directory mapping written by `project_set`. Self-hosted, it is a sub-directory of the deployment or a sub-domain of your own domain (`https://myproject.example.com`), depending on how that deployment routes projects. | `https://myproject.form.io` | `https://forms.example.com/myproject` |
+| `FORMIO_DEFAULT_PROJECT_URL` | no | — | A project URL to **offer**, not to apply. When set and the working directory has no mapping, the server names it as the suggested project so the agent can confirm it and persist it with `project_set`. It never changes what a tool resolves — the opposite of `FORMIO_PROJECT_URL`, which pins the server and cannot be redirected by `project_set`. |
+| `FORMIO_BASE_URL` | no | `https://api.form.io` | Full base URL of your Form.io deployment — always `https://api.form.io` on the hosted cloud, never a project's `*.form.io` sub-domain. Set it when self-hosting. | `https://api.form.io` | `https://forms.example.com` |
+| `FORMIO_API_KEY` | no | `undefined` | Long-lived project API key. When set, the server skips the browser login flow — the only way to authenticate on a host with no browser. | `CHANGEME` | `CHANGEME` |
 | `FORMIO_LOGIN_FORM` | no | Auto-resolved | Override the portal login form URL used by the JWT login flow. | `https://formio.form.io/user/login` | `https://forms.example.com/formio/user/login` |
 | `FORMIO_AUTH_HOST` | no | `127.0.0.1` | Bind address for the browser-login page. `0.0.0.0` makes it reachable from outside a container. |  |  |
 | `FORMIO_AUTH_PORT` | no | ephemeral | Fixed port for the browser-login page, so a container can publish it. | `43117` | `43117` |
 | `FORMIO_AUTH_TIMEOUT` | no | `900` | Seconds to wait for a browser login before failing the call. |  |  |
 | `FORMIO_INSECURE_TLS` | no | `undefined` | Set to `1` to skip TLS verification. Local development only — never against production. |  |  |
-| `FORMIO_PLUGIN_CONTEXT` | no | `0` | Set by the plugin manifest. When `1`, the server enables `project_set` and reads `FORMIO_PROJECT_URL` from `~/.formio/projects.json` per cwd instead of env. |  |  |
+| `FORMIO_FORCE_BROWSER` | no | `0` | Set to `1` to attempt the browser login even where the server detects no browser (CI, a container, SSH with no display). |  |  |
 
-\* Standalone only. The server starts without it and still lists its tools and answers `hello`; the tools that read or write Form.io data raise an error naming the variable. In plugin context, `FORMIO_PROJECT_URL` is captured per-cwd by the `project_set` tool and persisted to `~/.formio/projects.json`. The `verify-project-url` `SessionStart`/`PreToolUse` hook offers `formio_default_project_url` (from plugin user-config) as the default the first time you enter a workspace.
+<sub>\* Not at startup — the server starts, lists every tool, and answers `hello` without it; only the tools that read or write Form.io data error, naming `project_set` and this variable. The alternative is the `project_set` tool, which maps a working directory to a project in `~/.formio/projects.json`. Resolution order: `FORMIO_PROJECT_URL`, then the mapping for the caller's `cwd`, then the error. Map a directory before any client connects with `npx -y @formio/mcp project set --project-url <url> --base-url <url> --cwd <path>`; `project get --cwd <path>` prints what resolves and which source won. It exits `0` when it resolved, `1` when nothing is mapped for that directory, and `2` when the command could not answer (a usage error, a malformed URL, an unreadable `~/.formio/projects.json`) — so a caller can tell "nothing here yet" from "this failed".</sub>
 
-\*\* Reversed in plugin context: the plugin always collects `FORMIO_BASE_URL` through user-config, so it is required there and the hosted-cloud default does not apply.
 ## Privacy Policy
 
 Form.io's privacy policy covers the Form.io Services this server talks to: **https://form.io/privacy**
@@ -300,7 +300,7 @@ What the server itself does with data, which is the part the policy above cannot
 | File | Contents | Written when |
 | --- | --- | --- |
 | `mcp-tokens.json` | The JWT from the browser login, keyed by `FORMIO_BASE_URL` | You sign in through the browser |
-| `projects.json` | A per-directory map of project and base URLs | `project_set` runs (plugin context only) |
+| `projects.json` | A per-directory map of project and base URLs | `project_set` runs |
 
 Form data and submissions are never written to disk — they pass through in memory to answer a tool call.
 

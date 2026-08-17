@@ -8,16 +8,18 @@
 // budget is what guarantees they stay visible.
 
 import { describe, expect, it } from 'vitest';
-import { DESCRIPTION_BUDGET, descriptionOf, topLevelSkills } from './helpers.js';
+import { DESCRIPTION_BUDGET, allSkills, descriptionOf, topLevelSkills } from './helpers.js';
 
 describe('skill description budget', () => {
-  it.each(topLevelSkills())(
+  // Every skill in the library, nested ones included: the budget is also the
+  // Agent Skills specification's hard maximum, and clients other than Claude
+  // Code register nested skills by recursive scan.
+  it.each(allSkills().map((skill) => [skill.path, skill.description] as const))(
     `%s description is at most ${DESCRIPTION_BUDGET} characters (normalized)`,
-    (skill) => {
-      const description = descriptionOf(skill);
+    (path, description) => {
       expect(
         description.length,
-        `${skill} description is ${description.length} chars (budget ${DESCRIPTION_BUDGET})`
+        `${path} description is ${description.length} chars (budget ${DESCRIPTION_BUDGET})`
       ).toBeLessThanOrEqual(DESCRIPTION_BUDGET);
     }
   );

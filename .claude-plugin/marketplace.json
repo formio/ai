@@ -8,10 +8,7 @@
     {
       "name": "formio-ai",
       "description": "Form.io MCP server + skill library covering every endpoint in the Form.io API, with form JSON schema guidance for generating and editing Form.io forms and resources.",
-      "source": {
-        "source": "npm",
-        "package": "@formio/ai"
-      }
+      "source": "./plugin"
     }
   ]
 }

@@ -4,6 +4,16 @@ description: >-
   Form.io authentication and authorization specialist — resource-backed login (Login plus Role Assignment Actions), role-based access control and group permissions, SSO via OIDC/OAuth/SAML/LDAP with provider role mapping, Token Swap, Custom JWT for Enterprise/on-prem (signed with `JWT_SECRET`), email-token (passwordless) auth, and JWT/session mechanics (the `x-jwt-token` header, `jti` Session ID, logout, 2FA, reCAPTCHA). Use when the user asks to configure how users authenticate — SSO, OIDC, OAuth, SAML, LDAP, Token Swap, Custom JWT, passwordless auth, JWT, sessions, roles, permissions, RBAC, group permissions, 2FA, or reCAPTCHA in Form.io. Not for: designing the resource map or data model (see `formio-resource-planner`); orchestrating an app build (see `formio-application`); adding a Login or Role Assignment Action to one form — per-form action settings, priorities, conditions (see `formio-actions`); REST endpoint lookups (see `formio-api`); wiring a login screen into Angular (see `formio-angular`).
 ---
 
+## Preflight — the Form.io MCP server
+
+Before your first Form.io tool call, check that the Form.io MCP tools are available to you — `form_list`, `form_create`, `project_import`, `project_set`.
+
+**If they are missing, stop and connect the server before doing anything else.** Load the `formio-mcp-setup` skill and follow it; it writes the MCP configuration for every client and tells the user how to reload. If that skill is not installed either, tell the user:
+
+> I have no Form.io tools, so the Form.io MCP server isn't connected. Run `npx skills add formio/ai` to get the setup skill, or add the server to your agent's MCP configuration as `npx -y @formio/mcp`.
+
+Do **not** work around missing tools by making direct HTTP requests against a Form.io deployment, and do not write code that does. This library documents the whole Form.io REST surface, which makes hand-rolling requests tempting and wrong — it bypasses the guardrails the tools enforce and can write to a live deployment unreviewed. Stop and report what is blocking instead.
+
 ## Overview
 
 `formio-auth` is the stand-alone skill for everything authentication and authorization in Form.io. It covers how a user proves identity (Resource login, SSO, Token Swap, Custom JWT, email token), how Form.io carries that identity on the wire (`x-jwt-token` header, JWT payload, `jti` Session ID), and how that identity gates access at three scopes (project, form definition, submission data) and through two access models (role-based and group-based).

@@ -166,24 +166,32 @@ function manifestObject(version: string, tools: object[]) {
         command: 'node',
         args: ['${__dirname}/server/index.mjs'],
         env: {
-          FORMIO_PROJECT_URL: '${user_config.formio_project_url}',
+          FORMIO_DEFAULT_PROJECT_URL: '${user_config.formio_default_project_url}',
           FORMIO_BASE_URL: '${user_config.formio_base_url}',
           FORMIO_API_KEY: '${user_config.formio_api_key}',
         },
       },
     },
     user_config: {
+      // A suggestion, not a pin. A Form.io project is one-to-one with the
+      // application built against it, so an answer given once at install is right
+      // for one directory and wrong for the next; it reaches the server as
+      // FORMIO_DEFAULT_PROJECT_URL, which takes no part in resolution and is
+      // overridden the moment project_set maps a directory.
+      //
       // Not marked required, because it is not: the server starts, lists its tools
       // and answers `hello` without it, and the tools that do need a project say so
       // when called. Declaring it required told hosts to block on a value the
       // server can run without, which makes the server harder to try than it is.
-      formio_project_url: {
+      formio_default_project_url: {
         type: 'string',
-        title: 'Project URL',
+        title: 'Default project URL (suggested, not locked in)',
         description:
-          'Full URL of your Form.io project, e.g. https://myproject.form.io or ' +
-          'https://forms.example.com/myproject. Needed by every tool that reads or ' +
-          'writes Form.io data; leave it blank only to look around first.',
+          'Optional. A Form.io project to suggest when a working directory has no ' +
+          'project of its own, e.g. https://myproject.form.io or ' +
+          'https://forms.example.com/myproject. The agent confirms it with you and ' +
+          'records it for that directory, and any directory can use a different ' +
+          'project. Leave it blank and the agent simply asks.',
         required: false,
       },
       formio_base_url: {
