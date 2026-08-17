@@ -1,6 +1,6 @@
 {
   "name": "formio-ai",
-  "version": "0.8.0",
+  "version": "0.9.0",
   "description": "Build applications on the Form.io platform. Bundles the Form.io MCP server with a skill library covering app orchestration, form building, resource planning, JSON schema authoring, actions, authentication, the @formio/js SDK, and the full Form.io REST surface.",
   "author": {
     "name": "Form.io",
