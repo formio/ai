@@ -5,7 +5,7 @@ A Trello-style kanban board. Exercises three-level nesting (Board â†’ Swimlane â
 ## Prompt
 
 ```
-/formio-application Build me a Trello-style kanban app called Storyboard. Users can create boards (a name, a description, and a color). Inside a board they create swim lanes (a title and the order they appear left to right), and inside a lane they create stories (a title, a description, a priority of low/medium/high, an assignee, a due date, and the position of the story within its lane). Stories can be dragged and dropped between lanes and reordered within a lane, and the move has to stick. I also want teams: I create a team, add members to it, and assign the team to a board. When a member of that team logs in they can read and write every board their team is assigned to, and they can't see boards belonging to teams they're not on. Put the app in examples/storyboard-app.
+/formio-application Build me a Trello-style kanban app called Storyboard. Users can create boards (a name, a description, and a color). Inside a board they create swim lanes (a title and the order they appear left to right), and inside a lane they create stories (a title, a description, a priority of low/medium/high, an assignee, a due date, and the position of the story within its lane). Stories can be dragged and dropped between lanes and reordered within a lane, and the move has to stick. I also want teams: I create a team, add members to it, and assign the team to a board. When a member of that team logs in they can read and write every board their team is assigned to, and they can't see boards belonging to teams they're not on.
 ```
 
 ## What to look for
