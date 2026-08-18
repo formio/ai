@@ -80,6 +80,18 @@ pnpm changeset
 
 Pick the bump level and describe the change. On merge to `main`, the release workflow opens/updates a "Version Packages" PR; merging that PR publishes to npm.
 
+Three steps run inside `pnpm changeset:version` — which is what the release workflow invokes to build the Version Packages PR — so that PR carries their output and merging it is the only action needed:
+
+1. `pnpm changeset:follow` adds a patch changeset for `@formio/ai` when the pending release bumps `@formio/mcp` without it. The pins below live in files that ship inside the plugin, so a server-only release would otherwise change plugin content that never republishes, leaving the published plugin launching the previous server. The coupling is one-directional: a plugin-only release leaves the server alone.
+2. `pnpm sync:versions` writes `plugin/package.json`'s version into the three client manifests.
+3. `pnpm sync:pins` writes `packages/mcp-server/package.json`'s version — already bumped by `changeset version` at this point, so it is the version about to publish — into every launch of the server: the manifests' `npx` args, the install docs, and every skill that prints the command.
+
+Launches are pinned (`npx -y @formio/mcp@<version>`) rather than floating so an install runs the server the release was tested against instead of whatever the registry serves at that moment. Never hand-edit a pin or hand-write the follow-on changeset; the release PR is where both appear. `pnpm sync:pins --check` shows drift without writing, and `plugin-manifests.test.ts`, `plugin-follows-server.test.ts`, and `mcp-setup-project-config.test.ts` fail when either is stale.
+
+CI also runs `pnpm check:releases`, which fails a PR that changes published content without a changeset releasing the owning package. It skips the `changeset-release/*` branch: that PR has already consumed every changeset, so a changeset added there would release the release.
+
+Bumping the CDN assets the portal-login page loads (`packages/mcp-server/src/auth.ts`) means recomputing their Subresource Integrity digests. Do not hand-compute them — run `pnpm sync:sri`, which fetches each pinned URL and writes the digest of the bytes it served; `pnpm sync:sri --check` verifies them, and `login-asset-integrity.test.ts` runs that check whenever the CDN is reachable. A wrong digest passes every shape assertion and then blocks the renderer in the browser, hanging `authenticate` on a blank page.
+
 ## Pull requests
 
 - Branch from `main`; keep PRs focused on one change.

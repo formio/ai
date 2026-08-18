@@ -1,3 +1,5 @@
+import fs from 'node:fs';
+import path from 'node:path';
 import { describe, it, expect, vi } from 'vitest';
 import { authenticate } from '../auth.js';
 import { ResolvedFormioConfig } from '../config.js';
@@ -63,7 +65,22 @@ describe('authenticate', () => {
 
     await authPromise;
 
-    expect(html).toContain('formio.form.min.js');
+    // The renderer is a third-party script on a page that handles the user's
+    // portal credentials, so the URL must stay version-pinned and SRI-pinned.
+    expect(html).not.toContain('cdn.form.io');
+    expect(html).toMatch(
+      /<script src="https:\/\/cdn\.jsdelivr\.net\/npm\/@formio\/js@\d+\.\d+\.\d+\/dist\/formio\.form\.min\.js" integrity="sha384-[A-Za-z0-9+/=]+" crossorigin="anonymous">/
+    );
+    expect(html).toMatch(
+      /<link rel="stylesheet" href="https:\/\/cdn\.jsdelivr\.net\/npm\/@formio\/js@\d+\.\d+\.\d+\/dist\/formio\.form\.min\.css" integrity="sha384-[A-Za-z0-9+/=]+" crossorigin="anonymous">/
+    );
+    // Same rule for every third-party asset on the page, not just the renderer.
+    for (const link of html.match(
+      /<link rel="stylesheet" href="https:\/\/cdn\.jsdelivr\.net[^>]*>/g
+    ) ?? []) {
+      expect(link).toMatch(/@\d+\.\d+\.\d+\//);
+      expect(link).toMatch(/integrity="sha384-[A-Za-z0-9+/=]+" crossorigin="anonymous"/);
+    }
     expect(html).toContain('Formio.createForm');
     expect(html).toContain('https://formio.invalid/formio/user/login');
   });
@@ -89,5 +106,42 @@ describe('authenticate', () => {
 
     expect(html).toContain('https://custom.form.io/mylogin');
     expect(html).not.toContain('https://formio.invalid/formio/user/login');
+  });
+});
+
+// The README's privacy section is the disclosure that travels with the package —
+// packed into the npm tarball and copied into the .mcpb bundle — so the hosts it
+// names are a claim about what the sign-in page contacts. Naming a host the page
+// no longer loads, or omitting one it does, is wrong in a way no other test here
+// would notice.
+describe('the privacy disclosure names the hosts the sign-in page contacts', () => {
+  const README = path.resolve(__dirname, '../../README.md');
+
+  it('lists every external host on the page, and no other', async () => {
+    let html = '';
+    await authenticate(DEFAULT_CONFIG, {
+      onReady: async (port) => {
+        html = await (await fetch(`http://127.0.0.1:${port}/`)).text();
+        await postCallback(port, 'test-jwt');
+      },
+    });
+
+    // Every host the browser is told to fetch from, minus the deployment itself —
+    // the login form's own origin is the service the user is signing in to, not a
+    // third party.
+    const contacted = new Set(
+      [...html.matchAll(/https:\/\/([\w.-]+)/g)]
+        .map((match) => match[1])
+        .filter((host) => host !== new URL(DEFAULT_CONFIG.projectUrl).hostname)
+    );
+    const disclosure = fs
+      .readFileSync(README, 'utf8')
+      .split('\n')
+      .find((line) => line.startsWith('**Third parties.**'));
+
+    expect(disclosure, 'no **Third parties.** paragraph in the README').toBeDefined();
+    expect([...contacted].sort()).toEqual(
+      [...(disclosure as string).matchAll(/`([\w.-]+\.[a-z]{2,})`/g)].map((m) => m[1]).sort()
+    );
   });
 });

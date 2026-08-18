@@ -137,14 +137,14 @@ describe('plugin/mcp.json — Agent Plugins MCP declaration', () => {
 
     expect(server.command).toBe('npx');
     expect(server.args).toContain('-y');
-    expect(server.args).toContain('@formio/mcp');
+    expect(server.args?.some((arg) => arg.startsWith('@formio/mcp@'))).toBe(true);
   });
 
-  it('names this repository’s server package', () => {
+  it('names this repository’s server package at its published version', () => {
     const declared = mcpServers()['formio-mcp'].args ?? [];
-    const { name } = readJson(SERVER_PACKAGE_JSON) as { name: string };
+    const { name, version } = readJson(SERVER_PACKAGE_JSON) as { name: string; version: string };
 
-    expect(declared).toContain(name);
+    expect(declared).toContain(`${name}@${version}`);
   });
 
   it('uses no placeholder the specification does not define', () => {
@@ -243,7 +243,9 @@ describe('plugin/.cursor-plugin/plugin.json — Cursor manifest', () => {
 
     expect(Object.keys(cursorServers)).toEqual(['formio-mcp']);
     expect(cursorServers['formio-mcp'].command).toBe('npx');
-    expect(cursorServers['formio-mcp'].args).toContain('@formio/mcp');
+    expect(cursorServers['formio-mcp'].args?.some((arg) => arg.startsWith('@formio/mcp@'))).toBe(
+      true
+    );
   });
 });
 
@@ -288,27 +290,43 @@ describe('the Claude manifest and the marketplace source', () => {
     const server = manifest.mcpServers['formio-mcp'];
 
     expect(server.command).toBe('npx');
-    expect(server.args).toContain('@formio/mcp');
+    expect(server.args?.some((arg) => arg.startsWith('@formio/mcp@'))).toBe(true);
     expect(server.env?.FORMIO_BASE_URL).toBe('${user_config.formio_base_url}');
     expect(Object.keys(manifest.userConfig ?? {})).toContain('formio_base_url');
   });
 
-  // `@formio/mcp` is a 0.x line, so a range in a shipped manifest is a liability
-  // either way: a floor goes stale at the next minor, and a ceiling freezes an
-  // installed plugin on an old server. The merge-to-release window a floor would
-  // guard is closed by release ordering instead, and a server too old to serve
-  // project_set shows up as missing tools — which every skill's preflight already
-  // routes to formio-mcp-setup.
-  it('launches the package by name, with no version range hard-coded', () => {
+  // An unpinned `npx -y @formio/mcp` resolves whatever the registry serves at
+  // launch time — the "runtime URL that controls the agent" pattern skill
+  // scanners rate Medium, and a plugin release then describes a server nobody
+  // can name. The exact version ships with the manifest instead: an installed
+  // plugin runs the server that release was tested against, and `pnpm sync:pins`
+  // restamps every launch from packages/mcp-server/package.json during
+  // `changeset:version`, so upgrading the plugin upgrades the server.
+  // (`pnpm sync:versions` is the neighbouring script, and writes the manifests'
+  // own `version` field — not this pin.)
+  // Why an exact version and not a floor. `@formio/mcp` is a 0.x line, where a
+  // floor goes stale at the next minor and a ceiling freezes an installed plugin
+  // on an old server; a scanner also reads either range as resolving whatever the
+  // registry serves. The cost is a window: `.claude-plugin/marketplace.json`
+  // installs from `./plugin`, so between the Version Packages PR landing on main
+  // and npm accepting the publish, a fresh install names a version npm does not
+  // have yet and `npx` fails with E404. That window is one Release run — the same
+  // push that lands the pin triggers the publish, and every step in release.yml is
+  // idempotent, so a failed run is re-run rather than worked around. When it
+  // stays broken, publishing the server is the fix, not unpinning the manifests;
+  // formio-mcp-setup documents the E404 for anyone who installs inside the window.
+  it('launches the package pinned to the published server version', () => {
+    const { version } = readJson(SERVER_PACKAGE_JSON) as { version: string };
+
     for (const manifest of [MCP_MANIFEST, CURSOR_MANIFEST, CLAUDE_MANIFEST]) {
       const servers = (readJson(manifest).mcpServers ?? {}) as Record<string, McpServer>;
 
       for (const [name, server] of Object.entries(servers)) {
         const args = server.args ?? [];
-        expect(args, `${path.basename(manifest)} → ${name}`).toContain('@formio/mcp');
+        expect(args, `${path.basename(manifest)} → ${name}`).toContain(`@formio/mcp@${version}`);
         expect(
-          args.filter((arg) => arg.startsWith('@formio/mcp@')),
-          `${path.basename(manifest)} → ${name} must not hard-code a version`
+          args.filter((arg) => arg === '@formio/mcp'),
+          `${path.basename(manifest)} → ${name} must not launch the package unpinned`
         ).toEqual([]);
       }
     }
@@ -450,6 +468,61 @@ describe('the Claude manifest and the marketplace source', () => {
   }, 30_000);
 });
 
+// The pin the manifests carry is stamped, not hand-typed. `pnpm sync:pins` reads
+// packages/mcp-server/package.json and rewrites every launch — manifests, the
+// install docs, and every skill — so a release cannot ship a manifest launching
+// one server version while the skills describe another.
+describe('the @formio/mcp launch pin', () => {
+  const serverVersion = () => (readJson(SERVER_PACKAGE_JSON) as { version: string }).version;
+
+  it('agrees with the published server version in every source manifest', () => {
+    for (const manifest of [MCP_MANIFEST, CURSOR_MANIFEST, CLAUDE_MANIFEST]) {
+      const servers = (readJson(manifest).mcpServers ?? {}) as Record<string, McpServer>;
+
+      for (const [name, server] of Object.entries(servers)) {
+        expect(server.args ?? [], `${path.basename(manifest)} → ${name}`).toContain(
+          `@formio/mcp@${serverVersion()}`
+        );
+      }
+    }
+  });
+
+  // Asserting the exit code alone would keep passing if `--check` stopped
+  // reaching the script — pnpm swallowing the flag runs the writer, whose success
+  // message also names the version. Two things separate them: the check-mode
+  // wording ("launch pins", where the writer says "launch already pins"), and the
+  // fact that a check leaves every file it could rewrite byte-identical. The
+  // target list comes from the script's own `--list`, so the assertion covers
+  // whatever it would touch — and, unlike watching the working tree, it cannot be
+  // tripped by an unrelated write elsewhere in a parallel test run.
+  it('reports agreement from --check without writing a byte', () => {
+    const targets = spawnSync('pnpm', ['-s', 'sync:pins', '--list'], {
+      cwd: REPO_ROOT,
+      encoding: 'utf8',
+    })
+      .stdout.split('\n')
+      .filter((line) => line.length > 0 && !line.startsWith('>'));
+    const contents = () =>
+      targets.map((file) => readText(path.join(REPO_ROOT, file.trim()))).join('\u0000');
+
+    expect(targets.length).toBeGreaterThan(0);
+    const before = contents();
+
+    const clean = spawnSync('pnpm', ['sync:pins', '--check'], {
+      cwd: REPO_ROOT,
+      encoding: 'utf8',
+    });
+
+    expect(clean.status).toBe(0);
+    expect(`${clean.stdout}${clean.stderr}`).toMatch(
+      new RegExp(
+        `every documented launch pins @formio/mcp@${serverVersion().replace(/\./g, '\\.')}`
+      )
+    );
+    expect(contents()).toBe(before);
+  }, 30_000);
+});
+
 // The MCP Registry entry is a fourth install route, and its environment list is
 // what a registry installer prompts for. It has to describe the same server the
 // manifests do.
@@ -471,6 +544,33 @@ describe('the MCP Registry entry', () => {
       .map((variable) => variable.name);
 
     expect(required).toEqual([]);
+  });
+
+  // The entry names a version in two places, and a registry installer resolves
+  // the npm package from `packages[].version` — so a stale entry hands that one
+  // install route a different server from every other route, which all now pin.
+  // `pnpm sync:pins` stamps both fields; the release workflow re-stamps them
+  // before publishing, which keeps a hand-edited tree from reaching the registry
+  // but cannot make the committed file truthful.
+  it('names the published server version in both places', () => {
+    const { version } = readJson(SERVER_PACKAGE_JSON) as { version: string };
+    const registry = readJson(REGISTRY_MANIFEST) as {
+      version: string;
+      packages: Array<{ identifier: string; version: string }>;
+    };
+
+    expect(registry.version).toBe(version);
+    for (const pkg of registry.packages) {
+      expect(pkg.version, pkg.identifier).toBe(version);
+    }
+  });
+
+  // Not a launch command: the quoted-package launch pattern in sync-server-pin
+  // would rewrite this into `@formio/mcp@<version>` and break the entry.
+  it('keeps the package identifier free of a version spec', () => {
+    const registry = readJson(REGISTRY_MANIFEST) as { packages: Array<{ identifier: string }> };
+
+    expect(registry.packages.map((pkg) => pkg.identifier)).toEqual(['@formio/mcp']);
   });
 
   it('documents the variables that steer project resolution and the login flow', () => {

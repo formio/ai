@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { exec } from 'child_process';
+import net from 'node:net';
 import { authenticate } from '../auth.js';
 import { ResolvedFormioConfig } from '../config.js';
 
@@ -13,6 +14,26 @@ const DEFAULT_CONFIG: ResolvedFormioConfig = {
   projectUrl: 'https://formio.invalid/example',
   forceBrowser: true,
 };
+
+// A hard-coded port made this suite flaky: the OS holds a just-closed listener in
+// TIME_WAIT, so a repeat run inside the same minute — or any other process on that
+// number — met a connection reset instead of the login server. Asking the kernel
+// for a free one keeps the behaviour under test (an explicitly requested port is
+// the port that gets bound) without betting on a constant.
+function freePort(): Promise<number> {
+  return new Promise((resolve, reject) => {
+    const probe = net.createServer();
+    probe.once('error', reject);
+    probe.listen(0, '127.0.0.1', () => {
+      const address = probe.address();
+      if (address === null || typeof address === 'string') {
+        probe.close(() => reject(new Error('no port assigned')));
+        return;
+      }
+      probe.close(() => resolve(address.port));
+    });
+  });
+}
 
 function postCallback(port: number, token: string): Promise<Response> {
   return fetch(`http://127.0.0.1:${port}/callback`, {
@@ -55,9 +76,10 @@ describe('authenticate in headless environments', () => {
   // A container must publish a known port, and the host browser cannot reach a
   // server bound to the container's loopback address.
   it('honours an explicit bind host and port', async () => {
+    const requested = await freePort();
     let observed = 0;
     await authenticate(
-      { ...DEFAULT_CONFIG, authHost: '0.0.0.0', authPort: 43117 },
+      { ...DEFAULT_CONFIG, authHost: '0.0.0.0', authPort: requested },
       {
         onReady: async (port) => {
           observed = port;
@@ -66,7 +88,7 @@ describe('authenticate in headless environments', () => {
       }
     );
 
-    expect(observed).toBe(43117);
+    expect(observed).toBe(requested);
   });
 
   // The spawn failure was previously swallowed, leaving no clue why nothing

@@ -14,16 +14,18 @@ Before your first Form.io tool call, check that the Form.io MCP tools are availa
 
 **If they are missing, stop and connect the server before doing anything else.** Load the `formio-mcp-setup` skill and follow it; it writes the MCP configuration for every client and tells the user how to reload. If that skill is not installed either, tell the user:
 
-> I have no Form.io tools, so the Form.io MCP server isn't connected. Run `npx skills add formio/ai` to get the setup skill, or add the server to your agent's MCP configuration as `npx -y @formio/mcp`.
+> I have no Form.io tools, so the Form.io MCP server isn't connected. Run `npx skills add formio/ai` to get the setup skill, or add the server to your agent's MCP configuration as `npx -y @formio/mcp@0.9.0`.
 
-Do **not** work around missing tools by making direct HTTP requests against a Form.io deployment, and do not write code that does. This library documents the whole Form.io REST surface, which makes hand-rolling requests tempting and wrong — it bypasses the guardrails the tools enforce and can write to a live deployment unreviewed. Stop and report what is blocking instead.
+Do **not** work around missing tools by making direct HTTP requests against a Form.io deployment, and do not write a throwaway script that makes them for you. This library documents the whole Form.io REST surface, which makes hand-rolling requests tempting and wrong — it bypasses the guardrails the tools enforce and can write to a live deployment unreviewed. Stop and report what is blocking instead.
+
+That ban is on **build-time** work — the configuring you do in this session. It says nothing about the application you are building: an app is expected to call the Form.io REST API **at runtime**, to log its users in and to read and write their submissions, and [`formio-api`](../formio-api/SKILL.md)'s runtime-scope references document those endpoints for exactly that code.
 
 ## Stance
 
 - **Framework-specific, not orchestrator.** The library's generic "build me an app" entry point is `formio-application` — it decides build-new vs. extend, which framework (Angular today, more later), when to plan, and when to import. You are invoked AFTER those decisions. If a user reaches you directly by naming Angular explicitly ("build it in Angular", "use Angular"), honor that — otherwise, you arrive via handoff from `formio-application` with URLs + `template.json` already in hand.
 - **Import is NOT this skill's responsibility.** Template import via the `project_import` MCP tool lives in `formio-application`; you never call `project_import`. If the user invokes you directly and the target project has not yet been imported into, point them at `formio-application` instead of running the planner or calling the MCP tool yourself.
 - **One phase at a time, left to right.** SETUP → BOOTSTRAP → CONFIG → AUTH → Resources. No jumping ahead. Each phase that writes files ends with an approval gate; a declined gate stops the flow.
-- **Do not scaffold the Angular workspace yourself.** When the working directory does not yet contain an Angular workspace, BOOTSTRAP installs the Angular team's official skill library (`angular/skills`) and delegates to its `angular-new-app` skill. Do NOT call `ng new` directly, and do NOT hand-roll an `angular.json` / `package.json` — see [`BOOTSTRAP.md`](./BOOTSTRAP.md) for why.
+- **Do not hand-roll the Angular workspace.** When the working directory does not yet contain one, BOOTSTRAP offers to install the Angular team's official skill library (`angular/skills`) and delegates to its `angular-new-app` skill; if the user declines that install, it falls back to the Angular CLI (`npx @angular/cli@<major> new`) under its own approval. Both paths are in [`BOOTSTRAP.md`](./BOOTSTRAP.md) — never hand-write an `angular.json` / `package.json`, and never run a scaffolding command the user has not approved.
 - **Accept handoff mode gracefully.** When `formio-application` invokes you with URLs already captured, SETUP confirms them with one short acknowledgement and advances — no re-interview. Invoked directly with no handoff context, SETUP runs its full URL interview.
 - **Skip what is already wired.** Before CONFIG, inspect `src/app/config.ts`; before AUTH, inspect `src/app/app-module.ts` for an existing `AuthModule`. If the phase's output already matches the expected values, skip it and tell the user which file triggered the skip.
 - **The planner's `template.md` + `template.json` pair is the source of truth for AUTH.** When the pair exists, read the user resource, login form, register form, and roles from it per [`AUTH.md`](./AUTH.md)'s extraction rules — never invent. If the pair does not exist and no handoff context names one, point the user at `formio-application` (or `formio-resource-planner` if they only want to plan).
@@ -125,7 +127,7 @@ If the user realizes mid-AUTH that the SETUP URLs were wrong, stop AUTH, rewind 
 ## Links
 
 - [`SETUP.md`](./SETUP.md) — the URL interview
-- [`BOOTSTRAP.md`](./BOOTSTRAP.md) — installing `angular/skills` and delegating to `angular-new-app`
+- [`BOOTSTRAP.md`](./BOOTSTRAP.md) — offering `angular/skills`, delegating to `angular-new-app`, and the Angular CLI fallback
 - [`CONFIG.md`](./CONFIG.md) — `FormioAppConfig` / `config.ts` generation
 - [`AUTH.md`](./AUTH.md) — `AuthModule` / `FormioAuthConfig` generation
 - [`formio-angular-resources/SKILL.md`](./formio-angular-resources/SKILL.md) — per-resource NgModule scaffolding (nested sub-skill; load the file directly, never invoke it as a top-level skill).
@@ -134,4 +136,4 @@ External references:
 
 - https://help.form.io/developers/introduction/application
 - https://github.com/formio/angular-demo
-- https://github.com/angular/skills — Angular team's official skill library (installed by BOOTSTRAP)
+- https://github.com/angular/skills — Angular team's official skill library (BOOTSTRAP offers to install it; the user decides)

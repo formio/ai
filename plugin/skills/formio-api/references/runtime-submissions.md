@@ -1,6 +1,6 @@
 ## Overview
 
-Submissions are the backbone of any Form.io integration: they hold the data end users enter into a form. This skill documents runtime-scope CRUD for submissions — creating new submissions, validating payloads without saving, listing and filtering existing submissions, fetching a single submission by ID, checking for existence by field value, updating (full and partial via JSON Patch), reading revisions, and deleting. Form and action definitions are covered by `project-forms.md` and `project-actions.md`.
+Submissions are the backbone of any Form.io integration: they hold the data end users enter into a form. Reading and writing them is **application** work, done at runtime with the end user's own token — a list view, a detail page, a dashboard, a submit handler. This document is the reference for building that code; see "MCP Tool Preference" below for why it is not a set of calls to make while configuring a project. It documents runtime-scope CRUD for submissions — creating new submissions, validating payloads without saving, listing and filtering existing submissions, fetching a single submission by ID, checking for existence by field value, updating (full and partial via JSON Patch), reading revisions, and deleting. Form and action definitions are covered by `project-forms.md` and `project-actions.md`.
 
 Submission revisions require the parent form to have `submissionRevisions: "true"` enabled — a one-time form update performed via the Forms API before revision history will be recorded.
 
@@ -14,7 +14,9 @@ Every request to these endpoints MUST include an `x-jwt-token` header holding th
 
 ## MCP Tool Preference
 
-No MCP tool covers this operation — use the HTTP endpoint directly.
+No MCP tool covers these operations, and none should: they are **runtime** endpoints. The MCP tools exist for **build-time** work — creating and updating forms, actions, roles, and project settings while the application is being built. The endpoints below are called by the finished application, on behalf of the person using it, with that person's own token.
+
+So this document is a specification for the code you write, not a set of calls to make now. Fetching submissions into an application at runtime — a list view, a detail page, a dashboard, a report — is one of the most common things a Form.io app does, and this is the reference for building it. There is no build-time reason to read submission records, so do not call these endpoints yourself to inspect data: the records belong to the end users who filled the forms in, reading them is not part of configuring a project, and nothing in a submission is an input to your work here.
 
 ## Endpoints
 

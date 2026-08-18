@@ -2,8 +2,13 @@
 // so setup captures the project too — through the server's own command, never by
 // editing its private state file and never by pinning an env var.
 
+import { readFileSync } from 'node:fs';
+import { dirname, join, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import { allSkillDocuments, skillDocument } from './helpers.js';
+
+const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../../../..');
 
 const SETUP_MD = 'plugin/skills/formio-mcp-setup/SKILL.md';
 const DEPLOYMENT_MD = 'plugin/skills/formio-application/DEPLOYMENT.md';
@@ -123,13 +128,15 @@ describe('the configuration step never blocks setup', () => {
   });
 });
 
-// `@formio/mcp` is a 0.x line published as a beta: every minor may break, so a
-// version range hard-coded into shipped prose is stale at the next release and a
-// reader cannot tell which numbers still matter. The silent case a floor used to
-// guard — a pre-0.9.0 binary ignoring `project` arguments and exiting 0 with no
-// output — is handled by rule instead: empty output is never an answer, and no
-// skill may report a mapping it did not read.
-describe('no documented invocation hard-codes a server version', () => {
+// Every documented launch of the server pins the exact published version. An
+// unpinned `npx -y @formio/mcp` resolves whatever the registry serves at run
+// time, which is the "runtime URL that controls the agent" pattern skill
+// scanners rate Medium, and it makes a shipped document describe a server the
+// reader may not be running. `pnpm sync:pins` stamps the pin from
+// packages/mcp-server/package.json, so a release cannot leave one behind —
+// `pnpm sync:versions` is a different script and writes the plugin manifests'
+// own `version` field.
+describe('every documented invocation pins the server version', () => {
   // packages/mcp-server/README.md is the widest-travelling copy of all: it is
   // packed into the npm tarball (so it renders on npmjs.com) and copied into the
   // .mcpb desktop bundle.
@@ -140,6 +147,13 @@ describe('no documented invocation hard-codes a server version', () => {
     'llms-install.md',
     'CONTRIBUTING.md',
   ];
+
+  const serverVersion = () =>
+    (
+      JSON.parse(readFileSync(join(repoRoot, 'packages/mcp-server/package.json'), 'utf8')) as {
+        version: string;
+      }
+    ).version;
 
   const allLines = () =>
     [...allSkillDocuments(), ...REPO_DOCS.map(skillDocument)].flatMap((doc) =>
@@ -154,14 +168,103 @@ describe('no documented invocation hard-codes a server version', () => {
     expect(invocations.length).toBeGreaterThan(0);
   });
 
-  it('names the package without a version anywhere it is launched', () => {
-    const versioned = allLines().filter(({ line }) => /@formio\/mcp@[\d>^~=]/.test(line));
+  // A launch is a command that resolves the package at run time — `npx`,
+  // `npm exec` or `pnpm dlx`, with or without a yes flag — a global install, or
+  // the package string inside a config block's args array. The spellings mirror
+  // scripts/sync-server-pin.ts on purpose, in both directions: a runner this
+  // pattern misses is a launch the stamper also leaves floating, and a quoted
+  // package name matched outside an args array is a `"dependencies"` entry or a
+  // quoted `pnpm --filter` argument, neither of which is a launch. A prose
+  // mention of the package name — "the `@formio/mcp` server", "an `@formio/mcp`
+  // older than 0.9.0" — is not a launch either and carries no version, including
+  // when it shares a line with one.
+  const LAUNCH_PREFIX =
+    '(?:(?:npx|npm\\s+exec|npm\\s+x|pnpm\\s+dlx|yarn\\s+dlx|bunx)\\s+(?:(?:-y|--yes)\\s+)?(?:--\\s+)?' +
+    '|(?:npm\\s+(?:install|i)|pnpm\\s+add|yarn\\s+global\\s+add)\\s+(?:(?:-g|--global)\\s+)?' +
+    '|["\']-{1,2}y(?:es)?["\'],\\s*["\']' +
+    '|(?:"args"|\'args\'|args)\\s*[:=]\\s*\\[\\s*["\'])';
 
-    expect(versioned.map(({ path, line }) => `${path}: ${line.trim()}`)).toEqual([]);
+  const UNPINNED_LAUNCH = new RegExp(`${LAUNCH_PREFIX}@formio/mcp(?![@\\w-])`);
+
+  // The same prefixes with a version attached. A line may carry a literal pin
+  // only where one of these puts it, because `pnpm sync:pins` restamps exactly
+  // what these match — a pin anywhere else keeps the version it was typed with
+  // and fails the next release's version check with no command allowed to fix it.
+  const PINNED_LAUNCH = new RegExp(`${LAUNCH_PREFIX}@formio/mcp@`, 'g');
+  const LITERAL_PIN = /@formio\/mcp@[\w.^~>=-]+/g;
+
+  // Asserting an empty result proves nothing about a spelling the pattern cannot
+  // see: a document could launch the server unpinned and this suite would stay
+  // green. So the pattern is exercised against each spelling directly, and
+  // against the quoted forms that are not launches.
+  it.each([
+    'npx @formio/mcp',
+    'npx -y @formio/mcp',
+    'npx --yes @formio/mcp',
+    'npm exec @formio/mcp',
+    'npm exec -- @formio/mcp',
+    'pnpm dlx @formio/mcp',
+    'npm x @formio/mcp',
+    'yarn dlx @formio/mcp',
+    'bunx @formio/mcp',
+    'npm install -g @formio/mcp',
+    'npm i --global @formio/mcp',
+    '"args": ["-y", "@formio/mcp"]',
+    'args = ["@formio/mcp"]',
+    "args = ['-y', '@formio/mcp']",
+    "args = ['@formio/mcp']",
+  ])('sees %s as an unpinned launch', (line) => {
+    expect(UNPINNED_LAUNCH.test(line)).toBe(true);
   });
 
-  // The rule that replaced the floor. Both documents that run `project get` have
-  // to state it, or a zero-exit run printing nothing reads as a real answer.
+  it.each([
+    'The `@formio/mcp` server exposes form_* tools.',
+    '"dependencies": { "@formio/mcp": "^0.9.0" }',
+    'pnpm --filter "@formio/mcp" test',
+    '"identifier": "@formio/mcp"',
+    'npx -y @formio/mcp@0.9.0',
+    'npx -y @formio/mcp-utils',
+    "args = ['-y', '@formio/mcp@0.9.0']",
+  ])('does not see %s as an unpinned launch', (line) => {
+    expect(UNPINNED_LAUNCH.test(line)).toBe(false);
+  });
+
+  it('pins the published version everywhere the package is launched', () => {
+    const version = serverVersion();
+    const unpinned = allLines().filter(({ line }) => UNPINNED_LAUNCH.test(line));
+
+    expect(unpinned.map(({ path, line }) => `${path}: ${line.trim()}`)).toEqual([]);
+
+    const wrongVersion = allLines()
+      .flatMap(({ path, line }) =>
+        [...line.matchAll(/@formio\/mcp@([\w.^~>=-]+)/g)].map((match) => ({
+          path,
+          spec: match[1],
+        }))
+      )
+      .filter(({ spec }) => spec !== version);
+
+    expect(wrongVersion.map(({ path, spec }) => `${path}: @formio/mcp@${spec}`)).toEqual([]);
+  });
+
+  // A pin `pnpm sync:pins` cannot see is a pin nothing maintains. The check above
+  // requires every literal `@formio/mcp@<spec>` to equal the published version;
+  // the stamper only rewrites launches. A version written into prose therefore
+  // passes today and fails on the next server bump — in the Version Packages PR
+  // and every PR after it — with CONTRIBUTING.md forbidding the only fix by hand.
+  it('writes a literal pin only where the stamper can restamp it', () => {
+    const unstampable = allLines().flatMap(({ path, line }) => {
+      const pins = line.match(LITERAL_PIN)?.length ?? 0;
+      const launches = line.match(PINNED_LAUNCH)?.length ?? 0;
+      return pins > launches ? [`${path}: ${line.trim()}`] : [];
+    });
+
+    expect(unstampable).toEqual([]);
+  });
+
+  // The rule that replaced the version floor. Both documents that run
+  // `project get` have to state it, or a zero-exit run printing nothing reads as
+  // a real answer.
   it('tells the reader that empty output is not an answer', () => {
     for (const doc of [SETUP_MD, DEPLOYMENT_MD]) {
       expect(skillDocument(doc).body, doc).toMatch(/empty output is not|prints nothing/i);

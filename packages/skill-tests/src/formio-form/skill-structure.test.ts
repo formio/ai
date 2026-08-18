@@ -112,10 +112,35 @@ describe('formio-form canonical inclusion modes', () => {
     }
   });
 
-  it('setup.md documents the CDN mode (script + CSS link)', () => {
+  it('setup.md documents the CDN mode as a version-pinned, integrity-pinned renderer bundle', () => {
     const setup = readFileSync(join(referencesDir, 'setup.md'), 'utf8');
-    expect(setup).toContain('cdn.form.io/js/formio.full.min.js');
-    expect(setup).toMatch(/<link[^>]+formio\.full\.min\.css/);
+    expect(setup).toMatch(
+      /<script\s+src="https:\/\/cdn\.jsdelivr\.net\/npm\/@formio\/js@\d+\.\d+\.\d+\/dist\/formio\.form\.min\.js"\s+integrity="sha384-[A-Za-z0-9+/=]+"\s+crossorigin="anonymous"/
+    );
+    expect(setup).toMatch(
+      /<link[^>]+href="https:\/\/cdn\.jsdelivr\.net\/npm\/@formio\/js@\d+\.\d+\.\d+\/dist\/formio\.form\.min\.css"[^>]+integrity="sha384-[A-Za-z0-9+/=]+"/
+    );
+  });
+
+  it('no doc loads @formio/js from an unpinnable URL', () => {
+    for (const { file, content } of allSkillDocs()) {
+      expect(content, `${file} names a fixed-path vendor bundle`).not.toContain('cdn.form.io');
+      for (const url of content.match(
+        /https:\/\/cdn\.jsdelivr\.net\/npm\/@formio\/js[^\s"')`]*/g
+      ) ?? []) {
+        expect(url, `${file} loads @formio/js from an unversioned URL`).toMatch(
+          /^https:\/\/cdn\.jsdelivr\.net\/npm\/@formio\/js@\d+\.\d+\.\d+\//
+        );
+      }
+    }
+  });
+
+  it('no doc script-loads the builder bundle in an embed-only skill', () => {
+    for (const { file, content } of allSkillDocs()) {
+      expect(content, `${file} script-loads formio.full.min.js`).not.toMatch(
+        /<script[^>]+formio\.full\.min\.js/
+      );
+    }
   });
 
   it('setup.md documents the canonical ESM import', () => {

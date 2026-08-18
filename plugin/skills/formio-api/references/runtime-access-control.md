@@ -17,7 +17,9 @@ Every request to these endpoints MUST include an `x-jwt-token` header holding th
 
 ## MCP Tool Preference
 
-No MCP tool covers this operation — use the HTTP endpoint directly.
+No MCP tool covers these operations, and none should: they are **runtime** endpoints. The MCP tools exist for **build-time** work — creating and updating forms, actions, roles, and project settings while the application is being built. The endpoints below are called by the finished application, on behalf of the person using it, with that person's own token.
+
+So this document is a specification for the code you write, and a description of the rules the server enforces at runtime, when an end user's token reaches it. Configure permissions through the build-time tools (`role_*`, `project_import`, `form_update`); do not exercise them by making requests as an end user.
 
 ## Endpoints
 

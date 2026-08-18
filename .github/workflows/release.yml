@@ -106,6 +106,11 @@ jobs:
         run: |
           curl -L "https://github.com/modelcontextprotocol/registry/releases/latest/download/mcp-publisher_$(uname -s | tr '[:upper:]' '[:lower:]')_$(uname -m | sed 's/x86_64/amd64/;s/aarch64/arm64/').tar.gz" | tar xz mcp-publisher
 
+      # Belt and braces: `pnpm sync:pins` already stamps both version fields in the
+      # committed server.json during changeset:version, so this normally writes
+      # nothing. It stays because the registry entry is the one install route whose
+      # version is data rather than a launch command — publishing a stale one hands
+      # registry installers a different server from every other route.
       - name: Set version in server.json
         if: steps.mcp.outputs.version != ''
         run: |
@@ -147,7 +152,7 @@ jobs:
           else
             gh release create "$TAG" dist/formio-mcp.mcpb \
               --title "@formio/mcp ${VERSION}" \
-              --notes "Install with \`npx -y @formio/mcp\`, \`docker run formio/mcp\`, or download the attached \`.mcpb\` for one-click installation in Claude Desktop." \
+              --notes "Install with \`npx -y @formio/mcp@${VERSION}\`, \`docker run formio/mcp:${VERSION}\`, or download the attached \`.mcpb\` for one-click installation in Claude Desktop." \
               --target "${GITHUB_SHA}"
           fi
 

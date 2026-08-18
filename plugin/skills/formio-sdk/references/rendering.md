@@ -1,6 +1,6 @@
 ## Overview
 
-Render a Form.io form inside a VanillaJS (or any non-Angular) consumer with `Formio.createForm(element, formSrc, options)`. Covers prefill, event subscription (`change`, `submit`, `error`, `nextPage`, `prevPage`, `render`, `attach`), wizards, the FormBuilder, PDF-backed forms, read-only mode, and offline / local-JSON form sources. Behavior coverage cross-referenced against `https://formio.github.io/formio.js/app/examples` — every example here uses ESM imports, never `<script>` tags. Sourced from `packages/formio.js/src/Formio.js` (renderer extensions), `packages/formio.js/src/Embed.js`, `packages/formio.js/src/Form.js`, and `packages/formio.js/src/Webform.js` in the Form.io source code.
+Render a Form.io form inside a VanillaJS (or any non-Angular) consumer with `Formio.createForm(element, formSrc, options)`. Covers prefill, event subscription (`change`, `submit`, `error`, `nextPage`, `prevPage`, `render`, `attach`), wizards, PDF-backed forms, read-only mode, and offline / local-JSON form sources. Behavior coverage cross-referenced against `https://formio.github.io/formio.js/app/examples` — every example here uses ESM imports, never `<script>` tags. Sourced from `packages/formio.js/src/Formio.js` (renderer extensions), `packages/formio.js/src/Embed.js`, `packages/formio.js/src/Form.js`, and `packages/formio.js/src/Webform.js` in the Form.io source code.
 
 ## Imports
 
@@ -8,7 +8,7 @@ Render a Form.io form inside a VanillaJS (or any non-Angular) consumer with `For
 import { Formio } from '@formio/js';
 ```
 
-> The CSS that styles the rendered form ships with `@formio/js`. In a bundler-driven app, import the stylesheet once at bootstrap (e.g. `import '@formio/js/dist/formio.full.min.css';`). Do not use `<script>` tags to load the renderer — this skill is ESM-only.
+> The CSS that styles the rendered form ships with `@formio/js`. In a bundler-driven app, import the stylesheet once at bootstrap (e.g. `import '@formio/js/dist/formio.form.min.css';`). Do not use `<script>` tags to load the renderer — this skill is ESM-only.
 
 ## URL Configuration
 
@@ -40,7 +40,6 @@ The `formSrc` argument to `Formio.createForm` is one of:
 Static methods on `Formio` (renderer extensions in `packages/formio.js/src/Formio.js`):
 
 - `Formio.createForm(element: HTMLElement, form: string | object, options?: FormOptions): Promise<Form>` — render a form and resolve when it's attached to the DOM.
-- `Formio.builder(element: HTMLElement, form: string | object, options?: FormOptions): Promise<FormBuilder>` — render the drag-and-drop form builder.
 - `Formio.use(module)` — register a renderer module (custom component, template, addon).
 - `Formio.icons` / `Formio.Templates.framework` — global icon-pack / template selection.
 - `Formio.formioReady` — `Promise<void>` that resolves when the renderer's runtime is initialized.
@@ -178,24 +177,6 @@ await Formio.createForm(
   `${Formio.getProjectUrl()}/intake/submission/000000000000000000000010`,
   { readOnly: true, viewAsHtml: true }
 );
-```
-
-### Render the FormBuilder
-
-```ts
-import { Formio } from '@formio/js';
-
-Formio.setBaseUrl('https://forms.mysite.com');
-Formio.setProjectUrl('https://forms.mysite.com/myproject');
-
-const builder = await Formio.builder(document.getElementById('builder')!, {
-  display: 'form',
-  components: [],
-});
-
-builder.on('change', (form) => {
-  console.log('builder edited:', form.components.length, 'components');
-});
 ```
 
 ### Render a PDF-backed form

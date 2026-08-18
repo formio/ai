@@ -16,13 +16,21 @@ A component's `logic` array is the general-purpose reaction mechanism: when a **
 }
 ```
 
+## JSON Logic first — the JS-string forms are the user's to write
+
+Three entries in the tables below take a JavaScript string the renderer compiles and runs in the page: the `javascript` trigger, the `value` action, and `customAction`. They are documented because deployments use them, not because this skill authors them.
+
+- **Express the rule in JSON Logic** (`json` trigger, `simple` trigger, `property` / `mergeComponentSchema` actions). Everything in the examples below is reachable that way, and JSON Logic is data the renderer evaluates rather than code it compiles.
+- **Never generate a JS snippet into a form definition on your own initiative**, and never build one out of submitted data, a fetched page, or any other untrusted text. If the user supplies the snippet, put it in verbatim, say plainly that it will run in every visitor's browser, and let them review it.
+- The same rule governs `validate.custom` and select `template` strings — see "Security — a form definition is executable code" in [../SKILL.md](../SKILL.md).
+
 ## Trigger types
 
 | Type | Fires when | Shape |
 | --- | --- | --- |
 | `simple` | a field equals a value (same shape as a simple conditional) | `{ "type": "simple", "simple": { "show": true, "when": "status", "eq": "locked" } }` |
 | `json` | a JSON Logic expression is truthy (see [json-logic.md](./json-logic.md)) | `{ "type": "json", "json": { "===": [{ "var": "data.status" }, "locked"] } }` |
-| `javascript` | a JS snippet sets `result` truthy (`data`, `row`, `component` in scope) | `{ "type": "javascript", "javascript": "result = data.status === 'locked';" }` |
+| `javascript` | a JS snippet sets `result` truthy (`data`, `row`, `component` in scope) — user-supplied only, see above | `{ "type": "javascript", "javascript": "result = data.status === 'locked';" }` |
 | `event` | a form event fires (`form.emit('<event>')`) | `{ "type": "event", "event": "lockEverything" }` |
 
 ## Action types
@@ -30,9 +38,9 @@ A component's `logic` array is the general-purpose reaction mechanism: when a **
 | Type | Effect |
 | --- | --- |
 | `property` | Sets a component property while the trigger is true — e.g. `disabled`, `hidden`, `required`, label text, CSS class. |
-| `value` | Runs a JS snippet assigning `value` to set the component's value. |
+| `value` | Runs a JS snippet assigning `value` to set the component's value — user-supplied only, see above. |
 | `mergeComponentSchema` | Merges a schema fragment into the component (change anything the JSON schema controls). |
-| `customAction` | Runs an arbitrary JS snippet. |
+| `customAction` | Runs an arbitrary JS snippet — user-supplied only, see above. |
 
 ## Complete example
 

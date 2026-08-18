@@ -4,7 +4,7 @@ This document is loaded by the parent `formio-angular` skill during Phase 2. It 
 
 ## Why this phase exists
 
-`formio-angular` does not know how to scaffold an Angular workspace on its own, and it should not try. The Angular team ships a maintained skill library at [`angular/skills`](https://github.com/angular/skills) that already encodes the current best practices for `ng new`, workspace layout, build configuration, and CLI options. The right move is to install that library the first time `formio-angular` runs, then delegate the actual workspace creation to the `angular-new-app` skill from it. `formio-angular` picks the story back up at CONFIG, where it writes the Form.io-specific files (`config.ts`, `AuthModule`, resource NgModules) into the workspace the Angular skill just created.
+`formio-angular` does not know how to scaffold an Angular workspace on its own, and it should not try. The Angular team ships a maintained skill library at [`angular/skills`](https://github.com/angular/skills) that already encodes the current best practices for `ng new`, workspace layout, build configuration, and CLI options. The preferred move is to offer to install that library the first time `formio-angular` runs — the user decides, because installing skills adds instructions this session follows — and then delegate the actual workspace creation to the `angular-new-app` skill from it. A user who declines gets the local `@angular/cli` fallback in Step 2 instead; either way the workspace exists before CONFIG. `formio-angular` picks the story back up at CONFIG, where it writes the Form.io-specific files (`config.ts`, `AuthModule`, resource NgModules) into the workspace the Angular skill just created.
 
 Doing it this way keeps the framework-agnostic `formio-application` → `formio-angular` (→ its nested `./formio-angular-resources/SKILL.md` sub-skill) chain focused on Form.io concerns, and leans on the Angular team's own skill for the Angular concerns.
 
@@ -24,82 +24,101 @@ Otherwise, run BOOTSTRAP.
 
 ## Step 1 — resolve the target Angular version from `@formio/angular`
 
-Before installing anything, determine which Angular major the **current latest** `@formio/angular` officially supports. The canonical source is the package's own `package.json` on unpkg at an **unpinned** URL — fetch:
+Before installing anything, determine which Angular major the **current latest** `@formio/angular` officially supports. Read it from the npm registry with `npm view` — the same registry `npm install` resolves against, queried through the local npm client. Do not fetch a package manifest from a CDN or any other URL: a document fetched at run time decides what this skill installs and which Angular major it targets, so the answer has to come from the registry the install itself will use.
 
+```bash
+npm view @formio/angular version
+npm view @formio/angular peerDependencies
 ```
-https://unpkg.com/@formio/angular/package.json
-```
 
-unpkg resolves an unpinned package path to the latest published version automatically, so this URL always reflects whatever `@formio/angular` release is current. Do NOT hard-code a version (e.g., `@10.0.1`) into this URL; that would pin the skill to a stale release and defeat the point of fetching the file at runtime.
+What to read from the output:
 
-What to read from it:
-
-1. **The resolved `@formio/angular` version.** The returned JSON has a top-level `"version"` field (e.g., `"10.0.1"`). Capture it as `FORMIO_ANGULAR_VERSION` — this is what you will install in Step 4 and cite in the approval summary.
-2. **Highest supported Angular major.** Look under `peerDependencies` for `@angular/core`. The range typically lists several majors (e.g. `^17.0.0 || ^18.0.0 || … || ^N.0.0`). Take the **highest** major in that range — that is the newest Angular `@formio/angular` supports, and always the one to target. Capture it as `FORMIO_ANGULAR_SUPPORTED_MAJOR`. If `peerDependencies` is absent, fall back to `dependencies` for the same key; if neither is present, stop and tell the user — do NOT guess. (The goal is always the latest supported Angular — never an older major, and never a major newer than `@formio/angular` declares.)
-3. **Latest patch within that major.** Query the npm registry for the newest published version of `@angular/core` in that major:
+1. **The resolved `@formio/angular` version.** `npm view @formio/angular version` prints the latest published version (e.g., `10.0.1`). Capture it as `FORMIO_ANGULAR_VERSION` — this is what you will install in Step 4 and cite in the approval summary. Do NOT hard-code a version into the query; resolving the current release is the point.
+2. **Highest supported Angular major.** In the `peerDependencies` output, find `@angular/core`. The range typically lists several majors (e.g. `^17.0.0 || ^18.0.0 || … || ^N.0.0`). Take the **highest** major in that range — that is the newest Angular `@formio/angular` supports, and always the one to target. Capture it as `FORMIO_ANGULAR_SUPPORTED_MAJOR`. If `peerDependencies` prints nothing, fall back to `npm view @formio/angular dependencies` for the same key; if neither names `@angular/core`, stop and tell the user — do NOT guess. (The goal is always the latest supported Angular — never an older major, and never a major newer than `@formio/angular` declares.)
+3. **Latest patch within that major.** Query the registry for the newest published `@angular/core` in that major:
 
    ```bash
    npm view @angular/core@<major>.x.x version
    ```
 
-   This prints the latest patch in that major. Capture the full `MAJOR.MINOR.PATCH` string as `FORMIO_ANGULAR_TARGET_VERSION` — the version you pin the new workspace to in Step 3.
+   A range selector prints every matching version, newest last — take the last line. Capture that full `MAJOR.MINOR.PATCH` string as `FORMIO_ANGULAR_TARGET_VERSION`, the version you pin the new workspace to in Step 3.
 
-Then do the same resolution for `@formio/js`, the core Form.io SDK that `@formio/angular` wraps. Fetch its unpinned `package.json` from unpkg:
+Then do the same for `@formio/js`, the core Form.io SDK that `@formio/angular` wraps:
 
-```
-https://unpkg.com/@formio/js/package.json
-```
-
-Read the top-level `"version"` field and capture it as `FORMIO_JS_VERSION` (e.g., `5.3.3`). You do NOT need to cross-check `@formio/js`'s own peer dependencies against Angular — `@formio/angular` already declares the compatible `@formio/js` range in its own `peerDependencies` / `dependencies`. If the latest `@formio/js` falls outside that range, fall back to the newest version inside the range named by `@formio/angular`'s `package.json`; if it is inside the range, use the latest.
-
-Do the same for Bootstrap 5 and Bootstrap Icons, because the Form.io renderer defaults to its Bootstrap 5 template and without these stylesheets submission forms render unstyled. Fetch the unpinned `package.json` files from unpkg:
-
-```
-https://unpkg.com/bootstrap/package.json
-https://unpkg.com/bootstrap-icons/package.json
+```bash
+npm view @formio/js version
 ```
 
-Read the top-level `"version"` field from each and capture them as `BOOTSTRAP_VERSION` (e.g., `5.3.3`) and `BOOTSTRAP_ICONS_VERSION` (e.g., `1.11.3`). If unpkg returns a Bootstrap major other than `5`, stop and ask the user — Form.io's default template targets Bootstrap 5, and silently picking up Bootstrap 6+ would break the renderer. The user can opt in explicitly, but the default path stays on Bootstrap 5.
+Capture it as `FORMIO_JS_VERSION` (e.g., `5.3.3`). You do NOT need to cross-check `@formio/js`'s own peer dependencies against Angular — `@formio/angular` already declares the compatible `@formio/js` range in its own `peerDependencies` / `dependencies`. If the latest `@formio/js` falls outside that range, fall back to the newest version inside the range `@formio/angular` names; if it is inside the range, use the latest.
+
+Do the same for Bootstrap 5 and Bootstrap Icons, because the Form.io renderer defaults to its Bootstrap 5 template and without these stylesheets submission forms render unstyled:
+
+```bash
+npm view bootstrap@5 version
+npm view bootstrap-icons version
+```
+
+Capture them as `BOOTSTRAP_VERSION` (e.g., `5.3.3`) and `BOOTSTRAP_ICONS_VERSION` (e.g., `1.11.3`) — again, the `@5` range prints every 5.x release, so take the last line. The `@5` selector keeps Bootstrap on the major the renderer targets; if it resolves nothing, stop and ask the user rather than installing a different major — Form.io's default template targets Bootstrap 5, and silently picking up Bootstrap 6+ would break the renderer.
+
+**If the registry is unreachable.** On an air-gapped or proxy-restricted host the queries above fail with a network error rather than an empty answer — the same kind of environment `formio-mcp-setup` keeps a documented offline path for. Do not substitute a CDN or any other URL for the registry, and do not guess a major. Work down this list and stop at the first step that answers:
+
+1. **A manifest already on disk.** If the target directory or its parent workspace has `node_modules/@formio/angular/package.json`, read it with your file tools: its `version` is `FORMIO_ANGULAR_VERSION`, and its `peerDependencies['@angular/core']` carries the same range `npm view` would have printed, so `FORMIO_ANGULAR_SUPPORTED_MAJOR` is still the highest major in it. If `node_modules/@angular/core/package.json` is also present and its `version` is in that major, that full `MAJOR.MINOR.PATCH` is `FORMIO_ANGULAR_TARGET_VERSION`. Resolve `@formio/js`, `bootstrap`, and `bootstrap-icons` the same way from their own installed manifests where present. A file already on this machine is not a document fetched at run time — this is the offline equivalent of the registry query, not a way around it.
+2. **Ask the user.** Tell them in one line that the registry is unreachable, and ask for exactly what is missing: the `@formio/angular` version to install and the Angular version to target. Use what they give you verbatim; do not round it up to a newer major. If they name only a major rather than a full version, set `FORMIO_ANGULAR_TARGET_VERSION` to that major alone — `ng new` and `@angular/cli@<major>` both accept a bare major, and inventing a `.MINOR.PATCH` nobody named would pin the workspace to a release that may not exist.
+
+`FORMIO_ANGULAR_TARGET_VERSION` has no other offline source: it is the newest patch in a major, and only the registry knows that. Do not derive it from `FORMIO_ANGULAR_SUPPORTED_MAJOR` by appending `.0.0`.
+
+Whichever step answered, say so in the Phase 2 approval summary — "resolved from `node_modules`" or "supplied by you", not a bare version — so a number that did not come from the registry is never presented as though it did. If neither step answers, stop and tell the user Phase 2 cannot proceed without registry access or those versions. Never scaffold against an assumed Angular major: a workspace on a major `@formio/angular` does not support fails at CONFIG, after `ng new` has already written the tree.
 
 Stash the six results for later phases:
 
-- `FORMIO_ANGULAR_VERSION` — the latest `@formio/angular`, resolved from unpkg
-- `FORMIO_JS_VERSION` — the latest `@formio/js`, resolved from unpkg (constrained to `@formio/angular`'s declared range)
+- `FORMIO_ANGULAR_VERSION` — the latest `@formio/angular`, resolved from the npm registry
+- `FORMIO_JS_VERSION` — the latest `@formio/js` (constrained to `@formio/angular`'s declared range)
 - `FORMIO_ANGULAR_SUPPORTED_MAJOR` — the highest Angular major in `@formio/angular`'s peer range
 - `FORMIO_ANGULAR_TARGET_VERSION` — the latest `MAJOR.MINOR.PATCH` within that major
-- `BOOTSTRAP_VERSION` — the latest Bootstrap (must be a Bootstrap 5 major)
+- `BOOTSTRAP_VERSION` — the latest Bootstrap 5
 - `BOOTSTRAP_ICONS_VERSION` — the latest Bootstrap Icons
 
-If unpkg is unreachable (offline / proxied environment), fall back to `npm view @formio/angular version` / `npm view @formio/js version` / `npm view bootstrap@5 version` / `npm view bootstrap-icons version` + `npm view @formio/angular peerDependencies` to read the same fields from the npm registry directly. If the npm registry is also unreachable for `@angular/core@<major>.x.x`, fall back to the **highest version listed** in `@formio/angular`'s own `dependencies` for `@angular/core`, and tell the user you could not confirm a newer patch was available. Never silently pick a major the `@formio/angular` package has not declared support for.
+Report the six resolved versions to the user in the Step 2 approval summary — they are what the workspace gets built against, and a version nobody saw is a version nobody agreed to.
 
-**Opt-out:** if the user has explicitly said they do NOT want Bootstrap (e.g., "use Material", "skip Bootstrap", "I'll style it myself"), skip the two Bootstrap unpkg fetches above and set `BOOTSTRAP_VERSION` + `BOOTSTRAP_ICONS_VERSION` to `null`. Step 5 will then skip its install and `angular.json` edits entirely. The default stays on Bootstrap 5 because the Form.io renderer's default template is Bootstrap 5 and unstyled forms are a bad first impression — an override needs a real user signal.
+Never guess an Angular major, and never read a package manifest from a CDN or any other URL: the registry `npm view` queries here is the one `npm install` resolves against in Step 4, so it is the only source these six versions may come from.
 
-## Step 2 — install the Angular skills library
+**Opt-out:** if the user has explicitly said they do NOT want Bootstrap (e.g., "use Material", "skip Bootstrap", "I'll style it myself"), skip the two Bootstrap queries above and set `BOOTSTRAP_VERSION` + `BOOTSTRAP_ICONS_VERSION` to `null`. Step 5 will then skip its install and `angular.json` edits entirely. The default stays on Bootstrap 5 because the Form.io renderer's default template is Bootstrap 5 and unstyled forms are a bad first impression — an override needs a real user signal.
 
-Run this exactly once per session, before invoking `angular-new-app`:
+## Step 2 — offer the Angular skills library, then install it if the user agrees
+
+Scaffolding is delegated to the Angular team's own `angular-new-app` skill, which arrives by installing their skill library. That install writes skills into the user's agent configuration, and those skills then direct this session — so it is the user's call, not yours, and it needs an explicit yes before anything runs.
+
+Ask once, showing the exact command you would run and where it comes from:
 
 ```bash
 npx skills add https://github.com/angular/skills --all -a <agent> -y
 ```
 
-Notes:
+State three things with the offer: the source is the Angular team's official repository on GitHub (`angular/skills`), `--all` installs every skill in it — not only `angular-new-app` — and the installed skills become instructions this session follows. Then wait for an answer.
 
-- `--all` installs every skill in the Angular repo. We only need `angular-new-app` for scaffolding, but the Angular team ships related skills (e.g., component and service generators) that may be useful to the nested Resources sub-skill (`./formio-angular-resources/SKILL.md`) later. Installing everything up front is cheaper than re-invoking `npx skills add` per phase.
+**If the user agrees**, run it exactly once per session, before invoking `angular-new-app`, and report what it installed.
+
 - `-a <agent>` is the client you are actually running in — substitute it (`claude-code`, `cursor`, `codex`, `copilot`, …) so the skills register where this session will look for them. If you cannot determine the running client, omit the flag entirely: the default target is the universal `.agents/skills/` directory, which Cursor, Codex, and Copilot all read, and which Claude Code reads through a symlink. Never hardcode one client.
-- `-y` accepts the default install location and any prompts the `skills` CLI emits.
-- If `npx` is not on the user's `PATH`, surface the error verbatim — do not try to fall back to a manual install. The user almost certainly has Node.js installed (Angular requires it), and a missing `npx` means their toolchain is broken in a way that needs their attention before anything Angular-related will work.
+- `-y` accepts the default install location and any prompts the `skills` CLI emits. It does not stand in for the user's approval above — that approval is what allows the command to run at all.
+- If the command fails, never retry it against a different source. No other repository, fork, or mirror stands in for `angular/skills`, and no hand-assembled copy of those skills stands in for the CLI that installs them.
 
-If the command fails for any other reason (network outage, `skills` CLI not yet published, repository moved), stop BOOTSTRAP and report the exact error. Do not try to scaffold the workspace by hand with `ng new` — staying out of the Angular team's scaffolding path is the whole point of this phase.
+**If the user declines — or the install fails and they do not want to retry — scaffold the workspace locally instead.** Run the Angular CLI directly, pinned to the major resolved in Step 1, in the target directory:
+
+```bash
+npx -y @angular/cli@<FORMIO_ANGULAR_SUPPORTED_MAJOR> new <project-name> --directory . --routing --style=scss
+```
+
+Show the command and get approval for it too, then continue at Step 4 — Step 3 does not apply, because there is no `angular-new-app` to delegate to. The delegated path stays the default because the Angular team's skill encodes current `ng new` practice and keeps up with it; this fallback exists so declining a third-party skill install never leaves the user stuck, not because the two are equivalent.
 
 ## Step 3 — delegate to `angular-new-app`
 
-Once the install succeeds, invoke the `angular-new-app` skill to create the Angular workspace in the current working directory. The skill is designed to handle its own interview — routing (yes/no), stylesheet choice (CSS/SCSS/etc.), strict mode, and anything else `ng new` accepts — so you do NOT re-ask those questions on its behalf.
+Skip this step entirely when Step 2 took the local `@angular/cli` fallback — there is no `angular-new-app` to call. Otherwise, once the install succeeds, invoke the `angular-new-app` skill to create the Angular workspace in the current working directory. The skill is designed to handle its own interview — routing (yes/no), stylesheet choice (CSS/SCSS/etc.), strict mode, and anything else `ng new` accepts — so you do NOT re-ask those questions on its behalf.
 
 What to pass to `angular-new-app`:
 
 - **Working directory:** the absolute path where the workspace should be created. Usually the cwd, or the `workspacePath` from `formio-application`'s handoff context.
 - **Project name (if asked):** offer a name derived from the Form.io `Project URL`'s subdomain if the user gave one (e.g., `https://foo.form.io` → `foo`). Otherwise let `angular-new-app` default to the directory name.
-- **Angular version (critical):** pass the `FORMIO_ANGULAR_TARGET_VERSION` resolved in Step 1 — the latest patch of the highest Angular major `@formio/angular` supports. If `angular-new-app` exposes a version / CLI-version option, use it; if it shells out to `@angular/cli` and takes CLI flags, pass `@angular/cli@<FORMIO_ANGULAR_SUPPORTED_MAJOR>` so `npx` resolves the matching CLI major before running `ng new`. Always target the newest Angular `@formio/angular` supports; the only thing to avoid is an even-newer Angular major that `@formio/angular` has not yet declared, which would break `npm install` at Step 4.
+- **Angular version (critical):** pass the `FORMIO_ANGULAR_TARGET_VERSION` resolved in Step 1 — the latest patch of the highest Angular major `@formio/angular` supports, or, on the offline path, a bare major the user named. Either form is valid here: `@angular/cli@<major>` resolves the newest CLI in that major, so pass a bare major through unchanged rather than padding it to `<major>.0.0`. If `angular-new-app` exposes a version / CLI-version option, use it; if it shells out to `@angular/cli` and takes CLI flags, pass `@angular/cli@<FORMIO_ANGULAR_SUPPORTED_MAJOR>` so `npx` resolves the matching CLI major before running `ng new`. Always target the newest Angular `@formio/angular` supports; the only thing to avoid is an even-newer Angular major that `@formio/angular` has not yet declared, which would break `npm install` at Step 4.
 - **Intent note:** "This workspace will be wired against `@formio/angular@<version>`, which supports Angular `<major>`. The Form.io integration (config, auth, resource NgModules) is generated in subsequent phases by `formio-angular` and its nested Resources sub-skill at `./formio-angular-resources/SKILL.md`." The Angular skill does not need this for correctness, but surfacing it keeps the flow transparent to the user watching the transcript.
 
 Do not override `angular-new-app`'s approval gates — it runs its own, and layering a second one on top is confusing. When `angular-new-app` reports success and the workspace exists on disk, BOOTSTRAP is done.
@@ -113,7 +132,7 @@ Before advancing, verify all of the following exist:
 - `<workspace>/package.json` with `@angular/core` present at the major resolved in Step 1
 - `<workspace>/package.json` with `@formio/angular` pinned as `"^<FORMIO_ANGULAR_VERSION>"` and `@formio/js` pinned as `"^<FORMIO_JS_VERSION>"`
 
-If any are missing, something went wrong inside `angular-new-app` or the follow-up install. Do not patch around it; stop BOOTSTRAP and ask the user whether they want to retry, switch to an existing workspace, or abort. If `@angular/core` in the generated `package.json` is a different major than `FORMIO_ANGULAR_SUPPORTED_MAJOR`, the `angular-new-app` invocation did not honor the version pin — stop and surface the mismatch before continuing. If the Form.io entries landed as exact pins or `~` ranges, rewrite them to `^` as described above and re-run `npm install`.
+If any are missing, something went wrong inside the scaffolding step (`angular-new-app`, or the `@angular/cli` fallback) or the follow-up install. Do not patch around it; stop BOOTSTRAP and ask the user whether they want to retry, switch to an existing workspace, or abort. If `@angular/core` in the generated `package.json` is a different major than `FORMIO_ANGULAR_SUPPORTED_MAJOR`, the `angular-new-app` invocation did not honor the version pin — stop and surface the mismatch before continuing. If the Form.io entries landed as exact pins or `~` ranges, rewrite them to `^` as described above and re-run `npm install`.
 
 Also add `@formio/angular` and its peer SDK `@formio/js` to the workspace now so CONFIG can `import` from them without a follow-up install step. Install both in a single npm invocation, and use the caret (`^`) range prefix so the resulting `package.json` entries will auto-pick up future minor + patch releases within the same major without another bootstrap run:
 

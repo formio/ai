@@ -65,19 +65,27 @@ The `formio-form` `SKILL.md` frontmatter `description` SHALL contain three claus
 
 Across `plugin/skills/formio-form/SKILL.md` and every `plugin/skills/formio-form/references/*.md`, form-renderer inclusion SHALL be documented in exactly two canonical modes:
 
-- CDN: a `<script>` tag loading `https://cdn.form.io/js/formio.full.min.js` plus the matching CSS `<link>`, exposing the global `Formio`.
+- CDN: a `<script>` tag loading the renderer bundle `formio.form.min.js` from a version-pinned npm CDN path (`https://cdn.jsdelivr.net/npm/@formio/js@<MAJOR.MINOR.PATCH>/dist/formio.form.min.js`) plus the matching `formio.form.min.css` `<link>`, each carrying an `integrity="sha384-…"` digest and `crossorigin="anonymous"`, exposing the global `Formio`.
 - ESM: exactly `import { Formio } from '@formio/js';`
 
 The following SHALL NOT appear in any fenced code block: `from '@formio/core'` (any quote style), `from '@formio/js/lib/` (deep import), `require('@formio/js')`.
+
+No `formio-form` document SHALL name the host `cdn.form.io`, load `@formio/js` from an unversioned CDN path, or script-load the builder bundle `formio.full.min.js`. A fixed vendor path serves whatever that host decides to serve for it and cannot be integrity-pinned, so whoever controls the host controls what executes on the page; and `formio-form` embeds forms rather than building them, so the builder bundle is weight the page never uses.
 
 `setup.md` SHALL contain at least one occurrence of each canonical mode.
 
 #### Scenario: setup.md documents both inclusion modes
 
 - **WHEN** `plugin/skills/formio-form/references/setup.md` is inspected
-- **THEN** it contains a fenced code block with a `<script>` tag loading `cdn.form.io/js/formio.full.min.js` and a CSS `<link>`
+- **THEN** it contains a fenced code block with a `<script>` tag loading `https://cdn.jsdelivr.net/npm/@formio/js@<MAJOR.MINOR.PATCH>/dist/formio.form.min.js` with an `integrity="sha384-…"` attribute and `crossorigin="anonymous"`, and the matching `formio.form.min.css` `<link>` pinned the same way
 - **AND** it contains a fenced code block with exactly `import { Formio } from '@formio/js';`
 - **AND** it documents the target container element (a `<div>` passed to `Formio.createForm`)
+- **AND** it states how to recompute the digests when the version is bumped
+
+#### Scenario: Unpinnable renderer URL fails review
+
+- **WHEN** any `formio-form` document names `cdn.form.io`, loads `@formio/js` from a jsDelivr path with no `@<MAJOR.MINOR.PATCH>` segment, or script-loads `formio.full.min.js`
+- **THEN** the change fails review and the tag is replaced with the version-pinned, integrity-pinned renderer pair
 
 #### Scenario: Forbidden import present fails review
 

