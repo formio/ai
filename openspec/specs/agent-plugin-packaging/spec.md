@@ -25,7 +25,7 @@ Defines how the plugin directory is packaged for any coding agent: an Agent Plug
 
 ### Requirement: MCP servers are declared in a spec-conformant mcp.json
 
-`plugin/mcp.json` SHALL declare `$schema` exactly `https://agent-plugins.org/schemas/1.0.0/mcp.schema.json` — the same specification version as `plugin.json` — and an `mcpServers` object with one entry named `formio-mcp` of `type` `stdio`. The entry SHALL launch the published server with `npx -y @formio/mcp` rather than a path into the plugin directory, because a git-installed plugin contains no build output, and SHALL carry no version range — see the Claude manifest requirement for why a 0.x line takes neither a floor nor a ceiling in a shipped manifest. Its `env` SHALL NOT reference any placeholder other than `${PLUGIN_ROOT}` or `${PLUGIN_DATA}`, which are the only expansions the specification defines.
+`plugin/mcp.json` SHALL declare `$schema` exactly `https://agent-plugins.org/schemas/1.0.0/mcp.schema.json` — the same specification version as `plugin.json` — and an `mcpServers` object with one entry named `formio-mcp` of `type` `stdio`. The entry SHALL launch the published server with `npx -y @formio/mcp@<MAJOR.MINOR.PATCH>` rather than a path into the plugin directory, because a git-installed plugin contains no build output, and SHALL pin the exact `version` in `packages/mcp-server/package.json` rather than launching the package unpinned or with a range — see the Claude manifest requirement for why an unpinned launch chooses the agent's server at run time and why a 0.x line takes neither a floor nor a ceiling in a shipped manifest. Its `env` SHALL NOT reference any placeholder other than `${PLUGIN_ROOT}` or `${PLUGIN_DATA}`, which are the only expansions the specification defines.
 
 #### Scenario: Schema versions agree between the two manifests
 
@@ -36,7 +36,7 @@ Defines how the plugin directory is packaged for any coding agent: an Agent Plug
 
 - **WHEN** `plugin/mcp.json` is parsed
 - **THEN** `mcpServers["formio-mcp"].type` is `stdio`
-- **AND** its `command` is `npx` with args containing `-y` and `@formio/mcp`
+- **AND** its `command` is `npx` with args containing `-y` and `@formio/mcp@<version>` for the `version` in `packages/mcp-server/package.json`, never the bare `@formio/mcp`
 
 #### Scenario: No unsupported placeholders
 

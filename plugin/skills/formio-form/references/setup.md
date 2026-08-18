@@ -8,7 +8,7 @@ What a page needs before `Formio.createForm` can render anything: the renderer s
 
 ```js
 import { Formio } from '@formio/js';
-import '@formio/js/dist/formio.full.min.css';
+import '@formio/js/dist/formio.form.min.css';
 
 const form = await Formio.createForm(
   document.getElementById('formio'),
@@ -25,19 +25,19 @@ A `<script>` tag hands a third-party host the ability to run code on your page, 
 ```html
 <link
   rel="stylesheet"
-  href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css"
-  integrity="sha384-QWTKZyjpPEjISv5WaRU9OFeRpok6YctnYmDr5pNlyT2bRjXh0JMhjY6hW+ALEwIH"
+  href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/css/bootstrap.min.css"
+  integrity="sha384-sRIl4kxILFvY47J16cr9ZwB07vP4J8+LH7qKQnuqkuIAvNWLzeN8tE5YBujZqJLB"
   crossorigin="anonymous"
 />
 <link
   rel="stylesheet"
-  href="https://cdn.jsdelivr.net/npm/@formio/js@5.5.1/dist/formio.full.min.css"
-  integrity="sha384-H/hNRomN6/YJW4CqK9ZczzSQ4hAro6JOzB2AkUaw9wIBj5D2YHSw19ecJf/7l0Sp"
+  href="https://cdn.jsdelivr.net/npm/@formio/js@5.5.1/dist/formio.form.min.css"
+  integrity="sha384-/zfd6nkJxXzqXliV/Jlki/NOl+E/K7FujopWT3gKLYXMlIwiratcqMESMZG9ICY2"
   crossorigin="anonymous"
 />
 <script
-  src="https://cdn.jsdelivr.net/npm/@formio/js@5.5.1/dist/formio.full.min.js"
-  integrity="sha384-DhAYWcHV0ZOsuafd5+Fix8hSD2Xpq4LoDhxaM9P+X6vE4CQN1vmqTBAgRh9VOH8m"
+  src="https://cdn.jsdelivr.net/npm/@formio/js@5.5.1/dist/formio.form.min.js"
+  integrity="sha384-WI14pf615veSnkFtQYllUINR9h5mP1ukKxI47QtGb9DVDYvZlUeaOnWpK/G23Z5x"
   crossorigin="anonymous"
 ></script>
 
@@ -48,7 +48,7 @@ A `<script>` tag hands a third-party host the ability to run code on your page, 
 </script>
 ```
 
-The CDN build exposes the global `Formio`. Recompute the hashes whenever you bump the version: `curl -sL <url> | openssl dgst -sha384 -binary | openssl base64 -A`. `https://cdn.form.io/js/formio.full.min.js` serves the same bundle unversioned; it cannot be integrity-pinned, so use the version-pinned npm CDN path above instead.
+The CDN build exposes the global `Formio`. `formio.form.min.js` and `formio.form.min.css` are the renderer pair — everything `Formio.createForm` needs and nothing else. Recompute the hashes whenever you bump the version: `curl -sL <url> | openssl dgst -sha384 -binary | openssl base64 -A`. Load it from the version-pinned npm CDN path above and nowhere else: an unversioned URL — including a jsDelivr path with the `@5.5.1` omitted, or a vendor-hosted bundle served from a fixed path — cannot be integrity-pinned, so whoever controls that host controls what executes on your page.
 
 These are the only two supported inclusion modes. Never import from `@formio/core`, never deep-import from `@formio/js/lib/`, and never use CommonJS `require`.
 

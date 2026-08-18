@@ -1,7 +1,7 @@
 ---
 name: formio-sdk
 description: >-
-  Source-derived reference for the Form.io JavaScript SDK (`@formio/js`), the Utilities (`@formio/js/utils`), and the `@formio/core`-only helpers — authored from the Form.io source code. Covers static methods (`setBaseUrl`, `setProjectUrl`, `setToken`, `currentUser`, `logout`), instance methods on `new Formio(url)` (forms, submissions, files), VanillaJS rendering entry points (`Formio.createForm`, `Formio.builder`), the plugin lifecycle, and the `Utils` surface (Evaluator, traversal, conditions, JSONLogic, mask/sanitize). Use when the user asks to call a `Formio.*` static method, work with a `new Formio(...)` instance, invoke a `Utils.*` helper, evaluate JSONLogic, register a plugin, traverse component trees, or decode the JWT. Not for: REST endpoint shapes (see formio-api); orchestrating an app build (see formio-application); planning Resource schemas (see formio-resource-planner); `@formio/angular` wrappers (see formio-angular); embed/render-a-form tasks (see formio-form — this stays the raw API reference).
+  Source-derived reference for the Form.io JavaScript SDK (`@formio/js`), the Utilities (`@formio/js/utils`), and the `@formio/core`-only helpers — authored from the Form.io source code. Covers static methods (`setBaseUrl`, `setProjectUrl`, `setToken`, `currentUser`, `logout`), instance methods on `new Formio(url)` (forms, submissions, files), the VanillaJS rendering entry point (`Formio.createForm`), the plugin lifecycle, and the `Utils` surface (Evaluator, traversal, conditions, JSONLogic, mask/sanitize). Use when the user asks to call a `Formio.*` static method, work with a `new Formio(...)` instance, invoke a `Utils.*` helper, evaluate JSONLogic, register a plugin, traverse component trees, or decode the JWT. Not for: REST endpoint shapes (see formio-api); orchestrating an app build (see formio-application); planning Resource schemas (see formio-resource-planner); `@formio/angular` wrappers (see formio-angular); embed/render-a-form tasks (see formio-form — this stays the raw API reference).
 ---
 
 # Form.io SDK Skills
@@ -14,9 +14,11 @@ Before your first Form.io tool call, check that the Form.io MCP tools are availa
 
 **If they are missing, stop and connect the server before doing anything else.** Load the `formio-mcp-setup` skill and follow it; it writes the MCP configuration for every client and tells the user how to reload. If that skill is not installed either, tell the user:
 
-> I have no Form.io tools, so the Form.io MCP server isn't connected. Run `npx skills add formio/ai` to get the setup skill, or add the server to your agent's MCP configuration as `npx -y @formio/mcp`.
+> I have no Form.io tools, so the Form.io MCP server isn't connected. Run `npx skills add formio/ai` to get the setup skill, or add the server to your agent's MCP configuration as `npx -y @formio/mcp@0.9.0`.
 
-Do **not** work around missing tools by making direct HTTP requests against a Form.io deployment, and do not write code that does. This library documents the whole Form.io REST surface, which makes hand-rolling requests tempting and wrong — it bypasses the guardrails the tools enforce and can write to a live deployment unreviewed. Stop and report what is blocking instead.
+Do **not** work around missing tools by making direct HTTP requests against a Form.io deployment, and do not write a throwaway script that makes them for you. This library documents the whole Form.io REST surface, which makes hand-rolling requests tempting and wrong — it bypasses the guardrails the tools enforce and can write to a live deployment unreviewed. Stop and report what is blocking instead.
+
+That ban is on **build-time** work — the configuring you do in this session. It says nothing about the application you are building: an app is expected to call the Form.io REST API **at runtime**, to log its users in and to read and write their submissions, and [`formio-api`](../formio-api/SKILL.md)'s runtime-scope references document those endpoints for exactly that code.
 
 ## Imports
 
@@ -103,7 +105,7 @@ Reach for the SDK directly when you are authoring code that runs in a consumer a
 | Role CRUD on a project | [roles.md](./references/roles.md) |
 | Upload, download, delete files via storage providers | [files.md](./references/files.md) |
 | Register / deregister plugins, lifecycle hooks (`preRequest`, `request`, `wrapRequestPromise`, …) | [plugins.md](./references/plugins.md) |
-| Render a form in a VanillaJS / non-framework (Angular, React, etc) consumer via `Formio.createForm`, `Formio.builder`, events, prefill, wizard, PDF, builder, read-only | [rendering.md](./references/rendering.md) |
+| Render a form in a VanillaJS / non-framework (Angular, React, etc) consumer via `Formio.createForm` — events, prefill, wizard, PDF, read-only | [rendering.md](./references/rendering.md) |
 | Evaluate templates and expressions: `Utils.Evaluator`, `interpolate`, `evaluate`, `noeval` | [utils-evaluator.md](./references/utils-evaluator.md) |
 | Traverse and search component trees: `eachComponent`, `eachComponentData`, `getComponent`, `findComponent`, `flattenComponents` | [utils-form-traversal.md](./references/utils-form-traversal.md) |
 | Evaluate conditional logic: simple / JSON / legacy / custom conditionals | [utils-conditions.md](./references/utils-conditions.md) |

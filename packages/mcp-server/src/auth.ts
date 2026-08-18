@@ -15,6 +15,56 @@ const DEFAULT_AUTH_HOST = '127.0.0.1';
 // signing in will finish well inside this.
 const DEFAULT_AUTH_TIMEOUT_MS = 15 * 60 * 1000;
 
+/**
+ * Every CDN asset the login page loads, with the Subresource Integrity digest of
+ * the exact bytes each URL is expected to serve. This page handles the user's
+ * portal credentials, so a third-party script on it is pinned twice: to a version
+ * (jsDelivr serves that release forever) and to a hash (the browser refuses the
+ * file if the bytes differ).
+ *
+ * The digests are data, not decoration — nothing here recomputes them at run time,
+ * and no test can tell a correct hash from a plausible one by looking. A wrong or
+ * stale digest costs the whole login flow: the browser blocks the renderer,
+ * `Formio.createForm` throws `ReferenceError: Formio is not defined`, nothing is
+ * ever POSTed to /callback, and `authenticate` hangs on a blank page until it
+ * times out. So the pairs live in one list with one job — `pnpm sync:sri` fetches
+ * each URL, digests what it gets, and rewrites this list when a bump changes it;
+ * `pnpm sync:sri --check` verifies it, and login-asset-integrity.test.ts runs that
+ * check whenever the network is reachable.
+ *
+ * The Open Sans stylesheet is deliberately absent. Google Fonts serves
+ * per-browser CSS, so its bytes vary by request and no fixed digest can match;
+ * it also carries no script and only chooses a typeface.
+ */
+export const LOGIN_PAGE_ASSETS = {
+  bootstrapCss: {
+    url: 'https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/css/bootstrap.min.css',
+    integrity: 'sha384-sRIl4kxILFvY47J16cr9ZwB07vP4J8+LH7qKQnuqkuIAvNWLzeN8tE5YBujZqJLB',
+  },
+  bootstrapIconsCss: {
+    url: 'https://cdn.jsdelivr.net/npm/bootstrap-icons@1.13.1/font/bootstrap-icons.css',
+    integrity: 'sha384-Bk5cbLkZQ5raZ0+H2/+VbfYx3WpvxvQK4zqXZr7sYODuaX7bKXoSOnipQxkaS8sv',
+  },
+  formioCss: {
+    url: 'https://cdn.jsdelivr.net/npm/@formio/js@5.5.1/dist/formio.form.min.css',
+    integrity: 'sha384-/zfd6nkJxXzqXliV/Jlki/NOl+E/K7FujopWT3gKLYXMlIwiratcqMESMZG9ICY2',
+  },
+  formioJs: {
+    url: 'https://cdn.jsdelivr.net/npm/@formio/js@5.5.1/dist/formio.form.min.js',
+    integrity: 'sha384-WI14pf615veSnkFtQYllUINR9h5mP1ukKxI47QtGb9DVDYvZlUeaOnWpK/G23Z5x',
+  },
+} as const satisfies Record<string, { url: string; integrity: string }>;
+
+type PinnedAsset = (typeof LOGIN_PAGE_ASSETS)[keyof typeof LOGIN_PAGE_ASSETS];
+
+function styleTag(asset: PinnedAsset): string {
+  return `<link rel="stylesheet" href="${asset.url}" integrity="${asset.integrity}" crossorigin="anonymous">`;
+}
+
+function scriptTag(asset: PinnedAsset): string {
+  return `<script src="${asset.url}" integrity="${asset.integrity}" crossorigin="anonymous"></script>`;
+}
+
 function buildLoginPage(loginFormUrl: string): string {
   const domain = new URL(loginFormUrl).hostname;
   return `<!DOCTYPE html>
@@ -22,9 +72,9 @@ function buildLoginPage(loginFormUrl: string): string {
 <head>
 <title>Form.IO Login</title>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Open+Sans:400,400italic,700">
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap/dist/css/bootstrap.min.css">
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons/font/bootstrap-icons.css">
-<link rel="stylesheet" href="https://cdn.form.io/js/5.2.2/formio.full.min.css">
+${styleTag(LOGIN_PAGE_ASSETS.bootstrapCss)}
+${styleTag(LOGIN_PAGE_ASSETS.bootstrapIconsCss)}
+${styleTag(LOGIN_PAGE_ASSETS.formioCss)}
 <style>
   body { font-family: 'Open Sans', 'Helvetica Neue', Helvetica, Arial, sans-serif; background: #fff; margin: 0; padding: 2rem 1rem; color: #333; }
   .logo-wrap { text-align: center; margin-bottom: 1rem; }
@@ -47,7 +97,7 @@ function buildLoginPage(loginFormUrl: string): string {
   <div id="formio"></div>
   <div id="status"></div>
 </div>
-<script src="https://cdn.form.io/js/5.2.2/formio.form.min.js"></script>
+${scriptTag(LOGIN_PAGE_ASSETS.formioJs)}
 <script>
 var statusEl = document.getElementById('status');
 Formio.createForm(document.getElementById('formio'), '${loginFormUrl}').then(function(form) {

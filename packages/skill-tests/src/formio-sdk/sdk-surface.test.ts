@@ -280,7 +280,7 @@ describe('plugins.md surface', () => {
 });
 
 describe('rendering.md surface', () => {
-  const renderStatics = ['createForm', 'builder', 'use', 'formioReady'];
+  const renderStatics = ['createForm', 'use', 'formioReady'];
   for (const name of renderStatics) {
     it(`Formio.${name} is exposed`, () => {
       const value = staticMethod(name);

@@ -48,7 +48,7 @@ Show the user every file you intend to write, in full, before writing anything:
   "mcpServers": {
     "formio-mcp": {
       "command": "npx",
-      "args": ["-y", "@formio/mcp"]
+      "args": ["-y", "@formio/mcp@0.9.0"]
     }
   }
 }
@@ -61,7 +61,7 @@ Show the user every file you intend to write, in full, before writing anything:
   "mcpServers": {
     "formio-mcp": {
       "command": "npx",
-      "args": ["-y", "@formio/mcp"]
+      "args": ["-y", "@formio/mcp@0.9.0"]
     }
   }
 }
@@ -74,7 +74,7 @@ Show the user every file you intend to write, in full, before writing anything:
   "servers": {
     "formio-mcp": {
       "command": "npx",
-      "args": ["-y", "@formio/mcp"]
+      "args": ["-y", "@formio/mcp@0.9.0"]
     }
   }
 }
@@ -85,9 +85,15 @@ Show the user every file you intend to write, in full, before writing anything:
 ```toml
 [mcp_servers.formio-mcp]
 command = "npx"
-args = ["-y", "@formio/mcp"]
+args = ["-y", "@formio/mcp@0.9.0"]
 ```
 
+
+### Why the version is pinned
+
+Every block above launches the package at the exact version written into it — `@formio/mcp@<version>` — never a floating `@formio/mcp`. An unpinned `npx` resolves whatever the registry serves at the moment the client starts the server, so the code that gains tool access to the user's Form.io deployment is chosen at run time rather than reviewed once. Pinned, the user runs the exact build this skill was written against, and an upgrade is a visible edit to a file they approved. Write the version exactly as it appears here — do not substitute `latest`, a caret range, or a version you looked up yourself. If the user asks for a newer server, change the number in all four files together and tell them what changed.
+
+The package is first-party: `@formio/mcp` is published from the same repository as these skills ([formio/ai](https://github.com/formio/ai)) through npm Trusted Publishing, so npm carries a provenance attestation for the build.
 
 ### Merging with what is already there
 
@@ -110,7 +116,7 @@ The server starts with no project. Left unconfigured, the first Form.io tool cal
 ### First, check whether it is already configured
 
 ```bash
-npx -y @formio/mcp project get --cwd "$(pwd)"
+npx -y @formio/mcp@0.9.0 project get --cwd "$(pwd)"
 ```
 
 One trap to know about: the `project` command shipped in `@formio/mcp` 0.9.0, and an older binary ignores these arguments, starts its stdio server, reads end-of-input and exits **0 with no output** — so `project get` looks like a success that found nothing, and `project set` writes nothing while reporting nothing. Never report a mapping you did not read in the output, and never tell the user a project was persisted when `project set` printed nothing.
@@ -134,13 +140,13 @@ Ask for the Base URL rather than assuming the default. It builds the portal-logi
 ### Apply it with the server's own command
 
 ```bash
-npx -y @formio/mcp project set --project-url "<project url>" --base-url "<base url>" --cwd "$(pwd)"
+npx -y @formio/mcp@0.9.0 project set --project-url "<project url>" --base-url "<base url>" --cwd "$(pwd)"
 ```
 
 Then confirm rather than assume:
 
 ```bash
-npx -y @formio/mcp project get --cwd "$(pwd)"
+npx -y @formio/mcp@0.9.0 project get --cwd "$(pwd)"
 ```
 
 Report what it prints — and if it prints nothing, report that nothing was persisted rather than that the project was set. The mapping is read at tool-call time, so it is live the moment the server starts — there is nothing further to configure after the reload.
@@ -172,17 +178,23 @@ MCP configuration is read when a session starts, not when a tool is called, so t
 
 Then stop. Ask them to reload and re-issue the request that brought them here, and say which skill will pick it up. Do not claim the original task is finished, and do not attempt it without tools.
 
+## When the pinned version does not exist yet
+
+Every configuration in this skill names an exact server version. If `npx` fails with `E404` — `npm error 404 Not Found - GET https://registry.npmjs.org/@formio%2fmcp` naming the pinned version specifically — the package exists but that release has not landed on npm yet. It is a release still in flight, not a broken configuration, and it resolves itself within minutes.
+
+Tell the user that, then offer one of two things rather than editing the pin yourself: wait and reload, or install the immediately preceding published version — `npm view @formio/mcp versions` lists what npm actually has, and the highest entry below the pinned one is the fallback. Say which version you used and that it is a temporary substitute. Never replace the pin with `@latest` or an unpinned `@formio/mcp`: that is the pattern the pin exists to remove, and it silently outlives the release it was meant to work around.
+
 ## When `npx` cannot reach the registry
 
-Some environments block the public npm registry — an offline machine, an air-gapped network, a locked-down corporate host. Two alternatives, in order of preference:
+Some environments block the public npm registry — an air-gapped network, a locked-down corporate host that serves an internal mirror instead. Two alternatives, in order of preference:
 
 1. **Global install from an internal registry or a cached tarball**, then point the configuration at the binary instead of `npx`:
 
    ```bash
-   npm install -g @formio/mcp
+   npm install -g @formio/mcp@0.9.0
    ```
 
-   Replace `"command": "npx", "args": ["-y", "@formio/mcp"]` with `"command": "formio-mcp", "args": []` in each file (and the TOML equivalent).
+   Replace `"command": "npx", "args": ["-y", "@formio/mcp@0.9.0"]` with `"command": "formio-mcp", "args": []` in each file (and the TOML equivalent).
 
 2. **The desktop bundle.** For Claude Desktop and other hosts that accept one, the `.mcpb` bundle attached to each GitHub release carries the server with no registry access required.
 
@@ -190,4 +202,6 @@ If neither is possible, say so plainly rather than leaving the user with a confi
 
 ## Never work around missing tools
 
-If the user declines setup, or setup cannot complete, stop. Do **not** fall back to direct HTTP requests against a Form.io deployment, and do not write code that does. The skills document the full REST surface, which makes hand-rolling requests tempting and wrong: it bypasses the guardrails the tools enforce, and it can write to a live deployment in ways nobody reviewed. Report what is blocking and let the user decide.
+If the user declines setup, or setup cannot complete, stop. Do **not** fall back to direct HTTP requests against a Form.io deployment, and do not write a throwaway script that makes them for you. The skills document the full REST surface, which makes hand-rolling requests tempting and wrong: it bypasses the guardrails the tools enforce, and it can write to a live deployment in ways nobody reviewed. Report what is blocking and let the user decide.
+
+This is about **build-time** work — what you do in this session on the user's behalf. An application built with these skills calls the Form.io REST API **at runtime** as a matter of course; that code is not a workaround and is not covered by this rule.

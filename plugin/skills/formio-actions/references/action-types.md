@@ -1,5 +1,7 @@
 # Action Types — Detailed Settings Reference
 
+> **Every `{{ data.* }}` token below resolves at runtime to a value some submitter typed.** Configuring an action is build-time work; the action then runs inside the Form.io server on every matching submission, carrying those values into email bodies, webhook URLs and payloads, and recipient lists. The settings written here are the only place that handling gets decided, so keep webhook and template hosts literal and HTTPS, and constrain any field whose value lands in markup or an address. Stated once in [../SKILL.md](../SKILL.md) → "Build time vs runtime" and "Security"; applies to every action type below.
+
 ## Table of Contents
 
 ### Open Source
@@ -49,10 +51,6 @@ When `resource` is set, use `settings.fields` to map fields:
 ```
 
 Use the special value `"data"` to map the entire data object.
-
-### Transform
-
-The save action supports a `transform` setting — a JavaScript string executed in an isolated VM that can modify `submission.data` before saving to the target resource. The transform has access to `submission` and `data` variables.
 
 ### External IDs
 

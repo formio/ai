@@ -3,6 +3,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { assertSourceManifestVersionsAgree } from './sync-manifest-versions.js';
+import { assertServerPinsAgree } from './sync-server-pin.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const REPO_ROOT = path.resolve(path.dirname(__filename), '..');
@@ -97,6 +98,13 @@ export async function buildPlugin() {
   // tracked files during a release and after any hand-edit of
   // plugin/package.json. `pnpm sync:versions` is the only writer.
   assertSourceManifestVersionsAgree();
+  // Same rule for the `@formio/mcp@<version>` pin every manifest and skill
+  // carries, whose writer is `pnpm sync:pins`. Checked here because a
+  // plugin-only release runs plugin/package.json's `prepublishOnly`
+  // (build:plugin && test:plugin) and never the server package's tests — so
+  // without this a stale or hand-edited pin publishes in the plugin tarball
+  // with nothing having looked at it.
+  assertServerPinsAgree();
   copyStatic();
   syncManifestVersions();
   await bundleServer();

@@ -14,7 +14,9 @@ Note: the `Create User` and `User Login` endpoints below are themselves the prod
 
 ## MCP Tool Preference
 
-No MCP tool covers this operation — use the HTTP endpoint directly.
+No MCP tool covers these operations, and none should: they are **runtime** endpoints. The MCP tools exist for **build-time** work — creating and updating forms, actions, roles, and project settings while the application is being built. The endpoints below are called by the finished application, on behalf of the person using it, with that person's own token.
+
+So this document is a specification for the code you write — the app's login, registration, and current-user calls at runtime — not a set of calls to make now. Do not authenticate as an end user yourself; the MCP server has its own build-time authentication, and it is separate from the one you are wiring up here.
 
 ## Endpoints
 
