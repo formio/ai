@@ -5,7 +5,7 @@ A support ticket system with two user populations (customers and agents) and an 
 ## Prompt
 
 ```
-/formio-application Stand up a help desk for our software product. Customers submit support tickets (subject, description, severity: low / normal / high / urgent, product area, and optional file attachments). Our support agents pick up tickets, set the status (new, in progress, waiting on customer, resolved), assign a priority, and add internal notes customers can't see. Customers should only see their own tickets; agents see all of them. When a ticket is created, email our support inbox. Our agents sign in with our company's Okta (OIDC), but customers just register with email and password. Put the app in examples/help-desk-app.
+/formio-application Stand up a help desk for our software product. Customers submit support tickets (subject, description, severity: low / normal / high / urgent, product area, and optional file attachments). Our support agents pick up tickets, set the status (new, in progress, waiting on customer, resolved), assign a priority, and add internal notes customers can't see. Customers should only see their own tickets; agents see all of them. When a ticket is created, email our support inbox. Our agents sign in with our company's Okta (OIDC), but customers just register with email and password.
 ```
 
 ## What to look for
