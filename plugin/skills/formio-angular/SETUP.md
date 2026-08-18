@@ -17,7 +17,7 @@ The `Project URL` is the user's project API root — where forms and submissions
 
 These two URLs are scoped to the working directory, not to the client install: a Form.io project is one-to-one with the application built against it. The MCP server already keeps that scope — `project_set` maps a directory to a Project URL plus a Base URL, and every tool resolves it on each call. This phase reads that mapping instead of competing with it.
 
-Before interviewing, check whether this directory is already mapped. `project_set` is the writer, and either the tool's own report or `npx -y @formio/mcp@0.9.0 project get --cwd <workspace cwd>` tells you what resolves and which source supplied it. Empty output is not a mapping: an `@formio/mcp` older than 0.9.0 has no `project` command and exits 0 printing nothing, whatever is mapped. If a project is mapped, confirm in one line and skip the interview:
+Before interviewing, check whether this directory is already mapped. `project_set` is the writer, and either the tool's own report or `npx -y @formio/mcp@0.10.0 project get --cwd <workspace cwd>` tells you what resolves and which source supplied it. Empty output is not a mapping: an `@formio/mcp` older than 0.9.0 has no `project` command and exits 0 printing nothing, whatever is mapped. If a project is mapped, confirm in one line and skip the interview:
 
 > Using the Form.io project already configured for this directory — `<FORMIO_PROJECT_URL>` on `<FORMIO_BASE_URL>`. Say so if you want a different project.
 

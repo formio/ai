@@ -1,5 +1,25 @@
 # @formio/mcp
 
+## 0.10.0
+
+### Minor Changes
+
+- 94896a6: Resolve the medium-and-above skill-scanner findings across the library.
+
+  Every documented launch of the MCP server is pinned — `npx -y @formio/mcp@<version>` in the three client manifests, the install docs, and every skill that prints the command — so an install runs the server the release was tested against instead of whatever the registry serves at that moment. `pnpm sync:pins` stamps the pin from `packages/mcp-server/package.json` inside `changeset:version`, so the Version Packages PR already carries the version about to publish, and `pnpm changeset:follow` adds the plugin bump that a server-only release needs to carry the new pin to npm. Three suites fail when either goes stale.
+
+  The server's own browser-login page stops loading an unpinnable vendor bundle. It fetched `https://cdn.form.io/js/5.2.2/formio.full.min.js`, a host that serves whatever it decides to serve for that path with no integrity check available; the page now loads `@formio/js@5.5.1`, Bootstrap 5.3.8, and Bootstrap Icons 1.13.1 from jsDelivr with an `integrity` hash on every tag, and the renderer bundle narrowed to `formio.form.min.js` — the UMD global `Formio.createForm` needs and nothing more. This changeset releases `@formio/mcp` for that fix, which also republishes the plugin carrying the new pin.
+
+  `formio-angular` no longer fetches unpinned `package.json` files from a CDN to decide what it installs: version resolution goes through `npm view` against the registry the install itself uses. Installing the Angular team's skill library is now an offer with the exact command shown, and declining it falls back to the pinned Angular CLI rather than dead-ending.
+
+  The release tooling that enforces all of the above is itself checked. `pnpm sync:pins` recognises every runner spelling that resolves the registry at launch time (`npx`, `npm exec`, `pnpm dlx`, with or without a yes flag, plus global installs) so none ships floating, and its manifest pattern is anchored to the args array that launches the server — an unanchored quoted package name also matched `"dependencies"` entries, quoted `pnpm --filter` arguments, and the registry's `"identifier"`, and stamping a version into any of those corrupted the file and then failed the plugin build until the corruption was committed. `pnpm check:releases` skips the `changeset-release/*` branch, the one PR that consumes every changeset while rewriting the versions and pins it guards. And the login page's SRI digests are now derived rather than typed: `pnpm sync:sri` fetches each pinned asset and writes the digest of what the CDN served, with `login-asset-integrity.test.ts` verifying it whenever the network is reachable — a stale digest passed every shape assertion and then blocked the renderer, hanging the login flow on a blank page.
+
+  `formio-angular` keeps a bounded offline path for a host that cannot reach the npm registry: an `@formio/angular` manifest already in `node_modules`, otherwise asking the user for the version and Angular major, with the source named in the approval summary either way. Never a CDN, and never a guessed major.
+
+  `formio-actions` drops the save action's `transform` setting (a JavaScript string the server executes) and documents the build-time/runtime split explicitly: the skill writes project configuration and stops, the actions it configures run later inside the Form.io server, and the toolset exposes no submission-read tool — so nothing a submitter types is ever input to the skill. Its guidance is now framed as what the configuration decides about runtime handling, which is the only thing a build-time skill controls. `formio-form` gets the same framing for the code it writes around a rendered form, and states that the JS-string forms of field logic — the `javascript` trigger, the `value` action, `customAction` — are the user's to write, never the agent's to generate.
+
+  The same build-time/runtime split resolves a contradiction that ran through the whole library. Every skill's preflight said "do not write code that [makes direct HTTP requests against a deployment]", which forbade the applications `formio-angular` and `formio-form` exist to build; the ban is now scoped to build-time work, with the app's runtime API calls named as expected and legitimate. `formio-api`'s five runtime-scope references — submissions, auth, reports, access control, custom users — no longer say "use the HTTP endpoint directly" with no actor named: they state that the caller is the finished application, using the end user's own token, and that reading end users' submissions is no part of configuring a project.
+
 ## 0.9.0
 
 ### Minor Changes
