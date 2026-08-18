@@ -51,6 +51,72 @@ describe('the offline path resolves every required version', () => {
   });
 });
 
+// Naming a variable somewhere in the section is not resolving it. Step 1's
+// offline path is two ordered branches, and the second — asking the user — is the
+// one that runs when nothing is installed. A variable only the `node_modules`
+// branch answers is unset on that path, and the later step that interpolates it
+// emits the placeholder literally or invents a value the skill forbids guessing.
+describe('the ask-the-user branch answers every required version', () => {
+  // The branch ends where the section's closing prose begins — the paragraph
+  // about the target version's lack of an offline source names two of the
+  // variables, so slicing to the end of the section would let it answer for a
+  // branch that never sets them.
+  const askBranch = () => {
+    const section = offlineSection();
+    const start = section.indexOf('2. **Ask the user');
+    const end = section.indexOf('`FORMIO_ANGULAR_TARGET_VERSION` has no other offline source');
+
+    expect(start, 'no ask-the-user branch in the offline section').toBeGreaterThan(-1);
+    expect(end, 'no closing prose after the offline branches').toBeGreaterThan(start);
+    return section.slice(start, end);
+  };
+
+  it.each([
+    'FORMIO_ANGULAR_VERSION',
+    'FORMIO_JS_VERSION',
+    'FORMIO_ANGULAR_SUPPORTED_MAJOR',
+    'FORMIO_ANGULAR_TARGET_VERSION',
+    'BOOTSTRAP_VERSION',
+    'BOOTSTRAP_ICONS_VERSION',
+  ])('resolves %s with nothing installed', (variable) => {
+    expect(askBranch()).toContain(variable);
+  });
+
+  // The supported major is the one variable the user is not asked for directly:
+  // offline there is no peer range to read it out of, so it comes from the major
+  // of the target version they named. That is the user's own choice rather than a
+  // guess — and the derivation only runs in that direction.
+  it('derives the supported major from the target version the user named', () => {
+    expect(askBranch()).toMatch(/major of the `?FORMIO_ANGULAR_TARGET_VERSION/i);
+  });
+
+  it('never carries an unresolved placeholder into a command', () => {
+    expect(askBranch()).toMatch(/@angular\/cli@<FORMIO_ANGULAR_SUPPORTED_MAJOR>/);
+    expect(askBranch()).toMatch(/never carry|do not carry|installs nothing/i);
+  });
+});
+
+// Bootstrap has no offline fallback version, so the honest outcome is the state
+// Step 5 already understands — null, skip the install, and say why.
+describe('Bootstrap degrades to the documented skip when it cannot be resolved', () => {
+  it('sets both Bootstrap variables to null rather than inventing them', () => {
+    const branch = offlineSection().slice(offlineSection().indexOf('2. **Ask the user'));
+
+    expect(branch).toMatch(/`?BOOTSTRAP_VERSION`? and `?BOOTSTRAP_ICONS_VERSION`? are `?null/i);
+  });
+
+  it('lets Step 5 skip for the offline reason, not only the opt-out', () => {
+    const body = bootstrap();
+    const step5 = body.slice(body.indexOf('## Step 5 — add Bootstrap 5'));
+
+    expect(step5.slice(0, 600)).toMatch(/registry was unreachable|registry unreachable/i);
+  });
+
+  it('reports the skip reason in the approval summary', () => {
+    expect(bootstrap()).toContain('skipped — registry unreachable');
+  });
+});
+
 describe('Step 3 tolerates a major-only target version', () => {
   it('says what to pass when the target version is a bare major', () => {
     const body = bootstrap();

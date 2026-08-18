@@ -44,7 +44,7 @@ The skill SHALL write the MCP configuration for every supported client in one pa
 | `.vscode/mcp.json` | JSON, top-level **`servers`** |
 | `.codex/config.toml` | TOML, `[mcp_servers.formio-mcp]` |
 
-Every entry SHALL launch the server as `npx -y @formio/mcp` and SHALL contain no URL, key, or other configuration value: Phase 0's server starts with no configuration and raises an actionable error naming `project_set` when a tool needs a project. The skill SHALL note that `FORMIO_PROJECT_URL` may be added to pin a project, and SHALL NOT write it by default.
+Every entry SHALL launch the server as `npx -y @formio/mcp@<MAJOR.MINOR.PATCH>`, pinned to the exact `version` in `packages/mcp-server/package.json` and restamped by `pnpm sync:pins`, and SHALL contain no URL, key, or other configuration value: Phase 0's server starts with no configuration and raises an actionable error naming `project_set` when a tool needs a project. The skill SHALL note that `FORMIO_PROJECT_URL` may be added to pin a project, and SHALL NOT write it by default.
 
 All four paths are project-scoped. The skill SHALL NOT write to the user's home directory.
 
@@ -77,7 +77,7 @@ The skill SHALL print the full contents of every file it intends to write and ob
 
 The skill SHALL then stop and ask the user to re-issue their original request, rather than continuing as though the tools were available.
 
-The skill SHALL also cover: whether to commit or ignore the written files, and what to do where `npx` cannot reach the public registry (a global install of `@formio/mcp`, or the `.mcpb` desktop bundle).
+The skill SHALL also cover: whether to commit or ignore the written files, and what to do where `npx` cannot reach the public registry (a global install of `@formio/mcp@<MAJOR.MINOR.PATCH>` at the same pinned version, or the `.mcpb` desktop bundle).
 
 #### Scenario: Approval precedes any write
 
@@ -104,11 +104,11 @@ The skill SHALL also cover: whether to commit or ignore the written files, and w
 
 After writing the client configuration and before telling the user to reload, `formio-mcp-setup` SHALL offer to capture the Form.io project configuration, so the server resolves a project on its very first tool call instead of raising a "no project configured" error the user then has to resolve.
 
-The step SHALL ask for the Project URL and the Base URL in one question round, reusing the plain-language descriptions and example values that `formio-application/DEPLOYMENT.md` already carries, and referencing that document by file path rather than duplicating its wording. It SHALL apply the answers by running the server's own command — `npx -y @formio/mcp project set --project-url <url> --base-url <url> --cwd <absolute path>` — and SHALL NOT edit `~/.formio/projects.json` directly and SHALL NOT write `FORMIO_PROJECT_URL` into any client configuration file's `env` block, because an environment value takes precedence over the mapping and would pin the server against every later `project_set`.
+The step SHALL ask for the Project URL and the Base URL in one question round, reusing the plain-language descriptions and example values that `formio-application/DEPLOYMENT.md` already carries, and referencing that document by file path rather than duplicating its wording. It SHALL apply the answers by running the server's own command — `npx -y @formio/mcp@<MAJOR.MINOR.PATCH> project set --project-url <url> --base-url <url> --cwd <absolute path>` — and SHALL NOT edit `~/.formio/projects.json` directly and SHALL NOT write `FORMIO_PROJECT_URL` into any client configuration file's `env` block, because an environment value takes precedence over the mapping and would pin the server against every later `project_set`.
 
-The step SHALL confirm the result by running `npx -y @formio/mcp project get --cwd <absolute path>` and reporting the resolved URLs, rather than asserting success.
+The step SHALL confirm the result by running `npx -y @formio/mcp@<MAJOR.MINOR.PATCH> project get --cwd <absolute path>` and reporting the resolved URLs, rather than asserting success.
 
-The `project` invocations the skill documents SHALL carry no version range: `@formio/mcp` is a 0.x line, so a hard-coded floor in shipped prose goes stale at the next release. The command shipped in `@formio/mcp` 0.9.0, and an older binary ignores the arguments, starts its stdio server, reads end-of-input and exits **0 with no output** — so `project get` reports success while finding nothing and `project set` reports success while writing nothing. The skill SHALL therefore treat a zero-exit run that prints nothing as "no project is configured", and SHALL NOT report a mapping it did not read in the output or claim a project was persisted when `project set` printed nothing.
+The `project` invocations the skill documents SHALL carry the same exact pin as the configuration blocks, and SHALL NOT carry a range: `@formio/mcp` is a 0.x line, so a hard-coded floor in shipped prose goes stale at the next release while a ceiling freezes the reader on an old server, and an unpinned invocation runs whatever the registry serves at that moment. `pnpm sync:pins` restamps these invocations along with the blocks, so the prose and the configuration never name different servers. The command shipped in `@formio/mcp` 0.9.0, and an older binary ignores the arguments, starts its stdio server, reads end-of-input and exits **0 with no output** — so `project get` reports success while finding nothing and `project set` reports success while writing nothing. The skill SHALL therefore treat a zero-exit run that prints nothing as "no project is configured", and SHALL NOT report a mapping it did not read in the output or claim a project was persisted when `project set` printed nothing.
 
 #### Scenario: URLs captured, mapping written, first tool call resolves
 

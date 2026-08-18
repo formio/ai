@@ -63,7 +63,13 @@ Capture them as `BOOTSTRAP_VERSION` (e.g., `5.3.3`) and `BOOTSTRAP_ICONS_VERSION
 **If the registry is unreachable.** On an air-gapped or proxy-restricted host the queries above fail with a network error rather than an empty answer — the same kind of environment `formio-mcp-setup` keeps a documented offline path for. Do not substitute a CDN or any other URL for the registry, and do not guess a major. Work down this list and stop at the first step that answers:
 
 1. **A manifest already on disk.** If the target directory or its parent workspace has `node_modules/@formio/angular/package.json`, read it with your file tools: its `version` is `FORMIO_ANGULAR_VERSION`, and its `peerDependencies['@angular/core']` carries the same range `npm view` would have printed, so `FORMIO_ANGULAR_SUPPORTED_MAJOR` is still the highest major in it. If `node_modules/@angular/core/package.json` is also present and its `version` is in that major, that full `MAJOR.MINOR.PATCH` is `FORMIO_ANGULAR_TARGET_VERSION`. Resolve `@formio/js`, `bootstrap`, and `bootstrap-icons` the same way from their own installed manifests where present. A file already on this machine is not a document fetched at run time — this is the offline equivalent of the registry query, not a way around it.
-2. **Ask the user.** Tell them in one line that the registry is unreachable, and ask for exactly what is missing: the `@formio/angular` version to install and the Angular version to target. Use what they give you verbatim; do not round it up to a newer major. If they name only a major rather than a full version, set `FORMIO_ANGULAR_TARGET_VERSION` to that major alone — `ng new` and `@angular/cli@<major>` both accept a bare major, and inventing a `.MINOR.PATCH` nobody named would pin the workspace to a release that may not exist.
+2. **Ask the user for whatever step 1 did not answer.** Tell them in one line that the registry is unreachable, then ask in a single round for exactly the variables still unset: the `@formio/angular` version to install (`FORMIO_ANGULAR_VERSION`), the Angular version to target (`FORMIO_ANGULAR_TARGET_VERSION`), the `@formio/js` version to install alongside it (`FORMIO_JS_VERSION`), and the Bootstrap 5 and Bootstrap Icons versions (`BOOTSTRAP_VERSION`, `BOOTSTRAP_ICONS_VERSION`). Use what they give you verbatim; do not round any of it up to a newer major. If they name only a major rather than a full version for Angular, set `FORMIO_ANGULAR_TARGET_VERSION` to that major alone — `ng new` and `@angular/cli@<major>` both accept a bare major, and inventing a `.MINOR.PATCH` nobody named would pin the workspace to a release that may not exist.
+
+   Two of the six are then set from those answers rather than asked for separately:
+   - `FORMIO_ANGULAR_SUPPORTED_MAJOR` is the major of the `FORMIO_ANGULAR_TARGET_VERSION` the user named — both `19.2.4` and a bare `19` give `19`. That is not a guessed major; it is the major the user chose, and it is the value Step 2's `@angular/cli@<FORMIO_ANGULAR_SUPPORTED_MAJOR>` fallback, Step 3's CLI flag, Step 4's `@angular/core` check, and the approval summary all read. Only the reverse derivation stays forbidden: never build a target version out of a major by appending `.MINOR.PATCH`.
+   - `BOOTSTRAP_VERSION` and `BOOTSTRAP_ICONS_VERSION` are `null` when the user cannot name them. That is the same state as the Step 1 opt-out, so Step 5 skips its install and its `angular.json` edits. Tell the user in one line that submission forms will render unstyled until Bootstrap is added, and report it in the approval summary as `skipped — registry unreachable`, never as a version.
+
+   Never fill any of the six in yourself, and never carry an unresolved placeholder into a command: a literal `@angular/cli@<FORMIO_ANGULAR_SUPPORTED_MAJOR>` on the command line installs nothing, and an invented major fails at CONFIG after `ng new` has already written the tree.
 
 `FORMIO_ANGULAR_TARGET_VERSION` has no other offline source: it is the newest patch in a major, and only the registry knows that. Do not derive it from `FORMIO_ANGULAR_SUPPORTED_MAJOR` by appending `.0.0`.
 
@@ -155,7 +161,7 @@ Run this from inside the workspace directory created by `angular-new-app`. The c
 
 ## Step 5 — add Bootstrap 5 and Bootstrap Icons
 
-Skip this step only if the user explicitly opted out in Step 1 (`BOOTSTRAP_VERSION === null`). Otherwise run it unconditionally — the Form.io renderer ships a Bootstrap 5 default template, and the forms the sub-skill generates assume Bootstrap 5 classes (`form-control`, `btn`, `row`, etc.) and `bi bi-*` icon classes are available globally.
+Skip this step only when `BOOTSTRAP_VERSION === null` — either because the user explicitly opted out in Step 1, or because the registry was unreachable and they could not name the versions. Otherwise run it unconditionally — the Form.io renderer ships a Bootstrap 5 default template, and the forms the sub-skill generates assume Bootstrap 5 classes (`form-control`, `btn`, `row`, etc.) and `bi bi-*` icon classes are available globally.
 
 Install both packages with the caret prefix so future minor + patch releases in the same major flow through without re-bootstrapping:
 
@@ -318,8 +324,8 @@ Bootstrap complete
   @formio/js version:       <FORMIO_JS_VERSION>
   Supported Angular major:  <FORMIO_ANGULAR_SUPPORTED_MAJOR>
   Angular pinned to:        <FORMIO_ANGULAR_TARGET_VERSION>  (latest patch in major)
-  Bootstrap version:        <BOOTSTRAP_VERSION>              (or "skipped — user opted out")
-  Bootstrap Icons version:  <BOOTSTRAP_ICONS_VERSION>        (or "skipped — user opted out")
+  Bootstrap version:        <BOOTSTRAP_VERSION>              (or "skipped — user opted out" / "skipped — registry unreachable")
+  Bootstrap Icons version:  <BOOTSTRAP_ICONS_VERSION>        (or "skipped — user opted out" / "skipped — registry unreachable")
   Angular skills installed: <path reported by npx>
   Workspace:                <absolute workspace path>
   Key files:                angular.json, src/app/app-module.ts
