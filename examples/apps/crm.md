@@ -5,7 +5,7 @@ A classic sales CRM. Exercises the full build-new pipeline: multi-resource data 
 ## Prompt
 
 ```
-/formio-application I want to build a CRM for my consulting practice. I need to keep track of my clients (company name, primary contact, email, phone, industry, and some notes), the deals I'm working on with each client (a name for the deal, its dollar value, what stage it's in — lead, proposal, negotiation, won, or lost — and an expected close date), and a log of activities against each deal (calls, emails, meetings — with a date and a short summary). My two salespeople should each only see their own clients and deals, but I want to see everything as the owner. Put the app in examples/crm-app.
+/formio-application I want to build a CRM for my consulting practice. I need to keep track of my clients (company name, primary contact, email, phone, industry, and some notes), the deals I'm working on with each client (a name for the deal, its dollar value, what stage it's in — lead, proposal, negotiation, won, or lost — and an expected close date), and a log of activities against each deal (calls, emails, meetings — with a date and a short summary). My two salespeople should each only see their own clients and deals, but I want to see everything as the owner.
 ```
 
 ## What to look for
