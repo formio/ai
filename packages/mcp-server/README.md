@@ -19,7 +19,7 @@ Run that way it waits for MCP traffic on stdin, which only tells you it starts c
 
 | Transport | Command | Compatible with |
 | --- | --- | --- |
-| stdio | `npx -y @formio/mcp@0.9.0` (or `node dist/stdio.js`) | Claude Code, Claude Desktop, Cursor, VS Code, Codex, Windsurf, Cline — anything that speaks MCP over stdio |
+| stdio | `npx -y @formio/mcp@0.10.0` (or `node dist/stdio.js`) | Claude Code, Claude Desktop, Cursor, VS Code, Codex, Windsurf, Cline — anything that speaks MCP over stdio |
 
 There is no HTTP or SSE transport. The server's only HTTP listener is the temporary browser-login page described under [Authentication](#authentication), which carries no MCP traffic.
 
@@ -32,7 +32,7 @@ The same stdio entry works everywhere, but the file it goes in **and the key it 
   "mcpServers": {
     "formio-mcp": {
       "command": "npx",
-      "args": ["-y", "@formio/mcp@0.9.0"],
+      "args": ["-y", "@formio/mcp@0.10.0"],
       "env": {
         "FORMIO_PROJECT_URL": "https://your-project.form.io"
       }
@@ -285,7 +285,7 @@ The probe runs lazily — only when the local auth page is actually served.
 | `FORMIO_INSECURE_TLS` | no | `undefined` | Set to `1` to skip TLS verification. Local development only — never against production. |  |  |
 | `FORMIO_FORCE_BROWSER` | no | `0` | Set to `1` to attempt the browser login even where the server detects no browser (CI, a container, SSH with no display). |  |  |
 
-<sub>\* Not at startup — the server starts, lists every tool, and answers `hello` without it; only the tools that read or write Form.io data error, naming `project_set` and this variable. The alternative is the `project_set` tool, which maps a working directory to a project in `~/.formio/projects.json`. Resolution order: `FORMIO_PROJECT_URL`, then the mapping for the caller's `cwd`, then the error. Map a directory before any client connects with `npx -y @formio/mcp@0.9.0 project set --project-url <url> --base-url <url> --cwd <path>`; `project get --cwd <path>` prints what resolves and which source won. It exits `0` when it resolved, `1` when nothing is mapped for that directory, and `2` when the command could not answer (a usage error, a malformed URL, an unreadable `~/.formio/projects.json`) — so a caller can tell "nothing here yet" from "this failed".</sub>
+<sub>\* Not at startup — the server starts, lists every tool, and answers `hello` without it; only the tools that read or write Form.io data error, naming `project_set` and this variable. The alternative is the `project_set` tool, which maps a working directory to a project in `~/.formio/projects.json`. Resolution order: `FORMIO_PROJECT_URL`, then the mapping for the caller's `cwd`, then the error. Map a directory before any client connects with `npx -y @formio/mcp@0.10.0 project set --project-url <url> --base-url <url> --cwd <path>`; `project get --cwd <path>` prints what resolves and which source won. It exits `0` when it resolved, `1` when nothing is mapped for that directory, and `2` when the command could not answer (a usage error, a malformed URL, an unreadable `~/.formio/projects.json`) — so a caller can tell "nothing here yet" from "this failed".</sub>
 
 ---
 

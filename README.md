@@ -174,7 +174,7 @@ It is also listed in the [official MCP Registry](https://registry.modelcontextpr
   "mcpServers": {
     "formio-mcp": {
       "command": "npx",
-      "args": ["-y", "@formio/mcp@0.9.0"]
+      "args": ["-y", "@formio/mcp@0.10.0"]
     }
   }
 }
@@ -189,7 +189,7 @@ That is the **JSON `mcpServers`** shape — what Claude Code (`.mcp.json`), Curs
   "servers": {
     "formio-mcp": {
       "command": "npx",
-      "args": ["-y", "@formio/mcp@0.9.0"]
+      "args": ["-y", "@formio/mcp@0.10.0"]
     }
   }
 }
@@ -200,7 +200,7 @@ That is the **JSON `mcpServers`** shape — what Claude Code (`.mcp.json`), Curs
 ```toml
 [mcp_servers.formio-mcp]
 command = "npx"
-args = ["-y", "@formio/mcp@0.9.0"]
+args = ["-y", "@formio/mcp@0.10.0"]
 ```
 
 Authentication is the same everywhere: the first authenticated tool call opens the browser portal-login flow, or set `FORMIO_API_KEY` to skip the browser entirely — required on any host with no browser, such as a cloud agent, a container, or CI.
@@ -302,7 +302,7 @@ The probe runs lazily — only when the local auth page is actually served.
 | `FORMIO_AUTH_HOST` / `FORMIO_AUTH_PORT` | no | `127.0.0.1` / ephemeral | Bind address and port for the login server. Set both when running in a container so the login page is reachable through a published port. | — | `0.0.0.0` / `43117` |
 | `FORMIO_INSECURE_TLS` | no | `false` | When `true`, skips TLS certificate verification (sets `NODE_TLS_REJECT_UNAUTHORIZED=0`) — for self-hosted deployments behind self-signed certs. Do not use against production. | — | `true` |
 
-<sub>\* Not at startup — the server starts and lists every tool without it, and only errors when a tool actually needs a project. The alternative is the `project_set` tool, which maps a working directory to a project in `~/.formio/projects.json` so one server can serve several workspaces. Resolution order: `FORMIO_PROJECT_URL`, then the mapping for the caller's `cwd`, then the error. Map a directory before any client connects with `npx -y @formio/mcp@0.9.0 project set --project-url <url> --base-url <url> --cwd <path>`; `project get --cwd <path>` prints what resolves and which source won, exiting `0` when it resolved, `1` when nothing is mapped, and `2` when the command itself failed.</sub>
+<sub>\* Not at startup — the server starts and lists every tool without it, and only errors when a tool actually needs a project. The alternative is the `project_set` tool, which maps a working directory to a project in `~/.formio/projects.json` so one server can serve several workspaces. Resolution order: `FORMIO_PROJECT_URL`, then the mapping for the caller's `cwd`, then the error. Map a directory before any client connects with `npx -y @formio/mcp@0.10.0 project set --project-url <url> --base-url <url> --cwd <path>`; `project get --cwd <path>` prints what resolves and which source won, exiting `0` when it resolved, `1` when nothing is mapped, and `2` when the command itself failed.</sub>
 
 ---
 

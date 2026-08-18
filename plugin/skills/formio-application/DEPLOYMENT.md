@@ -34,7 +34,7 @@ The project configuration is captured once, wherever the user first lands, and n
 So before interviewing, ask the server what it resolves for this working directory:
 
 ```bash
-npx -y @formio/mcp@0.9.0 project get --cwd "<workspace cwd>"
+npx -y @formio/mcp@0.10.0 project get --cwd "<workspace cwd>"
 ```
 
 One trap to know about: the `project` command shipped in `@formio/mcp` 0.9.0, and an older binary ignores these arguments, starts its stdio server, reads end-of-input and exits **0 with no output** — indistinguishable from a lookup that found nothing. So never read empty output as an answer of any kind; treat it exactly as `1` and interview.
@@ -137,7 +137,7 @@ Why: the file's shape, its `0600` file mode, and its merge semantics are owned b
 If `project_set` appears to fail or no-op unexpectedly:
 
 1. Check its response text. A "no change / already persisted" message means the on-disk mapping for this working directory already matches — nothing is broken.
-2. Confirm what the server resolves: `npx -y @formio/mcp@0.9.0 project get --cwd <workspace cwd>` prints the active project, the base URL, and which source won. Empty output is not an answer — an `@formio/mcp` older than 0.9.0 has no `project` command and exits 0 printing nothing, whatever is mapped. Exit `2` here means the command itself failed rather than that nothing is mapped; report its stderr instead of re-running the interview.
+2. Confirm what the server resolves: `npx -y @formio/mcp@0.10.0 project get --cwd <workspace cwd>` prints the active project, the base URL, and which source won. Empty output is not an answer — an `@formio/mcp` older than 0.9.0 has no `project` command and exits 0 printing nothing, whatever is mapped. Exit `2` here means the command itself failed rather than that nothing is mapped; report its stderr instead of re-running the interview.
 3. If the tool genuinely errors, surface the error to the user and stop. Do NOT hand-write the file as a workaround. Report the failure so it can be fixed at the tool layer rather than papered over per session.
 
 This rule applies to every step in this skill and to any other skill that needs to persist a working-directory → project mapping.

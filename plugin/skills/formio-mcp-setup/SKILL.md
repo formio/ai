@@ -48,7 +48,7 @@ Show the user every file you intend to write, in full, before writing anything:
   "mcpServers": {
     "formio-mcp": {
       "command": "npx",
-      "args": ["-y", "@formio/mcp@0.9.0"]
+      "args": ["-y", "@formio/mcp@0.10.0"]
     }
   }
 }
@@ -61,7 +61,7 @@ Show the user every file you intend to write, in full, before writing anything:
   "mcpServers": {
     "formio-mcp": {
       "command": "npx",
-      "args": ["-y", "@formio/mcp@0.9.0"]
+      "args": ["-y", "@formio/mcp@0.10.0"]
     }
   }
 }
@@ -74,7 +74,7 @@ Show the user every file you intend to write, in full, before writing anything:
   "servers": {
     "formio-mcp": {
       "command": "npx",
-      "args": ["-y", "@formio/mcp@0.9.0"]
+      "args": ["-y", "@formio/mcp@0.10.0"]
     }
   }
 }
@@ -85,7 +85,7 @@ Show the user every file you intend to write, in full, before writing anything:
 ```toml
 [mcp_servers.formio-mcp]
 command = "npx"
-args = ["-y", "@formio/mcp@0.9.0"]
+args = ["-y", "@formio/mcp@0.10.0"]
 ```
 
 
@@ -116,7 +116,7 @@ The server starts with no project. Left unconfigured, the first Form.io tool cal
 ### First, check whether it is already configured
 
 ```bash
-npx -y @formio/mcp@0.9.0 project get --cwd "$(pwd)"
+npx -y @formio/mcp@0.10.0 project get --cwd "$(pwd)"
 ```
 
 One trap to know about: the `project` command shipped in `@formio/mcp` 0.9.0, and an older binary ignores these arguments, starts its stdio server, reads end-of-input and exits **0 with no output** — so `project get` looks like a success that found nothing, and `project set` writes nothing while reporting nothing. Never report a mapping you did not read in the output, and never tell the user a project was persisted when `project set` printed nothing.
@@ -140,13 +140,13 @@ Ask for the Base URL rather than assuming the default. It builds the portal-logi
 ### Apply it with the server's own command
 
 ```bash
-npx -y @formio/mcp@0.9.0 project set --project-url "<project url>" --base-url "<base url>" --cwd "$(pwd)"
+npx -y @formio/mcp@0.10.0 project set --project-url "<project url>" --base-url "<base url>" --cwd "$(pwd)"
 ```
 
 Then confirm rather than assume:
 
 ```bash
-npx -y @formio/mcp@0.9.0 project get --cwd "$(pwd)"
+npx -y @formio/mcp@0.10.0 project get --cwd "$(pwd)"
 ```
 
 Report what it prints — and if it prints nothing, report that nothing was persisted rather than that the project was set. The mapping is read at tool-call time, so it is live the moment the server starts — there is nothing further to configure after the reload.
@@ -191,10 +191,10 @@ Some environments block the public npm registry — an air-gapped network, a loc
 1. **Global install from an internal registry or a cached tarball**, then point the configuration at the binary instead of `npx`:
 
    ```bash
-   npm install -g @formio/mcp@0.9.0
+   npm install -g @formio/mcp@0.10.0
    ```
 
-   Replace `"command": "npx", "args": ["-y", "@formio/mcp@0.9.0"]` with `"command": "formio-mcp", "args": []` in each file (and the TOML equivalent).
+   Replace `"command": "npx", "args": ["-y", "@formio/mcp@0.10.0"]` with `"command": "formio-mcp", "args": []` in each file (and the TOML equivalent).
 
 2. **The desktop bundle.** For Claude Desktop and other hosts that accept one, the `.mcpb` bundle attached to each GitHub release carries the server with no registry access required.
 
