@@ -35,50 +35,47 @@
 
 ## Getting Started
 
-Works in any agent that supports Agent Skills:
+To get started, open up your Terminal within your application folder, and then use one of the following methods to install this plugin within your application folder.
+
+### Option 1: Skills.sh Installation
 
 ```bash
 npx skills add formio/ai
 ```
 
-Then open the folder in your agent and describe what you want:
+The command installs the skill library into `.agents/skills/` folder within your application, which every skills-capable agent reads. It installs **skills only** — the Form.io MCP server, which is what gives the agent tools like `form_create`, `form_list`, and `project_import`, is connected on first use by the bundled `formio-mcp-setup` skill: it writes the MCP configuration for your client, asks you to approve it, and tells you to reload.
 
+### Option 2: Agent Plugin Installation
+
+If your agent supports plugins, installing the plugin is an **alternative** to the command above. A plugin install already includes the skills *and* the MCP server:
+
+#### Claude Code
 ```
-Build me an app for tracking client engagements — clients, engagements, and time
-entries. Consultants should only see engagements they're assigned to.
+/plugin marketplace add https://github.com/formio/ai.git
+/plugin install formio-ai@formio
 ```
 
-That is the whole setup. The command installs the skill library into `.agents/skills/`, which every skills-capable agent reads. It installs **skills only** — the Form.io MCP server, which is what gives the agent tools like `form_create`, `form_list`, and `project_import`, is connected on first use by the bundled `formio-mcp-setup` skill: it writes the MCP configuration for your client, asks you to approve it, and tells you to reload. You never hand-write a config file.
+#### Cursor
+Plugin installation coming soon
 
-### Prefer a one-click plugin? <!-- omit from toc -->
+#### Codex
+Plugin installation coming soon
 
-If your agent has a plugin marketplace, installing the plugin is an **alternative** to the command above — not a second step. A plugin install already includes the skills *and* the MCP server, and it prompts for your Base URL — the deployment, not a project — up front:
+#### Copilot
+Plugin installation coming soon
 
-| Agent | Install | Includes |
-| --- | --- | --- |
-| Claude Code | `/plugin marketplace add https://github.com/formio/ai.git` then `/plugin install formio-ai@formio` | skills + MCP + Base URL prompt |
-| Cursor | Coming Soon | skills + MCP + Base URL prompt |
-| GitHub Copilot CLI | Coming Soon | skills + MCP |
-| VS Code | Coming Soon | skills + MCP |
-| Codex / ChatGPT | Coming Soon | skills + MCP |
-| Anything else | `npx skills add formio/ai` | skills; MCP installed on first use. |
+### Project Setup <!-- omit from toc -->
 
-Either way you end up in the same place: the skills loaded, and 20 Form.io tools available.
-
-### Pointing it at your Form.io project <!-- omit from toc -->
-
-Nothing above asks for a URL, because the server starts with no configuration and asks when it first needs one. Two values exist when you want to set them explicitly:
+Once this plugin has been installed, it will then prompt you for the following configurations:
 
 - **Project URL** — the endpoint for your project. On our SaaS environment (https://portal.form.io) that is a sub-domain such as `https://myproject.form.io`. Self-hosted, it depends on how your deployment routes projects: a sub-directory (`https://forms.mysite.com/myproject`) or a sub-domain of your own domain (`https://myproject.mysite.com`).
 - **Base URL** — the endpoint for the deployment. On our SaaS environment it is **always** `https://api.form.io` — never your project's `*.form.io` sub-domain. Self-hosted, it is the deployment host, often a sub-domain of your own domain, e.g. `https://forms.mysite.com`. In the sub-domain routing case the project host and the base host differ by design, so neither can be worked out from the other.
-
-A plugin install prompts for the Base URL only. The Project URL is never an install-time question: a deployment is shared across your projects, but a Form.io project is one-to-one with the application built against it, so the agent asks for it in the directory it belongs to and records both values there with the `project_set` tool. One server, one mapping per workspace.
 
 ## What you get
 
 - **Agent plugin: `@formio/ai`.** One-command install wherever the agent has a marketplace — Claude Code, Cursor, GitHub Copilot CLI, VS Code, Codex. Bundles the MCP server and the skill library, and each client reads the manifest it understands.
 - **MCP server: `@formio/mcp`.** Form.io operations (`form_*`, `role_*`, `action_*`, `project_*`) as MCP tools. Works with any MCP-aware client: Claude Code, Claude Desktop, VS Copilot, and whatever comes next.
-- **Skills library:** Eleven activatable skills covering app orchestration, form building (webforms and wizards), form embedding, resource planning, JSON-schema authoring, action configuration, authentication & authorization, the `@formio/js` SDK surface, and the full Form.io REST surface.
+- **Skills library:** Coding agent skills covering app orchestration, form building (webforms and wizards), form embedding, resource planning, JSON-schema authoring, action configuration, authentication & authorization, the `@formio/js` SDK surface, and the full Form.io REST surface.
 
 ## Why this exists
 
@@ -126,8 +123,9 @@ Ready-to-paste example prompts live in [`examples/`](./examples/) — each file 
 ```bash
 mkdir form-app
 cd form-app
-npx skills add formio/ai
 claude
+/plugin marketplace add https://github.com/formio/ai.git
+/plugin install formio-ai@formio
 ```
 
 ### Build complete applications
