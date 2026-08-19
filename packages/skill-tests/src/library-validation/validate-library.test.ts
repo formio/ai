@@ -49,6 +49,24 @@ describe('reference layout', () => {
     expect(issues[0].message).toContain('## MCP Tool Preference');
   });
 
+  // `indexOf('## Endpoints\n')` matches inside `### Endpoints\n`, so a demoted
+  // heading passed as present — a layout rule that accepts the layout it exists to
+  // reject.
+  it('does not accept a required heading demoted to level 3', () => {
+    const issues = validateReferenceLayout(
+      'r.md',
+      REFERENCE.replace('## MCP Tool Preference', '### MCP Tool Preference')
+    );
+
+    expect(issues.map((issue) => issue.rule)).toContain('headings.missing');
+  });
+
+  it('accepts a required heading on the last line, with nothing after it', () => {
+    const endsOnAHeading = REFERENCE.replace('\n\n### GET {projectUrl}/form', '');
+
+    expect(validateReferenceLayout('r.md', endsOnAHeading)).toEqual([]);
+  });
+
   it('reports headings that appear out of order', () => {
     const swapped = [
       '## Overview',

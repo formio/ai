@@ -3,7 +3,7 @@ import os from 'os';
 import path from 'path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { readProjectEntry } from '../project-map.js';
-import { COMMITTED_CONFIG_FILE } from '../committed-config.js';
+import { COMMITTED_CONFIG_FILE, findCommittedConfig } from '../committed-config.js';
 import { runProjectCommand } from '../cli/project-command.js';
 
 // Two scopes, chosen explicitly. Inferring it — committed file if one exists,
@@ -55,17 +55,19 @@ describe('project set --scope', () => {
   });
 
   // "The nearest file" is not evident from the arguments, so the path is printed.
-  it('updates the nearest existing file rather than creating a nested one', () => {
+  it('updates the nearest existing file when it already names this project', () => {
     fs.writeFileSync(
       path.join(repo, COMMITTED_CONFIG_FILE),
-      JSON.stringify({ projectUrl: 'https://old.form.io' })
+      JSON.stringify({ projectUrl: 'https://same.form.io' })
     );
     const nested = path.join(repo, 'apps', 'web');
     fs.mkdirSync(nested, { recursive: true });
 
     const result = run([
       '--project-url',
-      'https://new.form.io',
+      'https://same.form.io',
+      '--base-url',
+      'https://api.form.io',
       '--scope',
       'repo',
       '--cwd',
@@ -73,9 +75,89 @@ describe('project set --scope', () => {
     ]);
 
     expect(result.exitCode).toBe(0);
-    expect(committed(repo).projectUrl).toBe('https://new.form.io');
+    expect(committed(repo).baseUrl).toBe('https://api.form.io');
     expect(fs.existsSync(path.join(nested, COMMITTED_CONFIG_FILE))).toBe(false);
     expect(result.stdout).toContain(path.join(repo, COMMITTED_CONFIG_FILE));
+  });
+
+  // The read side walks up and takes the nearest file, so a monorepo's folders
+  // can target different projects. Rewriting the ancestor instead made that
+  // impossible to create AND silently re-pointed every sibling folder.
+  describe('recording a different project for one folder', () => {
+    const seedRoot = () =>
+      fs.writeFileSync(
+        path.join(repo, COMMITTED_CONFIG_FILE),
+        JSON.stringify({ projectUrl: 'https://root.form.io' })
+      );
+
+    it('writes the file in the named directory', () => {
+      seedRoot();
+      const nested = path.join(repo, 'apps', 'web');
+      fs.mkdirSync(nested, { recursive: true });
+
+      const result = run([
+        '--project-url',
+        'https://web.form.io',
+        '--scope',
+        'repo',
+        '--cwd',
+        nested,
+      ]);
+
+      expect(result.exitCode).toBe(0);
+      expect(committed(nested).projectUrl).toBe('https://web.form.io');
+    });
+
+    it('leaves the ancestor — and so the folders beside it — alone', () => {
+      seedRoot();
+      const nested = path.join(repo, 'apps', 'web');
+      const sibling = path.join(repo, 'apps', 'api');
+      fs.mkdirSync(nested, { recursive: true });
+      fs.mkdirSync(sibling, { recursive: true });
+
+      run(['--project-url', 'https://web.form.io', '--scope', 'repo', '--cwd', nested]);
+
+      expect(committed(repo).projectUrl).toBe('https://root.form.io');
+      expect(findCommittedConfig(sibling)?.projectUrl).toBe('https://root.form.io');
+      expect(findCommittedConfig(nested)?.projectUrl).toBe('https://web.form.io');
+    });
+
+    // The caller asked to record a project and got a file in a directory they may
+    // not have expected; unsaid, this write is indistinguishable from one that
+    // re-pointed the whole tree.
+    it('says which file still governs everything else', () => {
+      seedRoot();
+      const nested = path.join(repo, 'apps', 'web');
+      fs.mkdirSync(nested, { recursive: true });
+
+      const result = run([
+        '--project-url',
+        'https://web.form.io',
+        '--scope',
+        'repo',
+        '--cwd',
+        nested,
+      ]);
+
+      expect(result.stdout).toContain(path.join(repo, COMMITTED_CONFIG_FILE));
+      expect(result.stdout).toContain('https://root.form.io');
+    });
+
+    it('rewrites the file in the caller’s own directory rather than shadowing it', () => {
+      seedRoot();
+
+      const result = run([
+        '--project-url',
+        'https://new.form.io',
+        '--scope',
+        'repo',
+        '--cwd',
+        repo,
+      ]);
+
+      expect(result.exitCode).toBe(0);
+      expect(committed(repo).projectUrl).toBe('https://new.form.io');
+    });
   });
 
   it('updates only the base URL of an existing committed file', () => {

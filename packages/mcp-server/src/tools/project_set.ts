@@ -7,10 +7,10 @@ import { local } from '../tool-annotations.js';
 import { readProjectEntry, writeProjectEntry } from '../project-map.js';
 import {
   COMMITTED_CONFIG_FILE,
-  committedConfigWritePath,
   findCommittedConfig,
+  planCommittedConfigWrite,
 } from '../committed-config.js';
-import { derivesOwnBaseUrl } from '../project-resolver.js';
+import { derivesOwnBaseUrl, usableEnvironmentBaseUrl } from '../project-resolver.js';
 import fs from 'fs';
 import path from 'path';
 
@@ -63,7 +63,7 @@ export function registerProjectSetTool(server: McpServer, options: ProjectSetOpt
           .enum(['user', 'repo'])
           .optional()
           .describe(
-            `Where to record the project. "user" (default) writes the machine-local mapping in ~/.formio/projects.json. "repo" writes a committed ${COMMITTED_CONFIG_FILE} — the nearest existing one at or above cwd, or a new one in cwd — which is versioned with the code and takes precedence over the mapping. "repo" requires an absolute cwd.`
+            `Where to record the project. "user" (default) writes the machine-local mapping in ~/.formio/projects.json. "repo" writes a committed ${COMMITTED_CONFIG_FILE}, versioned with the code and taking precedence over the mapping. Which file: the nearest existing one at or above cwd when this call amends what it already says — the same project again, or a base URL for it — and a new file in cwd when it records a DIFFERENT project, because rewriting an ancestor would re-point every folder beside this one. "repo" requires an absolute cwd.`
           ),
         baseUrl: z
           .url({ protocol: /^https?$/ })
@@ -173,7 +173,7 @@ export function registerProjectSetTool(server: McpServer, options: ProjectSetOpt
       const resolvedBase =
         baseUrlArg ||
         carriedBase ||
-        (derivesOwnBaseUrl(effectiveProjectUrl) ? undefined : getEnvBaseUrl());
+        usableEnvironmentBaseUrl({ projectUrl: effectiveProjectUrl, read: getEnvBaseUrl });
       const baseUrl = resolvedBase ? normalizeHttpUrl(resolvedBase, 'baseUrl') : undefined;
       // The server's process cwd is fixed at spawn; for a plugin-launched server
       // it is not the user's directory. Keying there still beats refusing — some
@@ -184,7 +184,16 @@ export function registerProjectSetTool(server: McpServer, options: ProjectSetOpt
         : ` Warning: no cwd argument was passed, so this mapping is keyed to the MCP server's own working directory. If that is not the user's directory, call project_set again with cwd set to it.`;
 
       if (normalizedPrevious === normalized && previousBase === baseUrl) {
-        const message = `Active project is already ${effectiveProjectUrl} and persisted for ${entryCwd}; no change${serverCwdWarning}`;
+        // Which record holds the project is the difference between a true report
+        // and a false one. "persisted for <cwd>" is a statement about the mapping,
+        // and where only a committed formio.json names the project the mapping
+        // holds nothing — deliberately, so the two records cannot disagree — so
+        // saying it there told the user the mapping held a project it does not.
+        const message =
+          (normalized
+            ? `Active project is already ${effectiveProjectUrl} and persisted for ${entryCwd}; no change`
+            : `Active project is already ${effectiveProjectUrl}, recorded in the committed ${COMMITTED_CONFIG_FILE} rather than in the mapping for ${entryCwd}${baseUrl ? `, whose Base URL ${baseUrl} is already mapped there` : ''}; no change`) +
+          serverCwdWarning;
         return toMcpStructuredResult(
           {
             ok: true,
@@ -231,7 +240,7 @@ export function registerProjectSetTool(server: McpServer, options: ProjectSetOpt
 // The tool half of `project set --scope repo`. Kept beside the mapping writer
 // rather than shared with the CLI's copy because the two return different shapes —
 // a structured MCP result versus a shell result — while the placement rule they
-// both obey lives in committedConfigWritePath.
+// both obey lives in planCommittedConfigWrite.
 function writeCommittedScope({
   projectUrl,
   baseUrl,
@@ -241,7 +250,13 @@ function writeCommittedScope({
   baseUrl?: string;
   cwd: string;
 }) {
-  const target = committedConfigWritePath(cwd);
+  // Normalized before the placement question is asked: "is this the same project
+  // the governing file already names?" is a comparison between normalized URLs.
+  const requestedProjectUrl = projectUrl ? normalizeHttpUrl(projectUrl, 'projectUrl') : undefined;
+  const { filePath: target, shadows } = planCommittedConfigWrite({
+    startDir: cwd,
+    projectUrl: requestedProjectUrl,
+  });
 
   // Read-modify-write so a hand-added key ($schema, a convention comment) is not
   // discarded by a tool that only owns two fields.
@@ -257,11 +272,11 @@ function writeCommittedScope({
     }
   }
 
-  const resolvedProjectUrl = projectUrl
-    ? normalizeHttpUrl(projectUrl, 'projectUrl')
-    : typeof existing.projectUrl === 'string'
+  const resolvedProjectUrl =
+    requestedProjectUrl ??
+    (typeof existing.projectUrl === 'string'
       ? normalizeHttpUrl(existing.projectUrl, `projectUrl in ${target}`)
-      : undefined;
+      : undefined);
   if (!resolvedProjectUrl) {
     throw new Error(
       `projectUrl is required for ${target}, which records no project yet. Ask the user for their Project URL and call project_set again with scope "repo".`
@@ -283,7 +298,13 @@ function writeCommittedScope({
   const message =
     `Wrote ${target} (${COMMITTED_CONFIG_FILE}, committed scope): project ${resolvedProjectUrl}` +
     `${resolvedBaseUrl ? ` on ${resolvedBaseUrl}` : ''}. ` +
-    `This file is versioned with the code and takes precedence over the working-directory mapping, so everyone who clones this repository resolves the same project.`;
+    `This file is versioned with the code and takes precedence over the working-directory mapping, so everyone who clones this repository resolves the same project.` +
+    // The ancestor was left alone on purpose, so the folders beside this one keep
+    // the project it names. Unsaid, the caller cannot tell this write from one
+    // that re-pointed the whole tree.
+    (shadows
+      ? ` ${shadows.filePath} still names ${shadows.projectUrl} and was left unchanged, so it keeps governing every other directory under it; the new file takes precedence for ${cwd} and everything beneath it. To re-point the whole tree instead, call project_set again with cwd set to ${path.dirname(shadows.filePath)}.`
+      : '');
 
   return toMcpStructuredResult(
     {

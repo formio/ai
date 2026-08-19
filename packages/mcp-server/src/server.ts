@@ -1,27 +1,13 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import { readFileSync } from 'fs';
-import { createRequire } from 'module';
 import { DEFAULT_BASE_URL, FormioConfig, PROJECT_URL_GUIDANCE, getConfig } from './config.js';
 import { COMMITTED_CONFIG_FILE } from './committed-config.js';
 import { registerAllTools } from './tools/index.js';
+import { SERVER_VERSION } from './cli-launch.js';
 
-// Read from package.json rather than repeating the version here: clients show
-// this in their server list, and a hand-maintained literal drifts silently —
-// it had been reporting 0.1.0 since the first release.
-function readPackageVersion(): string {
-  try {
-    const require = createRequire(import.meta.url);
-    const pkg = JSON.parse(readFileSync(require.resolve('../package.json'), 'utf-8')) as {
-      version?: string;
-    };
-    return pkg.version ?? '0.0.0';
-  } catch {
-    // Version reporting must never stop the server from starting.
-    return '0.0.0';
-  }
-}
-
-export const SERVER_VERSION = readPackageVersion();
+// Re-exported from cli-launch.ts, which owns it alongside the runnable spelling
+// of the CLI those messages print — one module that knows which published build
+// this process is.
+export { SERVER_VERSION };
 
 // Surfaced at initialize, so this is the only configuration guidance an agent
 // receives when the server is used stand-alone with no skills installed. It

@@ -10,6 +10,7 @@ import {
   stripTrailingSlashes,
 } from './config.js';
 import { ProjectMapUnreadableError, projectMapPath, readProjectEntry } from './project-map.js';
+import { projectCommand } from './cli-launch.js';
 import {
   COMMITTED_CONFIG_FILE,
   CommittedProjectConfig,
@@ -65,7 +66,7 @@ function missingProjectError({ cwd, mapCwd }: MissingProject): Error {
   // if and when it becomes real.
   return new Error(
     `No Form.io project is configured${where}, and no ${COMMITTED_CONFIG_FILE} was found by walking up from it. ` +
-      `Ask the user for their Project URL, then call ${how}, or run: formio-mcp project set --project-url <project_url> --cwd ${cwd ?? mapCwd}. ` +
+      `Ask the user for their Project URL, then call ${how}, or run: ${projectCommand(`set --project-url <project_url> --cwd ${cwd ?? mapCwd}`)}. ` +
       `To record the target with the code instead — versioned, and shared with everyone who clones it — add a ${COMMITTED_CONFIG_FILE} holding {"projectUrl": "..."} in the application's own folder, or run the same command with --scope repo. ` +
       `${PROJECT_URL_GUIDANCE} FORMIO_PROJECT_URL in the server environment supplies one too, but it is the weakest source: a ${COMMITTED_CONFIG_FILE} or a mapping overrides it.`
   );
@@ -88,7 +89,7 @@ export function requireBaseUrl(config: ResolvedFormioConfig): string {
     `The Base URL for ${config.projectUrl} cannot be determined, so JWT authentication cannot proceed. ` +
       `${BASE_URL_UNRESOLVED_GUIDANCE} ` +
       `Guessing one would build the portal-login URL and key the cached token against a deployment you do not use. ` +
-      `Set it with project_set (pass baseUrl alongside the cwd), or run: formio-mcp project set --base-url <base_url> --cwd <cwd>. ` +
+      `Set it with project_set (pass baseUrl alongside the cwd), or run: ${projectCommand(`set --base-url <base_url> --cwd ${config.cwd ?? process.cwd()}`)}. ` +
       `The project itself is configured — only its Base URL is missing, so do not ask for the Project URL again. ` +
       `An API key needs no Base URL and is unaffected.`
   );
@@ -185,6 +186,82 @@ function deriveBaseUrlFromProjectPath(projectUrl: URL): string | undefined {
 // resolution actually derives.
 export function derivesOwnBaseUrl(projectUrl: string): boolean {
   return chooseBaseUrl(projectUrl, []).baseUrlSource === 'derived';
+}
+
+export interface EnvironmentBaseUrl {
+  projectUrl: string;
+  // Read lazily: a project shape the environment cannot answer for never touches
+  // the variable, so no "Ignoring FORMIO_BASE_URL" note is emitted about a value
+  // that was never going to be consulted.
+  read: () => string | undefined;
+  onNote?: (message: string) => void;
+}
+
+// Whether FORMIO_BASE_URL may answer for THIS project. Asked by the read path and
+// by both writers, so what resolution honours and what a `project set` persists
+// cannot drift.
+//
+// FORMIO_BASE_URL is one global answering a per-project question, and the value
+// most likely to be left over in a shell is https://api.form.io — so ranking it
+// above derivation sent the portal login and the token-cache key to a deployment
+// the user does not use. Suppressing it outright is not the answer either: a
+// deployment whose API root is NOT the project URL's parent — project
+// https://forms.mysite.com/myproject served by https://forms.mysite.com/api — has
+// no other way to say so on a launch configured purely by environment, with no
+// writable ~/.formio and no committed file.
+//
+// So the environment is honoured exactly where it can only be talking about this
+// project:
+//   - a hosted-cloud project ignores it always. Its deployment is api.form.io for
+//     every project on it, and a *.form.io host is never a base URL, so nothing
+//     the variable holds can be a correction.
+//   - a project that derives its own deployment honours it only when the two share
+//     an ORIGIN. Same host is a statement about this deployment's own layout; a
+//     different host is the stale global this gate exists to reject.
+//   - a project that derives nothing honours it unconditionally. That shape names
+//     no deployment at all, and the environment is the only source a container or
+//     CI launch has.
+export function usableEnvironmentBaseUrl({
+  projectUrl,
+  read,
+  onNote,
+}: EnvironmentBaseUrl): string | undefined {
+  let parsed: URL;
+  try {
+    parsed = new URL(projectUrl);
+  } catch {
+    return read();
+  }
+
+  if (isHostedCloudProject(parsed)) {
+    return undefined;
+  }
+
+  const value = read();
+  if (!value) {
+    return undefined;
+  }
+
+  const derived = deriveBaseUrlFromProjectPath(parsed);
+  if (!derived) {
+    return value;
+  }
+  if (sameOrigin(value, parsed)) {
+    return value;
+  }
+
+  onNote?.(
+    `Ignoring FORMIO_BASE_URL (${value}): it is on another host than ${projectUrl}, whose own deployment is ${derived}. One global cannot answer for every project. Record ${value} for this directory with project_set if it is right.`
+  );
+  return undefined;
+}
+
+function sameOrigin(candidate: string, projectUrl: URL): boolean {
+  try {
+    return new URL(candidate).origin === projectUrl.origin;
+  } catch {
+    return false;
+  }
 }
 
 // Ordered candidates in, the winner and its provenance out. Precedence is stated
@@ -342,7 +419,7 @@ export function resolveProject(
   // A broken committed file throws out of here on purpose. It is not an absent
   // file, and answering "nothing configured" would send the caller to project_set
   // to write a mapping this file then shadows.
-  const committed: CommittedProjectConfig | undefined = findCommittedConfig(mapCwd);
+  const committed: CommittedProjectConfig | undefined = findCommittedConfig(mapCwd, { onNote });
   // An unreadable map is tolerated ONLY when nothing is left for it to decide —
   // a committed file supplying BOTH URLs. Otherwise it fails, and the reordering
   // is why: the mapping now outranks the environment for both halves, so skipping
@@ -402,9 +479,11 @@ export function resolveProject(
   //
   // The shadowed global is still reported through baseUrlCandidates below, or
   // "my FORMIO_BASE_URL did nothing" has no answer in `project get`'s output.
-  const environmentBaseUrl = derivesOwnBaseUrl(normalizedProjectUrl)
-    ? undefined
-    : baseConfig.baseUrl;
+  const environmentBaseUrl = usableEnvironmentBaseUrl({
+    projectUrl: normalizedProjectUrl,
+    read: () => baseConfig.baseUrl,
+    onNote,
+  });
   const { baseUrl, baseUrlSource } = chooseBaseUrl(normalizedProjectUrl, [
     ['committed', committed?.baseUrl],
     ['mapping', mappedEnv?.FORMIO_BASE_URL],
@@ -416,6 +495,7 @@ export function resolveProject(
       ...baseConfig,
       baseUrl: baseUrl && stripTrailingSlashes(baseUrl),
       projectUrl: normalizedProjectUrl,
+      cwd: mapCwd,
     },
     sources: {
       projectUrl: projectUrlSource,

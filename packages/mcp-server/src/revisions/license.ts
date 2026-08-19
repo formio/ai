@@ -9,6 +9,7 @@ import {
 } from './browser-prompts.js';
 import { stripRevisions } from './helpers.js';
 import { requireBaseUrl } from '../project-resolver.js';
+import { projectCommand } from '../cli-launch.js';
 
 // ─── License detection ──────────────────────────────────────────────────────
 // Resolves the deployment's Security Module flag (`sac`) from the anonymous
@@ -193,7 +194,7 @@ export async function gateRevisionsLicense(
         `Cannot ${actionLabel} — the Security Module flag is read from ${'${baseUrl}'}/config.js, and the Base URL for ${cfg.projectUrl} cannot be determined, so that probe never ran. ` +
           `${BASE_URL_UNRESOLVED_GUIDANCE} ` +
           `This one is needed however you authenticate: the probe is an ANONYMOUS request to the deployment, so an API key does not exempt it. ` +
-          `Set it with project_set (pass baseUrl alongside the cwd), or run: formio-mcp project set --base-url <base_url> --cwd <cwd>. ` +
+          `Set it with project_set (pass baseUrl alongside the cwd), or run: ${projectCommand(`set --base-url <base_url> --cwd ${cfg.cwd ?? process.cwd()}`)}. ` +
           `The project itself is configured — only its Base URL is missing, so do not ask for the Project URL again.`
       );
     }

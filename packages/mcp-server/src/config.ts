@@ -84,6 +84,14 @@ export interface FormioConfig {
 export interface ResolvedFormioConfig extends FormioConfig {
   baseUrl?: string;
   projectUrl: string;
+  // The directory this configuration was resolved for — the cwd argument when a
+  // caller passed one, and the server's own working directory when it did not.
+  //
+  // Carried because the errors raised downstream name a repair command that takes
+  // `--cwd`, and a message printing a literal `<cwd>` placeholder is not a command
+  // anybody can run. Resolution is the only step that knows which directory the
+  // answer belongs to.
+  cwd?: string;
 }
 
 // One behavior for every agent: no environment variable switches the defaults,

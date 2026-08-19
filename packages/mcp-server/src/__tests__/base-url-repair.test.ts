@@ -52,13 +52,16 @@ describe('repairing an underivable base URL', () => {
     it('runs the exact command the failing project get printed', () => {
       const remedy = run(['get', '--cwd', repo])
         .stderr.split('\n')
-        .find((line) => line.startsWith('Run: formio-mcp project set'));
+        .find((line) => line.startsWith('Run: '));
       expect(remedy).toBeDefined();
 
-      const args = (remedy as string)
-        .replace('Run: formio-mcp ', '')
-        .split(' ')
-        .slice(1)
+      // The printed command launches the published server through npx, which is
+      // the only spelling the documented install route can run. What this command
+      // takes is everything from the `project` subcommand onward.
+      const tokens = (remedy as string).replace('Run: ', '').split(' ');
+      expect(tokens[0]).toBe('npx');
+      const args = tokens
+        .slice(tokens.indexOf('project') + 1)
         .map((token) => (token === '<base_url>' ? 'https://forms.mysite.com' : token));
 
       expect(run(args).exitCode).toBe(0);
@@ -117,6 +120,22 @@ describe('repairing an underivable base URL', () => {
 
       expect(result.isError ?? false).toBe(false);
       expect(readProjectEntry(repo)?.env.FORMIO_BASE_URL).toBe('https://forms.mysite.com');
+    });
+
+    // "persisted for <cwd>" is a statement about the MAPPING, and the repair
+    // deliberately writes no project there — the committed file stays the one
+    // record. Saying it anyway told the user the mapping held a project it does
+    // not, which is the record they would go on to edit.
+    it('does not claim the mapping holds a project only the committed file names', async () => {
+      commit({ projectUrl: 'https://myproject.mysite.com' });
+      await call({ baseUrl: 'https://forms.mysite.com', cwd: repo });
+
+      const again = await call({ baseUrl: 'https://forms.mysite.com', cwd: repo });
+      const text = JSON.stringify(again.content);
+
+      expect(text).toContain('no change');
+      expect(text).toContain('formio.json');
+      expect(text).not.toMatch(/https:\/\/myproject\.mysite\.com and persisted for/);
     });
 
     it('still requires a project URL where nothing configures one', async () => {

@@ -4,8 +4,8 @@ import { FormioConfig, PROJECT_URL_GUIDANCE, normalizeHttpUrl, readHttpUrlEnv } 
 import {
   COMMITTED_CONFIG_FILE,
   CommittedConfigUnusableError,
-  committedConfigWritePath,
   findCommittedConfig,
+  planCommittedConfigWrite,
 } from '../committed-config.js';
 import { ProjectMapUnreadableError, readProjectEntry, writeProjectEntry } from '../project-map.js';
 import {
@@ -13,7 +13,9 @@ import {
   ProjectResolution,
   derivesOwnBaseUrl,
   resolveProject,
+  usableEnvironmentBaseUrl,
 } from '../project-resolver.js';
+import { PROJECT_CLI, projectCommand } from '../cli-launch.js';
 
 export interface ProjectCommandOptions {
   cacheDir?: string;
@@ -45,10 +47,14 @@ export const EXIT_NOT_CONFIGURED = 1;
 export const EXIT_FAILED = 2;
 export const EXIT_BASE_URL_UNRESOLVED = 3;
 
+// Spelled the way the documented install route can actually run it. `formio-mcp`
+// is this package's bin and nothing puts it on PATH — the plugin and every skill
+// launch the server through npx — so a usage line naming the bare bin printed a
+// command that answers `command not found`.
 const USAGE = [
   'Usage:',
-  '  formio-mcp project set [--project-url <url>] [--base-url <url>] [--cwd <absolute path>] [--scope user|repo]',
-  '  formio-mcp project get [--cwd <absolute path>]',
+  `  ${PROJECT_CLI} set [--project-url <url>] [--base-url <url>] [--cwd <absolute path>] [--scope user|repo]`,
+  `  ${PROJECT_CLI} get [--cwd <absolute path>]`,
   '',
   'Scopes:',
   '  user  (default)  the machine-local mapping in ~/.formio/projects.json',
@@ -105,8 +111,18 @@ function ok(stdout: string, notes: readonly string[] = []): ProjectCommandResult
 
 // The command ran and the answer is "nothing here" — the one non-zero outcome a
 // caller should respond to by interviewing the user.
-function notConfigured(stderr: string): ProjectCommandResult {
-  return { exitCode: EXIT_NOT_CONFIGURED, stdout: '', stderr };
+//
+// Notes collected on the way here belong in it, for the same reason
+// baseUrlUnresolved keeps them: an "Ignoring FORMIO_PROJECT_URL: ..." note is
+// often the CAUSE of this branch — a host that never expanded its manifest
+// variable — and dropping it left the user reading "nothing is configured" about
+// a directory whose configuration had just been discarded unread.
+function notConfigured(stderr: string, notes: readonly string[] = []): ProjectCommandResult {
+  return {
+    exitCode: EXIT_NOT_CONFIGURED,
+    stdout: '',
+    stderr: [...notes, stderr].filter(Boolean).join('\n'),
+  };
 }
 
 // The project resolved and its deployment did not. One named value is missing and
@@ -224,13 +240,16 @@ function runSet(flags: Record<string, string>, context: CommandContext): Project
   const declaredBaseUrl =
     flags['base-url'] ||
     carriedBaseUrl ||
-    (derivesOwnBaseUrl(effectiveProjectUrl)
-      ? undefined
-      : readHttpUrlEnv({
+    usableEnvironmentBaseUrl({
+      projectUrl: effectiveProjectUrl,
+      read: () =>
+        readHttpUrlEnv({
           raw: context.env.FORMIO_BASE_URL,
           name: 'FORMIO_BASE_URL',
           onIgnored,
-        }));
+        }),
+      onNote: onIgnored,
+    });
   const baseUrl = declaredBaseUrl ? normalizeHttpUrl(declaredBaseUrl, 'baseUrl') : undefined;
 
   writeProjectEntry(
@@ -287,14 +306,15 @@ function runGet(flags: Record<string, string>, context: CommandContext): Project
     return notConfigured(
       [
         `No Form.io project is configured for ${cwd}, and no ${COMMITTED_CONFIG_FILE} was found by walking up from it.`,
-        `Run: formio-mcp project set --project-url <url> --cwd ${cwd}`,
+        `Run: ${projectCommand(`set --project-url <url> --cwd ${cwd}`)}`,
         `Or record it with the code, versioned and shared with everyone who clones the repository:`,
-        `     formio-mcp project set --project-url <url> --scope repo --cwd ${cwd}`,
+        `     ${projectCommand(`set --project-url <url> --scope repo --cwd ${cwd}`)}`,
         ``,
         PROJECT_URL_GUIDANCE,
       ]
         .filter(Boolean)
-        .join('\n')
+        .join('\n'),
+      notes
     );
   }
 
@@ -345,7 +365,7 @@ function runGet(flags: Record<string, string>, context: CommandContext): Project
         `Base URL:    could not be determined.`,
         ``,
         `The project is configured — only its Base URL is missing. A project URL with no path names its deployment nowhere: the deployment is a sibling sub-domain of the same parent domain, so it must be supplied rather than derived.`,
-        `Run: formio-mcp project set --base-url <base_url> --cwd ${cwd}`,
+        `Run: ${projectCommand(`set --base-url <base_url> --cwd ${cwd}`)}`,
         `Or add a "baseUrl" key beside "projectUrl" in the committed ${COMMITTED_CONFIG_FILE}, which records it with the code.`,
         ``,
         `This blocks JWT authentication, which builds the portal-login URL from the Base URL and keys the cached token by it. An API key needs no Base URL and is unaffected.`,
@@ -486,13 +506,21 @@ export function runProjectCommand(
 
 // `--scope repo` writes the committed file rather than the machine-local mapping.
 //
-// Where it writes is the whole subtlety: the nearest existing file when the
-// upward walk finds one — so a second `project set` updates the file the first
-// created rather than shadowing it from a deeper directory — and otherwise the
-// caller's own directory. Never an ancestor that has no file, because a file
-// created higher up would govern every sibling beneath it.
+// Where it writes is the whole subtlety, and planCommittedConfigWrite owns the
+// rule: an amendment lands on the governing file wherever the walk found it, and
+// a write recording a DIFFERENT project lands in the directory the caller named,
+// because rewriting an ancestor would re-point every sibling folder beside it.
 function writeCommittedScope(flags: Record<string, string>, cwd: string): ProjectCommandResult {
-  const target = committedConfigWritePath(cwd);
+  // Normalized before the placement question is asked: "is this the same project
+  // the governing file already names?" is a comparison between normalized URLs,
+  // and an unusable value has to fail as a usage error rather than decide a path.
+  const requestedProjectUrl = flags['project-url']
+    ? normalizeHttpUrl(flags['project-url'], 'projectUrl')
+    : undefined;
+  const { filePath: target, shadows } = planCommittedConfigWrite({
+    startDir: cwd,
+    projectUrl: requestedProjectUrl,
+  });
 
   // Read-modify-write, preserving unknown keys: the file is hand-edited and may
   // carry a $schema or a convention key that this command has no business
@@ -512,11 +540,11 @@ function writeCommittedScope(flags: Record<string, string>, cwd: string): Projec
     }
   }
 
-  const projectUrl = flags['project-url']
-    ? normalizeHttpUrl(flags['project-url'], 'projectUrl')
-    : typeof existing.projectUrl === 'string'
+  const projectUrl =
+    requestedProjectUrl ??
+    (typeof existing.projectUrl === 'string'
       ? normalizeHttpUrl(existing.projectUrl, `projectUrl in ${target}`)
-      : undefined;
+      : undefined);
   if (!projectUrl) {
     return fail(
       `--project-url is required for ${target}, which records no project yet.\n\n${USAGE}`
@@ -544,6 +572,15 @@ function writeCommittedScope(flags: Record<string, string>, cwd: string): Projec
       ...(baseUrl ? [`Base URL:    ${baseUrl}`] : []),
       ``,
       `This file is committed with the code and takes precedence over the machine-local mapping, so everyone who clones this repository resolves the same project.`,
+      // Said out loud because the caller asked to record a project and got a file
+      // in a directory they may not have expected: the ancestor was left alone on
+      // purpose, so the folders beside this one keep the project it names.
+      ...(shadows
+        ? [
+            ``,
+            `${shadows.filePath} still names ${shadows.projectUrl} and was left unchanged, so it keeps governing every other directory under it. The new file takes precedence for ${cwd} and everything beneath it. To re-point the whole tree instead, run the same command with --cwd ${path.dirname(shadows.filePath)}.`,
+          ]
+        : []),
     ].join('\n')
   );
 }

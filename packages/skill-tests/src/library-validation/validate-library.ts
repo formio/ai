@@ -58,11 +58,17 @@ function lineOf(body: string, needle: string): number {
   return index === -1 ? 1 : index + 1;
 }
 
+// Matched line by line, not by substring. `body.indexOf('## Endpoints\n')` also
+// matches inside `### Endpoints\n` — so a required heading demoted to level 3
+// passed the missing check, and the offset it recorded was one character past the
+// real one, which can reorder the ordering check with it. A trailing heading with
+// no newline after it is a heading too, which the substring form also missed.
 export function validateReferenceLayout(path: string, body: string): LibraryIssue[] {
   const issues: LibraryIssue[] = [];
+  const lines = body.split('\n');
   const positions = REQUIRED_REFERENCE_HEADINGS.map((heading) => ({
     heading,
-    at: body.indexOf(`${heading}\n`),
+    at: lines.findIndex((line) => line.trimEnd() === heading),
   }));
 
   for (const { heading, at } of positions) {

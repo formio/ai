@@ -1,6 +1,6 @@
 # IMPORT — Call `project_import`
 
-> **`FormioAppConfig` renames both URLs.** `appUrl` is the **Project URL** — the project this application reads and writes, and the one value anyone supplies. `apiUrl` is the **Base URL** — the deployment hosting it, which is normally derived from the Project URL rather than supplied. Take both from `npx -y @formio/mcp@0.10.0 project get --cwd "<workspace root>"`; never compose, derive, or hand-type either one yourself.
+> **Both URLs come from `project get`, never from you.** The **Project URL** is the project this application reads and writes — the one value anyone supplies. The **Base URL** is the deployment hosting it, normally derived from the Project URL rather than supplied. Take both from `npx -y @formio/mcp@0.10.0 project get --cwd "<workspace root>"`; never compose, derive, or hand-type either one yourself. Whatever the framework skill this hands off to calls them in its own configuration, those are the values that go there.
 
 This document is loaded by the parent `formio-application` skill during Step 3. It is **not** a standalone skill — no frontmatter.
 

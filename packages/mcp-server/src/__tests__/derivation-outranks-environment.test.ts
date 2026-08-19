@@ -68,6 +68,55 @@ describe('a derivable base URL outranks the environment global', () => {
     expect(sources.baseUrl).toBe('environment');
   });
 
+  // Suppressing the global outright is not the answer either. A deployment whose
+  // API root is NOT the project URL's parent — mounted at /api beside the
+  // projects it serves — has no other way to say so on a launch configured purely
+  // by environment: no writable ~/.formio, no committed file. Same host is a
+  // statement about THIS deployment's own layout, which is exactly what the stale
+  // global never is.
+  it('reads a global on the project’s own host over the parent path it would derive', () => {
+    const { config, sources } = resolveFor(
+      'https://forms.mysite.com/myproject',
+      'https://forms.mysite.com/api',
+      '/w/rank-same-origin'
+    );
+
+    expect(config.baseUrl).toBe('https://forms.mysite.com/api');
+    expect(sources.baseUrl).toBe('environment');
+  });
+
+  it('says why it dropped a global on another host', () => {
+    const notes: string[] = [];
+    writeProjectEntry(
+      '/w/rank-noted',
+      { FORMIO_PROJECT_URL: 'https://forms.mysite.com/myproject' },
+      cacheDir
+    );
+
+    resolveProject(
+      '/w/rank-noted',
+      { baseUrl: 'https://api.form.io' },
+      { cacheDir, onNote: (message) => notes.push(message) }
+    );
+
+    expect(notes.join('\n')).toContain('Ignoring FORMIO_BASE_URL');
+    expect(notes.join('\n')).toContain('https://forms.mysite.com');
+  });
+
+  // A *.form.io host is never a base URL, and every project on the hosted cloud is
+  // served by api.form.io — so nothing the variable holds there can be a
+  // correction, same host or not.
+  it('ignores a global on the project’s own host for a hosted-cloud project', () => {
+    const { config, sources } = resolveFor(
+      'https://examples.form.io',
+      'https://examples.form.io',
+      '/w/rank-hosted'
+    );
+
+    expect(config.baseUrl).toBe('https://api.form.io');
+    expect(sources.baseUrl).toBe('derived');
+  });
+
   // A mapping is a per-directory statement the user wrote, not a global, so it
   // keeps its rank above derivation.
   it('leaves a mapped deployment above derivation', () => {
