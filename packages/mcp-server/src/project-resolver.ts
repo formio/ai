@@ -388,10 +388,27 @@ export function resolveProject(
   // mapping-first while the project URL resolved environment-first, so one pair
   // resolved in two directions; the borrow-the-mapped-base-URL special case
   // existed only to paper over that.
+  //
+  // With ONE exception, and it is the same exception the writers already make:
+  // FORMIO_BASE_URL is a single global answering a per-project question, so it is
+  // offered only for a project URL that names no deployment of its own. Ranked
+  // above derivation it beat the per-project-correct answer whenever the variable
+  // merely existed — api.form.io being the value most likely to be left over in a
+  // shell — which sent the portal login and the token-cache key to a deployment
+  // the user does not use. derivesOwnBaseUrl guarded that on the write side only,
+  // so the read path did it anyway and the guard bought nothing. The committed
+  // file and the mapping keep their rank: both are per-directory statements
+  // somebody wrote about THIS project, not one value standing in for every one.
+  //
+  // The shadowed global is still reported through baseUrlCandidates below, or
+  // "my FORMIO_BASE_URL did nothing" has no answer in `project get`'s output.
+  const environmentBaseUrl = derivesOwnBaseUrl(normalizedProjectUrl)
+    ? undefined
+    : baseConfig.baseUrl;
   const { baseUrl, baseUrlSource } = chooseBaseUrl(normalizedProjectUrl, [
     ['committed', committed?.baseUrl],
     ['mapping', mappedEnv?.FORMIO_BASE_URL],
-    ['environment', baseConfig.baseUrl],
+    ['environment', environmentBaseUrl],
   ]);
 
   return {

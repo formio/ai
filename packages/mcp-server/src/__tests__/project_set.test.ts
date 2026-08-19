@@ -364,16 +364,16 @@ describe('project_set tool', () => {
 
     await client.callTool({
       name: 'project_set',
-      arguments: { projectUrl: 'https://forms.acme.com/old', baseUrl: 'https://forms.acme.com' },
+      arguments: { projectUrl: 'https://old.acme.com', baseUrl: 'https://forms.acme.com' },
     });
     await client.callTool({
       name: 'project_set',
-      arguments: { projectUrl: 'https://forms.acme.com/new' },
+      arguments: { projectUrl: 'https://new.acme.com' },
     });
 
     expect(readProjectEntry(cwd)).toEqual({
       env: {
-        FORMIO_PROJECT_URL: 'https://forms.acme.com/new',
+        FORMIO_PROJECT_URL: 'https://new.acme.com',
         FORMIO_BASE_URL: 'https://forms.acme.com',
       },
     });
@@ -384,16 +384,16 @@ describe('project_set tool', () => {
 
     await client.callTool({
       name: 'project_set',
-      arguments: { projectUrl: 'https://forms.acme.com/old', baseUrl: 'https://forms.acme.com' },
+      arguments: { projectUrl: 'https://old.acme.com', baseUrl: 'https://forms.acme.com' },
     });
     await client.callTool({
       name: 'project_set',
-      arguments: { projectUrl: 'https://forms.acme.com/new' },
+      arguments: { projectUrl: 'https://new.acme.com' },
     });
 
     expect(readProjectEntry(cwd)).toEqual({
       env: {
-        FORMIO_PROJECT_URL: 'https://forms.acme.com/new',
+        FORMIO_PROJECT_URL: 'https://new.acme.com',
         FORMIO_BASE_URL: 'https://forms.acme.com',
       },
     });

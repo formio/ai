@@ -5,7 +5,11 @@ import { toMcpStructuredResult } from '../mcp-responses.js';
 import { projectMappingShape } from '../output-schemas.js';
 import { local } from '../tool-annotations.js';
 import { readProjectEntry, writeProjectEntry } from '../project-map.js';
-import { COMMITTED_CONFIG_FILE, committedConfigWritePath } from '../committed-config.js';
+import {
+  COMMITTED_CONFIG_FILE,
+  committedConfigWritePath,
+  findCommittedConfig,
+} from '../committed-config.js';
 import { derivesOwnBaseUrl } from '../project-resolver.js';
 import fs from 'fs';
 import path from 'path';
@@ -39,7 +43,7 @@ export function registerProjectSetTool(server: McpServer, options: ProjectSetOpt
         "The chosen URL is persisted to ~/.formio/projects.json keyed by the cwd argument when provided (or the MCP server process cwd otherwise). Pass the `cwd` argument whenever you know the user's current working directory — the server process cwd is fixed at spawn and may not match where the user actually is.",
         'Every Form.io tool resolves its project URL from this map on each call, so the new mapping takes effect immediately for subsequent tool calls from the same cwd.',
         'You normally pass only projectUrl. The base URL — which builds the portal-login URL and keys the cached token — is derived from it — https://api.form.io for a project on a form.io host, and the parent path for a project addressed as a sub-directory — so there is nothing to supply. Pass baseUrl ONLY when the server reports that it cannot be determined, which happens for a project URL that carries no path on a customer domain: there the deployment is a sibling sub-domain and nothing in the project URL names it. Do not ask the user for a base URL before the server says it needs one.',
-        `Pass scope to choose WHERE the choice is recorded. The default "user" writes the machine-local mapping in ~/.formio/projects.json, which is keyed by absolute path and therefore does not survive a clone. "repo" instead writes a committed ${COMMITTED_CONFIG_FILE} — versioned with the code, visible in a diff, and shared with everyone who clones the repository. Use "repo" when the target is a property of the application being built; use the default when it is a property of this machine.`,
+        `Pass scope to choose WHERE the choice is recorded. The default "user" writes the machine-local mapping in ~/.formio/projects.json, which is keyed by absolute path and therefore does not survive a clone. "repo" instead writes a committed ${COMMITTED_CONFIG_FILE} — versioned with the code, visible in a diff, and shared with everyone who clones the repository. Use "repo" when the target is a property of the application being built; use the default when it is a property of this machine. "repo" REQUIRES an absolute cwd: that file is found by walking up, so one written into the wrong directory governs every directory beneath it, and the server process cwd is not the user's.`,
         `Resolution is by scope, narrowest first, and precedence runs: a committed ${COMMITTED_CONFIG_FILE}, then the working-directory mapping, then FORMIO_PROJECT_URL in the environment, which is the weakest of the three. So a mapping written here DOES override an environment value, and a committed file overrides both.`,
       ].join(' '),
       inputSchema: {
@@ -53,13 +57,13 @@ export function registerProjectSetTool(server: McpServer, options: ProjectSetOpt
           .string()
           .optional()
           .describe(
-            "User's current working directory to key the persisted mapping against. Pass whenever known (e.g. from UserPromptSubmit hook context). Falls back to the MCP server's process.cwd() when omitted."
+            'User\'s current working directory to key the persisted mapping against. Pass whenever known (e.g. from UserPromptSubmit hook context). Falls back to the MCP server\'s process.cwd() when omitted — except with scope "repo", which requires an absolute path here and refuses without one.'
           ),
         scope: z
           .enum(['user', 'repo'])
           .optional()
           .describe(
-            `Where to record the project. "user" (default) writes the machine-local mapping in ~/.formio/projects.json. "repo" writes a committed ${COMMITTED_CONFIG_FILE} — the nearest existing one at or above cwd, or a new one in cwd — which is versioned with the code and takes precedence over the mapping.`
+            `Where to record the project. "user" (default) writes the machine-local mapping in ~/.formio/projects.json. "repo" writes a committed ${COMMITTED_CONFIG_FILE} — the nearest existing one at or above cwd, or a new one in cwd — which is versioned with the code and takes precedence over the mapping. "repo" requires an absolute cwd.`
           ),
         baseUrl: z
           .url({ protocol: /^https?$/ })
@@ -75,30 +79,64 @@ export function registerProjectSetTool(server: McpServer, options: ProjectSetOpt
     async ({ projectUrl, cwd, baseUrl: baseUrlArg, scope }) => {
       const entryCwd = cwd ?? getServerCwd();
       if (scope === 'repo') {
-        return writeCommittedScope({ projectUrl, baseUrl: baseUrlArg, cwd: entryCwd });
+        // The user-scope branch below can key a mapping to the server's own
+        // process cwd and warn about it, because a mapping is read back by that
+        // one exact path. A committed file is not: it is found by walking UP, so
+        // one written into the server's directory — arbitrary for a plugin- or
+        // desktop-launched server, often a home directory — governs every
+        // non-git directory beneath it, and no warning undoes that. Refuse.
+        if (!cwd) {
+          throw new Error(
+            "cwd is required with scope \"repo\". It decides which directory the committed formio.json is written into, and that file governs every directory beneath it — the MCP server's own working directory is fixed at spawn and is usually not the user's. Pass the user's current working directory as an absolute path."
+          );
+        }
+        // path.resolve inside the writer would silently re-base a relative value
+        // on that same server directory, which is the identical misplacement
+        // arrived at through a value the caller did supply.
+        if (!path.isAbsolute(cwd)) {
+          throw new Error(
+            `cwd must be an absolute path with scope "repo" (received: ${cwd}). A relative value would be resolved against the MCP server's own working directory, not the user's.`
+          );
+        }
+        return writeCommittedScope({ projectUrl, baseUrl: baseUrlArg, cwd });
       }
       const existing = readProjectEntry(entryCwd);
       const previousMapped = existing?.env.FORMIO_PROJECT_URL;
+      // A committed formio.json configures the project exactly as the mapping
+      // does, and requireBaseUrl's remedy — "pass baseUrl alongside the cwd" —
+      // deliberately does not re-ask for a project URL. So the question is
+      // whether ANY source has one, not whether this map does: asking only the
+      // map made that remedy fail with "projectUrl is required" for a directory
+      // whose project the server had just named.
+      const committedProjectUrl = findCommittedConfig(entryCwd)?.projectUrl;
       if (!projectUrl && !baseUrlArg) {
         throw new Error(
           'Pass at least one of projectUrl or baseUrl. With a project already mapped for this cwd, either one alone is a valid update.'
         );
       }
-      // Required only where there is nothing to update. Optional on a mapped
-      // directory so the base-URL error's remedy is runnable: that message asks
-      // for the deployment alone, so demanding a project URL here would
-      // contradict the server's own instruction.
-      if (!projectUrl && !previousMapped) {
+      // Required only where nothing configures a project at all.
+      if (!projectUrl && !previousMapped && !committedProjectUrl) {
         throw new Error(
           `projectUrl is required for ${entryCwd}, which has no project mapped yet. Ask the user for their Project URL and call project_set again.`
         );
       }
-      const normalized = projectUrl
-        ? normalizeHttpUrl(projectUrl, 'projectUrl')
-        : // Re-normalized rather than passed through: the stored value is
+      const normalizedPrevious = previousMapped
+        ? // Re-normalized rather than passed through: the stored value is
           // hand-editable and predates this validation, and it is about to be
           // rewritten as though freshly supplied.
-          normalizeHttpUrl(previousMapped as string, `FORMIO_PROJECT_URL mapped for ${entryCwd}`);
+          normalizeHttpUrl(previousMapped, `FORMIO_PROJECT_URL mapped for ${entryCwd}`)
+        : undefined;
+      // Undefined when only a committed file names the project. Nothing is
+      // written to the mapping in that case: copying the committed value in would
+      // make a second record that goes stale the moment the tracked file changes,
+      // and this call was asked for a deployment, not for a project.
+      const normalized = projectUrl
+        ? normalizeHttpUrl(projectUrl, 'projectUrl')
+        : normalizedPrevious;
+      // What this directory will resolve to once the write lands, whichever record
+      // holds it — the value the derivation questions below are about.
+      const effectiveProjectUrl = (normalized ?? committedProjectUrl) as string;
+      const repointed = Boolean(normalizedPrevious) && normalized !== normalizedPrevious;
       // Read tolerantly, exactly like the environment global below it. A stored
       // base URL is data rather than the caller's typing, and this call is the
       // documented repair for a directory whose mapping the resolver now refuses:
@@ -123,8 +161,19 @@ export function registerProjectSetTool(server: McpServer, options: ProjectSetOpt
       // The global link is reached only for a project URL that derives no
       // deployment of its own — see derivesOwnBaseUrl. Otherwise the global would
       // be written in place of the derivation and outrank it here forever.
+      //
+      // The MAPPED link is dropped on the same terms when the directory is being
+      // re-pointed: that value belongs to the project it was recorded with, so
+      // carrying it onto a project that names its own deployment leaves one
+      // deployment answering for another — and, since the mapping outranks
+      // derivation, answering forever. A re-set that leaves the project alone
+      // keeps it, because there it is this project's own explicit answer.
+      const carriedBase =
+        repointed && derivesOwnBaseUrl(effectiveProjectUrl) ? undefined : previousBase;
       const resolvedBase =
-        baseUrlArg || previousBase || (derivesOwnBaseUrl(normalized) ? undefined : getEnvBaseUrl());
+        baseUrlArg ||
+        carriedBase ||
+        (derivesOwnBaseUrl(effectiveProjectUrl) ? undefined : getEnvBaseUrl());
       const baseUrl = resolvedBase ? normalizeHttpUrl(resolvedBase, 'baseUrl') : undefined;
       // The server's process cwd is fixed at spawn; for a plugin-launched server
       // it is not the user's directory. Keying there still beats refusing — some
@@ -134,14 +183,14 @@ export function registerProjectSetTool(server: McpServer, options: ProjectSetOpt
         ? ''
         : ` Warning: no cwd argument was passed, so this mapping is keyed to the MCP server's own working directory. If that is not the user's directory, call project_set again with cwd set to it.`;
 
-      if (previousMapped === normalized && previousBase === baseUrl) {
-        const message = `Active project is already ${normalized} and persisted for ${entryCwd}; no change${serverCwdWarning}`;
+      if (normalizedPrevious === normalized && previousBase === baseUrl) {
+        const message = `Active project is already ${effectiveProjectUrl} and persisted for ${entryCwd}; no change${serverCwdWarning}`;
         return toMcpStructuredResult(
           {
             ok: true,
             message,
             cwd: entryCwd,
-            projectUrl: normalized,
+            projectUrl: effectiveProjectUrl,
             ...(baseUrl && { baseUrl }),
             changed: false,
           },
@@ -149,22 +198,27 @@ export function registerProjectSetTool(server: McpServer, options: ProjectSetOpt
         );
       }
 
-      const env: Record<string, string> = { FORMIO_PROJECT_URL: normalized };
-      if (baseUrl) {
-        env.FORMIO_BASE_URL = baseUrl;
-      }
+      // FORMIO_PROJECT_URL is omitted where only the committed file names the
+      // project: writing a copy of it here would make a second record that goes
+      // stale the moment the tracked file changes.
+      const env: Record<string, string> = {
+        ...(normalized && { FORMIO_PROJECT_URL: normalized }),
+        ...(baseUrl && { FORMIO_BASE_URL: baseUrl }),
+      };
       writeProjectEntry(entryCwd, env);
       const message =
-        (previousMapped
-          ? `Active project set to ${normalized} (was ${previousMapped}; persisted for ${entryCwd})`
-          : `Active project set to ${normalized}; mapping persisted for ${entryCwd}`) +
+        (normalized
+          ? previousMapped
+            ? `Active project set to ${normalized} (was ${previousMapped}; persisted for ${entryCwd})`
+            : `Active project set to ${normalized}; mapping persisted for ${entryCwd}`
+          : `Base URL ${baseUrl} persisted for ${entryCwd}; the project stays recorded in the committed ${COMMITTED_CONFIG_FILE} as ${effectiveProjectUrl}`) +
         serverCwdWarning;
       return toMcpStructuredResult(
         {
           ok: true,
           message,
           cwd: entryCwd,
-          projectUrl: normalized,
+          projectUrl: effectiveProjectUrl,
           ...(baseUrl && { baseUrl }),
           changed: true,
         },

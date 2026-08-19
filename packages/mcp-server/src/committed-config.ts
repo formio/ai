@@ -23,12 +23,18 @@ export interface CommittedProjectConfig {
 // symptom clears, the cause persists, and the precedence order hides it. Same
 // reasoning as ProjectMapUnreadableError, one layer up.
 export class CommittedConfigUnusableError extends Error {
+  // Carried as a field, not only inside the message. `project set --scope repo` is
+  // the documented repair for this file, so the writer has to be able to land on
+  // the exact path the walk rejected rather than parse it back out of prose.
+  readonly filePath: string;
+
   constructor(filePath: string, reason: string) {
     super(
       `The committed Form.io configuration at ${filePath} cannot be used: ${reason}. ` +
         `Fix that file — it takes precedence over the working-directory mapping, so writing a mapping will not override it.`
     );
     this.name = 'CommittedConfigUnusableError';
+    this.filePath = filePath;
   }
 }
 
@@ -121,16 +127,18 @@ export function findCommittedConfig(startDir: string): CommittedProjectConfig | 
 // file — the default placement is the directory the caller named, because a file
 // created higher up would govern everything beneath it.
 export function committedConfigWritePath(startDir: string): string {
-  const found = (() => {
-    try {
-      return findCommittedConfig(startDir);
-    } catch (error) {
-      // A broken file is still the file to rewrite; repairing it is the point.
-      if (error instanceof CommittedConfigUnusableError) {
-        return undefined;
-      }
-      throw error;
+  try {
+    const found = findCommittedConfig(startDir);
+    return found?.filePath ?? path.join(path.resolve(startDir), COMMITTED_CONFIG_FILE);
+  } catch (error) {
+    // A broken file is still the file to rewrite; repairing it is the point — and
+    // the file to repair is the one the walk found, which the error names. Falling
+    // back to <startDir>/formio.json instead created a SECOND file below an
+    // unusable ancestor and left that ancestor governing every sibling directory,
+    // after CommittedConfigUnusableError had told the user it was the thing to fix.
+    if (error instanceof CommittedConfigUnusableError) {
+      return error.filePath;
     }
-  })();
-  return found?.filePath ?? path.join(path.resolve(startDir), COMMITTED_CONFIG_FILE);
+    throw error;
+  }
 }

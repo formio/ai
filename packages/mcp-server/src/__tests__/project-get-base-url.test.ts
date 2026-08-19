@@ -3,7 +3,11 @@ import fs from 'fs';
 import path from 'path';
 import os from 'os';
 import { writeProjectEntry } from '../project-map.js';
-import { runProjectCommand } from '../cli/project-command.js';
+import {
+  EXIT_BASE_URL_UNRESOLVED,
+  EXIT_FAILED,
+  runProjectCommand,
+} from '../cli/project-command.js';
 
 // `project get` is the read surface skills consume, so its report on the base
 // URL has to distinguish a value the user named from one the resolver worked out
@@ -64,8 +68,29 @@ describe('project get reports how the base URL was resolved', () => {
     // Exit 1 means "nothing is mapped", whose documented remedy is supplying a
     // project URL. This directory HAS one, so a 1 would send the caller into the
     // wrong interview.
-    it('exits 2 rather than the 1 that means nothing is mapped', () => {
-      expect(get('/w/subdomain').exitCode).toBe(2);
+    it('exits neither 0 nor the 1 that means nothing is mapped', () => {
+      expect([0, 1]).not.toContain(get('/w/subdomain').exitCode);
+    });
+
+    // Nor a 2. That code means the command could not answer AT ALL — an unreadable
+    // map, a formio.json that will not parse — and every skill's preflight
+    // branches on it by stopping without interviewing. This branch has an answer
+    // and an actionable remedy: one value, named, with the command that records
+    // it. Collapsed into 2, the one deployment shape this surface exists to serve
+    // dead-ended on its own guidance.
+    it('exits 3, the code that means one named value is missing', () => {
+      expect(get('/w/subdomain').exitCode).toBe(EXIT_BASE_URL_UNRESOLVED);
+      expect(EXIT_BASE_URL_UNRESOLVED).toBe(3);
+    });
+
+    it('keeps 2 for a command that could not answer at all', () => {
+      const broken = runProjectCommand(['project', 'get', '--cwd', 'relative/path'], {
+        cacheDir,
+        env: {},
+      });
+
+      expect(broken.exitCode).toBe(EXIT_FAILED);
+      expect(EXIT_FAILED).toBe(2);
     });
 
     it('names project set and its --base-url argument', () => {

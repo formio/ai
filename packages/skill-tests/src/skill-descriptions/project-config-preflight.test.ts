@@ -109,7 +109,7 @@ describe('every tool-calling skill probes the project configuration', () => {
     );
   });
 
-  // Three exit codes exist so a caller can tell "nothing is recorded here yet"
+  // Four exit codes exist so a caller can tell "nothing is recorded here yet"
   // (interview) from "this command could not answer" (do not interview — an
   // unreadable map, a broken formio.json, a malformed URL). Every gate branched on
   // "non-zero" alone, which collapses them and sends the agent into the interview
@@ -118,6 +118,28 @@ describe('every tool-calling skill probes the project configuration', () => {
     expect(
       offenders(probingSkillMd(), (text) => !/exit(s)? `?2`?|exit code 2/i.test(text))
     ).toEqual([]);
+  });
+
+  // Exit 3 is the half-configured answer: the project is on record and its
+  // deployment could not be derived. It reported as a 2 before, which every gate
+  // answers by relaying and STOPPING — so the one deployment shape this surface
+  // exists to serve, a path-less project URL on a customer domain, dead-ended on
+  // guidance written for a broken file.
+  it('gives the missing-base-URL answer its own branch', () => {
+    expect(
+      offenders(probingSkillMd(), (text) => !/exit(s)? `?3`?|exit code 3/i.test(text))
+    ).toEqual([]);
+  });
+
+  it('sends the exit 3 branch to --base-url rather than back to the project interview', () => {
+    expect(offenders(probingSkillMd(), (text) => !/--base-url/.test(text))).toEqual([]);
+  });
+
+  it('tells formio-mcp-setup that exit 3 is the base-URL round', () => {
+    const setup = read(join(skillsRoot, 'formio-mcp-setup/SKILL.md'));
+
+    expect(setup).toMatch(/exits? `3`/);
+    expect(setup).toContain('--base-url');
   });
 
   it('leaves the planner with the tools preflight but no probe', () => {

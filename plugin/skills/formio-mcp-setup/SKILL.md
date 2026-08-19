@@ -140,15 +140,15 @@ npx -y @formio/mcp@0.10.0 project set --project-url "<project url>" --scope repo
 
 Then re-run `project get`. Most of the time that is the end of it: the Base URL is derived from the Project URL — `https://api.form.io` for a project on a `form.io` host, the parent path for a project addressed as a sub-directory — so there is no second value to collect.
 
-The exception is a Project URL that is a plain sub-domain of the user's own domain, e.g. `https://myproject.mysite.com`, whose deployment is a sibling sub-domain that nothing in the Project URL names. There, and only there, the re-run asks for a Base URL. Ask for it then, with the flag that message names — never before, and never by assuming a default:
+The exception is a Project URL that is a plain sub-domain of the user's own domain, e.g. `https://myproject.mysite.com`, whose deployment is a sibling sub-domain that nothing in the Project URL names. There, and only there, the re-run exits `3` and asks for a Base URL. That is its own exit code because it is its own answer: the project is on record and one named value is missing. Ask for it then, with the flag that message names — never before, and never by assuming a default:
 
 ```bash
 npx -y @formio/mcp@0.10.0 project set --base-url "<base url>" --cwd "$(pwd)"
 ```
 
-Either flag alone is a valid update once a project is mapped, so the second round does not re-ask for the first value.
+Either flag alone is a valid update once a project is on record — in the working-directory mapping or in a committed `formio.json` — so the second round does not re-ask for the first value.
 
-**Exit `2` is not this branch.** It means the command could not answer at all — an unreadable `~/.formio/projects.json`, a `formio.json` that will not parse, a malformed URL. Do not interview and do not run `project set`: it would fail for the same unreported reason, and the user would see an interview-then-error loop that never names the cause. Relay the message, which names the file to fix, and treat the step as skipped.
+**Exit `2` is neither of those branches.** It means the command could not answer at all — an unreadable `~/.formio/projects.json`, a `formio.json` that will not parse, a malformed URL. Do not interview and do not run `project set`: it would fail for the same unreported reason, and the user would see an interview-then-error loop that never names the cause. Relay the message, which names the file to fix, and treat the step as skipped.
 
 **Do not compose your own version of this guidance.** The server's messages carry the valid URL shapes, an example of each, and why a value cannot be guessed — they reach an agent that never read this skill, so they are the single copy. Relay them; do not paraphrase them, and do not add shape rules of your own here.
 

@@ -4,7 +4,7 @@ import path from 'path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { writeProjectEntry } from '../project-map.js';
 import { COMMITTED_CONFIG_FILE } from '../committed-config.js';
-import { runProjectCommand } from '../cli/project-command.js';
+import { EXIT_BASE_URL_UNRESOLVED, runProjectCommand } from '../cli/project-command.js';
 
 // With three layers, "my project_set did nothing" becomes the obvious support
 // question, and output that names only the winner cannot answer it. Reporting the
@@ -104,7 +104,7 @@ describe('project get reports the winning layer and what it shadowed', () => {
 
     const result = get();
 
-    expect(result.exitCode).toBe(2);
+    expect(result.exitCode).toBe(EXIT_BASE_URL_UNRESOLVED);
     expect(result.stderr).toContain('--base-url');
     expect(result.stderr).toContain('baseUrl');
     expect(result.stderr).toMatch(/JWT/i);

@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import {
   CommittedConfigUnusableError,
   COMMITTED_CONFIG_FILE,
+  committedConfigWritePath,
   findCommittedConfig,
 } from '../committed-config.js';
 
@@ -162,6 +163,53 @@ describe('the committed formio.json', () => {
       repo(root);
 
       expect(findCommittedConfig(root)).toBeUndefined();
+    });
+  });
+
+  // Where `project set --scope repo` writes. A broken file is the file to repair —
+  // CommittedConfigUnusableError says so in as many words — so the write path has
+  // to land ON it. Falling back to <cwd>/formio.json created a second file in a
+  // subdirectory and left the unusable ancestor governing every sibling of it,
+  // with the reported cause untouched.
+  describe('where a repo-scoped write lands', () => {
+    it('rewrites the nearest existing file rather than shadowing it', () => {
+      repo(root);
+      write(root, { projectUrl: 'https://inside.form.io' });
+      const nested = path.join(root, 'packages', 'thing');
+      fs.mkdirSync(nested, { recursive: true });
+
+      expect(committedConfigWritePath(nested)).toBe(path.join(root, COMMITTED_CONFIG_FILE));
+    });
+
+    it('creates one in the caller’s own directory when the walk finds none', () => {
+      repo(root);
+      const nested = path.join(root, 'packages', 'thing');
+      fs.mkdirSync(nested, { recursive: true });
+
+      expect(committedConfigWritePath(nested)).toBe(path.join(nested, COMMITTED_CONFIG_FILE));
+    });
+
+    it('targets an unusable ancestor rather than creating a second file below it', () => {
+      repo(root);
+      write(root, '{ not json');
+      const nested = path.join(root, 'packages', 'thing');
+      fs.mkdirSync(nested, { recursive: true });
+
+      expect(committedConfigWritePath(nested)).toBe(path.join(root, COMMITTED_CONFIG_FILE));
+    });
+
+    it('names the offending file on the error itself', () => {
+      repo(root);
+      write(root, '{ not json');
+
+      expect(() => findCommittedConfig(root)).toThrow(CommittedConfigUnusableError);
+      try {
+        findCommittedConfig(root);
+      } catch (error) {
+        expect((error as CommittedConfigUnusableError).filePath).toBe(
+          path.join(root, COMMITTED_CONFIG_FILE)
+        );
+      }
     });
   });
 });

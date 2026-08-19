@@ -3,7 +3,11 @@ import fs from 'fs';
 import path from 'path';
 import os from 'os';
 import { readProjectEntry, writeProjectEntry } from '../project-map.js';
-import { isProjectCommand, runProjectCommand } from '../cli/project-command.js';
+import {
+  EXIT_BASE_URL_UNRESOLVED,
+  isProjectCommand,
+  runProjectCommand,
+} from '../cli/project-command.js';
 
 // The bin gains a `project` command so a working directory can be mapped to a
 // Form.io project before any MCP client has connected. Every case here drives
@@ -127,21 +131,21 @@ describe('project command', () => {
       writeProjectEntry(
         '/abs/path',
         {
-          FORMIO_PROJECT_URL: 'https://old.forms.acme.com/old',
+          FORMIO_PROJECT_URL: 'https://old.acme.com',
           FORMIO_BASE_URL: 'https://forms.acme.com',
         },
         cacheDir
       );
 
       const result = runProjectCommand(
-        ['project', 'set', '--project-url', 'https://forms.acme.com/new', '--cwd', '/abs/path'],
+        ['project', 'set', '--project-url', 'https://new.acme.com', '--cwd', '/abs/path'],
         { cacheDir, env: {} }
       );
 
       expect(result.exitCode).toBe(0);
       expect(readProjectEntry('/abs/path', cacheDir)).toEqual({
         env: {
-          FORMIO_PROJECT_URL: 'https://forms.acme.com/new',
+          FORMIO_PROJECT_URL: 'https://new.acme.com',
           FORMIO_BASE_URL: 'https://forms.acme.com',
         },
       });
@@ -156,14 +160,14 @@ describe('project command', () => {
       writeProjectEntry(
         '/abs/path',
         {
-          FORMIO_PROJECT_URL: 'https://forms.acme.com/old',
+          FORMIO_PROJECT_URL: 'https://old.acme.com',
           FORMIO_BASE_URL: 'https://forms.acme.com',
         },
         cacheDir
       );
 
       runProjectCommand(
-        ['project', 'set', '--project-url', 'https://forms.acme.com/new', '--cwd', '/abs/path'],
+        ['project', 'set', '--project-url', 'https://new.acme.com', '--cwd', '/abs/path'],
         { cacheDir, env: { FORMIO_BASE_URL: '' } }
       );
 
@@ -179,14 +183,14 @@ describe('project command', () => {
       writeProjectEntry(
         '/abs/path',
         {
-          FORMIO_PROJECT_URL: 'https://forms.acme.com/old',
+          FORMIO_PROJECT_URL: 'https://old.acme.com',
           FORMIO_BASE_URL: 'https://forms.acme.com',
         },
         cacheDir
       );
 
       runProjectCommand(
-        ['project', 'set', '--project-url', 'https://forms.acme.com/new', '--cwd', '/abs/path'],
+        ['project', 'set', '--project-url', 'https://new.acme.com', '--cwd', '/abs/path'],
         { cacheDir, env: { FORMIO_BASE_URL: 'https://api.form.io' } }
       );
 
@@ -638,7 +642,7 @@ describe('project command', () => {
         },
       });
 
-      expect(result.exitCode).toBe(2);
+      expect(result.exitCode).toBe(EXIT_BASE_URL_UNRESOLVED);
       expect(result.stderr).toMatch(/could not be determined/);
       expect(result.stderr).toMatch(/Ignoring FORMIO_BASE_URL/);
     });

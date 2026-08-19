@@ -62,6 +62,46 @@ describe('the revisions license gate with an unresolved base URL', () => {
     expect(result.form).toEqual(form);
   });
 
+  // The license flag is read by an ANONYMOUS GET of ${baseUrl}/config.js, so this
+  // demand has nothing to do with the JWT login. Reusing requireBaseUrl told an
+  // API-key caller that JWT authentication was blocked and that "an API key needs
+  // no Base URL and is unaffected" — in the one message only an API-key caller
+  // with an underivable deployment ever reads.
+  const rejectionMessage = async (form: Record<string, unknown>, requiresRevisions: boolean) => {
+    try {
+      await gateRevisionsLicense(server, unresolved, {
+        actionLabel: 'create',
+        requiresRevisions,
+        form,
+      });
+    } catch (error) {
+      return error instanceof Error ? error.message : String(error);
+    }
+    throw new Error('expected the gate to reject');
+  };
+
+  it('blames the license probe rather than JWT authentication', async () => {
+    const message = await rejectionMessage({ title: 'Contact', revisions: 'current' }, false);
+
+    expect(message).toMatch(/config\.js/);
+    expect(message).not.toMatch(/JWT/i);
+    expect(message).not.toMatch(/unaffected/i);
+  });
+
+  it('says an API key does not exempt this one', async () => {
+    const message = await rejectionMessage({ title: 'Contact' }, true);
+
+    expect(message).toMatch(/API key/i);
+    expect(message).toMatch(/anonymous/i);
+  });
+
+  it('does not re-ask for the project URL, which is configured', async () => {
+    const message = await rejectionMessage({ title: 'Contact' }, true);
+
+    expect(message).toMatch(/--base-url|baseUrl/);
+    expect(message).toMatch(/do not ask for the Project URL again/i);
+  });
+
   it('does not claim the deployment is unlicensed by prompting for consent', async () => {
     await gateRevisionsLicense(server, unresolved, {
       actionLabel: 'create',
