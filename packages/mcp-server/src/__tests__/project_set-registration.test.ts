@@ -77,13 +77,18 @@ describe('project_set registration', () => {
     expect(mode & 0o777).toBe(0o600);
   });
 
-  it('states that an environment project URL takes precedence over the mapping', async () => {
+  // The test name used to assert the opposite of what resolution does. The
+  // description has to state the order a caller of THIS tool needs: a mapping
+  // written here overrides FORMIO_PROJECT_URL, because that is what makes the tool
+  // worth calling in a directory whose environment names another project.
+  it('states that the mapping it writes overrides the environment', async () => {
     const client = await connect();
 
     const { tools } = await client.listTools();
     const projectSet = tools.find((tool) => tool.name === 'project_set');
 
     expect(projectSet?.description).toMatch(/FORMIO_PROJECT_URL/);
-    expect(projectSet?.description).toMatch(/precedence|takes precedence|overrides/);
+    expect(projectSet?.description).toMatch(/weakest/i);
+    expect(projectSet?.description).toMatch(/mapping written here DOES override/);
   });
 });

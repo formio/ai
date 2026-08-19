@@ -20,17 +20,27 @@ Do **not** work around missing tools by making direct HTTP requests against a Fo
 
 That ban is on **build-time** work — the configuring you do in this session. It says nothing about the application you are building: an app is expected to call the Form.io REST API **at runtime**, to log its users in and to read and write their submissions, and [`formio-api`](../formio-api/SKILL.md)'s runtime-scope references document those endpoints for exactly that code.
 
+**Available tools are not a configured project.** Every Form.io tool resolves which project it targets from a mapping keyed on a working directory, so pass `cwd` — the user's current working directory — on every Form.io tool call; omitting it resolves against the MCP server's own directory, which is fixed at spawn and may be mapped to a different project. Before the first call that reads from or writes to a deployment, ask the server what this directory resolves to:
+
+```bash
+npx -y @formio/mcp@0.10.0 project get --cwd "$(pwd)"
+```
+
+On success, what it prints IS the configuration. There is one value to think about — the **Project URL**, the full URL of the Form.io project this work reads and writes. The **Base URL** (the deployment hosting it) is normally DERIVED from that project URL rather than supplied, so it is not a second thing to ask for. The values may come from a committed `formio.json` tracked with the application's own source, from this directory's mapping, or from the environment — the command says which. Do not ask the user to confirm or re-supply either one. On exit `1` — nothing is recorded for this directory — relay that message's own instruction to the user, ask for the single value it names, run the `project set` command it names, and re-run, repeating if the next run names the second value. On exit `2` the command could not answer at all (an unreadable `~/.formio/projects.json`, a `formio.json` that will not parse, a malformed URL): do NOT interview, because a `project set` would fail for the same unreported reason and the loop would repeat with the cause never named — relay the message and stop until it is fixed. Before the first call that WRITES (`form_create`, `form_update`, `role_create`, `action_create`, `project_import`), state the resolved Project URL and Base URL in one line, so a wrong target is caught before anything is written to it.
+
+Never invent a Base URL, never reuse one from another project or an earlier session, and never edit `~/.formio/projects.json` by any means — its shape, its `0600` mode, and its merge rules belong to the server, and `project set` / `project_set` are how you reach them. The server's own messages carry the URL shapes and the remedy for each; this skill does not restate them.
+
 ## Stance
 
 - **Framework-specific, not orchestrator.** The library's generic "build me an app" entry point is `formio-application` — it decides build-new vs. extend, which framework (Angular today, more later), when to plan, and when to import. You are invoked AFTER those decisions. If a user reaches you directly by naming Angular explicitly ("build it in Angular", "use Angular"), honor that — otherwise, you arrive via handoff from `formio-application` with URLs + `template.json` already in hand.
 - **Import is NOT this skill's responsibility.** Template import via the `project_import` MCP tool lives in `formio-application`; you never call `project_import`. If the user invokes you directly and the target project has not yet been imported into, point them at `formio-application` instead of running the planner or calling the MCP tool yourself.
 - **One phase at a time, left to right.** SETUP → BOOTSTRAP → CONFIG → AUTH → Resources. No jumping ahead. Each phase that writes files ends with an approval gate; a declined gate stops the flow.
 - **Do not hand-roll the Angular workspace.** When the working directory does not yet contain one, BOOTSTRAP offers to install the Angular team's official skill library (`angular/skills`) and delegates to its `angular-new-app` skill; if the user declines that install, it falls back to the Angular CLI (`npx @angular/cli@<major> new`) under its own approval. Both paths are in [`BOOTSTRAP.md`](./BOOTSTRAP.md) — never hand-write an `angular.json` / `package.json`, and never run a scaffolding command the user has not approved.
-- **Accept handoff mode gracefully.** When `formio-application` invokes you with URLs already captured, SETUP confirms them with one short acknowledgement and advances — no re-interview. Invoked directly with no handoff context, SETUP runs its full URL interview.
+- **Resolve the project, never interview for it.** SETUP reads the Project URL and Base URL from the MCP server with `project get`, on every path — handoff or direct invocation. A handoff from `formio-application` is a copy of those values, and the mapping is what `@formio/angular` and every later tool call actually resolve against, so SETUP confirms against the server rather than trusting what it was handed. It asks the user for a URL only when the server's own message says one is missing, and only for the value that message names.
 - **Skip what is already wired.** Before CONFIG, inspect `src/app/config.ts`; before AUTH, inspect `src/app/app-module.ts` for an existing `AuthModule`. If the phase's output already matches the expected values, skip it and tell the user which file triggered the skip.
 - **The planner's `template.md` + `template.json` pair is the source of truth for AUTH.** When the pair exists, read the user resource, login form, register form, and roles from it per [`AUTH.md`](./AUTH.md)'s extraction rules — never invent. If the pair does not exist and no handoff context names one, point the user at `formio-application` (or `formio-resource-planner` if they only want to plan).
 - **Delegate Resources by reading the sub-skill file.** Per-resource NgModule scaffolding, `FormioResourceConfig`, `FormioResourceRoutes()`, bidirectional joins, parent→child hierarchies, transitive group access — all of that lives in the nested file `./formio-angular-resources/SKILL.md`, a sub-folder of this skill, NOT a separately-registered top-level skill. Load that file directly (same pattern as `SETUP.md` / `BOOTSTRAP.md` / `CONFIG.md` / `AUTH.md`) and follow its Phase A / Phase B cadence. Do not attempt to invoke a top-level skill named `formio-angular-resources` — the name in the nested file's frontmatter is historical.
-- **Batch your questions.** When input is needed (URLs in SETUP handoff-free mode, auth strategy choices in AUTH), ask everything that phase needs in ONE question round, using the client's structured question mechanism (in Claude Code, `AskUserQuestion`). Do not pepper.
+- **Batch your questions.** When input is needed (auth strategy choices in AUTH), ask everything that phase needs in ONE question round, using the client's structured question mechanism (in Claude Code, `AskUserQuestion`). Do not pepper. Configuration is the exception and is never batched: SETUP asks for whichever single URL the server's message names, because the other one is usually already resolved.
 - **NgModule-based, `standalone: false`.** Match the official `@formio/angular` demo. No standalone components anywhere in generated files.
 - **Consult `frontend-design` for every UI decision (whenever it is available).** `frontend-design` is strongly recommended but not required (the orchestrator offers it — see [`BOOTSTRAP.md`](./BOOTSTRAP.md) Step 7). **When it is available**, any file in this skill or its sub-skill that touches the user-facing surface MUST load `frontend-design` first and follow its guidance — treat it the same way you treat `SETUP.md` / `CONFIG.md` / `AUTH.md`: a file you load before writing output. When it is NOT available and the user chose to proceed anyway, disclose that on every UI approval gate rather than silently emitting plain Bootstrap. `BOOTSTRAP.md` Step 7 enumerates the covered surfaces, the full "user-facing surface" definition, and the one exemption (form-field markup the Form.io renderer emits itself).
 - **Always brief `frontend-design` with the Bootstrap 5 constraint.** When you load `frontend-design`, prepend the `FRONTEND_DESIGN_BRIEF` from [`BOOTSTRAP.md`](./BOOTSTRAP.md) Step 7d so it does NOT default to Tailwind, custom utility CSS, or bespoke design-token systems that would conflict with the Bootstrap 5 + Bootstrap Icons stack BOOTSTRAP installed. The brief pins the stack, the native Bootstrap 5 utility classes and `bi bi-*` icon names to use, the custom-CSS-only-for-gaps rule (extend `--bs-*` CSS variables, never parallel tokens), the do-not-restyle-renderer-markup rule, and the `standalone: false` / `*ngIf` / `*ngFor` constraints. When a user request truly needs a non-Bootstrap system (e.g., "use Material instead"), that is a scope change — re-run BOOTSTRAP opt-out, not a `frontend-design` override.
@@ -41,7 +51,7 @@ You are designed to work in three scenarios. All of them start with the data mod
 
 | Scenario | Source of inputs | What you do |
 | --- | --- | --- |
-| **Handoff from `formio-application` (build-new)** | Orchestrator passes workspace path, `FORMIO_PROJECT_URL`, `FORMIO_BASE_URL`, `template.md` path, `template.json` path, and an `importStatus` flag. | Confirm the handoff context in one sentence, skip SETUP's interview (URLs are known), run BOOTSTRAP if the workspace path is empty, then proceed to CONFIG. |
+| **Handoff from `formio-application` (build-new)** | Orchestrator passes workspace path, `projectUrl`, `baseUrl`, `template.md` path, `template.json` path, and an `importStatus` flag. | Confirm the handoff context in one sentence, run SETUP to confirm the handed-in URLs against `project get`, run BOOTSTRAP if the workspace path is empty, then proceed to CONFIG. |
 | **Direct invocation with an approved `template.md` + `template.json` in scope** | User has run the planner (and typically `formio-application` + import) themselves and is now explicitly asking for the Angular build. Has an existing Angular workspace OR a fresh directory and the artifact pair. | Run pre-flight, then SETUP → BOOTSTRAP (if no `angular.json`) → CONFIG → AUTH → Resources. |
 | **Direct invocation against an existing partially-wired Angular workspace** | User asks to regenerate or fix the Angular scaffolding. Workspace has some of `config.ts` / `AuthModule` already. | Run pre-flight, skip BOOTSTRAP (workspace already exists), skip the other phases whose outputs already exist, run only the missing ones. |
 
@@ -61,18 +71,20 @@ Before SETUP, do these reads so you don't ask questions the workspace already an
 
 Surface your findings to the user in one short paragraph before the interview:
 
-- Empty cwd: "This working folder is empty — I'll capture your Form.io URLs (SETUP), then install the Angular team's skills library and delegate to `angular-new-app` to scaffold the workspace (BOOTSTRAP), then wire Form.io into it (CONFIG, AUTH, Resources)."
-- Existing workspace, partial wiring: "I see an existing workspace with `config.ts` wired for `https://X.form.io` but no `AuthModule`. I'll skip BOOTSTRAP and CONFIG, run SETUP (to confirm URLs), then AUTH, then load the Resources sub-skill at `./formio-angular-resources/SKILL.md`."
+- Empty cwd: "This working folder is empty — I'll confirm which Form.io project this directory is configured for (SETUP), then install the Angular team's skills library and delegate to `angular-new-app` to scaffold the workspace (BOOTSTRAP), then wire Form.io into it (CONFIG, AUTH, Resources)."
+- Existing workspace, partial wiring: "I see an existing workspace with `config.ts` wired for `https://X.form.io` but no `AuthModule`. I'll skip BOOTSTRAP and CONFIG, run SETUP (to confirm the configured project), then AUTH, then load the Resources sub-skill at `./formio-angular-resources/SKILL.md`."
 
 Pause for acknowledgement, then proceed.
 
 ## Phase 1 — SETUP
 
-**Goal:** capture the Form.io `Project URL` (the project's API root) and `Base URL` (the platform deployment), which flow into `FormioAppConfig` as `appUrl` and `apiUrl` respectively — see [`SETUP.md`](./SETUP.md)'s table for examples.
+> **`FormioAppConfig` renames both URLs.** `appUrl` is the **Project URL** — the project this application reads and writes, and the one value anyone supplies. `apiUrl` is the **Base URL** — the deployment hosting it, which is normally derived from the Project URL rather than supplied. Take both from `npx -y @formio/mcp@0.10.0 project get --cwd "<workspace root>"`; never compose, derive, or hand-type either one yourself.
+
+**Goal:** resolve the Form.io `Project URL` (the project this application reads and writes) and `Base URL` (the deployment hosting it), which flow into `FormioAppConfig` as `appUrl` and `apiUrl` respectively — see [`SETUP.md`](./SETUP.md)'s table.
 
 **Handoff mode:** when `formio-application` invoked you and passed both URLs, DO NOT run the interview. Confirm the URLs in one short acknowledgement ("Using Project URL `X`, Base URL `Y` that you gave me during the import step. Continuing to BOOTSTRAP.") and advance — no question round, no approval gate; the user already approved those values upstream. If the handoff-supplied workspace already contains `angular.json`, BOOTSTRAP will self-skip and the next user-visible phase is CONFIG.
 
-**Standalone mode:** when there is no handoff context (user invoked you directly), read [`SETUP.md`](./SETUP.md) for the full interview script, the batched question shape, URL validation rules, and the exact stash names (`FORMIO_PROJECT_URL`, `FORMIO_BASE_URL`) CONFIG and AUTH pick up.
+**Every mode, handoff or standalone:** read [`SETUP.md`](./SETUP.md) for the `project get` probe, what to do when its message names a missing value, the existing-`config.ts` mismatch branch, and the exact stash names (`projectUrl`, `baseUrl`) CONFIG and AUTH pick up.
 
 **Gate (standalone mode only):** print `Project URL = X, Base URL = Y. Proceed?` and wait for explicit approval. If the user declines, stop.
 
@@ -122,11 +134,11 @@ The sub-skill expects `FormioAppConfig` to already be wired into `AppModule`. If
 
 ## When to reset to an earlier phase
 
-If the user realizes mid-AUTH that the SETUP URLs were wrong, stop AUTH, rewind to SETUP, re-run CONFIG with the corrected URLs, then re-run AUTH. Do not try to patch `config.ts` in place from inside AUTH — restart the affected phases cleanly so the approval gates give the user another chance to sanity-check.
+If the user realizes mid-AUTH that the resolved project was wrong, stop AUTH, rewind to SETUP, re-run CONFIG with the corrected URLs, then re-run AUTH. Do not try to patch `config.ts` in place from inside AUTH — restart the affected phases cleanly so the approval gates give the user another chance to sanity-check.
 
 ## Links
 
-- [`SETUP.md`](./SETUP.md) — the URL interview
+- [`SETUP.md`](./SETUP.md) — resolving the configured project
 - [`BOOTSTRAP.md`](./BOOTSTRAP.md) — offering `angular/skills`, delegating to `angular-new-app`, and the Angular CLI fallback
 - [`CONFIG.md`](./CONFIG.md) — `FormioAppConfig` / `config.ts` generation
 - [`AUTH.md`](./AUTH.md) — `AuthModule` / `FormioAuthConfig` generation

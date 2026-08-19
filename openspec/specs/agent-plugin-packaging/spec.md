@@ -1,7 +1,7 @@
 # agent-plugin-packaging Specification
 
 ## Purpose
-Defines how the plugin directory is packaged for any coding agent: an Agent Plugins 1.0.0 manifest, a spec-conformant `mcp.json` server declaration, a Cursor manifest that prompts for configuration at install time, and one directory that serves every client.
+Defines how the plugin directory is packaged for any coding agent: an Agent Plugins 1.0.0 manifest, a spec-conformant `mcp.json` server declaration, a Cursor manifest that prompts for nothing at install time, and one directory that serves every client.
 ## Requirements
 ### Requirement: The plugin directory carries an Agent Plugins 1.0.0 manifest
 
@@ -54,40 +54,39 @@ Defines how the plugin directory is packaged for any coding agent: an Agent Plug
 - **THEN** it answers `tools/list` with the full tool set including `project_set`
 - **AND** no test spawns `npx` against the public registry, which would assert the behaviour of the last published version rather than this tree
 
-### Requirement: A Cursor plugin manifest prompts for configuration at install time
+### Requirement: A Cursor plugin manifest prompts for nothing at install time
 
-`plugin/.cursor-plugin/plugin.json` SHALL declare `name`, `description`, `version`, `author`, `repository`, `license`, `logo`, a `skills` path of `skills`, an `mcpServers` entry equivalent to `mcp.json`'s, and a `variables` JSON Schema declaring `FORMIO_BASE_URL` (with a default of `https://api.form.io`) and `FORMIO_DEFAULT_PROJECT_URL`. Every `${VAR}` placeholder used in the manifest's MCP configuration SHALL be declared in `variables`, and every declared variable SHALL be referenced somewhere — Cursor rejects a mismatch at submission.
+`plugin/.cursor-plugin/plugin.json` SHALL declare `name`, `description`, `version`, `author`, `repository`, `license`, `logo`, a `skills` path of `skills`, and an `mcpServers` entry equivalent to `mcp.json`'s.
 
-The install-time project answer SHALL feed `FORMIO_DEFAULT_PROJECT_URL`, never `FORMIO_PROJECT_URL`. The latter takes precedence over every working-directory mapping, so wiring an install-time prompt to it means a value entered once, at install, silently defeats every later `project_set` call — a conflict the user configures in two different places and can see in neither. The offering variable is surfaced by the server as a suggestion and can be overridden per directory.
+It SHALL declare no `variables` schema and SHALL pass no `env` block to the server: the manifest prompts for nothing at install time. Every `${VAR}` placeholder used in the manifest SHALL still be declared in `variables` — an invariant Cursor enforces at submission, and one that now holds over two empty sets, so adding a placeholder without declaring it remains a failure.
 
-Neither variable SHALL be listed in `variables.required`: the server starts with no configuration and raises an actionable error naming `project_set` when a tool needs a project, so an install that skips configuration is a working install rather than a broken one.
+An install-time prompt for either URL is the wrong scope for both. A Form.io project is one-to-one with the application built against it, so a project answer typed once at install is right for one directory and wrong for every later one. A deployment answer is no better placed: the base URL is derived per project from the project URL's shape when it can be, the environment is the weakest resolution source and so cannot override a committed `formio.json` or a working-directory mapping, and on a self-hosted install a single global silently satisfied the base URL for every project including ones on another deployment. Both values are therefore captured per directory — by `project_set`, or by a committed `formio.json` that travels with the application's own source.
+
+Nothing is required at install time, and an install that configures nothing is a working install rather than a broken one: the server starts with no configuration and raises an actionable error naming `project_set` when a tool needs a project, or naming `project set --base-url` when a base URL cannot be determined.
 
 #### Scenario: Variables and placeholders match exactly
 
-- **WHEN** the set of `${VAR}` placeholders in `plugin/.cursor-plugin/plugin.json` is compared with the keys of its `variables.properties`
+- **WHEN** the set of `${VAR}` placeholders in `plugin/.cursor-plugin/plugin.json` is compared with the keys of its `variables.properties`, treating an absent `variables` as an empty set
 - **THEN** the two sets are equal
 
-#### Scenario: The project answer offers rather than pins
+#### Scenario: The manifest prompts for nothing
 
-- **WHEN** the manifest's `mcpServers.formio-mcp.env` is inspected
-- **THEN** the install-time project placeholder is assigned to `FORMIO_DEFAULT_PROJECT_URL`
-- **AND** no install-time placeholder is assigned to `FORMIO_PROJECT_URL`
+- **WHEN** `plugin/.cursor-plugin/plugin.json` is parsed
+- **THEN** it declares no `variables` schema
+- **AND** its `mcpServers.formio-mcp` entry has no `env` block
+- **AND** no `${VAR}` placeholder appears anywhere in the manifest
 
-#### Scenario: Base URL carries the hosted default
+#### Scenario: Neither URL is prompted for at install time
 
-- **WHEN** `variables.properties.FORMIO_BASE_URL` is inspected
-- **THEN** its `default` is `https://api.form.io`
+- **WHEN** the manifest is searched for `FORMIO_PROJECT_URL`, `FORMIO_DEFAULT_PROJECT_URL`, and `FORMIO_BASE_URL`
+- **THEN** none appears
+- **AND** the project and the deployment are captured per directory instead
 
-#### Scenario: Nothing is required at install time
+#### Scenario: An unconfigured install still works
 
-- **WHEN** `variables` is inspected
-- **THEN** it declares no `required` entries
-
-#### Scenario: Skills path resolves
-
-- **WHEN** the manifest's `skills` path is resolved relative to the plugin root
-- **THEN** the directory exists and every immediate child containing a `SKILL.md` is a skill the library ships
-
+- **WHEN** a user installs the Cursor plugin and configures nothing
+- **THEN** the server starts and serves its full tool list
+- **AND** the first project-scoped tool call raises the actionable resolution error rather than failing opaquely
 ### Requirement: One plugin directory serves every client
 
 The plugin directory SHALL carry all three manifests side by side — `plugin.json` (Agent Plugins), `.cursor-plugin/plugin.json` (Cursor), and `.claude-plugin/plugin.json` (Claude Code) — over a single `skills/` directory and a single `mcp.json`. Skills SHALL NOT be duplicated per client. Each client detects its own manifest by location, so the presence of the others SHALL be inert.

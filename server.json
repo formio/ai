@@ -20,28 +20,21 @@
       "environmentVariables": [
         {
           "name": "FORMIO_PROJECT_URL",
-          "description": "Optional. Pins every directory to one Form.io project (e.g. https://examples.form.io on the hosted cloud; self-hosted it is either https://your-project.your-domain.com or https://your-host/project-name, depending on how that deployment routes projects). It takes precedence over the per-directory mapping and project_set cannot redirect it — set it only for a launch that must always target the same project, such as CI or a container. Leave it unset and the agent asks for a project and records it per directory.",
-          "isRequired": false,
-          "format": "string",
-          "isSecret": false
-        },
-        {
-          "name": "FORMIO_DEFAULT_PROJECT_URL",
-          "description": "Optional. A project URL to offer, not to apply. When a working directory has no mapping, the server names it as the suggested project for the agent to confirm and persist with project_set. It never changes what a tool resolves — the opposite of FORMIO_PROJECT_URL.",
+          "description": "Optional, and the WEAKEST of the three project sources: a committed formio.json found by walking up from the working directory wins, then the per-directory mapping project_set writes, then this. It pins nothing \u2014 project_set can redirect a directory whose environment names a different project. Useful for a launch with nowhere to record a project, such as CI or a container (e.g. https://examples.form.io on the hosted cloud; self-hosted it is either https://your-project.your-domain.com or https://your-host/project-name, depending on how that deployment routes projects). Leave it unset and the agent asks for a project and records it per directory.",
           "isRequired": false,
           "format": "string",
           "isSecret": false
         },
         {
           "name": "FORMIO_BASE_URL",
-          "description": "Base URL of your Form.io deployment — the parent of FORMIO_PROJECT_URL (default: https://api.form.io). Set this when self-hosting or using Form.io Enterprise.",
+          "description": "Optional, and usually unnecessary: the base URL is DERIVED from the project URL \u2014 https://api.form.io for a project on a form.io host, the parent path for a project addressed as a sub-directory \u2014 and is asked for only when it cannot be derived, which is a path-less project URL on a customer domain. There is no default. Like FORMIO_PROJECT_URL it is the weakest source, behind a committed formio.json and the per-directory mapping.",
           "isRequired": false,
           "format": "string",
           "isSecret": false
         },
         {
           "name": "FORMIO_API_KEY",
-          "description": "Form.io project API key. Optional — when omitted the server uses a browser-based portal login flow to obtain a JWT.",
+          "description": "Form.io project API key. Optional \u2014 when omitted the server uses a browser-based portal login flow to obtain a JWT.",
           "isRequired": false,
           "format": "string",
           "isSecret": true
@@ -62,7 +55,7 @@
         },
         {
           "name": "FORMIO_INSECURE_TLS",
-          "description": "Set to 1 to skip TLS certificate verification. For local development against self-signed certificates only — never enable in production.",
+          "description": "Set to 1 to skip TLS certificate verification. For local development against self-signed certificates only \u2014 never enable in production.",
           "isRequired": false,
           "format": "string",
           "isSecret": false

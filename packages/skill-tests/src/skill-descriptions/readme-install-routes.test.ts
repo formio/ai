@@ -1,10 +1,10 @@
 // The README's install story.
 //
 // Two routes, and they are alternatives rather than steps: a plugin install for
-// clients with a marketplace (skills plus MCP plus an install-time prompt), and
-// the skills CLI for everything else (skills only, with `formio-mcp-setup`
-// connecting the server on first use). Nothing is hosted beyond the GitHub
-// repository in either case.
+// clients with a marketplace (skills plus the MCP server), and the skills CLI for
+// everything else (skills only, with `formio-mcp-setup` connecting the server on
+// first use). Nothing is hosted beyond the GitHub repository in either case, and
+// neither route prompts for a URL — both are resolved per directory.
 //
 // The one thing the README must never do again is imply a single MCP config file
 // works everywhere: Codex is TOML-only, and VS Code uses a `servers` key.
@@ -43,8 +43,8 @@ describe('README quickstart', () => {
   });
 });
 
-describe('README install matrix', () => {
-  it('has a row for every client that has a marketplace', () => {
+describe('README install routes', () => {
+  it('covers every client that has a marketplace', () => {
     const text = readme();
 
     for (const client of ['Claude Code', 'Cursor', 'Copilot', 'VS Code', 'Codex']) {
@@ -55,15 +55,27 @@ describe('README install matrix', () => {
 
   // A marketplace whose install has not been verified end to end says so rather
   // than naming a command: publishing an unverified recipe costs the reader more
-  // than an honest gap does. Every such row must carry one or the other.
+  // than an honest gap does. Each per-client section must carry one or the other.
+  //
+  // Asserted over the `#### <Client>` sections the README uses now — the table it
+  // used to carry was removed deliberately, and matching table rows made this
+  // suite silently vacuous once it went.
   it('either names the install command or marks the route as not live yet', () => {
-    const rows = readme()
-      .split('\n')
-      .filter((line) => /^\| (Cursor|GitHub Copilot CLI|VS Code|Codex)/.test(line));
+    const text = readme();
+    const sections = [...text.matchAll(/^#### (.+)$/gm)];
+    const perClient = sections
+      .map((match, index) => {
+        const start = match.index ?? 0;
+        const next = sections[index + 1]?.index ?? text.length;
+        return { client: match[1].trim(), body: text.slice(start, next) };
+      })
+      .filter(({ client }) => /Claude Code|Cursor|Codex|Copilot|VS Code/i.test(client));
 
-    expect(rows, 'one matrix row per marketplace client').toHaveLength(4);
-    for (const row of rows) {
-      expect(row, row).toMatch(/`[^`]+`|coming soon/i);
+    expect(perClient.length, 'one section per marketplace client').toBeGreaterThanOrEqual(4);
+    for (const { client, body } of perClient) {
+      expect(body, `${client} must name a command or say the route is not live`).toMatch(
+        /```|`[^`]+`|coming soon/i
+      );
     }
   });
 
@@ -77,6 +89,23 @@ describe('README install matrix', () => {
     const text = readme();
 
     expect(text).toMatch(/skills only|does not (itself )?configure|no MCP server/i);
+  });
+
+  // The plugin never prompted for a Project URL, and no longer prompts for a Base
+  // URL either: both manifests launch the server with command and args alone.
+  // Telling a reader to expect a prompt sends them looking for one that never
+  // appears.
+  it('does not claim the plugin install prompts for either URL', () => {
+    const text = readme();
+
+    expect(text).not.toMatch(/prompt you for the following configuration/i);
+    expect(text).not.toMatch(/(plugin|install).{0,40}will (then )?prompt you/i);
+  });
+
+  it('says how the two URLs are actually supplied', () => {
+    const text = readme();
+
+    expect(text).toMatch(/project get|project set|formio\.json/);
   });
 
   it('still documents that there is no universal MCP config file', () => {

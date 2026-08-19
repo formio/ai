@@ -63,31 +63,13 @@ describe('getConfig', () => {
     expect(getConfig().projectUrl).toBeUndefined();
   });
 
-  it('treats an empty FORMIO_DEFAULT_PROJECT_URL as unset', () => {
-    process.env.FORMIO_DEFAULT_PROJECT_URL = '';
+  // The offering variable is gone: it existed only because FORMIO_PROJECT_URL
+  // pinned the server, and the scope reorder made the environment the weakest
+  // source, so a project set there is already overridden by both stronger sources.
+  it('does not read FORMIO_DEFAULT_PROJECT_URL at all', () => {
+    process.env.FORMIO_DEFAULT_PROJECT_URL = 'https://suggested.form.io';
 
-    expect(getConfig().defaultProjectUrl).toBeUndefined();
-  });
-
-  // The default is echoed to the agent as "the suggested project", and an agent
-  // that accepts a suggestion persists it. An unsubstituted ${...} placeholder or
-  // a typo must not survive that far.
-  it('ignores a FORMIO_DEFAULT_PROJECT_URL that is not a valid http(s) URL', () => {
-    process.env.FORMIO_DEFAULT_PROJECT_URL = '${FORMIO_DEFAULT_PROJECT_URL}';
-
-    expect(getConfig().defaultProjectUrl).toBeUndefined();
-  });
-
-  it('ignores a FORMIO_DEFAULT_PROJECT_URL on a non-http protocol', () => {
-    process.env.FORMIO_DEFAULT_PROJECT_URL = 'ftp://suggested.form.io';
-
-    expect(getConfig().defaultProjectUrl).toBeUndefined();
-  });
-
-  it('keeps a valid FORMIO_DEFAULT_PROJECT_URL and strips the trailing slash', () => {
-    process.env.FORMIO_DEFAULT_PROJECT_URL = 'https://suggested.form.io/';
-
-    expect(getConfig().defaultProjectUrl).toBe('https://suggested.form.io');
+    expect(Object.keys(getConfig())).not.toContain('defaultProjectUrl');
   });
 
   // Both plugin manifests set these from a host variable, and an unsubstituted

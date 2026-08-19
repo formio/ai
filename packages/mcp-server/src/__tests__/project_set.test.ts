@@ -131,7 +131,51 @@ describe('project_set tool', () => {
     expect(mtimeAfter).toBe(mtimeBefore);
   });
 
-  it('persists FORMIO_BASE_URL alongside FORMIO_PROJECT_URL when a base URL is available', async () => {
+  // The global applies to the ONE project shape that cannot derive a deployment:
+  // a path-less project URL on a customer domain, whose deployment is a sibling
+  // sub-domain nothing in the project URL names.
+  it('persists FORMIO_BASE_URL alongside FORMIO_PROJECT_URL when the shape cannot derive one', async () => {
+    const { client } = await createTestClient({
+      cwd: () => cwd,
+      baseUrl: () => 'https://forms.mysite.com',
+    });
+
+    await client.callTool({
+      name: 'project_set',
+      arguments: { projectUrl: 'https://myproject.mysite.com' },
+    });
+
+    expect(readProjectEntry(cwd)).toEqual({
+      env: {
+        FORMIO_PROJECT_URL: 'https://myproject.mysite.com',
+        FORMIO_BASE_URL: 'https://forms.mysite.com',
+      },
+    });
+  });
+
+  // A global FORMIO_BASE_URL is one value answering a per-project question. Where
+  // the project URL derives its own deployment, writing the global into the
+  // mapping replaces a per-project-correct answer with a stale one that then
+  // outranks derivation forever — and api.form.io is the value most likely to be
+  // exported, which is exactly the wrong-deployment login the shape rules exist
+  // to prevent.
+  it('does not persist the env global over a base URL the project URL derives', async () => {
+    const { client } = await createTestClient({
+      cwd: () => cwd,
+      baseUrl: () => 'https://api.form.io',
+    });
+
+    await client.callTool({
+      name: 'project_set',
+      arguments: { projectUrl: 'https://forms.mysite.com/myproject' },
+    });
+
+    expect(readProjectEntry(cwd)).toEqual({
+      env: { FORMIO_PROJECT_URL: 'https://forms.mysite.com/myproject' },
+    });
+  });
+
+  it('does not persist the env global for a hosted-cloud project either', async () => {
     const { client } = await createTestClient({
       cwd: () => cwd,
       baseUrl: () => 'https://api.form.io',
@@ -143,10 +187,7 @@ describe('project_set tool', () => {
     });
 
     expect(readProjectEntry(cwd)).toEqual({
-      env: {
-        FORMIO_PROJECT_URL: 'https://next.form.io',
-        FORMIO_BASE_URL: 'https://api.form.io',
-      },
+      env: { FORMIO_PROJECT_URL: 'https://next.form.io' },
     });
   });
 
@@ -231,18 +272,18 @@ describe('project_set tool', () => {
   it('strips a trailing slash from the base URL before persisting', async () => {
     const { client } = await createTestClient({
       cwd: () => cwd,
-      baseUrl: () => 'https://api.form.io/',
+      baseUrl: () => 'https://forms.mysite.com/',
     });
 
     await client.callTool({
       name: 'project_set',
-      arguments: { projectUrl: 'https://next.form.io' },
+      arguments: { projectUrl: 'https://myproject.mysite.com' },
     });
 
     expect(readProjectEntry(cwd)).toEqual({
       env: {
-        FORMIO_PROJECT_URL: 'https://next.form.io',
-        FORMIO_BASE_URL: 'https://api.form.io',
+        FORMIO_PROJECT_URL: 'https://myproject.mysite.com',
+        FORMIO_BASE_URL: 'https://forms.mysite.com',
       },
     });
   });
@@ -277,11 +318,14 @@ describe('project_set tool', () => {
   });
 
   // The mapping is the more specific answer for THIS directory, and it is the
-  // one resolveProjectConfig honours over the environment at resolve time. A
-  // plugin install always carries a FORMIO_BASE_URL (the manifests default it to
-  // https://api.form.io), so an environment-first fallback here would rewrite
-  // every self-hosted mapping the moment a directory was re-pointed at a sibling
+  // one resolveProjectConfig honours over the environment at resolve time. A host
+  // that exports a FORMIO_BASE_URL of its own would otherwise rewrite every
+  // self-hosted mapping the moment a directory was re-pointed at a sibling
   // project — the exact silent deployment move the fallback exists to prevent.
+  //
+  // Both project URLs are the sub-domain shape, which derives no deployment: that
+  // is the only shape where a stored base URL is the answer rather than a stale
+  // copy of one, so it is the shape this precedence question is really about.
   it('prefers the mapped base URL over the environment global when no argument is passed', async () => {
     const first = await createTestClient({
       cwd: () => cwd,
@@ -289,7 +333,7 @@ describe('project_set tool', () => {
     });
     await first.client.callTool({
       name: 'project_set',
-      arguments: { projectUrl: 'https://forms.acme.com/old' },
+      arguments: { projectUrl: 'https://old.acme.com' },
     });
 
     const second = await createTestClient({
@@ -298,12 +342,12 @@ describe('project_set tool', () => {
     });
     await second.client.callTool({
       name: 'project_set',
-      arguments: { projectUrl: 'https://forms.acme.com/new' },
+      arguments: { projectUrl: 'https://new.acme.com' },
     });
 
     expect(readProjectEntry(cwd)).toEqual({
       env: {
-        FORMIO_PROJECT_URL: 'https://forms.acme.com/new',
+        FORMIO_PROJECT_URL: 'https://new.acme.com',
         FORMIO_BASE_URL: 'https://forms.acme.com',
       },
     });
@@ -431,18 +475,20 @@ describe('project_set tool', () => {
       });
     });
 
-    it('persists a usable global', async () => {
+    // The sub-domain shape, which names no deployment: the global is the answer
+    // here rather than a stale stand-in for a derivation.
+    it('persists a usable global for a project URL that derives nothing', async () => {
       process.env.FORMIO_BASE_URL = 'https://forms.acme.com/';
       const { client } = await createTestClient({ cwd: () => cwd });
 
       await client.callTool({
         name: 'project_set',
-        arguments: { projectUrl: 'https://forms.acme.com/next' },
+        arguments: { projectUrl: 'https://next.acme.com' },
       });
 
       expect(readProjectEntry(cwd)).toEqual({
         env: {
-          FORMIO_PROJECT_URL: 'https://forms.acme.com/next',
+          FORMIO_PROJECT_URL: 'https://next.acme.com',
           FORMIO_BASE_URL: 'https://forms.acme.com',
         },
       });

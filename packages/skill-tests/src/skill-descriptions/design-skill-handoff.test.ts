@@ -88,7 +88,7 @@ describe('the never-emit-unstyled-UI guarantee survives', () => {
   it('FRAMEWORK.md offers the install and forbids silent plain UI', () => {
     const { body } = skillDocument(FRAMEWORK_MD);
 
-    expect(body).toMatch(/Step 5a/);
+    expect(body).toMatch(/Step 4a/);
     expect(body).toMatch(/strongly recommended but not required/i);
     expect(body).toMatch(/do NOT silently emit plain UI/i);
   });

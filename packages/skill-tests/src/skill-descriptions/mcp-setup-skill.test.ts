@@ -146,11 +146,19 @@ describe('preflight contract', () => {
   // budget and by trigger-collision guards, so it must not move.
   //
   // The fixture is a deliberate snapshot, not an immutable law: when a change
-  // means to edit a description, it updates the fixture and says why. Two entries
-  // have moved since the snapshot was taken — formio-application dropped the
-  // sentence promising a `.mcp.json` write and a Claude Code restart, because the
-  // step that did that is gone; and formio-sdk dropped `Formio.builder` from its
-  // rendering clause, because the library no longer documents the form builder.
+  // means to edit a description, it updates the fixture and says why. Three
+  // entries have moved since the snapshot was taken — formio-application dropped
+  // the sentence promising a `.mcp.json` write and a Claude Code restart, because
+  // the step that did that is gone; formio-sdk dropped `Formio.builder` from its
+  // rendering clause, because the library no longer documents the form builder;
+  // and formio-mcp-setup now says it asks the server which project the directory
+  // resolves to and captures only the URL it reports missing, rather than offering
+  // to capture both, because the server owns that wording and the step probes
+  // before it asks.
+  //
+  // formio-mcp-setup was ADDED to the fixture by that same change. It postdated
+  // the original snapshot, so nothing was pinning the one description most likely
+  // to drift as the setup flow changed.
   it('left every existing description byte-identical', () => {
     const before = JSON.parse(readFileSync(descriptionSnapshot, 'utf8')) as Record<string, string>;
     const now = Object.fromEntries(

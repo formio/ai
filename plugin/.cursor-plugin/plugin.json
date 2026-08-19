@@ -15,21 +15,7 @@
   "mcpServers": {
     "formio-mcp": {
       "command": "npx",
-      "args": ["-y", "@formio/mcp@0.10.0"],
-      "env": {
-        "FORMIO_BASE_URL": "${FORMIO_BASE_URL}"
-      }
-    }
-  },
-  "variables": {
-    "type": "object",
-    "properties": {
-      "FORMIO_BASE_URL": {
-        "type": "string",
-        "title": "Form.io base URL",
-        "description": "Base URL of your Form.io deployment — the parent of the project URL. Leave the default for Form.io SaaS; set it to your host when self-hosting or running Form.io Enterprise.",
-        "default": "https://api.form.io"
-      }
+      "args": ["-y", "@formio/mcp@0.10.0"]
     }
   }
 }

@@ -34,21 +34,24 @@ describe('resolveProjectConfig', () => {
     }
   });
 
-  describe('environment wins over the project map', () => {
-    it('resolves the environment project URL despite a mapped entry for the cwd', () => {
+  // Precedence is by scope: a mapping is a statement about this directory, the
+  // environment a process-wide default. Both halves of the pair now resolve that
+  // way — the base URL always did, and the project URL used to resolve the other
+  // direction, so one pair resolved in two.
+  describe('the project map wins over the environment', () => {
+    it('resolves the mapped project URL despite an environment project URL', () => {
       writeProjectEntry('/workspace/pkg-a', {
         FORMIO_PROJECT_URL: 'https://mapped.form.io',
       });
 
       const cfg = resolveProjectConfig('/workspace/pkg-a', configWithEnvProject);
 
-      expect(cfg.projectUrl).toBe('https://from-env.form.io');
+      expect(cfg.projectUrl).toBe('https://mapped.form.io');
     });
 
-    // An explicit FORMIO_BASE_URL is part of the pin, so it outranks whatever
-    // deployment the mapping names — the pair the launch configuration declared
-    // travels together.
-    it('keeps the configured base URL when the environment supplies the project', () => {
+    // The mapped deployment outranks the environment's for the same reason its
+    // project does: it is the more specific statement about this directory.
+    it('prefers the mapped base URL over the configured one', () => {
       writeProjectEntry('/workspace/pkg-a', {
         FORMIO_PROJECT_URL: 'https://mysite.com/mapped',
         FORMIO_BASE_URL: 'https://mysite.com',
@@ -56,7 +59,7 @@ describe('resolveProjectConfig', () => {
 
       const cfg = resolveProjectConfig('/workspace/pkg-a', configWithEnvProject);
 
-      expect(cfg.baseUrl).toBe('https://api.form.io');
+      expect(cfg.baseUrl).toBe('https://mysite.com');
     });
 
     // A pin supplies a project, not a deployment. A self-hosted user who pins
@@ -79,27 +82,12 @@ describe('resolveProjectConfig', () => {
       expect(cfg.baseUrl).toBe('https://forms.mysite.com');
     });
 
-    // The borrow is gated on the two projects being the same one. A base URL
-    // belongs to a deployment, not to a directory: lending a self-hosted
-    // deployment to a pinned hosted project sends the portal login to the wrong
-    // host and caches the token under that host's key — the same silent failure
-    // the borrow was added to prevent, reached from the other side.
-    it('refuses to lend the mapped base URL to a different pinned project', () => {
-      writeProjectEntry('/workspace/pkg-other-project', {
-        FORMIO_PROJECT_URL: 'https://proj-a.mysite.com',
-        FORMIO_BASE_URL: 'https://forms.mysite.com',
-      });
-
-      const cfg = resolveProjectConfig('/workspace/pkg-other-project', {
-        apiKey: 'abc',
-        projectUrl: 'https://examples.form.io',
-      });
-
-      expect(cfg.projectUrl).toBe('https://examples.form.io');
-      expect(cfg.baseUrl).toBe('https://api.form.io');
-    });
-
-    it('resolves the environment project URL when no cwd is supplied', () => {
+    // The old "refuses to lend the mapped base URL to a different pinned project"
+    // guard is deleted rather than rewritten. It existed because a pinned project
+    // could differ from the mapped one while the mapped base URL was still
+    // consulted; now the mapping's project wins outright, so that combination is
+    // unreachable and there is nothing to gate.
+    it('resolves the environment project URL when nothing else supplies one', () => {
       const cfg = resolveProjectConfig(undefined, configWithEnvProject);
 
       expect(cfg.projectUrl).toBe('https://from-env.form.io');
@@ -122,7 +110,7 @@ describe('resolveProjectConfig', () => {
 
       const cfg = resolveProjectConfig('/workspace/pkg-a', configWithEnvProject);
 
-      expect(cfg.projectUrl).toBe('https://from-env.form.io');
+      expect(cfg.projectUrl).toBe('https://mapped.form.io');
     });
   });
 
@@ -275,54 +263,81 @@ describe('resolveProjectConfig', () => {
       vi.restoreAllMocks();
     });
 
-    it('is never read when the pin carries its own base URL', () => {
-      const cfg = resolveProjectConfig(
-        '/workspace/pkg-a',
-        { projectUrl: 'https://examples.form.io', baseUrl: 'https://api.form.io' },
-        { cacheDir }
-      );
-
-      expect(cfg.projectUrl).toBe('https://examples.form.io');
-      expect(cfg.baseUrl).toBe('https://api.form.io');
+    // Skipping an unreadable map used to be safe for an environment project URL,
+    // because the map was strictly lower precedence for that half. It is not safe
+    // now: the map outranks the environment for BOTH halves, so continuing past a
+    // file we cannot read could resolve a value the unreadable entry would have
+    // overridden — a silent wrong deployment, which is the whole failure class
+    // this ordering exists to close.
+    it('fails an environment project URL rather than skipping a map it cannot read', () => {
+      expect(() =>
+        resolveProjectConfig(
+          '/workspace/pkg-a',
+          { projectUrl: 'https://examples.form.io', baseUrl: 'https://api.form.io' },
+          { cacheDir }
+        )
+      ).toThrow(ProjectMapUnreadableError);
     });
 
-    // Consulted here, but only as a base-URL fallback: unreadable means "no
-    // mapped base URL", the same answer as no mapping, so the pin still resolves.
-    it('does not fail a pin that has no base URL of its own', () => {
-      const cfg = resolveProjectConfig(
-        '/workspace/pkg-a',
-        { projectUrl: 'https://examples.form.io' },
-        { cacheDir }
-      );
-
-      expect(cfg.projectUrl).toBe('https://examples.form.io');
-      expect(cfg.baseUrl).toBe('https://api.form.io');
+    it('fails an environment project URL with no base URL of its own too', () => {
+      expect(() =>
+        resolveProjectConfig(
+          '/workspace/pkg-a',
+          { projectUrl: 'https://examples.form.io' },
+          { cacheDir }
+        )
+      ).toThrow(ProjectMapUnreadableError);
     });
 
     // Through the caller's sink, not the process stream: the bin's project
     // command returns its whole outcome in a result object, and a note written
     // to stderr from here is the one part of it no caller and no test can see.
+    // The one case where skipping is provably safe: a committed file supplying
+    // BOTH URLs leaves the map nothing to decide, so an unreadable file cannot
+    // change the answer. The reason is still said out loud, because a broken map
+    // that nothing depends on today breaks every uncommitted directory tomorrow.
     it('reports the skipped map through the caller’s note sink', () => {
+      const workspace = fs.mkdtempSync(path.join(os.tmpdir(), 'formio-complete-'));
+      fs.mkdirSync(path.join(workspace, '.git'), { recursive: true });
+      fs.writeFileSync(
+        path.join(workspace, 'formio.json'),
+        JSON.stringify({
+          projectUrl: 'https://examples.form.io',
+          baseUrl: 'https://api.form.io',
+        })
+      );
       const notes: string[] = [];
 
-      resolveProjectConfig(
-        '/workspace/pkg-a',
-        { projectUrl: 'https://examples.form.io' },
-        { cacheDir, onNote: (message) => notes.push(message) }
+      const cfg = resolveProjectConfig(
+        workspace,
+        {},
+        {
+          cacheDir,
+          onNote: (message) => notes.push(message),
+        }
       );
 
+      expect(cfg.projectUrl).toBe('https://examples.form.io');
       expect(notes.join('\n')).toMatch(/projects\.json/);
       expect(vi.mocked(process.stderr.write)).not.toHaveBeenCalled();
+      fs.rmSync(workspace, { recursive: true, force: true });
     });
 
     it('falls back to stderr when the caller supplies no sink', () => {
-      resolveProjectConfig(
-        '/workspace/pkg-a',
-        { projectUrl: 'https://examples.form.io' },
-        { cacheDir }
+      const workspace = fs.mkdtempSync(path.join(os.tmpdir(), 'formio-complete-'));
+      fs.mkdirSync(path.join(workspace, '.git'), { recursive: true });
+      fs.writeFileSync(
+        path.join(workspace, 'formio.json'),
+        JSON.stringify({
+          projectUrl: 'https://examples.form.io',
+          baseUrl: 'https://api.form.io',
+        })
       );
 
+      resolveProjectConfig(workspace, {}, { cacheDir });
+
       expect(vi.mocked(process.stderr.write).mock.calls.join('')).toMatch(/projects\.json/);
+      fs.rmSync(workspace, { recursive: true, force: true });
     });
 
     // Where the map is the source of the project, the corruption still travels:
@@ -402,21 +417,22 @@ describe('resolveProjectConfig', () => {
     // A pin that never needed the map must not be failed by it — the same rule an
     // unreadable projects.json already follows. Unusable means "no mapped base
     // URL", which is the answer no mapping at all would have given.
-    it('does not fail a pinned launch that only borrows the base URL', () => {
+    // Previously this was tolerated: the entry's base URL was only a fallback for
+    // a pinned project, so an unusable one degraded to the default. Now the
+    // mapping outranks the environment for both halves, so an entry we cannot read
+    // could be hiding the value that should have won — and degrading silently to
+    // api.form.io is exactly the wrong-deployment failure to avoid.
+    it('fails rather than degrading an unusable mapped base URL to the default', () => {
       writeProjectEntry('/workspace/pkg-pin-bad-base', {
         FORMIO_PROJECT_URL: 'https://examples.form.io',
         FORMIO_BASE_URL: 'forms.mysite.com',
       });
-      const notes: string[] = [];
 
-      const cfg = resolveProjectConfig(
-        '/workspace/pkg-pin-bad-base',
-        { projectUrl: 'https://examples.form.io' },
-        { onNote: (message) => notes.push(message) }
-      );
-
-      expect(cfg.baseUrl).toBe('https://api.form.io');
-      expect(notes.join('\n')).toMatch(/FORMIO_BASE_URL/);
+      expect(() =>
+        resolveProjectConfig('/workspace/pkg-pin-bad-base', {
+          projectUrl: 'https://examples.form.io',
+        })
+      ).toThrow(/FORMIO_BASE_URL/);
     });
   });
 
@@ -540,8 +556,22 @@ describe('cwdSchema', () => {
     expect(cwdSchema.safeParse('/workspace/pkg-a').success).toBe(true);
   });
 
-  it('describes both ways to supply a project', () => {
+  // The description is read on every tool call, more reliably than the server's
+  // instructions, so it has to carry the SAME precedence the resolver
+  // implements. It used to say a FORMIO_PROJECT_URL in the environment "takes
+  // precedence over every mapping" and made cwd unnecessary — the pre-reorder
+  // model, and now backwards: the environment is the weakest source, so omitting
+  // cwd cannot be made safe by setting a variable.
+  it('names every source of a project, narrowest scope first', () => {
     expect(cwdSchema.description).toMatch(/project_set/);
     expect(cwdSchema.description).toMatch(/FORMIO_PROJECT_URL/);
+    expect(cwdSchema.description).toContain('formio.json');
+    expect(cwdSchema.description).toMatch(/weakest/i);
+  });
+
+  it('does not claim the environment pins the project or replaces cwd', () => {
+    expect(cwdSchema.description).not.toMatch(/\bpins?\b/i);
+    expect(cwdSchema.description).not.toMatch(/makes it unnecessary/i);
+    expect(cwdSchema.description).not.toMatch(/takes precedence over every mapping/i);
   });
 });

@@ -12,7 +12,7 @@ const form = await Formio.createForm(element, srcOrJson, options);
 
 ## Rendering by form URL
 
-Point `createForm` at a form living under your project URL (`{FORMIO_PROJECT_URL}/{formPath}`):
+Point `createForm` at a form living under your project URL (`{projectUrl}/{formPath}`):
 
 ```js
 const form = await Formio.createForm(

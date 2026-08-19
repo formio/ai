@@ -4,7 +4,7 @@ The PDF API covers everything a project admin does with PDF-backed forms: upload
 
 ## Root URL
 
-All endpoints below are rooted at `${FORMIO_PROJECT_URL}/pdf-proxy` — the project-proxied PDF server path. Direct PDF-server endpoints are not supported here.
+All endpoints below are rooted at `{projectUrl}/pdf-proxy` — the project-proxied PDF server path. Direct PDF-server endpoints are not supported here.
 
 ## Authentication
 
@@ -16,7 +16,7 @@ No MCP tool covers this operation — use the HTTP endpoint directly.
 
 ## Endpoints
 
-### POST ${FORMIO_PROJECT_URL}/pdf-proxy/upload
+### POST {projectUrl}/pdf-proxy/upload
 
 Upload a PDF template file to the project. The server parses form fields from the PDF (AcroForm fields) and returns a component skeleton plus a stable `file` UUID used to reference the PDF in subsequent calls.
 
@@ -50,10 +50,10 @@ Example:
 ```bash
 curl -X POST -H "x-jwt-token: $FORMIO_JWT" \
   -F "file=@w4.pdf" \
-  "${FORMIO_PROJECT_URL}/pdf-proxy/upload"
+  "{projectUrl}/pdf-proxy/upload"
 ```
 
-### GET ${FORMIO_PROJECT_URL}/pdf-proxy/pdf/:projectId/file
+### GET {projectUrl}/pdf-proxy/pdf/:projectId/file
 
 List all PDF uploads associated with the project. `:projectId` is the MongoDB ID of the current project — the proxy validates it matches the JWT's project context.
 
@@ -78,10 +78,10 @@ Example:
 
 ```bash
 curl -H "x-jwt-token: $FORMIO_JWT" \
-  "${FORMIO_PROJECT_URL}/pdf-proxy/pdf/$PROJECT_ID/file"
+  "{projectUrl}/pdf-proxy/pdf/$PROJECT_ID/file"
 ```
 
-### GET ${FORMIO_PROJECT_URL}/pdf-proxy/pdf/:projectId/file/:pdfFileName.html
+### GET {projectUrl}/pdf-proxy/pdf/:projectId/file/:pdfFileName.html
 
 Retrieve the rendered HTML representation of a specific uploaded PDF — used by the form builder to overlay components on the PDF visually.
 
@@ -94,7 +94,7 @@ Response: `text/html` document.
 
 Errors: `404` if the PDF does not exist; `401`/`403` for auth failures.
 
-### GET ${FORMIO_PROJECT_URL}/pdf-proxy/pdf/:projectId/file/:pdfFileName.pdf
+### GET {projectUrl}/pdf-proxy/pdf/:projectId/file/:pdfFileName.pdf
 
 Download the raw PDF binary.
 
@@ -106,11 +106,11 @@ Example:
 
 ```bash
 curl -H "x-jwt-token: $FORMIO_JWT" \
-  "${FORMIO_PROJECT_URL}/pdf-proxy/pdf/$PROJECT_ID/file/$PDF_FILE.pdf" \
+  "{projectUrl}/pdf-proxy/pdf/$PROJECT_ID/file/$PDF_FILE.pdf" \
   -o template.pdf
 ```
 
-### POST ${FORMIO_PROJECT_URL}/pdf-proxy/form
+### POST {projectUrl}/pdf-proxy/form
 
 Create a new PDF-display form tied to an uploaded PDF template. Equivalent to the standard form-create endpoint but routed via the PDF proxy so overlay metadata is validated against the referenced PDF.
 
@@ -144,7 +144,7 @@ Response: the created form document with server-assigned `_id`, `machineName`, `
 
 Errors: `400` for validation errors (missing overlay, bad PDF reference); `401`/`403` for auth failures.
 
-### POST ${FORMIO_PROJECT_URL}/pdf-proxy/form/:pdfFormId/submission
+### POST {projectUrl}/pdf-proxy/form/:pdfFormId/submission
 
 Create a submission against a PDF form. The submission is stored and optionally pre-renders data onto the PDF for later download.
 
@@ -166,7 +166,7 @@ Response: the created submission document (`_id`, `form`, `owner`, `data`, `crea
 
 Errors: `400` for validation errors against the form's component schema; `401`/`403` for auth failures; `404` if `:pdfFormId` does not exist.
 
-### POST ${FORMIO_PROJECT_URL}/pdf-proxy/pdf/:projectId/download
+### POST {projectUrl}/pdf-proxy/pdf/:projectId/download
 
 Create an ad-hoc PDF rendered from an inline form definition and submission — no stored form or submission required. Useful for one-off export workflows.
 
@@ -191,7 +191,7 @@ Response: `application/pdf` binary stream.
 
 Errors: `400` for invalid form/submission shape; `401`/`403` for auth failures.
 
-### GET ${FORMIO_PROJECT_URL}/pdf-proxy/token
+### GET {projectUrl}/pdf-proxy/token
 
 Mint a short-lived download token that grants GET access to a specific submission PDF without the caller's primary JWT. Used to embed download URLs in emails or front-end links.
 
@@ -216,10 +216,10 @@ Example:
 curl -H "x-jwt-token: $FORMIO_JWT" \
   -H "x-allow: GET:/project/$PROJECT_ID/form/$FORM_ID/submission/$SUB_ID/download" \
   -H "x-expire: 3600" \
-  "${FORMIO_PROJECT_URL}/pdf-proxy/token"
+  "{projectUrl}/pdf-proxy/token"
 ```
 
-### GET ${FORMIO_PROJECT_URL}/pdf-proxy/form/:pdfFormId/submission/:pdfSubmissionId/download
+### GET {projectUrl}/pdf-proxy/form/:pdfFormId/submission/:pdfSubmissionId/download
 
 Download a specific submission rendered onto its PDF template.
 
@@ -234,11 +234,11 @@ Errors: `401`/`403` if neither a valid JWT nor a valid token is supplied; `404` 
 Example:
 
 ```bash
-curl "${FORMIO_PROJECT_URL}/pdf-proxy/form/$FORM_ID/submission/$SUB_ID/download?token=$DOWNLOAD_TOKEN" \
+curl "{projectUrl}/pdf-proxy/form/$FORM_ID/submission/$SUB_ID/download?token=$DOWNLOAD_TOKEN" \
   -o submission.pdf
 ```
 
-### DELETE ${FORMIO_PROJECT_URL}/pdf-proxy/pdf/:projectId/file/:pdfFileName
+### DELETE {projectUrl}/pdf-proxy/pdf/:projectId/file/:pdfFileName
 
 Delete a specific PDF upload. Forms still referencing the PDF will fail to render until their `settings.pdf.id` is updated.
 
@@ -250,7 +250,7 @@ Example:
 
 ```bash
 curl -X DELETE -H "x-jwt-token: $FORMIO_JWT" \
-  "${FORMIO_PROJECT_URL}/pdf-proxy/pdf/$PROJECT_ID/file/$PDF_FILE"
+  "{projectUrl}/pdf-proxy/pdf/$PROJECT_ID/file/$PDF_FILE"
 ```
 
 ## Related Skills

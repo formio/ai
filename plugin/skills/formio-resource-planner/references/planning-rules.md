@@ -8,7 +8,7 @@ Form.io has two kinds of entries — Resources and Forms. Decide the kind for ev
 
 ### Resource — the data model (a "noun")
 
-A **Resource** defines, displays, and stores a structured record. Resources are the nouns of the application — `Contact`, `Product`, `Project`, `Task`, `Applicant`. Each Resource auto-generates a REST API (`GET/POST/PUT/DELETE ${FORMIO_PROJECT_URL}/<path>`), so the set of Resources is effectively the application's database — a structured, queryable backend much like Firebase. Reach for a Resource when:
+A **Resource** defines, displays, and stores a structured record. Resources are the nouns of the application — `Contact`, `Product`, `Project`, `Task`, `Applicant`. Each Resource auto-generates a REST API (`GET/POST/PUT/DELETE {projectUrl}/<path>`), so the set of Resources is effectively the application's database — a structured, queryable backend much like Firebase. Reach for a Resource when:
 
 - The data is a persistent record other parts of the app read, reference, or report on.
 - Other entities point at it (it is the target of a reference `select` — a foreign key).

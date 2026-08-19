@@ -1,5 +1,7 @@
 # Interview guide — rounds 2–4, guard decisions, heuristics
 
+> **`FormioAppConfig` renames both URLs.** `appUrl` is the **Project URL** — the project this application reads and writes, and the one value anyone supplies. `apiUrl` is the **Base URL** — the deployment hosting it, which is normally derived from the Project URL rather than supplied. Take both from `npx -y @formio/mcp@0.10.0 project get --cwd "<workspace root>"`; never compose, derive, or hand-type either one yourself.
+
 Companion to `../SKILL.md`'s "The interview": the full question wording for round 1, the checklists for rounds 2–4, the template-pair reading guide, the Access Matrix guard-decision rules, and the heuristics for compressing or skipping rounds.
 
 ## Round 1 — Confirm workspace context (direct invocation only — skipped in handoff mode)
@@ -7,7 +9,7 @@ Companion to `../SKILL.md`'s "The interview": the full question wording for roun
 Ask in ONE question round, using the client's structured question mechanism (in Claude Code, `AskUserQuestion`):
 
 1. **New or existing Angular workspace?** If existing: path to the workspace root (should contain `angular.json`). If new: the desired app name (kebab-case).
-2. **Form.io project URL** (`FORMIO_PROJECT_URL`) — the value that goes into `FormioAppConfig.appUrl`. Same value as the one the `formio-api` skill use. For an existing workspace, read it from `src/app/config.ts` first and just confirm; only ask when the file is absent or holds a placeholder. It is acceptable for the user to fill this in later; if so, emit a placeholder `YOUR_FORMIO_PROJECT_URL` and call it out in Phase A.
+2. **Form.io project URL** (`projectUrl`) — the value that goes into `FormioAppConfig.appUrl`. Not a question to ask: resolve it with `npx -y @formio/mcp@0.10.0 project get --cwd "<workspace root>"` and reconcile against `src/app/config.ts`, asking only for whichever value that command reports missing.
 3. **Design language** — what the ViewComponent templates should lean on: **Bootstrap 5** (matches angular-demo, default), **Tailwind**, **Material** (`@angular/material`), **the workspace's existing design system** (for existing workspaces, read their styles and match), or **unstyled HTML** (minimum viable, user will restyle). The routing shape is the same regardless; only the template classes and markup change.
 
 ## Reading the template pair

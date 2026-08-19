@@ -4,7 +4,7 @@ The Project Roles API lets a project admin manage the roles that govern access i
 
 ## Root URL
 
-All endpoints below are rooted at `${FORMIO_PROJECT_URL}` — the project endpoint, equivalent to `{{baseUrl}}/{{projectName}}` in Postman.
+All endpoints below are rooted at `{projectUrl}` — the project endpoint, equivalent to `{{baseUrl}}/{{projectName}}` in Postman.
 
 ## Authentication
 
@@ -14,15 +14,15 @@ Every request to these endpoints MUST include an `x-jwt-token` header holding th
 
 Prefer the MCP server's first-party tools when they cover the requested operation. Call the HTTP endpoint directly only when no MCP tool applies.
 
-| Operation      | Preferred MCP tool | Fallback endpoint                        |
-| -------------- | ------------------ | ---------------------------------------- |
-| List all roles | `role_list`        | `GET ${FORMIO_PROJECT_URL}/role`         |
-| Create a role  | `role_create`      | `POST ${FORMIO_PROJECT_URL}/role`        |
-| Update a role  | `role_update`      | `PUT ${FORMIO_PROJECT_URL}/role/:roleId` |
+| Operation      | Preferred MCP tool | Fallback endpoint               |
+| -------------- | ------------------ | ------------------------------- |
+| List all roles | `role_list`        | `GET {projectUrl}/role`         |
+| Create a role  | `role_create`      | `POST {projectUrl}/role`        |
+| Update a role  | `role_update`      | `PUT {projectUrl}/role/:roleId` |
 
 ## Endpoints
 
-### GET ${FORMIO_PROJECT_URL}/role
+### GET {projectUrl}/role
 
 List every role defined in the project, including built-in roles (`Administrator`, `Authenticated`, `Anonymous`) and any custom roles the admin has created.
 
@@ -48,10 +48,10 @@ Example:
 
 ```bash
 curl -H "x-jwt-token: $FORMIO_JWT" \
-  "${FORMIO_PROJECT_URL}/role"
+  "{projectUrl}/role"
 ```
 
-### POST ${FORMIO_PROJECT_URL}/role
+### POST {projectUrl}/role
 
 Create a new role inside the project.
 
@@ -89,10 +89,10 @@ Example:
 ```bash
 curl -X POST -H "x-jwt-token: $FORMIO_JWT" -H "Content-Type: application/json" \
   -d '{"title":"Employee","description":"A person who belongs to a company."}' \
-  "${FORMIO_PROJECT_URL}/role"
+  "{projectUrl}/role"
 ```
 
-### PUT ${FORMIO_PROJECT_URL}/role/:roleId
+### PUT {projectUrl}/role/:roleId
 
 Update an existing role. This is a full replacement — include every field you want to preserve.
 
@@ -120,7 +120,7 @@ Example:
 ```bash
 curl -X PUT -H "x-jwt-token: $FORMIO_JWT" -H "Content-Type: application/json" \
   -d '{"title":"Employee","description":"A person who belongs to a company."}' \
-  "${FORMIO_PROJECT_URL}/role/69d68310040fa2cea2572945"
+  "{projectUrl}/role/69d68310040fa2cea2572945"
 ```
 
 ## Related Skills

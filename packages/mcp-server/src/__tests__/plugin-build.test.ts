@@ -10,10 +10,12 @@ const SERVER_BUNDLE = path.join(DIST_PLUGIN, 'server/stdio.mjs');
 const SKILLS_DIR = path.join(DIST_PLUGIN, 'skills');
 const PLUGIN_SRC_README = path.join(REPO_ROOT, 'plugin/README.md');
 const DIST_README = path.join(DIST_PLUGIN, 'README.md');
+// FORMIO_DEFAULT_PROJECT_URL is gone: the environment is the weakest resolution
+// source, so a project set there already suggests without pinning, which is what
+// the separate offering variable existed to guarantee.
 const REQUIRED_ENV_VARS = [
   'FORMIO_BASE_URL',
   'FORMIO_PROJECT_URL',
-  'FORMIO_DEFAULT_PROJECT_URL',
   'FORMIO_API_KEY',
   'FORMIO_LOGIN_FORM',
 ] as const;
@@ -307,13 +309,18 @@ describe('pnpm test:plugin — smoke test', () => {
       }
     }, 60_000);
 
+    // Driven by ADDING an undeclared placeholder rather than deleting a
+    // declaration: the manifest now prompts for nothing, so there is no
+    // declaration left to delete — and the invariant that matters is still that a
+    // placeholder without a declaration is caught, which Cursor rejects at
+    // submission.
     it('3.6 exits non-zero when the Cursor variables and placeholders disagree', () => {
       const target = path.join(DIST_PLUGIN, '.cursor-plugin/plugin.json');
       const original = fs.readFileSync(target, 'utf8');
       const manifest = JSON.parse(original) as {
-        variables: { properties: Record<string, unknown> };
+        mcpServers: Record<string, { env?: Record<string, string> }>;
       };
-      delete manifest.variables.properties.FORMIO_BASE_URL;
+      manifest.mcpServers['formio-mcp'].env = { FORMIO_BASE_URL: '${FORMIO_BASE_URL}' };
       fs.writeFileSync(target, JSON.stringify(manifest, null, 2));
       try {
         const { status, stdout, stderr } = runSmokeTest();

@@ -1,5 +1,7 @@
 # AUTH — `AuthModule` and `FormioAuthConfig` wiring
 
+> **`FormioAppConfig` renames both URLs.** `appUrl` is the **Project URL** — the project this application reads and writes, and the one value anyone supplies. `apiUrl` is the **Base URL** — the deployment hosting it, which is normally derived from the Project URL rather than supplied. Take both from `npx -y @formio/mcp@0.10.0 project get --cwd "<workspace root>"`; never compose, derive, or hand-type either one yourself.
+
 This document is loaded by the parent `formio-angular` skill during Phase 4. It is **not** a standalone skill — no frontmatter, no independent trigger. The parent reads it after CONFIG has been approved and before delegating to the resource sub-skill.
 
 ## Skip-if-already-wired detection
@@ -410,8 +412,8 @@ Auth values derived from template.md (confirmed against template.json)
   login form path:     <LOGIN_FORM_PATH>          (template.json.forms[*].path — GOES INTO config.login.form)
   register form name:  <REGISTER_FORM_NAME>       (template.json.forms[*].name — NOT used in config)
   register form path:  <REGISTER_FORM_PATH>       (template.json.forms[*].path — GOES INTO config.register.form)
-  app.appUrl:          <FORMIO_PROJECT_URL>       (same value as FormioAppConfig.appUrl from CONFIG)
-  app.apiUrl:          <FORMIO_BASE_URL>          (same value as FormioAppConfig.apiUrl from CONFIG)
+  app.appUrl:          <projectUrl>       (same value as FormioAppConfig.appUrl from CONFIG)
+  app.apiUrl:          <baseUrl>          (same value as FormioAppConfig.apiUrl from CONFIG)
   roles:               [<ROLE_1>, <ROLE_2>, ...]
 
 Files to create

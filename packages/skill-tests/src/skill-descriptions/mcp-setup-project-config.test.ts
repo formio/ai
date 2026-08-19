@@ -6,12 +6,11 @@ import { readFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
-import { allSkillDocuments, skillDocument } from './helpers.js';
+import { allSkillDocuments, liveSkillDocuments, skillDocument } from './helpers.js';
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../../../..');
 
 const SETUP_MD = 'plugin/skills/formio-mcp-setup/SKILL.md';
-const DEPLOYMENT_MD = 'plugin/skills/formio-application/DEPLOYMENT.md';
 
 const setupBody = () => skillDocument(SETUP_MD).body;
 
@@ -36,34 +35,41 @@ describe('the setup skill captures the project configuration', () => {
     expect(body).toMatch(/never edit .*projects\.json|not edit .*projects\.json/i);
   });
 
-  it('refuses to pin the project through a client config env block', () => {
+  // Keeping FORMIO_PROJECT_URL out of a client env block is still right, but the
+  // REASON changed with the resolution order: it is the wrong scope for the value
+  // — one global answer for every directory the client opens — not a pin. The
+  // environment is the weakest source, so a value there is overridden by a
+  // committed formio.json and by any project_set mapping.
+  it('keeps the project URL out of a client config env block on scope grounds', () => {
     const body = setupBody();
 
-    expect(body).toMatch(/precedence/i);
     expect(body).toMatch(/FORMIO_PROJECT_URL/);
+    expect(body).toMatch(/env.*block/i);
+    expect(body).toMatch(/scope|one project for every directory|wrong place/i);
   });
 
-  // The two variables resolve in opposite directions — the environment wins for
-  // the project URL, the mapping wins for the base URL — and every shipped
-  // manifest sets FORMIO_BASE_URL in its env block. Stating one rule for both
-  // makes an agent "fix" a correct plugin install by stripping the variable.
-  it('does not extend the project-URL precedence rule to the base URL', () => {
+  // The inverted claim is the one that does real damage: an agent reading it
+  // abandons the project_set repair that now works, and tells the user their
+  // directory cannot be redirected.
+  it('never claims the environment outranks the mapping or defeats project_set', () => {
     const body = setupBody();
-    const precedenceParagraph = body
-      .split('\n')
-      .filter((line) => /precedence/i.test(line))
-      .join('\n');
 
-    expect(precedenceParagraph).not.toMatch(/FORMIO_BASE_URL/);
+    expect(body).not.toMatch(/takes? \*\*precedence\*\* over the mapping/i);
+    expect(body).not.toMatch(/takes? precedence over the mapping/i);
+    expect(body).not.toMatch(/pins the server to one project/i);
+    expect(body).not.toMatch(/silently do nothing/i);
+    expect(body).not.toMatch(/that pin is real/i);
   });
 
-  it('says the mapping wins for the base URL', () => {
-    const baseUrlParagraph = setupBody()
-      .split('\n\n')
-      .find((paragraph) => paragraph.includes('FORMIO_BASE_URL') && /wins/i.test(paragraph));
+  // Both URLs resolve in the SAME order now — committed file, mapping,
+  // environment. The skill used to call FORMIO_BASE_URL "the opposite", which was
+  // true only under the old split order.
+  it('states one resolution order for both URLs', () => {
+    const body = setupBody();
 
-    expect(baseUrlParagraph, 'no paragraph explains that a mapped base URL wins').toBeDefined();
-    expect(baseUrlParagraph).toMatch(/mapp(ed|ing)/i);
+    expect(body).not.toMatch(/resolves the other way round/i);
+    expect(body).not.toMatch(/is the opposite/i);
+    expect(body).toMatch(/weakest/i);
   });
 
   // `project get` runs in the agent's shell. A plugin-launched server has its own
@@ -77,11 +83,32 @@ describe('the setup skill captures the project configuration', () => {
     expect(setupBody()).toMatch(/@formio\/mcp\S*\s+project get/);
   });
 
-  it('asks for both URLs in one round and defers wording to DEPLOYMENT.md', () => {
+  it("relays the server's message instead of carrying its own URL wording", () => {
     const body = setupBody();
 
-    expect(body).toMatch(/one question round|ONE question round/);
-    expect(body).toContain('DEPLOYMENT.md');
+    // The server owns this guidance now: its instructions and its errors carry the
+    // shapes and the remedy, and they reach an agent that never read this skill.
+    // A second copy here is the drift that removing the copies was meant to end.
+    expect(body).toMatch(/relay/i);
+    expect(body).not.toMatch(/three valid shapes/i);
+    expect(body).not.toContain('DEPLOYMENT.md');
+  });
+
+  it('probes with project get before interviewing', () => {
+    const body = setupBody();
+    const probeIndex = body.indexOf('project get');
+    const askIndex = body.search(/ask for the \*\*single value it names\*\*|relay that message/i);
+
+    expect(probeIndex).toBeGreaterThan(-1);
+    expect(askIndex).toBeGreaterThan(probeIndex);
+  });
+
+  it('asks for one value at a time, with either flag alone a valid update', () => {
+    const body = setupBody();
+
+    expect(body).toMatch(/single value it names/i);
+    expect(body).toContain('--base-url');
+    expect(body).toMatch(/[Ee]ither flag alone/);
   });
 });
 
@@ -266,127 +293,79 @@ describe('every documented invocation pins the server version', () => {
   // `project get` have to state it, or a zero-exit run printing nothing reads as
   // a real answer.
   it('tells the reader that empty output is not an answer', () => {
-    for (const doc of [SETUP_MD, DEPLOYMENT_MD]) {
+    for (const doc of [SETUP_MD]) {
       expect(skillDocument(doc).body, doc).toMatch(/empty output is not|prints nothing/i);
     }
   });
 });
 
-describe('Deployment resolves before it asks', () => {
-  it('checks for an existing mapping first', () => {
-    const { body } = skillDocument(DEPLOYMENT_MD);
-    const resolveIndex = body.search(/resolve before you ask/i);
-    const interviewIndex = body.search(/Run the interview/i);
-
-    expect(resolveIndex).toBeGreaterThan(-1);
-    expect(resolveIndex).toBeLessThan(interviewIndex);
-  });
-
-  it('confirms in one line instead of interviewing when one resolves', () => {
-    const { body } = skillDocument(DEPLOYMENT_MD);
-
-    expect(body).toMatch(/confirm/i);
-    expect(body).toMatch(/one line/i);
-  });
-
-  it('passes baseUrl to project_set and says why', () => {
-    const { body } = skillDocument(DEPLOYMENT_MD);
-
-    expect(body).toMatch(/project_set\(\{[^}]*baseUrl/);
-    expect(body).toMatch(/login/i);
-  });
-
-  // "Check whether the directory is mapped" is not actionable on its own: no MCP
-  // tool reads the map, and this document forbids reading the file. Without the
-  // command named here, the step is skipped or the JSON is read by hand.
-  it('names the command that reads the mapping', () => {
-    const { body } = skillDocument(DEPLOYMENT_MD);
-    const resolveSection = body.slice(
-      body.search(/resolve before you ask/i),
-      body.search(/## Plain-language descriptions/i)
+// The URL interview is gone. What replaces it is a probe every tool-calling skill
+// runs, and a server whose errors are answerable on their own — so the assertions
+// move from "does the document explain the shapes" to "does the document delegate".
+describe('the skills delegate project resolution to the server', () => {
+  const probing = () =>
+    liveSkillDocuments().filter(
+      (doc) =>
+        doc.path.endsWith('/SKILL.md') &&
+        !doc.path.includes('formio-mcp-setup') &&
+        !doc.path.includes('formio-resource-planner')
     );
 
-    expect(resolveSection).toContain('project get');
+  it('every tool-calling skill names the read surface', () => {
+    const offenders = probing()
+      .filter((doc) => !doc.body.includes('project get'))
+      .map((doc) => doc.path);
+
+    expect(offenders).toEqual([]);
   });
 
-  // On the hosted SaaS the Base URL is always https://api.form.io and the project
-  // is a *.form.io sub-domain. Deriving the base URL from the project's own origin
-  // contradicts that, and project_set persists the result — keying the token cache
-  // per project and pointing the login URL at the project sub-domain.
-  it('derives the hosted cloud base URL for a project subdomain', () => {
-    const { body } = skillDocument(DEPLOYMENT_MD);
-    const derivationSection = body.slice(
-      body.search(/### If only the Project URL is known/i),
-      body.search(/## Validation/i)
-    );
-    const derivationRow = derivationSection
-      .split('\n')
-      .find((line) => line.startsWith('|') && /https:\/\/\w+\.form\.io`?\s*\|/.test(line));
+  it('no skill document explains the URL shapes itself', () => {
+    const offenders = liveSkillDocuments()
+      .filter((doc) => /three valid shapes/i.test(doc.body))
+      .map((doc) => doc.path);
 
-    expect(derivationRow, 'no derivation row for a *.form.io project URL').toBeDefined();
-    expect(derivationRow).toContain('https://api.form.io');
+    expect(offenders).toEqual([]);
   });
 
-  // Three shapes, and only three. The failures this guards are a doc that offers
-  // a *.form.io host as a Base URL, api.form.io/<project> as a hosted Project
-  // URL, or — the one added last — a customer deployment whose projects live on
-  // sibling sub-domains rather than sub-directories.
-  it('states all three valid URL shapes and rules out the wrong ones', () => {
-    const { body } = skillDocument(DEPLOYMENT_MD);
+  it('no skill document derives a base URL itself', () => {
+    const offenders = liveSkillDocuments()
+      .filter((doc) => /not derivable/i.test(doc.body))
+      .map((doc) => doc.path);
 
-    expect(body).toMatch(/always\s+\*?\*?`?https:\/\/api\.form\.io/i);
-    expect(body).toMatch(/three valid shapes/i);
-    expect(body).toMatch(/sub-?domain project routing/i);
-    expect(body).toMatch(/sub-?director(y|ies) project routing/i);
-    expect(body).toMatch(/is \*\*never\*\* a Base URL|is never a Base URL/i);
+    expect(offenders).toEqual([]);
   });
 
-  // A project on a sibling sub-domain shares nothing with the deployment host but
-  // the parent domain, so an origin-derived Base URL is wrong there in exactly the
-  // way it is wrong on SaaS. The doc has to say so and send the agent to ask.
-  it('refuses to derive a base URL for a customer sub-domain project', () => {
-    const { body } = skillDocument(DEPLOYMENT_MD);
-    const derivationSection = body.slice(
-      body.search(/### If only the Project URL is known/i),
-      body.search(/## Validation/i)
-    );
+  it('DEPLOYMENT.md is gone and nothing links to it', () => {
+    const offenders = liveSkillDocuments()
+      .filter((doc) => doc.body.includes('DEPLOYMENT.md'))
+      .map((doc) => doc.path);
 
-    expect(derivationSection).toContain('https://myproject.mysite.com');
-    expect(derivationSection).toMatch(/not derivable|cannot be derived/i);
-    expect(derivationSection).toMatch(/ask for the Base URL/i);
-  });
-
-  // The check that came with the two-shape version rejected the sub-domain shape
-  // outright: it required a non-SaaS project URL to be a path under the base URL.
-  it('does not treat differing hosts as an error in the sub-domain shape', () => {
-    const { body } = skillDocument(DEPLOYMENT_MD);
-    const validationSection = body.slice(body.search(/## Validation/i));
-
-    expect(validationSection).toMatch(/SUPPOSED to differ|differ by design/i);
-    expect(validationSection).toMatch(/parent domain/i);
+    expect(offenders).toEqual([]);
   });
 });
 
-// Step 3 is the only place the working directory gets mapped to a project.
-// Skipping it wholesale on modify-existing left the server with no project at
-// all, and Step 4's project_import threw after the user had already approved it.
-describe('the modify-existing branch still maps the directory', () => {
+// Both branches resolve the configuration in the Preflight. Skipping it on
+// modify-existing left the server with no project at all, and the import threw
+// after the user had already approved it — a workspace's own FormioAppConfig is
+// not the mapping project_import resolves against.
+describe('both orchestrator branches resolve the mapping', () => {
   const orchestrator = () => skillDocument('plugin/skills/formio-application/SKILL.md').body;
 
-  it('calls project_set from the FormioAppConfig values rather than only stashing them', () => {
+  it('resolves the configuration in the preflight rather than in a step', () => {
     const body = orchestrator();
-    const skipSentence = body
+
+    expect(body).toMatch(/## Preflight/);
+    expect(body).toContain('project get');
+    expect(body).not.toMatch(/### Step \d[\w.]* — Deployment/);
+  });
+
+  it('states that modify-existing resolves it too', () => {
+    const body = orchestrator();
+    const modifyLines = body
       .split('\n')
       .filter((line) => line.includes('FormioAppConfig'))
       .join('\n');
 
-    expect(skipSentence).toContain('project_set');
-  });
-
-  it('says what is skipped is the interview, not the mapping', () => {
-    const { body } = skillDocument(DEPLOYMENT_MD);
-    const skipSection = body.slice(body.search(/## Skip conditions/i));
-
-    expect(skipSection).toContain('project_set');
+    expect(modifyLines).toMatch(/project get|mapping/i);
   });
 });

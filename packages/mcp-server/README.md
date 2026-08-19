@@ -41,7 +41,7 @@ The same stdio entry works everywhere, but the file it goes in **and the key it 
 }
 ```
 
-Every tool that reaches Form.io needs a project: either `FORMIO_PROJECT_URL` in the environment, or a per-directory mapping written by the `project_set` tool (the environment wins when both exist). `FORMIO_BASE_URL` is optional and defaults to `https://api.form.io`, so set it when self-hosting. The Claude Code plugin collects both through user-config and the per-cwd `~/.formio/projects.json` mapping; other clients set the environment or call `project_set`.
+Every tool that reaches Form.io needs a project. It can come from a committed `formio.json`, from a per-directory mapping written by the `project_set` tool, or from `FORMIO_PROJECT_URL` in the environment — in that order, narrowest scope first, so a mapping overrides the environment and a committed file overrides both. `FORMIO_BASE_URL` is optional and usually unnecessary: the base URL is derived from the project URL's shape — `https://api.form.io` for a project on a `form.io` host, the parent path for a sub-directory-routed one — and is asked for only when it cannot be derived. No plugin manifest prompts for either value; every client records them per directory with `project_set` or a committed `formio.json`, and the `.mcpb` desktop bundle is the one exception because a desktop host has no working directory to interview in.
 
 The server starts without either one, so a client can connect and list the tools before anything is configured — the project URL is only demanded at the point a tool needs it, and `hello` works regardless.
 
@@ -214,7 +214,7 @@ The bundled `@formio/mcp` server exposes these tools. Skills prefer these over r
 | --- | --- |
 | `project_export` | Export the project's complete template (roles, resources, forms, actions) as a portable JSON document. Use before `project_import` to snapshot. |
 | `project_import` | Import a template JSON — additively merges roles, resources, forms, and actions in one call. **Same-machine-name items are overwritten in place; everything else is preserved.** |
-| `project_set` | Persist a per-cwd Project URL mapping in `~/.formio/projects.json`, so one server can serve several workspaces. Registered in every client. An explicit `FORMIO_PROJECT_URL` in the server environment takes precedence over the mapping. |
+| `project_set` | Persist a Project URL for a directory — in `~/.formio/projects.json` by default, or in a committed `formio.json` with `scope: "repo"`, so the target travels with the code. One server can serve several workspaces. Registered in every client. A mapping written here overrides `FORMIO_PROJECT_URL` in the server environment, which is the weakest source. |
 
 ### Diagnostic
 
@@ -262,9 +262,11 @@ If no login arrives within `FORMIO_AUTH_TIMEOUT` seconds (default 900) the call 
 
 When `FORMIO_LOGIN_FORM` is unset, the server probes these candidates on the first login attempt and caches the first one that responds (1.5-second timeout per candidate):
 
-1. `${FORMIO_BASE_URL}/formio/user/login` (portal-base)
-2. `${FORMIO_PROJECT_URL}/admin/login` (project admin)
-3. `${FORMIO_PROJECT_URL}/user/login` (project user)
+1. `{baseUrl}/formio/user/login` (portal-base)
+2. `{projectUrl}/admin/login` (project admin)
+3. `{projectUrl}/user/login` (project user)
+
+`{baseUrl}` and `{projectUrl}` are the RESOLVED values — whatever `project get` reports for that directory — not the environment variables of similar name.
 
 The probe runs lazily — only when the local auth page is actually served.
 
@@ -274,9 +276,8 @@ The probe runs lazily — only when the local auth page is actually served.
 
 | Name | Required | Default | Purpose | Hosted SaaS example | Self-hosted example |
 | --- | :-: | --- | --- | --- | --- |
-| `FORMIO_PROJECT_URL` | yes\* | — | Full URL of your Form.io project. Takes precedence over any per-directory mapping written by `project_set`. Self-hosted, it is a sub-directory of the deployment or a sub-domain of your own domain (`https://myproject.example.com`), depending on how that deployment routes projects. | `https://myproject.form.io` | `https://forms.example.com/myproject` |
-| `FORMIO_DEFAULT_PROJECT_URL` | no | — | A project URL to **offer**, not to apply. When set and the working directory has no mapping, the server names it as the suggested project so the agent can confirm it and persist it with `project_set`. It never changes what a tool resolves — the opposite of `FORMIO_PROJECT_URL`, which pins the server and cannot be redirected by `project_set`. |
-| `FORMIO_BASE_URL` | no | `https://api.form.io` | Full base URL of your Form.io deployment — always `https://api.form.io` on the hosted cloud, never a project's `*.form.io` sub-domain. Set it when self-hosting. | `https://api.form.io` | `https://forms.example.com` |
+| `FORMIO_PROJECT_URL` | yes\* | — | Full URL of your Form.io project. The WEAKEST of the three sources: a committed `formio.json` found by walking up from the working directory wins, then a per-directory mapping written by `project_set`, then this. Self-hosted, it is a sub-directory of the deployment or a sub-domain of your own domain (`https://myproject.example.com`), depending on how that deployment routes projects. | `https://myproject.form.io` | `https://forms.example.com/myproject` |
+| `FORMIO_BASE_URL` | no | derived, see note | Full base URL of your Form.io deployment. Normally DERIVED from the project URL rather than set — `https://api.form.io` for a project on a `form.io` host, the parent path for a project addressed as a sub-directory. Supply it only for a project URL with no path on your own domain, whose deployment cannot be derived. The weakest of three sources: a committed `formio.json` wins, then the per-directory mapping, then this. On the hosted cloud it is always `https://api.form.io`, never a project's `*.form.io` sub-domain. | `https://api.form.io` | `https://forms.example.com` |
 | `FORMIO_API_KEY` | no | `undefined` | Long-lived project API key. When set, the server skips the browser login flow — the only way to authenticate on a host with no browser. | `CHANGEME` | `CHANGEME` |
 | `FORMIO_LOGIN_FORM` | no | Auto-resolved | Override the portal login form URL used by the JWT login flow. | `https://formio.form.io/user/login` | `https://forms.example.com/formio/user/login` |
 | `FORMIO_AUTH_HOST` | no | `127.0.0.1` | Bind address for the browser-login page. `0.0.0.0` makes it reachable from outside a container. |  |  |
@@ -285,7 +286,7 @@ The probe runs lazily — only when the local auth page is actually served.
 | `FORMIO_INSECURE_TLS` | no | `undefined` | Set to `1` to skip TLS verification. Local development only — never against production. |  |  |
 | `FORMIO_FORCE_BROWSER` | no | `0` | Set to `1` to attempt the browser login even where the server detects no browser (CI, a container, SSH with no display). |  |  |
 
-<sub>\* Not at startup — the server starts, lists every tool, and answers `hello` without it; only the tools that read or write Form.io data error, naming `project_set` and this variable. The alternative is the `project_set` tool, which maps a working directory to a project in `~/.formio/projects.json`. Resolution order: `FORMIO_PROJECT_URL`, then the mapping for the caller's `cwd`, then the error. Map a directory before any client connects with `npx -y @formio/mcp@0.10.0 project set --project-url <url> --base-url <url> --cwd <path>`; `project get --cwd <path>` prints what resolves and which source won. It exits `0` when it resolved, `1` when nothing is mapped for that directory, and `2` when the command could not answer (a usage error, a malformed URL, an unreadable `~/.formio/projects.json`) — so a caller can tell "nothing here yet" from "this failed".</sub>
+<sub>\* Not at startup — the server starts, lists every tool, and answers `hello` without it; only the tools that read or write Form.io data error, naming `project_set` and this variable. The alternative is the `project_set` tool, which maps a working directory to a project in `~/.formio/projects.json`. Resolution runs by scope, narrowest first: a committed `formio.json` found by walking up from the caller's `cwd`, then the mapping for that `cwd`, then `FORMIO_PROJECT_URL` in the environment as the weakest source, then the error. Map a directory before any client connects with `npx -y @formio/mcp@0.10.0 project set --project-url <url> --base-url <url> --cwd <path>`; `project get --cwd <path>` prints what resolves and which source won. It exits `0` when it resolved, `1` when nothing is mapped for that directory, and `2` when the command could not answer (a usage error, a malformed URL, an unreadable `~/.formio/projects.json`) — so a caller can tell "nothing here yet" from "this failed".</sub>
 
 ---
 

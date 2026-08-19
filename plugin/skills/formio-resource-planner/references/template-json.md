@@ -94,7 +94,7 @@ See `formio-resource-planner/SKILL.md` → "Resources vs. Forms — the core mod
   "title": "Human Readable Title",
   "type": "resource",              // or "form"
   "name": "machineName",           // matches the map key; camelCase
-  "path": "url-path",              // kebab-case; served at ${FORMIO_PROJECT_URL}/<path>
+  "path": "url-path",              // kebab-case; served at {projectUrl}/<path>
   "tags": [],                      // freeform, often ["join"] for join resources
   "components": [ /* ... */ ],
   "access":           [ /* ... */ ],

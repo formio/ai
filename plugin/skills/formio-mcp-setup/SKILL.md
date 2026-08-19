@@ -1,7 +1,7 @@
 ---
 name: formio-mcp-setup
 description: >-
-  Connects the Form.io MCP server (`@formio/mcp`) to whatever coding agent is running, so the Form.io skills have tools to call. Use when a Form.io skill's preflight finds the MCP tools missing, when Form.io tool calls fail because no Form.io tools are available, or when the user asks to install, connect, configure, or fix the Form.io MCP server. Also use when the user has installed the Form.io skills on their own but nothing has wired the server yet. Writes the MCP configuration for every supported client in one pass — Claude Code, Cursor, VS Code, Codex — behind an approval gate, then offers to capture the Form.io Project URL and Base URL so the first tool call works, and tells the user how to reload. Not for: authenticating to Form.io (see `formio-auth`); building anything with Form.io — return to the skill that sent you here once the server is connected.
+  Connects the Form.io MCP server (`@formio/mcp`) to whatever coding agent is running, so the Form.io skills have tools to call. Use when a Form.io skill's preflight finds the MCP tools missing, when Form.io tool calls fail because no Form.io tools are available, or when the user asks to install, connect, configure, or fix the Form.io MCP server. Also use when the user has installed the Form.io skills on their own but nothing has wired the server yet. Writes the MCP configuration for every supported client in one pass — Claude Code, Cursor, VS Code, Codex — behind an approval gate, then asks the server which Form.io project this directory resolves to and captures only whichever URL it reports missing, so the first tool call works, and tells the user how to reload. Not for: authenticating to Form.io (see `formio-auth`); building anything with Form.io — return to the skill that sent you here once the server is connected.
 ---
 
 # Connect the Form.io MCP server
@@ -88,7 +88,6 @@ command = "npx"
 args = ["-y", "@formio/mcp@0.10.0"]
 ```
 
-
 ### Why the version is pinned
 
 Every block above launches the package at the exact version written into it — `@formio/mcp@<version>` — never a floating `@formio/mcp`. An unpinned `npx` resolves whatever the registry serves at the moment the client starts the server, so the code that gains tool access to the user's Form.io deployment is chosen at run time rather than reviewed once. Pinned, the user runs the exact build this skill was written against, and an upgrade is a visible edit to a file they approved. Write the version exactly as it appears here — do not substitute `latest`, a caret range, or a version you looked up yourself. If the user asks for a newer server, change the number in all four files together and tell them what changed.
@@ -111,49 +110,53 @@ After writing, list the paths you created or modified.
 
 ## Step 4 — Offer to configure the project
 
-The server starts with no project. Left unconfigured, the first Form.io tool call after the reload fails with an actionable error naming `project_set`, and the user resolves mid-task what could have been resolved here. So offer to capture it now.
+The server starts with no project. Left unconfigured, the first Form.io tool call after the reload fails with an actionable error — a good error, but one the user resolves mid-task when it could have been resolved here. So probe now, and ask only for what the probe says is missing.
 
-### First, check whether it is already configured
-
-```bash
-npx -y @formio/mcp@0.10.0 project get --cwd "$(pwd)"
-```
-
-One trap to know about: the `project` command shipped in `@formio/mcp` 0.9.0, and an older binary ignores these arguments, starts its stdio server, reads end-of-input and exits **0 with no output** — so `project get` looks like a success that found nothing, and `project set` writes nothing while reporting nothing. Never report a mapping you did not read in the output, and never tell the user a project was persisted when `project set` printed nothing.
-
-If that prints a project, the work is already done. Report the Project URL and Base URL in one line and go to Step 5 — do not interview for something already on record.
-
-**Empty output is not a project.** Treat a zero-exit run that prints nothing exactly as you would treat "not configured", and never report a mapping you did not read in the output.
-
-**Exit `1` and exit `2` are different answers.** `1` means nothing is mapped for this directory — ask. `2` means the command ran and failed (an unreadable `~/.formio/projects.json`, a relative `--cwd`, a malformed stored URL or entry): report its stderr and stop. Interviewing on a `2` ends in a `project set` that fails for the same unreported reason. One caveat on `1`: `npx` itself exits `1` when it cannot fetch the server at all (`npm error` on stderr), which means nothing was checked — read stderr before treating a `1` as "not configured".
-
-Read its `Source:` line for what it is: this command runs in your shell, and the MCP server's own environment is **not visible** from there. When it names your shell's `FORMIO_PROJECT_URL`, that pin is real and no configuring here will redirect it. When it names the working-directory mapping, that is what is on disk — a `FORMIO_PROJECT_URL` in the server's own `env` block (a plugin install, an `.mcp.json`) would still override it, and this command cannot see that.
-
-### Otherwise, ask — in one question round
-
-Ask for the Project URL and the Base URL together, in ONE question round, using the client's structured question mechanism (in Claude Code, `AskUserQuestion`). Both need a free-text answer alongside any example options.
-
-Use the plain-language descriptions and example values from [`formio-application/DEPLOYMENT.md`](../formio-application/DEPLOYMENT.md) — that document owns this wording, including the three valid URL shapes, and it is not repeated here. In short: on the hosted cloud the Base URL is always `https://api.form.io` and the Project URL is the project name as a subdomain (`https://examples.form.io`); on a deployment the customer hosts, the Base URL is the platform host (`https://forms.mysite.com`) and the Project URL is either a sibling subdomain of their own domain (`https://myproject.mysite.com`) or a sub-directory of the platform (`https://forms.mysite.com/myproject`), depending on how that deployment routes projects. A `*.form.io` host is never a Base URL, and a project host that differs from the Base URL's host is normal in the sub-domain shape.
-
-Ask for the Base URL rather than assuming the default. It builds the portal-login URL and keys the cached token, so a self-hosted user who gets the default silently ends up logging in against the wrong deployment.
-
-### Apply it with the server's own command
-
-```bash
-npx -y @formio/mcp@0.10.0 project set --project-url "<project url>" --base-url "<base url>" --cwd "$(pwd)"
-```
-
-Then confirm rather than assume:
+### First, ask the server what this directory resolves to
 
 ```bash
 npx -y @formio/mcp@0.10.0 project get --cwd "$(pwd)"
 ```
 
-Report what it prints — and if it prints nothing, report that nothing was persisted rather than that the project was set. The mapping is read at tool-call time, so it is live the moment the server starts — there is nothing further to configure after the reload.
+On a zero exit it prints the Project URL, the Base URL, and which source supplied each. The work is already done: report both URLs in one line and go to Step 5. Do not interview for something already on record.
 
-**Two things never to do here.** Never edit `~/.formio/projects.json` yourself: its shape, its `0600` mode, and its merge rules belong to the server, and the command above is how you reach them. And never put `FORMIO_PROJECT_URL` into a client configuration file's `env` block: for the project URL an environment value takes **precedence** over the mapping, which pins the server to one project and makes every later `project_set` silently do nothing.
+One trap to know about: the `project` command shipped in `@formio/mcp` 0.9.0, and an older binary ignores these arguments, starts its stdio server, reads end-of-input and exits **0 with no output** — so `project get` looks like a success that found nothing, and `project set` writes nothing while reporting nothing. **Empty output is not a project.** Never report a mapping you did not read in the output, and never tell the user a project was persisted when `project set` printed nothing.
 
-`FORMIO_BASE_URL` is the opposite and is genuinely useful in an `env` block — the shipped plugin manifests set it from the install-time prompt, and the `.mcpb` bundle from its user config. It resolves the other way round: a base URL mapped for a working directory **wins** over the environment, so the global is the default for directories that have not named their own deployment. Setting it pins nothing and blocks no later `project_set`; do not strip it from a configuration that has it, and do not add it to one that does not — that value is the host's prompt to own.
+Read the `Source:` line for what it is: this command runs in your shell, and the MCP server's own environment is **not visible** from there. That does not make the answer unreliable — the environment is the **weakest** source, so a `FORMIO_PROJECT_URL` or `FORMIO_BASE_URL` set in the server's own `env` block cannot override what this command reports. When the line names your shell's `FORMIO_PROJECT_URL`, that is a value you can still redirect: record one here and the mapping wins. When it names the working-directory mapping or a committed `formio.json`, that is what is on disk and what the server resolves.
+
+### Otherwise, relay what it says and ask for that one value
+
+On exit `1` — nothing is recorded for this directory — the command explains what is missing and names the command that fixes it. Relay that instruction to the user, ask for the **single value it names**, and persist it with the command it named:
+
+```bash
+npx -y @formio/mcp@0.10.0 project set --project-url "<project url>" --cwd "$(pwd)"
+```
+
+**When the working directory is inside a git repository, offer the choice of where to record it, in the same round you ask for the URL.** Adding `--scope repo` writes a committed `formio.json` instead of the machine-local mapping — tracked with the code, so it is shared with everyone who clones the repository and it survives a fresh checkout. The default records it for this machine only. Say that consequence in one line and let the user pick; do not explain how the two are ranked, because `project get` reports which one supplied a value. Outside a git repository, do not offer `--scope repo` — nothing would be tracking the file.
+
+```bash
+npx -y @formio/mcp@0.10.0 project set --project-url "<project url>" --scope repo --cwd "$(pwd)"
+```
+
+Then re-run `project get`. Most of the time that is the end of it: the Base URL is derived from the Project URL — `https://api.form.io` for a project on a `form.io` host, the parent path for a project addressed as a sub-directory — so there is no second value to collect.
+
+The exception is a Project URL that is a plain sub-domain of the user's own domain, e.g. `https://myproject.mysite.com`, whose deployment is a sibling sub-domain that nothing in the Project URL names. There, and only there, the re-run asks for a Base URL. Ask for it then, with the flag that message names — never before, and never by assuming a default:
+
+```bash
+npx -y @formio/mcp@0.10.0 project set --base-url "<base url>" --cwd "$(pwd)"
+```
+
+Either flag alone is a valid update once a project is mapped, so the second round does not re-ask for the first value.
+
+**Exit `2` is not this branch.** It means the command could not answer at all — an unreadable `~/.formio/projects.json`, a `formio.json` that will not parse, a malformed URL. Do not interview and do not run `project set`: it would fail for the same unreported reason, and the user would see an interview-then-error loop that never names the cause. Relay the message, which names the file to fix, and treat the step as skipped.
+
+**Do not compose your own version of this guidance.** The server's messages carry the valid URL shapes, an example of each, and why a value cannot be guessed — they reach an agent that never read this skill, so they are the single copy. Relay them; do not paraphrase them, and do not add shape rules of your own here.
+
+Report what the final `project get` prints — and if it prints nothing, report that nothing was persisted rather than that the project was set. The mapping is read at tool-call time, so it is live the moment the server starts; there is nothing further to configure after the reload.
+
+**Two things never to do here.** Never edit `~/.formio/projects.json` yourself: its shape, its `0600` mode, and its merge rules belong to the server, and the commands above are how you reach them. And never put `FORMIO_PROJECT_URL` into a client configuration file's `env` block — not because it would pin anything, but because it is the wrong **scope** for the value: an `env` block is one answer for every directory that client opens, while a Form.io project is one-to-one with the application built against it. Record it per directory with the commands above instead.
+
+`FORMIO_BASE_URL` is safe in an `env` block for the same reason, read from the other end: both URLs resolve in the **same** order — a committed `formio.json`, then the working-directory mapping, then the environment as the weakest — so a global base URL only applies where nothing nearer named a deployment, and a project whose URL derives its own deployment never reads it at all. Setting it blocks no later `project_set`; do not strip it from a configuration that has it, and do not add it to one that does not — that value is the host's prompt to own.
 
 ### When to skip it
 
@@ -163,7 +166,7 @@ Skipping is a normal outcome, not a failure. Skip when:
 - The request that brought you here needs no project at all — an API-reference question, a schema question.
 - The user would simply rather not.
 
-Say what happens instead, in one line: the first Form.io tool call will ask for the project and persist it with `project_set`. Then continue to Step 5. Do not re-ask, and do not describe setup as incomplete.
+Say what happens instead, in one line: the first Form.io tool call will raise the same actionable message, and `project_set` will handle it then. Then continue to Step 5. Do not re-ask, and do not describe setup as incomplete.
 
 **If the command fails, or succeeds while printing nothing** — no version satisfying `>=0.9.0` available, a blocked registry, or an older binary that swallowed the arguments — treat it exactly like a skip. Report what failed in one line, name `project_set` on the first tool call as the fallback, and carry on to Step 5. The server configuration you wrote in Step 3 is still good.
 

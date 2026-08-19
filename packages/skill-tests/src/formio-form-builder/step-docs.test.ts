@@ -61,10 +61,14 @@ describe('SAVE.md — form_create with an approval gate', () => {
     expect(save).toMatch(/target project|project it will be saved/i);
   });
 
-  it('confirms the saved form path and full form URL under FORMIO_PROJECT_URL', () => {
+  // The URL is `{projectUrl}/{formPath}` — a substitution slot, not an
+  // environment variable. Spelled FORMIO_PROJECT_URL it told the agent to read an
+  // environment the shipped manifests deliberately leave empty.
+  it('confirms the saved form path and full form URL under the project URL', () => {
     const save = readStepDoc('SAVE.md');
-    expect(save).toContain('FORMIO_PROJECT_URL');
+    expect(save).toContain('{projectUrl}');
     expect(save).toContain('formPath');
+    expect(save).not.toContain('FORMIO_PROJECT_URL');
   });
 
   it('routes auth errors through the authenticate portal-login flow and retries', () => {

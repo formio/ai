@@ -166,40 +166,52 @@ function manifestObject(version: string, tools: object[]) {
         command: 'node',
         args: ['${__dirname}/server/index.mjs'],
         env: {
-          FORMIO_DEFAULT_PROJECT_URL: '${user_config.formio_default_project_url}',
+          FORMIO_PROJECT_URL: '${user_config.formio_project_url}',
           FORMIO_BASE_URL: '${user_config.formio_base_url}',
           FORMIO_API_KEY: '${user_config.formio_api_key}',
         },
       },
     },
     user_config: {
-      // A suggestion, not a pin. A Form.io project is one-to-one with the
-      // application built against it, so an answer given once at install is right
-      // for one directory and wrong for the next; it reaches the server as
-      // FORMIO_DEFAULT_PROJECT_URL, which takes no part in resolution and is
-      // overridden the moment project_set maps a directory.
+      // Reaches the server as FORMIO_PROJECT_URL, and that is now safe. The
+      // environment is the WEAKEST resolution source — a committed formio.json
+      // wins, then a project_set mapping, then this — so a value given here
+      // suggests without pinning, which is exactly what a separate offering
+      // variable used to exist to guarantee. One variable instead of two.
+      //
+      // The CLI plugin manifests prompt for nothing; this bundle is the exception
+      // because a desktop host has no working directory to map and no repository to
+      // commit a formio.json into, so an install-time answer is its only practical
+      // route to a project.
       //
       // Not marked required, because it is not: the server starts, lists its tools
       // and answers `hello` without it, and the tools that do need a project say so
       // when called. Declaring it required told hosts to block on a value the
       // server can run without, which makes the server harder to try than it is.
-      formio_default_project_url: {
+      formio_project_url: {
         type: 'string',
-        title: 'Default project URL (suggested, not locked in)',
+        title: 'Project URL (overridable per folder)',
         description:
-          'Optional. A Form.io project to suggest when a working directory has no ' +
-          'project of its own, e.g. https://myproject.form.io or ' +
-          'https://forms.example.com/myproject. The agent confirms it with you and ' +
-          'records it for that directory, and any directory can use a different ' +
-          'project. Leave it blank and the agent simply asks.',
+          'Optional. The Form.io project to use when a folder has none of its own, ' +
+          'e.g. https://myproject.form.io or https://forms.example.com/myproject. ' +
+          'Any folder can override it — the agent records a per-folder project with ' +
+          'project_set, and a committed formio.json overrides both. Leave it blank ' +
+          'and the agent simply asks.',
         required: false,
       },
+      // Usually unnecessary: the base URL is derived from the project URL — its
+      // parent path for a sub-directory project, api.form.io for a form.io host.
+      // It is asked for here only because a desktop host cannot be handed one
+      // later per folder, and it matters for the one shape that cannot be
+      // derived: a project URL with no path on your own domain.
       formio_base_url: {
         type: 'string',
-        title: 'Base URL',
+        title: 'Base URL (only if it cannot be derived)',
         description:
-          'Base URL of the deployment. Leave as-is for Form.io SaaS; change it when self-hosting.',
-        default: 'https://api.form.io',
+          'Optional, and usually blank. The deployment hosting the project, which is ' +
+          'normally worked out from the project URL. Set it when your project URL is ' +
+          'a plain sub-domain of your own domain, e.g. https://myproject.mysite.com, ' +
+          'whose deployment cannot be derived.',
         required: false,
       },
       formio_api_key: {

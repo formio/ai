@@ -4,7 +4,7 @@ The runtime authentication API covers end-user (application user) account lifecy
 
 ## Root URL
 
-All endpoints below are rooted at `${FORMIO_PROJECT_URL}` — the project endpoint, equivalent to `{{baseUrl}}/{{projectName}}` in Postman.
+All endpoints below are rooted at `{projectUrl}` — the project endpoint, equivalent to `{{baseUrl}}/{{projectName}}` in Postman.
 
 ## Authentication
 
@@ -20,7 +20,7 @@ So this document is a specification for the code you write — the app's login, 
 
 ## Endpoints
 
-### POST ${FORMIO_PROJECT_URL}/user/submission
+### POST {projectUrl}/user/submission
 
 Register a new end-user by submitting to the default `user` resource. Creates a new submission of the `user` resource with email/password credentials.
 
@@ -46,10 +46,10 @@ Example:
 ```bash
 curl -X POST -H "Content-Type: application/json" \
   -d '{"data":{"email":"new.user@example.com","password":"CHANGEME"}}' \
-  "${FORMIO_PROJECT_URL}/user/submission"
+  "{projectUrl}/user/submission"
 ```
 
-### POST ${FORMIO_PROJECT_URL}/user/login/submission
+### POST {projectUrl}/user/login/submission
 
 Authenticate an existing end-user against the default `userLogin` form. On success, Form.io validates the credentials against the `user` resource and issues a JWT.
 
@@ -75,10 +75,10 @@ Example:
 ```bash
 curl -X POST -H "Content-Type: application/json" \
   -d '{"data":{"email":"new.user@example.com","password":"CHANGEME"}}' \
-  "${FORMIO_PROJECT_URL}/user/login/submission"
+  "{projectUrl}/user/login/submission"
 ```
 
-### GET ${FORMIO_BASE_URL}/current
+### GET {baseUrl}/current
 
 Return the currently authenticated user's submission document. Used to rehydrate user state on app start or to check that a stored JWT is still valid.
 
@@ -90,10 +90,10 @@ Example:
 
 ```bash
 curl -H "x-jwt-token: $FORMIO_JWT" \
-  "${FORMIO_BASE_URL}/current"
+  "{baseUrl}/current"
 ```
 
-### GET ${FORMIO_PROJECT_URL}/logout
+### GET {projectUrl}/logout
 
 Invalidate the current user session. Form.io clears the JWT server-side so it can no longer be used.
 
@@ -105,10 +105,10 @@ Example:
 
 ```bash
 curl -H "x-jwt-token: $FORMIO_JWT" \
-  "${FORMIO_PROJECT_URL}/logout"
+  "{projectUrl}/logout"
 ```
 
-### GET ${FORMIO_BASE_URL}/current (session expired)
+### GET {baseUrl}/current (session expired)
 
 Same endpoint as `Get Current User`, but documents the expired-session behavior. When the supplied `x-jwt-token` has expired or been revoked (e.g., after calling `logout`), Form.io responds with a plain-text body:
 
@@ -122,7 +122,7 @@ Example:
 
 ```bash
 curl -H "x-jwt-token: $EXPIRED_JWT" \
-  "${FORMIO_BASE_URL}/current"
+  "{baseUrl}/current"
 ```
 
 ## Related Skills

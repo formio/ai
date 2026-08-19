@@ -2,6 +2,7 @@ import { FormioConfig, ResolvedFormioConfig } from './config.js';
 import { getAuthHeader } from './auth-header.js';
 import { ensureAuthenticated, invalidateJwtCache } from './ensure-auth.js';
 import { clearToken } from './token-cache.js';
+import { requireBaseUrl } from './project-resolver.js';
 
 // Accept the common truthy spellings ("true", "TRUE", "1") so a self-signed
 // deployment (e.g. a local Form.io Enterprise server) is not rejected over a
@@ -66,8 +67,14 @@ export async function formioRawFetch(
 
   if (!response.ok) {
     if (response.status === 401 && config.jwt) {
-      invalidateJwtCache(config.baseUrl);
-      await clearToken(config.baseUrl);
+      // A jwt in hand means the auth path already ran, which means it already
+      // demanded a base URL — so this is a re-read of a resolved value, not a
+      // new requirement. Funnelled through the same guard rather than asserted,
+      // so an unreachable state raises the actionable error instead of keying
+      // the cache under "undefined".
+      const baseUrl = requireBaseUrl(config);
+      invalidateJwtCache(baseUrl);
+      await clearToken(baseUrl);
       config.jwt = undefined;
       await ensureAuthenticated(config);
       const retryResponse = await fetch(url, buildFetchInit(config, options));
