@@ -160,12 +160,12 @@ After all files are emitted, finish with a short "Next steps" section. **In hand
 ### Next steps
 
 1. `cd <workspace>`
-2. `npm install` (or `npm install @formio/angular @formio/js bootstrap font-awesome` in an existing workspace)
+2. `npm install` (or `npm install @formio/angular @formio/js bootstrap bootstrap-icons` in an existing workspace)
 3. Import your project template (if not yet imported):
    `curl -X POST -H "x-jwt-token: $JWT" -H "Content-Type: application/json" \
      -d "{\"template\": $(cat template.json)}" {projectUrl}/import`
 4. `ng serve` and open <http://localhost:4200>
-5. Sign up at `/register` — you are the first user; promote yourself to `administrator` in the Form.io portal, then sign back in.
+5. Sign up at `/auth/register` — you are the first user; promote yourself to `administrator` in the Form.io portal, then sign back in.
 ```
 
 ### Phase B closing check — see a library-rendered page before reporting done
@@ -173,8 +173,9 @@ After all files are emitted, finish with a short "Next steps" section. **In hand
 `ng build` and unit tests pass on a zero-gutter layout, in any design language, so neither one catches a missing page shell. Before you report Phase B complete, verify the shell's page-layout wrapper actually applies to routes you did not author:
 
 1. Serve the app (`ng serve`).
-2. Load one library-rendered resource route — `/<resource>/new` — and one auth route — `/auth/login`.
-3. Confirm the rendered content sits inside the shell's horizontal gutters and max content width, not flush against the viewport edges, and that the navbar brand aligns with the content below it. If it does not, the shell is missing its page-layout wrapper: fix `src/app/app.html` (legacy `src/app/app.component.html`) per the parent skill's `AUTH.md` → "Page layout contract". Do NOT patch it with wrappers inside `resource.component.html` / `view/view.component.html` — that pads only the pages you wrote and leaves these two still broken.
+2. Load one auth route first — `/auth/login` — and sign in. Every authenticated app-shell route carries `canActivate: [authGuard]`, so visiting `/<resource>/new` while anonymous redirects straight back to `/auth/login`: without signing in you inspect the login page twice and learn nothing about the resource route. If no account exists yet, register at `/auth/register`. If you cannot sign in (no seeded user, no credentials), say so and report the resource route as unverified rather than treating the redirect as a pass.
+3. Load one library-rendered resource route — `/<resource>/new` — and confirm the URL that rendered is actually that route, not the login redirect.
+4. Confirm the rendered content sits inside the shell's horizontal gutters and max content width, not flush against the viewport edges, and that the navbar brand aligns with the content below it. If it does not, the shell is missing its page-layout wrapper: fix `src/app/app.html` (legacy `src/app/app.component.html`) per the parent skill's `AUTH.md` → "Page layout contract". Do NOT patch it with wrappers inside `resource.component.html` / `view/view.component.html` — that pads only the pages you wrote and leaves these two still broken.
 
 If no browser or renderer is available in this session, say so plainly in the completion report as an outstanding item — "the UI was not rendered; verify `/<resource>/new` and `/auth/login` sit inside the shell's gutters" — and never phrase the report in a way that implies the pages were seen.
 

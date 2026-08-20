@@ -293,10 +293,13 @@ Design constraints:
   container being the SAME `container-xxl px-3 px-md-4` so the brand aligns with the
   content (padding the full-bleed `<nav>` element instead misaligns it above the
   container's max width).
-- Use Bootstrap 5 utility classes first: `container-fluid`, `row`, `col-*`, `g-*`,
+- Use Bootstrap 5 utility classes first: `row`, `col-*`, `g-*`,
   `d-flex`, `align-items-*`, `justify-content-*`, `gap-*`, margin/padding helpers
   (`m[t|b|s|e|x|y]-*`, `p[...]-*`), text helpers (`text-*`, `fs-*`, `fw-*`),
-  color helpers (`bg-*`, `text-*`, `border-*`).
+  color helpers (`bg-*`, `text-*`, `border-*`). The container is NOT a free choice:
+  the page shell above fixes it at `container-xxl`, so do not reach for
+  `container-fluid` / `container` there — `container-fluid` spans the full viewport
+  and drops the max content width the shell contract requires.
 - Components to reach for: `card` / `card-body` / `card-header`, `btn` + variants,
   `nav` / `nav-tabs` / `nav-pills`, `navbar`, `list-group`, `badge`, `alert`,
   `table` / `table-hover`, `breadcrumb`, `dropdown`, `modal`-as-markup-only.
@@ -309,7 +312,8 @@ Design constraints:
 - Color: Bootstrap's CSS variables (`--bs-primary`, `--bs-secondary`, `--bs-success`,
   `--bs-danger`, `--bs-warning`, `--bs-info`, `--bs-light`, `--bs-dark`,
   `--bs-body-color`, `--bs-border-color`, `--bs-border-radius`). If the brand
-  needs a different primary, override `--bs-primary` in `src/styles.scss` ONCE;
+  needs a different primary, override `--bs-primary` ONCE in the workspace's
+  global stylesheet (`src/styles.css`, or `src/styles.scss` on an SCSS workspace);
   do not hard-code hex codes per component.
 - Responsive: Bootstrap's breakpoints (`sm` 576, `md` 768, `lg` 992, `xl` 1200, `xxl` 1400).
 - Accessibility: proper `label for` on form controls (the renderer handles this for

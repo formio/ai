@@ -50,6 +50,8 @@ If there is no `template.md` / `template.json` pair available, pause at the star
 // When ready, generate src/app/auth/auth.module.ts and import AuthModule into this module.
 ```
 
+**The shell layout wrapper is NOT skipped on this path.** Only the auth wiring is unknown without the artifact pair; the page-layout requirement is independent of it. Still write `src/app/app.html` (or `src/app/app.component.html`) with the required page-layout wrapper around `<router-outlet>` per "Page layout contract" below — omit only the auth-state conditionals from the nav chrome — because this remains the phase that owns that wrapper and an app that skips it here ships with a bare `<router-outlet>`.
+
 Do not proceed to the Resources phase in a way that assumes authenticated access if AUTH was skipped — surface the skip clearly in the handoff to the Resources sub-skill (`./formio-angular-resources/SKILL.md`, a sub-folder of this skill — NOT a separately-registered top-level skill) so resource modules that require auth flag the gap.
 
 ## `src/app/auth/auth.module.ts` template
@@ -214,10 +216,15 @@ import { Subscription } from 'rxjs';
 @Component({
   selector: 'app-root',
   templateUrl: './app.html', // legacy naming: './app.component.html'
-  styleUrl: './app.scss', // legacy naming: styleUrls: ['./app.component.scss']
+  styleUrl: './app.scss', // match the workspace's stylesheet extension — './app.css' on a CSS workspace; legacy naming: styleUrls: ['./app.component.scss']
   standalone: false,
 })
 export class App implements OnInit, OnDestroy {
+  // Rendered as the navbar brand by the shell template below. Any property the
+  // shell interpolates MUST be declared here — `ng new` sets `strictTemplates: true`,
+  // so an undeclared property fails the build with NG9 rather than rendering empty.
+  appName = '<application name>';
+
   private subs = new Subscription();
 
   constructor(
@@ -262,6 +269,7 @@ export class App implements OnInit, OnDestroy {
 
 Notes:
 
+- `appName` exists because the shell template below interpolates it as the navbar brand. `ng new` enables `strictTemplates`, so every property the shell reads must be declared on this class or the build fails with `NG9: Property '<name>' does not exist on type 'App'`. Seed it with the application name from the Resource Map (or the workspace's project name) — do not leave the placeholder in the emitted file.
 - `standalone: false` matches the `angular-demo` convention. If the workspace was scaffolded standalone, flip this with whatever setting CONFIG / BOOTSTRAP already applied to match the rest of the generated code — consistency with the other modules is what matters.
 - `onLogin` fires on interactive logins only. If you want a returning user with a cached JWT to also be redirected on app boot, subscribe to `onUser` instead (or in addition) — `onUser` fires whenever the user object is resolved from the server, covering both paths.
 - The target route on login is `'/'` — the app shell. If the user has a specific home/dashboard route (e.g. `/home`, `/dashboard`), use that instead. Do NOT derive it from the user's role here; role-based landing pages are a later concern handled by route guards + per-role redirects inside the Resources sub-skill.
@@ -279,7 +287,7 @@ Before overwriting an existing root component:
 
 ## `src/app/app.html` (or `src/app/app.component.html` on legacy naming) — shell layout (REQUIRED) + auth-aware nav chrome (recommended)
 
-Two different things live in this file, with two different obligation levels. The **shell layout wrapper** around `<router-outlet>` is REQUIRED — without it every routed page in the app renders flush against the viewport edges, and no later phase can repair that (see "Page layout contract" immediately below). The **auth-aware nav chrome** is recommended — strongly advised, but an app without it still lays out correctly.
+Two different things live in this file, with two different obligation levels. The **shell layout wrapper** around `<router-outlet>` is REQUIRED — without it every routed page in the app renders flush against the viewport edges (see "Page layout contract" immediately below). This is the phase that owns the wrapper: the Resources sub-skill's two repair paths (its `app-integration.md` §10 existing-workspace read and its Phase B closing check) are backstops for a workspace this phase never touched, not a substitute for writing it here. The **auth-aware nav chrome** is recommended — strongly advised, but an app without it still lays out correctly.
 
 ### Page layout contract
 
@@ -293,7 +301,9 @@ The shell's `<router-outlet>` wrapper is the only layout boundary that applies t
 | `/<resource>/:id/delete` | `FormioResourceDeleteComponent` | no |
 | `/auth/login`, `/auth/register` | `FormioAuthLoginComponent` / `FormioAuthRegisterComponent` | no |
 
-The shell wraps `<router-outlet>` in a single page-layout element that supplies the app's horizontal gutters, max content width, and top spacing. The wrapper element and its position are fixed; its classes are not — express them in the design language selected for this app.
+The shell wraps `<router-outlet>` in a single page-layout element that supplies the app's horizontal gutters, max content width, and top spacing. The wrapper element and its position are fixed; its classes are not — express them in the design language this workspace actually carries.
+
+**Which design language, at this point in the flow.** Read it off the workspace rather than asking: whatever BOOTSTRAP Step 5 wired into `angular.json`'s `styles` array (Bootstrap 5 by default), as recorded in the Step 7d `FRONTEND_DESIGN_BRIEF`. The Resources sub-skill asks its own design-language question later (its `references/interview-guide.md` round 1, direct invocation only), and that answer can differ from what is installed. When it does, the sub-skill re-expresses this wrapper and the navbar container in the newly-selected language as part of switching the stylesheet — a shell left in the old language's classes after its stylesheet is swapped out has no gutters at all, which is the failure this contract exists to prevent. Do not pre-empt that question here, and do not leave the wrapper unwritten waiting for it.
 
 ```html
 <!-- nav chrome above (see "Auth-aware nav chrome" below) -->
@@ -347,6 +357,7 @@ Give the navbar the same inner container and gutters as the content wrapper — 
 
 Notes:
 
+- `{{ appName }}` reads the `appName` property declared on the root component above. Under `strictTemplates` (the `ng new` default) any property this template interpolates that the class does not declare is a build error, not an empty string — so if you rename the brand binding, add the matching property in the same edit.
 - The `<main>` wrapper is the page-layout element the contract above requires, shown here in its Bootstrap 5 realization because that is the default stack. Swap the classes — never the element or its position — for a different design language.
 - The navbar's inner `container-xxl px-3 px-md-4` is the SAME container and padding as the `<main>` wrapper, which is what makes the brand line up with the content below it. Padding the `<nav>` element itself instead does not: `container-xxl` caps the content at its max width and centers it, so above that width (1400px viewport and up for `container-xxl`) a full-bleed navbar's brand sits far to the left of the content it is supposed to align with. Bootstrap's `.navbar > .container-*` is already `display: flex` with `justify-content: space-between`, so `me-auto` / `ms-auto` still behave as usual.
 - The empty left-hand `<ul class="navbar-nav me-auto">` is the insertion point the Resources sub-skill fills with one `<li>` per browsable resource; keep it even when it starts out empty.

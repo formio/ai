@@ -35,7 +35,7 @@ End-to-end walk-through of `../SKILL.md`'s flow: the planner's input, the Phase 
     app-module.ts                                       NEW
     app-routing-module.ts                               NEW
     config.ts                                           NEW
-    home/home.component.{ts,html,scss}                  NEW
+    home/home.{ts,html,scss}                            NEW  (legacy naming: home/home.component.*)
     auth/auth.module.ts                                 NEW
     project/project.module.ts                           NEW
     project/resource.component.{ts,html,scss}           NEW  (tabs: View / Tasks / Members / Edit / Delete)

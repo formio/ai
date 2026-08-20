@@ -25,7 +25,7 @@ Emit the plan as a single fenced markdown block. Use this exact template — ter
     app-module.ts                                       MODIFY  (adds imports)
     app-routing-module.ts                               NEW
     config.ts                                           NEW or MODIFY  (FormioAppConfig + FormioAuthConfig — same file the parent CONFIG phase writes)
-    home/home.component.{ts,html,scss}                  NEW
+    home/home.{ts,html,scss}                            NEW     (legacy naming: home/home.component.*)
     auth/auth.module.ts                                 NEW
     <resource>/<resource>.module.ts                     NEW     (one per browsable resource)
     <resource>/resource.component.{ts,html,scss}        NEW     (designed nav — tabs / breadcrumb / sidebar)
