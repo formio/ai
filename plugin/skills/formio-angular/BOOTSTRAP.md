@@ -238,7 +238,7 @@ A clean build confirms the `polyfills` shape matches the builder and the CD prov
 
 ### Why this step exists
 
-Every downstream phase in `formio-angular` that authors a user-facing surface (the AUTH phase's `app.component.html` nav UI, the Resources phase's `resource.component.html` / `view/view.component.html` / per-resource SCSS, any custom login/register component override, any dashboard or landing template) should consult the `frontend-design` skill before writing output — that is how the generated UI ends up polished instead of generic. "User-facing surface" means anything touching: HTML templates, SCSS/CSS, page layout (the app shell's page gutters, max content width, and top spacing around `<router-outlet>`), component layout, spacing, typography, color, nav UI, empty states, loading states, error states, list-vs-card layouts, form styling beyond `form-control` defaults, responsive behavior, and accessibility (focus order, ARIA, contrast). Form-field styling that comes directly from the Form.io renderer's default Bootstrap 5 template is exempt — you do not override what the renderer already provides — but anything the skill itself authors outside the renderer's output is NOT exempt. `frontend-design` is **strongly recommended but NOT required**. BOOTSTRAP only **detects** its availability and records the status; it does NOT run its own install prompt. The strong recommendation + install offer is owned by the orchestrator `formio-application` (Step 5a) — keeping it in one place avoids two skills nagging the user about the same skill.
+Every downstream phase in `formio-angular` that authors a user-facing surface (the AUTH phase's shell layout and nav UI in `app.html` (legacy `app.component.html`), the Resources phase's `resource.component.html` / `view/view.component.html` / per-resource SCSS, any custom login/register component override, any dashboard or landing template) should consult the `frontend-design` skill before writing output — that is how the generated UI ends up polished instead of generic. "User-facing surface" means anything touching: HTML templates, SCSS/CSS, page layout (the app shell's page gutters, max content width, and top spacing around `<router-outlet>`), component layout, spacing, typography, color, nav UI, empty states, loading states, error states, list-vs-card layouts, form styling beyond `form-control` defaults, responsive behavior, and accessibility (focus order, ARIA, contrast). Form-field styling that comes directly from the Form.io renderer's default Bootstrap 5 template is exempt — you do not override what the renderer already provides — but anything the skill itself authors outside the renderer's output is NOT exempt. `frontend-design` is **strongly recommended but NOT required**. BOOTSTRAP only **detects** its availability and records the status; it does NOT run its own install prompt. The strong recommendation + install offer is owned by the orchestrator `formio-application` (Step 5a) — keeping it in one place avoids two skills nagging the user about the same skill.
 
 ### 7a. Detect whether `frontend-design` is available — match the skill, not one client's prefix
 
@@ -289,8 +289,10 @@ Design constraints:
   add their own page-level wrapper. Library-rendered routes (create / edit / delete /
   index / login / register) inherit gutters only from that shell element, so it is the
   only place page padding can come from. In this stack, realize it with:
-  `<main class="container-xxl px-3 px-md-4 py-4">`; a navbar with its own inner
-  container gets matching horizontal padding so the brand aligns with the content.
+  `<main class="container-xxl px-3 px-md-4 py-4">`, with the navbar's own inner
+  container being the SAME `container-xxl px-3 px-md-4` so the brand aligns with the
+  content (padding the full-bleed `<nav>` element instead misaligns it above the
+  container's max width).
 - Use Bootstrap 5 utility classes first: `container-fluid`, `row`, `col-*`, `g-*`,
   `d-flex`, `align-items-*`, `justify-content-*`, `gap-*`, margin/padding helpers
   (`m[t|b|s|e|x|y]-*`, `p[...]-*`), text helpers (`text-*`, `fs-*`, `fw-*`),
@@ -328,7 +330,7 @@ Output shape `frontend-design` should produce:
   for why no Bootstrap utility covered the case.
 ```
 
-Every later phase that invokes `frontend-design` prepends this brief to the prompt it passes. AUTH's `app.component.html` section references it (see `AUTH.md`'s nav section). The Resources sub-skill's Phase A plan cites the brief in its `frontend-design consulted:` line (see `formio-angular-resources/SKILL.md`). Keeping the brief in one place avoids drift: update BOOTSTRAP Step 7d once and every downstream phase picks up the new wording.
+Every later phase that invokes `frontend-design` prepends this brief to the prompt it passes. AUTH's shell-template section references it (see `AUTH.md`'s nav section). The Resources sub-skill's Phase A plan cites the brief in its `frontend-design consulted:` line (see `formio-angular-resources/SKILL.md`). Keeping the brief in one place avoids drift: update BOOTSTRAP Step 7d once and every downstream phase picks up the new wording.
 
 ## The approval gate
 

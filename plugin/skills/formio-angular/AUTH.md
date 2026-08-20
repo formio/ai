@@ -13,10 +13,11 @@ Before generating anything, inspect the target workspace:
 3. Read `src/app/app-routing-module.ts`. Check for a route whose `path` is `'auth'` with a `loadChildren` entry pointing at `./auth/auth.module`. Missing this route means `/auth/login` is a dead URL even when `AuthModule` is correct. ALSO check that the authenticated routes carry `canActivate: [authGuard]` — a routing module that mounts the resource routes but leaves them unguarded is half-wired (anonymous visitors can navigate straight into them); treat that as "needs the guard added" and run the phase.
 4. Read `src/app/app.ts` (or `src/app/app.component.ts` on legacy naming). Check for `FormioAuthService` import + `onLogin` + `onLogout` subscriptions + `router.navigate` calls.
 5. Read `src/app/auth/auth.guard.ts`. Check that it exports an `authGuard` `CanActivateFn` that reads `FormioAuthService.authenticated` and redirects unauthenticated visitors to `/auth/login`. Missing this file (or a routing module that never references it) means protected routes are reachable while anonymous — run the phase to add it.
+6. Read `src/app/app.html` (or `src/app/app.component.html` on legacy naming). Check that `<router-outlet>` sits INSIDE a page-layout element supplying horizontal gutters and a max content width (see "Page layout contract" below). A bare `<router-outlet>`, or one whose only ancestor is the navbar, means every library-rendered route renders flush against the viewport edges — and this phase is the only one that writes that wrapper, so a skip here leaves the app permanently unpadded. Treat a missing wrapper as "needs the shell layout added" and run the phase (adding the wrapper alone is enough when conditions 1-5 already hold).
 
-If ALL five conditions hold, **skip this phase**. Tell the user which files triggered the skip:
+If ALL six conditions hold, **skip this phase**. Tell the user which files triggered the skip:
 
-> Skipping AUTH — `src/app/auth/auth.module.ts` already configures `FormioAuthConfig` and mounts `FormioAuthRoutes()`, `src/app/auth/auth.guard.ts` exports `authGuard`, `AppModule` already imports `AuthModule`, `AppRoutingModule` has the `/auth` lazy route and applies `canActivate: [authGuard]` on the authenticated routes, and the root component subscribes to `FormioAuthService.onLogin` / `onLogout`. Moving to Resources. Say if you want to regenerate the auth wiring anyway.
+> Skipping AUTH — `src/app/auth/auth.module.ts` already configures `FormioAuthConfig` and mounts `FormioAuthRoutes()`, `src/app/auth/auth.guard.ts` exports `authGuard`, `AppModule` already imports `AuthModule`, `AppRoutingModule` has the `/auth` lazy route and applies `canActivate: [authGuard]` on the authenticated routes, the root component subscribes to `FormioAuthService.onLogin` / `onLogout`, and the shell template already wraps `<router-outlet>` in a page-layout element. Moving to Resources. Say if you want to regenerate the auth wiring anyway.
 
 If only a subset is already wired, run the phase and regenerate ONLY the missing pieces (don't clobber user-customized files). If the user wants to fully regenerate, run the phase as normal and overwrite.
 
@@ -295,7 +296,7 @@ The shell's `<router-outlet>` wrapper is the only layout boundary that applies t
 The shell wraps `<router-outlet>` in a single page-layout element that supplies the app's horizontal gutters, max content width, and top spacing. The wrapper element and its position are fixed; its classes are not — express them in the design language selected for this app.
 
 ```html
-</nav>
+<!-- nav chrome above (see "Auth-aware nav chrome" below) -->
 <main class="<page-layout classes for the selected design language>">
   <router-outlet></router-outlet>
 </main>
@@ -309,7 +310,7 @@ Illustrative realizations, not normative markup:
 - **The workspace's existing design system**: whatever that system's page/content wrapper already is. Use it; do not introduce a parallel one.
 - **Unstyled HTML**: a `<main>` with a minimal padding rule, since there are no utilities to reach for.
 
-If the navbar carries its own inner container, its gutters must be consistent with the content wrapper's — otherwise the brand does not align with the content beneath it. Consistency is the requirement; the specific classes follow from the design language.
+Give the navbar the same inner container and gutters as the content wrapper — otherwise the brand does not align with the content beneath it. A max-width container centers its content, so padding a full-bleed navbar to the same value only matches below that max width and drifts apart above it. Matching the container is the requirement; the specific classes follow from the design language.
 
 ### Auth-aware nav chrome
 
@@ -318,22 +319,26 @@ If the navbar carries its own inner container, its gutters must be consistent wi
 `FormioAuthService` exposes `authenticated` (boolean) and `user` (submission object) as properties, and `logout()` as a method. Wire them into the root template so the nav bar reacts to login state without any extra plumbing. Typical addition (keep whatever shell the Angular CLI scaffolded; add this block inside your nav, and keep the required page-layout wrapper from the contract above around `<router-outlet>`):
 
 ```html
-<nav class="navbar navbar-expand navbar-light bg-light px-3 px-md-4">
-  <a class="navbar-brand" routerLink="/">{{ appName }}</a>
-  <ul class="navbar-nav ms-auto">
-    <li class="nav-item" *ngIf="!auth.authenticated">
-      <a class="nav-link" routerLink="/auth/login" routerLinkActive="active">Sign in</a>
-    </li>
-    <li class="nav-item" *ngIf="!auth.authenticated">
-      <a class="nav-link" routerLink="/auth/register" routerLinkActive="active">Register</a>
-    </li>
-    <li class="nav-item" *ngIf="auth.authenticated">
-      <span class="navbar-text me-2">{{ auth.user?.data?.email }}</span>
-    </li>
-    <li class="nav-item" *ngIf="auth.authenticated">
-      <a class="nav-link" (click)="auth.logout()" style="cursor: pointer">Log out</a>
-    </li>
-  </ul>
+<nav class="navbar navbar-expand navbar-light bg-light">
+  <div class="container-xxl px-3 px-md-4">
+    <a class="navbar-brand" routerLink="/">{{ appName }}</a>
+    <!-- Resource links land here — the Resources sub-skill adds one <li> per browsable resource. -->
+    <ul class="navbar-nav me-auto"></ul>
+    <ul class="navbar-nav">
+      <li class="nav-item" *ngIf="!auth.authenticated">
+        <a class="nav-link" routerLink="/auth/login" routerLinkActive="active">Sign in</a>
+      </li>
+      <li class="nav-item" *ngIf="!auth.authenticated">
+        <a class="nav-link" routerLink="/auth/register" routerLinkActive="active">Register</a>
+      </li>
+      <li class="nav-item" *ngIf="auth.authenticated">
+        <span class="navbar-text me-2">{{ auth.user?.data?.email }}</span>
+      </li>
+      <li class="nav-item" *ngIf="auth.authenticated">
+        <a class="nav-link" (click)="auth.logout()" style="cursor: pointer">Log out</a>
+      </li>
+    </ul>
+  </div>
 </nav>
 <main class="container-xxl px-3 px-md-4 py-4">
   <router-outlet></router-outlet>
@@ -343,7 +348,8 @@ If the navbar carries its own inner container, its gutters must be consistent wi
 Notes:
 
 - The `<main>` wrapper is the page-layout element the contract above requires, shown here in its Bootstrap 5 realization because that is the default stack. Swap the classes — never the element or its position — for a different design language.
-- The nav's own `px-3 px-md-4` matches the wrapper's horizontal padding so the brand lines up with the content below it.
+- The navbar's inner `container-xxl px-3 px-md-4` is the SAME container and padding as the `<main>` wrapper, which is what makes the brand line up with the content below it. Padding the `<nav>` element itself instead does not: `container-xxl` caps the content at its max width and centers it, so above that width (1400px viewport and up for `container-xxl`) a full-bleed navbar's brand sits far to the left of the content it is supposed to align with. Bootstrap's `.navbar > .container-*` is already `display: flex` with `justify-content: space-between`, so `me-auto` / `ms-auto` still behave as usual.
+- The empty left-hand `<ul class="navbar-nav me-auto">` is the insertion point the Resources sub-skill fills with one `<li>` per browsable resource; keep it even when it starts out empty.
 - The template talks to `auth` directly because the component injected it as `public` above — no extra bindings, no extra getters.
 - `(click)="auth.logout()"` does NOT need to navigate; `FormioAuthService.logout()` clears the JWT and emits `onLogout`, which the `ngOnInit` subscription above catches and routes to `/auth/login`.
 - `routerLinkActive="active"` is Bootstrap-friendly because Bootstrap 5's `.nav-link.active` styling is already in the stylesheet BOOTSTRAP installed.

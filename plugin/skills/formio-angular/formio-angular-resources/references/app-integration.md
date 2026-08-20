@@ -34,7 +34,7 @@ import { FormioAuthService, FormioAuthConfig } from '@formio/angular/auth';
 import { FormioResources } from '@formio/angular/resource';
 
 import { AppConfig, AuthConfig } from './config';
-import { AppRoutingModule } from './app-routing.module';
+import { AppRoutingModule } from './app-routing-module';
 import { App } from './app'; // legacy naming: `import { AppComponent } from './app.component';`
 import { HomeComponent } from './home/home.component';
 
@@ -156,7 +156,7 @@ The shell template (`src/app/app.html`, legacy `src/app/app.component.html`) is 
 
 By the time this file is consulted the shell already exists. Two edits belong here, and nothing else:
 
-- Add one `<li class="nav-item"><a class="nav-link" routerLink="/<kebab>"><Resource></a></li>` per browsable resource to the navbar's left-hand `<ul>`.
+- Add one `<li class="nav-item"><a class="nav-link" routerLink="/<kebab>"><Resource></a></li>` per browsable resource to the navbar's left-hand `<ul class="navbar-nav me-auto">` — the empty insertion point AUTH.md's shell skeleton leaves for exactly this. If the shell has no left-hand `<ul>` (a hand-written navbar, or one from a different design language), add one before the auth-state list rather than appending resource links into it.
 - Verify the page-layout wrapper around `<router-outlet>` is present. If it is missing, add it per AUTH.md's contract — do not compensate with per-page wrappers inside the resource templates.
 
 `src/app/home/home.component.ts`:
@@ -284,7 +284,7 @@ Required `npm install`:
 npm install @formio/angular @formio/js bootstrap font-awesome
 ```
 
-If the user picked "none" for UI framework, omit the bootstrap/font-awesome lines and generate plain HTML (no `nav-tabs` in `resource.component.html`, no card markup in `home.component.html`).
+If the user picked **unstyled HTML** for the design language, omit the bootstrap/font-awesome lines and generate plain HTML (no `nav-tabs` in `resource.component.html`, no card markup in `home.component.html`). If they picked Tailwind, Angular Material, or the workspace's existing design system, install that language's packages instead of bootstrap/font-awesome and use its vocabulary in the templates — the shell's page-layout wrapper is still required in every case.
 
 ## 7. Logout route
 
@@ -294,7 +294,7 @@ Already covered in section 5. Do not duplicate `FormioAuthService.logout()` logi
 
 When the Resource Map says `SSO: OIDC` or `SSO: SAML`, skip the native-form login and link `/auth/login` to the project's SSO redirect URL instead. The Form.io project configures the IdP; the Angular app just points the user at it.
 
-Replace the Login button in `app.component.html`:
+Replace the Login button in the shell template (`src/app/app.html`, legacy `src/app/app.component.html`):
 
 ```html
 <li class="nav-item" *ngIf="!auth.authenticated">

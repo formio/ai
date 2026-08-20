@@ -174,7 +174,7 @@ After all files are emitted, finish with a short "Next steps" section. **In hand
 
 1. Serve the app (`ng serve`).
 2. Load one library-rendered resource route — `/<resource>/new` — and one auth route — `/auth/login`.
-3. Confirm the rendered content sits inside the shell's horizontal gutters and max content width, not flush against the viewport edges, and that the navbar brand aligns with the content below it. If it does not, the shell is missing its page-layout wrapper: fix `src/app/app.html` per the parent skill's `AUTH.md` → "Page layout contract". Do NOT patch it with wrappers inside `resource.component.html` / `view/view.component.html` — that pads only the pages you wrote and leaves these two still broken.
+3. Confirm the rendered content sits inside the shell's horizontal gutters and max content width, not flush against the viewport edges, and that the navbar brand aligns with the content below it. If it does not, the shell is missing its page-layout wrapper: fix `src/app/app.html` (legacy `src/app/app.component.html`) per the parent skill's `AUTH.md` → "Page layout contract". Do NOT patch it with wrappers inside `resource.component.html` / `view/view.component.html` — that pads only the pages you wrote and leaves these two still broken.
 
 If no browser or renderer is available in this session, say so plainly in the completion report as an outstanding item — "the UI was not rendered; verify `/<resource>/new` and `/auth/login` sit inside the shell's gutters" — and never phrase the report in a way that implies the pages were seen.
 
