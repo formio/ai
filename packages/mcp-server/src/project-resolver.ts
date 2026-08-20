@@ -244,7 +244,27 @@ export function usableEnvironmentBaseUrl({
 
   const derived = deriveBaseUrlFromProjectPath(parsed);
   if (!derived) {
-    return value;
+    // Nothing in a path-less customer-domain project URL names its deployment —
+    // that is a sibling sub-domain — so a global on another host is exactly what
+    // this shape needs, and cannot be checked against the project URL. One thing
+    // can still be said about it: a *.form.io host is never a base URL for such a
+    // project (api.form.io serves the hosted cloud, whose projects take the
+    // branch above). Left accepted, the value most likely to be stale in a shell
+    // became the portal-login URL and the token-cache key for a deployment the
+    // user does not use — the failure this whole precedence exists to prevent.
+    let parsedValue: URL;
+    try {
+      parsedValue = new URL(value);
+    } catch {
+      return value;
+    }
+    if (!isHostedCloudProject(parsedValue)) {
+      return value;
+    }
+    onNote?.(
+      `Ignoring FORMIO_BASE_URL (${value}): a form.io host is never the deployment of ${projectUrl}, whose own deployment is a sibling sub-domain that nothing in the project URL names. Record the right one for this directory with project_set.`
+    );
+    return undefined;
   }
   if (sameOrigin(value, parsed)) {
     return value;

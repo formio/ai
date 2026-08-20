@@ -138,4 +138,49 @@ describe('a derivable base URL outranks the environment global', () => {
     expect(config.baseUrl).toBe('https://api.mysite.com');
     expect(sources.baseUrl).toBe('mapping');
   });
+  // The one shape where derivation cannot arbitrate: a path-less customer domain
+  // names no deployment, so the environment global is all there is. That makes it
+  // the shape where a leftover value does the most damage, and the file's own
+  // rationale already says a *.form.io host is never a base URL — the hosted-cloud
+  // branch refuses the variable outright, and this branch was accepting it.
+  it('refuses a *.form.io global for a project whose deployment is underivable', () => {
+    const notes: string[] = [];
+    writeProjectEntry(
+      '/w/rank-sibling',
+      { FORMIO_PROJECT_URL: 'https://myproject.mysite.com' },
+      cacheDir
+    );
+
+    const { config, sources } = resolveProject(
+      '/w/rank-sibling',
+      { baseUrl: 'https://api.form.io' },
+      { cacheDir, onNote: (message) => notes.push(message) }
+    );
+
+    // Unresolved is the correct answer here: the first call needing a base URL
+    // then fails asking for that alone, which is the documented repair.
+    expect(config.baseUrl).toBeUndefined();
+    expect(sources.baseUrl).toBe('unresolved');
+    expect(notes.join('\n')).toMatch(/api\.form\.io/);
+  });
+
+  // Same shape, a value that CAN be right: the deployment of a path-less project
+  // URL is a sibling sub-domain, so a different host is expected and must not be
+  // refused merely for differing.
+  it('keeps a customer-host global for that same underivable shape', () => {
+    writeProjectEntry(
+      '/w/rank-sibling-ok',
+      { FORMIO_PROJECT_URL: 'https://myproject.mysite.com' },
+      cacheDir
+    );
+
+    const { config, sources } = resolveProject(
+      '/w/rank-sibling-ok',
+      { baseUrl: 'https://forms.mysite.com' },
+      { cacheDir, onNote: () => {} }
+    );
+
+    expect(config.baseUrl).toBe('https://forms.mysite.com');
+    expect(sources.baseUrl).toBe('environment');
+  });
 });

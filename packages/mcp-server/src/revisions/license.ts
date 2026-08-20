@@ -191,7 +191,7 @@ export async function gateRevisionsLicense(
   if (licensed === undefined) {
     if (requiresRevisions || 'revisions' in form) {
       throw new Error(
-        `Cannot ${actionLabel} — the Security Module flag is read from ${'${baseUrl}'}/config.js, and the Base URL for ${cfg.projectUrl} cannot be determined, so that probe never ran. ` +
+        `Cannot ${actionLabel} — the Security Module flag is read from {baseUrl}/config.js, and the Base URL for ${cfg.projectUrl} cannot be determined, so that probe never ran. ` +
           `${BASE_URL_UNRESOLVED_GUIDANCE} ` +
           `This one is needed however you authenticate: the probe is an ANONYMOUS request to the deployment, so an API key does not exempt it. ` +
           `Set it with project_set (pass baseUrl alongside the cwd), or run: ${projectCommand(`set --base-url <base_url> --cwd ${cfg.cwd ?? process.cwd()}`)}. ` +
