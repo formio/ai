@@ -43,7 +43,7 @@ Actions:
   - `attemptWindow` — seconds during which `allowedAttempts` is counted (typical 30).
   - `lockWait` — seconds the account stays locked after exceeding `allowedAttempts` (typical 1800 = 30 minutes).
 
-For the full Login Action JSON shape (priority, handler, method, settings), see `plugin/skills/formio-resource-planner/references/template-json.md` lines 504–534.
+For the full Login Action JSON shape (priority, handler, method, settings), see `plugin/skills/formio-resource-planner/references/template-json.md` → "Login".
 
 ### Registration form
 
@@ -67,7 +67,7 @@ Actions (order matters because `priority` is the tie-breaker among handlers at t
 
 If the prompt specifically requires that "admins" log into the application, then you may include `"admin"` in the Login Action's `settings.resources`. It should be noted, however, that most administrative work is performed via the Form.io project portal.
 
-For the canonical action JSON shapes, see `plugin/skills/formio-resource-planner/references/template-json.md` lines 504–553.
+For the canonical action JSON shapes, see `plugin/skills/formio-resource-planner/references/template-json.md` → "Login" and "Role Assignment".
 
 ### Anonymous vs admin write paths
 
@@ -86,7 +86,7 @@ The Resource Map terminology used by the planner:
 
 ## See also
 
-- `formio-resource-planner` — owns the canonical login and registration form JSON shapes plus the Login Action and Role Assignment Action shapes. Use the planner first if the forms do not yet exist. See `plugin/skills/formio-resource-planner/references/template-json.md` lines 504–553 and `plugin/skills/formio-resource-planner/references/examples/task-manager/template.json` for a working end-to-end example.
+- `formio-resource-planner` — owns the canonical login and registration form JSON shapes plus the Login Action and Role Assignment Action shapes. Use the planner first if the forms do not yet exist. See `plugin/skills/formio-resource-planner/references/template-json.md` → "Login" and "Role Assignment" and `plugin/skills/formio-resource-planner/references/examples/task-manager/template.json` for a working end-to-end example.
 - [`resource-auth.md`](./resource-auth.md) — the six-step auth flow, the `x-jwt-token` header, and the `user` Resource shape.
 - [`roles-and-permissions.md`](./roles-and-permissions.md) — what `access` and `submissionAccess` actually permit, and how the eight permission types interact.
 - [`jwt-and-sessions.md`](./jwt-and-sessions.md) — the JWT that the Login Action returns and how the renderer carries it.

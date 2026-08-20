@@ -40,6 +40,7 @@ Ask (together):
 
 - Is access **owner-level** (users see only their own records)?
 - **Group-level** (users see everything in their team / project / tenant)?
+  - If group-level: **who creates the groups** — an administrator through the portal, or end users inside the app? End-user group creation needs `create_all` + `read_own` + `update_own` on the group resource for that role, and the group-creation flow must also write the creator's membership row, or the creator ends up locked out of the group they just made.
 - **Role-level** (admins see all, members see some, viewers see read-only)?
 - **Tenant-level** (strict multi-tenant isolation)?
 - Or some combination — e.g., "admins see everything, members see only their group's data."
@@ -114,10 +115,10 @@ When the interview has enough signal, emit the resource map as a single fenced m
 | Resource | Actor          | create | read  | update | delete | Notes                   |
 | -------- | -------------- | ------ | ----- | ------ | ------ | ----------------------- |
 | <R>      | administrator  | all    | all   | all    | all    |                         |
-| <R>      | authenticated  | —      | group | group  | —      | group-via-<Join>        |
+| <R>      | authenticated  | group  | group | group  | group  | group-via-<Join>        |
 | ...      | ...            | ...    | ...   | ...    | ...    |                         |
 
-(Actors are roles and groups. Cell tokens: `all`, `own`, `group`, `group(<j>)`, `role(<r>)`, `—`. One row per (resource, actor) pair with a non-trivial rule.)
+(Actors are roles and groups. Cell tokens: `all`, `own`, `group`, `group(<j>)`, `role(<r>)`, `—`. One row per (resource, actor) pair with a non-trivial rule. The `group` row above assumes the child's field-based block confers all four operations — the four-entry / `admin` form. If the plan withholds deletion from members, the block becomes `write` and that row's `delete` cell becomes `—`; the two must agree. A **group resource** never takes `group` in its own row — see `template-md.md` → "Token → `template.json` mapping".)
 
 ## ER Diagram
 
@@ -160,7 +161,7 @@ A multi-user task manager where each Project has a set of Tasks and a team of Us
   Purpose: container for tasks assigned to a team of users.
   Fields:
     - name: textfield — human-readable project name
-  Access: read/update limited to members (group-via-ProjectUser)
+  Access: members of the project (group-via-ProjectUser); readable by `authenticated` via `read_all` so the project select can populate
   Actions:
     - (save only)
 

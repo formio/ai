@@ -7,22 +7,31 @@ How `formio-resource-planner` maps access requirements onto Form.io constructs. 
 | Pattern | Form.io construct |
 | --- | --- |
 | Owner-only ("my records") | Submission Access on the resource: `read/update/delete = Owner` |
-| Group-based ("my team's records") | Two halves, both required: (a) a join resource (user ↔ group) with a Group Assignment action; (b) on every child resource that inherits the group's access, a four-entry `submissionAccess` block on the `select` component that points at the group |
+| Group-based ("my team's records") | Three parts, all required: (a) a join resource (user ↔ group) with a Group Assignment action; (b) on every child resource that inherits the group's access, a field-based `submissionAccess` block on the `select` that points at the group, with types chosen deliberately; (c) `read_all` for the end-user role on the group resource itself, without which the group select cannot populate and group-scoped creates fail |
 | Role-based ("admins see all") | Project roles (`administrator`, `authenticated`, custom). Gate resource access with roles. Assign roles on signup with a Role Assignment action |
 | Tenant-based ("strict customer isolation") | Platform tenants — out of scope for this skill; point the user at `formio-api/references/platform-tenants` |
 
-## Group-based access has two halves — both must land
+## Group-based access has three parts — all must land
 
-When a child resource's access flows from a group, the plan must include both:
+When a child resource's access flows from a group, the plan must include all three:
 
-1. **The Group Assignment action on the join resource** (e.g., `projectUser:group` with `settings: { group: "project", user: "user" }`). This registers user-to-group memberships.
-2. **A field-based `submissionAccess` block on the child's group-reference select component** (e.g., on `Task.project`, on `Contact.company`). The block has four entries — `read`, `create`, `update`, `delete` — each with `roles: []`. The empty roles are intentional: permissions are resolved at runtime from the group submission's ACL, not from static role lists.
+1. **The Group Assignment action on the join resource** (e.g., `projectUser:group` with `settings: { group: "project", user: "user" }`). It writes the group submission's id into the member's `roles`, which is what every later check resolves against.
+2. **A field-based `submissionAccess` block on the child's group-reference select component** (e.g., on `Task.project`, on `Contact.company`), with `roles: []` on each entry. On every write the server rebuilds that row's own `access` from this block, keyed to the referenced group. The entry types decide what members may do — `read`, `create`, `update`, `delete`, or the shorthands `write` (read + create + update, no delete) and `admin` (all four). This block is the whole mechanism, create included; a group-scoped child needs no `create_own`, and adding one would authorize creating rows outside the group.
+3. **A `read_all` grant for the end-user role on the group resource itself.** Nothing stamps a group row's own `access`, and group membership does not confer read of the group record. Without this the group's name cannot render and — more damagingly — the `dataSrc: "resource"` select cannot populate, so no group reference reaches the payload and every group-scoped create fails. The cost is that every end user can read every group row; the group model offers no membership-scoped alternative here.
 
-## Gotcha
+## Three silent failure modes
 
-Missing half 2 is a silent bug. The user can log in and see the Project they're a member of, but they cannot see the Tasks attached to it because Task's access never inherits. Always call out both halves in the Phase A map, and always emit both halves in Phase B.
+**Missing part 2.** The user logs in and sees the Project they're a member of, but not the Tasks attached to it — the child's access never inherits.
 
-See `template-json.md` for the exact JSON shape of the field-based submissionAccess block.
+**Missing part 3.** Reads of existing rows work, and every create returns `Unauthorized`, because the group select was empty and the payload carried no group reference. Nothing fails loudly on the way there: the import succeeds, the front-end builds, unit tests pass, and the defect surfaces the first time a human clicks "New task".
+
+**No membership row for the group's creator.** When end users create groups at runtime, creating the group grants no membership in it — the Group Assignment action fires on the join, so until a join row links the creator to their new group they hold no group role, and every child read and create under it is refused. The group saves, the UI navigates to it, the first list is empty, the first create returns `Unauthorized`. Plan the membership write as part of the group-creation flow, and say so in the Resource Map so the framework skill wires it. Self-serve group creation additionally needs `create_all` plus `read_own` and `update_own` for the end-user role on the group resource, because the assignment is verified against the requester's update access on the group record they are assigning into.
+
+**A block whose types don't match the Access Matrix.** The four-entry CRUD block confers delete on every group member. If the matrix's `delete` column says `—`, the template contradicts the plan and the template wins at runtime — any member can permanently delete any of their group's rows. Choose `write` when deletion should stay with administrators.
+
+Call out all three parts in the Phase A map and emit all three in Phase B. `template-md.md` → "Token → `template.json` mapping" gives the per-cell mapping, and `packages/skill-tests/src/formio-resource-planner/example-access-consistency.test.ts` enforces it over the checked-in examples.
+
+See `template-json.md` → "Choosing the types" for the full type menu and the delete decision, and [`../../formio-api/references/runtime-access-control.md`](../../formio-api/references/runtime-access-control.md) for the runtime description.
 
 ## Transitive group access — 2+ levels below the group
 

@@ -224,7 +224,7 @@
       "name": "group",
       "form": "teamUser",
       "priority": 5,
-      "method": ["create"],
+      "method": ["create", "update", "delete"],
       "handler": ["after"],
       "settings": {
         "group": "team",
@@ -378,7 +378,7 @@
         },
         {
           "type": "read_all",
-          "roles": ["administrator"]
+          "roles": ["administrator", "salesRep"]
         },
         {
           "type": "update_all",
@@ -399,6 +399,12 @@
       "components": [
         {
           "type": "select",
+          "submissionAccess": [
+            {
+              "type": "read",
+              "roles": []
+            }
+          ],
           "key": "team",
           "label": "Team",
           "widget": "choicesjs",
