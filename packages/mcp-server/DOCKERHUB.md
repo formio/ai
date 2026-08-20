@@ -42,7 +42,7 @@ Works with Claude Code, Claude Desktop, Cursor, VS Code, Windsurf, Cline, and an
 | --- | --- | --- |
 | `FORMIO_PROJECT_URL` | yes | Full project URL — `https://examples.form.io` on the hosted cloud, `https://forms.mysite.com/myproject` or `https://myproject.mysite.com` when self-hosted, depending on that deployment's project routing |
 | `FORMIO_API_KEY` | recommended | Project API key. See authentication below. |
-| `FORMIO_BASE_URL` | no | The deployment hosting the project — always `https://api.form.io` on the hosted cloud (the default), your own host when self-hosting. Never a `*.form.io` project subdomain. |
+| `FORMIO_BASE_URL` | no | The deployment hosting the project. Usually leave it unset: it is derived from the project URL — `https://api.form.io` for a project on a `form.io` host, the parent path for a sub-directory-routed one. Supply it only for a path-less project URL on your own domain, whose deployment cannot be derived. Never a `*.form.io` project subdomain. |
 | `FORMIO_AUTH_HOST` | no | Bind address for browser login (default `127.0.0.1`). |
 | `FORMIO_AUTH_PORT` | no | Fixed port for browser login, so it can be published from a container. |
 | `FORMIO_AUTH_TIMEOUT` | no | Seconds to wait for a browser login (default `900`). |

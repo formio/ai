@@ -56,22 +56,20 @@ These are the only two supported inclusion modes. Never import from `@formio/cor
 
 `Formio.createForm` renders into any block element you hand it — conventionally an empty `<div>`. The renderer owns that element's contents; do not manage its children from your own code.
 
-## Hosted vs SaaS URL configuration
+## URL configuration
 
-- SaaS: `FORMIO_BASE_URL` is always `https://api.form.io`; `FORMIO_PROJECT_URL` is `https://<project>.form.io`.
-- Self-hosted, sub-directory projects: `FORMIO_BASE_URL` is your server root (e.g. `https://forms.mysite.com`); `FORMIO_PROJECT_URL` appends the project path (e.g. `https://forms.mysite.com/myproject`).
-- Self-hosted, sub-domain projects: `FORMIO_BASE_URL` is still your server root (e.g. `https://forms.mysite.com`), but `FORMIO_PROJECT_URL` is a sibling subdomain of your own domain (e.g. `https://myproject.mysite.com`) — not a path under the base URL.
+**Where these two values come from.** The hosts below are illustrations. When you write these calls into a real application, take both URLs from the MCP server rather than typing them — run `npx -y @formio/mcp@0.10.0 project get --cwd "$(pwd)"` and use exactly what it prints: its `Project URL` for `setProjectUrl`, its `Base URL` for `setBaseUrl`. Do not hardcode an example host, do not derive either URL from the other, and do not carry a value over from another project or an earlier session — the mapping the server reports is what every build-time Form.io tool call resolves, so a different value here ships an application pointed at a deployment the tooling is not managing. If the command reports a value missing, relay its instruction, persist the answer with the `project set` command it names, and re-run it.
 
-Which of the two self-hosted shapes applies is a property of that deployment, so read both values rather than deriving one from the other.
+Every deployment shape is handled by that one command, so there is nothing to work out here: whichever routing the deployment uses, `project get` reports the pair that matches it.
 
 ```js
 import { Formio } from '@formio/js';
 
-Formio.setBaseUrl('https://forms.mysite.com'); // FORMIO_BASE_URL
-Formio.setProjectUrl('https://forms.mysite.com/myproject'); // FORMIO_PROJECT_URL
+Formio.setBaseUrl('https://forms.mysite.com'); // the Base URL from `project get`
+Formio.setProjectUrl('https://forms.mysite.com/myproject'); // the Project URL from `project get`
 ```
 
-Form URLs passed to `Formio.createForm` are `{FORMIO_PROJECT_URL}/{formPath}`.
+Form URLs passed to `Formio.createForm` are `{projectUrl}/{formPath}`.
 
 ## See also
 

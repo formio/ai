@@ -22,6 +22,16 @@ Do **not** work around missing tools by making direct HTTP requests against a Fo
 
 That ban is on **build-time** work — the configuring you do in this session. It says nothing about the application you are building: an app is expected to call the Form.io REST API **at runtime**, to log its users in and to read and write their submissions, and [`formio-api`](../../formio-api/SKILL.md)'s runtime-scope references document those endpoints for exactly that code.
 
+**Available tools are not a configured project.** Every Form.io tool resolves which project it targets from a mapping keyed on a working directory, so pass `cwd` — the user's current working directory — on every Form.io tool call; omitting it resolves against the MCP server's own directory, which is fixed at spawn and may be mapped to a different project. Before the first call that reads from or writes to a deployment, ask the server what this directory resolves to:
+
+```bash
+npx -y @formio/mcp@0.10.0 project get --cwd "$(pwd)"
+```
+
+On success, what it prints IS the configuration. There is one value to think about — the **Project URL**, the full URL of the Form.io project this work reads and writes. The **Base URL** (the deployment hosting it) is normally DERIVED from that project URL rather than supplied, so it is not a second thing to ask for. The values may come from a committed `formio.json` tracked with the application's own source, from this directory's mapping, or from the environment — the command says which. Do not ask the user to confirm or re-supply either one. On exit `1` — nothing is recorded for this directory — relay that message's own instruction to the user, ask for the single value it names, run the `project set` command it names, and re-run. On exit `3` the project IS recorded and one named value is still missing — the Base URL, for a project URL that names no deployment of its own: relay that message the same way, ask for that one value, run the `project set --base-url` command it names, and re-run. Do not re-ask for the Project URL there; that message deliberately does not request it. On exit `2` the command could not answer at all (an unreadable `~/.formio/projects.json`, a `formio.json` that will not parse, a malformed URL): do NOT interview, because a `project set` would fail for the same unreported reason and the loop would repeat with the cause never named — relay the message and stop until it is fixed. Before the first call that WRITES (`form_create`, `form_update`, `role_create`, `action_create`, `project_import`), state the resolved Project URL and Base URL in one line, so a wrong target is caught before anything is written to it.
+
+Never invent a Base URL, never reuse one from another project or an earlier session, and never edit `~/.formio/projects.json` by any means — its shape, its `0600` mode, and its merge rules belong to the server, and `project set` / `project_set` are how you reach them. The server's own messages carry the URL shapes and the remedy for each; this skill does not restate them.
+
 ## Feature shapes this skill handles
 
 Four shapes, all driven from the planner's Resource Map — every one of them ends in resource NgModules wired through `FormioResourceRoutes()`:
@@ -70,11 +80,13 @@ You are reached two ways: directly (the user asks for Angular resource work) or 
 - `newResourceNames` (extend path) — the delta resources from the planner's delta plan; generate modules ONLY for these. Existing modules are integration points, never regenerated.
 - `frontendDesignStatus` — `'available'` | `'declined'`; carries through to the Phase A disclosure line.
 
-**In handoff mode, skip interview round 1 entirely.** The workspace is `workspacePath`; the URLs are NOT in the payload by design — read `FormioAppConfig` (`appUrl`, `apiUrl`) from `<workspacePath>/src/app/config.ts` (the file the parent CONFIG phase wrote). If that file is missing or has placeholders, THEN fall back to asking. Design language: for an existing app, read its current styles and match; only ask when nothing is established. Rounds 2–4 still run but compress hard — the map plus `newResourceNames` answers most of them, so confirm in one batch or skip when unambiguous.
+**In handoff mode, skip interview round 1 entirely.** The workspace is `workspacePath`; the URLs are NOT in the payload by design — resolve them with `npx -y @formio/mcp@0.10.0 project get --cwd "<workspacePath>"`, whose `Project URL` is `appUrl` and whose `Base URL` is `apiUrl`. Read `<workspacePath>/src/app/config.ts` too, and compare: it is a record of what the app ships with, not the authority. When the two agree, proceed. When they DISAGREE — a clone on a fresh machine, a re-pointed project, a hand edit — stop and ask which is correct, naming both pairs and where each came from; writing modules against one while the tools resolve the other is the split-brain this check exists to catch. When `project get` reports a value missing, relay its instruction and persist the answer with the `project set` command it names. Design language: for an existing app, read its current styles and match; only ask when nothing is established. Rounds 2–4 still run but compress hard — the map plus `newResourceNames` answers most of them, so confirm in one batch or skip when unambiguous.
 
 When invoked directly (no payload), run the full interview below.
 
 ## The interview
+
+> **`FormioAppConfig` renames both URLs.** `appUrl` is the **Project URL** — the project this application reads and writes, and the one value anyone supplies. `apiUrl` is the **Base URL** — the deployment hosting it, which is normally derived from the Project URL rather than supplied. Take both from `npx -y @formio/mcp@0.10.0 project get --cwd "<workspace root>"`; never compose, derive, or hand-type either one yourself.
 
 Work through these rounds; compress aggressively when the user has already answered — the map itself answers most of them. Full checklists and round-skipping heuristics: [references/interview-guide.md](references/interview-guide.md).
 
@@ -83,7 +95,7 @@ Work through these rounds; compress aggressively when the user has already answe
 One batched question round covering three things — full question wording in [references/interview-guide.md](references/interview-guide.md):
 
 1. **New or existing Angular workspace?** (existing → workspace root path; new → kebab-case app name)
-2. **Form.io project URL** (`FORMIO_PROJECT_URL`) — the value that goes into `FormioAppConfig.appUrl`. For an existing workspace, read it from `src/app/config.ts` first and just confirm; only ask when the file is absent or holds a placeholder (a `YOUR_FORMIO_PROJECT_URL` placeholder called out in Phase A is acceptable).
+2. **Form.io project URL** (`projectUrl`) — the value that goes into `FormioAppConfig.appUrl`. Do not ask for this: resolve it with `project get` for the workspace directory, and reconcile it against `src/app/config.ts` as above. Ask only when the command itself says a value is missing, and then only for the value it names.
 3. **Design language** — **Bootstrap 5** (matches angular-demo, default), **Tailwind**, **Material**, **the workspace's existing design system**, or **unstyled HTML**. Routing shape is identical regardless; only template classes and markup change.
 
 ### 2. Confirm the resource set
@@ -151,7 +163,7 @@ After all files are emitted, finish with a short "Next steps" section. **In hand
 2. `npm install` (or `npm install @formio/angular @formio/js bootstrap font-awesome` in an existing workspace)
 3. Import your project template (if not yet imported):
    `curl -X POST -H "x-jwt-token: $JWT" -H "Content-Type: application/json" \
-     -d "{\"template\": $(cat template.json)}" $FORMIO_PROJECT_URL/import`
+     -d "{\"template\": $(cat template.json)}" {projectUrl}/import`
 4. `ng serve` and open <http://localhost:4200>
 5. Sign up at `/register` — you are the first user; promote yourself to `administrator` in the Form.io portal, then sign back in.
 ```

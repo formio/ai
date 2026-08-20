@@ -1,16 +1,24 @@
 import path from 'path';
 import { z } from 'zod';
 import {
+  BASE_URL_UNRESOLVED_GUIDANCE,
   DEFAULT_BASE_URL,
   FormioConfig,
   ResolvedFormioConfig,
+  PROJECT_URL_GUIDANCE,
   normalizeHttpUrl,
   stripTrailingSlashes,
 } from './config.js';
 import { ProjectMapUnreadableError, projectMapPath, readProjectEntry } from './project-map.js';
+import { projectCommand } from './cli-launch.js';
+import {
+  COMMITTED_CONFIG_FILE,
+  CommittedProjectConfig,
+  findCommittedConfig,
+} from './committed-config.js';
 
 const CWD_DESCRIPTION =
-  "User's current working directory as an absolute path. Selects the Form.io project mapped to that directory in ~/.formio/projects.json — call project_set to create the mapping. Pass it on every call whenever you know it: omitting it resolves against the MCP server's own working directory, which is fixed at spawn and may be a different directory mapped to a different project. Only a FORMIO_PROJECT_URL set in the server environment makes it unnecessary, because that pin takes precedence over every mapping.";
+  "User's current working directory as an absolute path. Selects the Form.io project that directory resolves to, by scope, narrowest first: a committed formio.json found by walking up from it, then the working-directory mapping project_set writes, then FORMIO_PROJECT_URL in the environment, which is the weakest of the three. Pass it on EVERY call whenever you know it: omitting it resolves against the MCP server's own working directory, which is fixed at spawn and may resolve to a different project. No environment variable removes the need for it — the environment is the source a file or a mapping overrides, not the one that overrides them.";
 
 // One schema for every client. Requiredness cannot live here: whether a cwd is
 // needed depends on the environment the server was launched with, and this
@@ -25,16 +33,16 @@ export const cwdSchema = z
   .optional()
   .describe(CWD_DESCRIPTION);
 
-// The only configuration guidance a stand-alone server can give, so it names
-// the base URL too: omitting it defaults to api.form.io, which builds the login
-// URL and would send a self-hosted user to the wrong deployment.
+// The only configuration guidance a stand-alone server can give for the value it
+// is missing. It names the project URL alone: the base URL that will be needed
+// depends on which project URL the user supplies, and requireBaseUrl raises the
+// second half if and when that becomes real.
 interface MissingProject {
   cwd: string | undefined;
   mapCwd: string;
-  suggested?: string;
 }
 
-function missingProjectError({ cwd, mapCwd, suggested }: MissingProject): Error {
+function missingProjectError({ cwd, mapCwd }: MissingProject): Error {
   // Which directory was searched is the whole answer when no cwd was passed: the
   // server's own is not the user's, so "nothing is configured" without it sends
   // the caller to project_set, which writes a mapping the next cwd-passing call
@@ -45,14 +53,45 @@ function missingProjectError({ cwd, mapCwd, suggested }: MissingProject): Error 
   const how = cwd
     ? `project_set with cwd=${cwd} and the project URL`
     : "project_set with cwd set to the user's current working directory and the project URL — and pass that same cwd on every Form.io tool call";
-  // A configured default is offered here rather than applied during resolution:
-  // the agent must confirm it and persist it, so nothing is written to a project
-  // the user did not choose for this directory.
-  const offer = suggested
-    ? ` A default is configured (FORMIO_DEFAULT_PROJECT_URL): ${suggested} — the suggested project. Confirm it with the user before using it, then persist it with the same call.`
-    : '';
+  // Names the remedy in BOTH vocabularies, because the same string reaches an
+  // agent holding MCP tools and a caller holding a shell, and neither can act on
+  // the other's form. Carries the shape guidance for the same reason: no skill
+  // document restates it any more, so an agent that never read the server's
+  // instructions has this message and nothing else.
+  //
+  // Asks for the project URL ALONE. The base URL that will be needed depends on
+  // the answer — a hosted-cloud project needs none, and a sub-directory one is
+  // derived — so demanding both here presents a compound task and asks for a
+  // value that is usually never required. requireBaseUrl raises the second half
+  // if and when it becomes real.
   return new Error(
-    `No Form.io project is configured${where}. Ask the user for their Project URL and Base URL, then call ${how} (pass baseUrl too — it defaults to ${DEFAULT_BASE_URL}, which is wrong for a self-hosted deployment and is what the login URL is built from).${offer} Setting FORMIO_PROJECT_URL and FORMIO_BASE_URL in the server environment works as well.`
+    `No Form.io project is configured${where}, and no ${COMMITTED_CONFIG_FILE} was found by walking up from it. ` +
+      `Ask the user for their Project URL, then call ${how}, or run: ${projectCommand(`set --project-url <project_url> --cwd ${cwd ?? mapCwd}`)}. ` +
+      `To record the target with the code instead — versioned, and shared with everyone who clones it — add a ${COMMITTED_CONFIG_FILE} holding {"projectUrl": "..."} in the application's own folder, or run the same command with --scope repo. ` +
+      `${PROJECT_URL_GUIDANCE} FORMIO_PROJECT_URL in the server environment supplies one too, but it is the weakest source: a ${COMMITTED_CONFIG_FILE} or a mapping overrides it.`
+  );
+}
+
+// The base URL is required only to authenticate, so the demand for one is raised
+// here rather than during resolution: an API-key deployment never reads the
+// value, and failing its calls over a URL it does not use would break a working
+// configuration. Callers on the auth path funnel their reads through this.
+//
+// Deliberately NOT the unset-project wording. The project URL is configured and
+// correct; only its deployment is missing, so sending the agent to interview both
+// URLs from scratch is the wrong remedy — and project_set's own base-URL fallback
+// would then re-persist whatever the environment holds.
+export function requireBaseUrl(config: ResolvedFormioConfig): string {
+  if (config.baseUrl) {
+    return config.baseUrl;
+  }
+  throw new Error(
+    `The Base URL for ${config.projectUrl} cannot be determined, so JWT authentication cannot proceed. ` +
+      `${BASE_URL_UNRESOLVED_GUIDANCE} ` +
+      `Guessing one would build the portal-login URL and key the cached token against a deployment you do not use. ` +
+      `Set it with project_set (pass baseUrl alongside the cwd), or run: ${projectCommand(`set --base-url <base_url> --cwd ${config.cwd ?? process.cwd()}`)}. ` +
+      `The project itself is configured — only its Base URL is missing, so do not ask for the Project URL again. ` +
+      `An API key needs no Base URL and is unaffected.`
   );
 }
 
@@ -60,14 +99,35 @@ function missingProjectError({ cwd, mapCwd, suggested }: MissingProject): Error 
 // code that knows: a reader comparing the resolved value against the mapping
 // cannot tell "the mapping supplied it" from "the mapping happened to hold the
 // same string", and https://api.form.io is the value most likely to collide.
-export type ProjectUrlSource = 'environment' | 'mapping';
-export type BaseUrlSource = 'environment' | 'mapping' | 'default';
+export type ProjectUrlSource = 'committed' | 'mapping' | 'environment';
+export type BaseUrlSource = 'committed' | 'mapping' | 'environment' | 'derived' | 'unresolved';
 
 export interface ProjectResolution {
   config: ResolvedFormioConfig;
   sources: {
     projectUrl: ProjectUrlSource;
     baseUrl: BaseUrlSource;
+  };
+  // The file that supplied a committed value, by path. Reported rather than
+  // inferred because the upward walk means the governing file is usually not in
+  // the directory the caller passed.
+  committedFilePath?: string;
+  // Every layer that COULD have supplied the project URL, whether or not it won.
+  // A reporting caller needs the losers to say what was shadowed — without them,
+  // "my project_set did nothing" has no answer in the output.
+  candidates: {
+    committed?: string;
+    mapping?: string;
+    environment?: string;
+  };
+  // The same losers for the base URL. Reported separately rather than folded into
+  // `candidates` because the two halves resolve independently — a committed
+  // project can be paired with a mapped deployment — so one shared list would
+  // attribute a shadowed deployment to whichever layer supplied the project.
+  baseUrlCandidates: {
+    committed?: string;
+    mapping?: string;
+    environment?: string;
   };
 }
 
@@ -88,16 +148,165 @@ interface MappedEnvRead {
   onNote: (message: string) => void;
 }
 
+// A project URL's host tells us whether DEFAULT_BASE_URL can possibly be right.
+// The hosted cloud is the only deployment whose base URL is a constant, and it
+// is api.form.io for every project on it — so a project sub-domain of form.io
+// implies it, and nothing else does.
+function isHostedCloudProject(projectUrl: URL): boolean {
+  return projectUrl.hostname === 'form.io' || projectUrl.hostname.endsWith('.form.io');
+}
+
+// A sub-directory-routed project URL is its deployment plus exactly ONE
+// segment — the project's name — so the deployment is the project URL's parent,
+// not its origin. Those coincide only for a single-segment path: a deployment
+// mounted at https://forms.mysite.com/one serves project `two` at
+// https://forms.mysite.com/one/two, and flattening that to the origin would
+// build the portal login and ${baseUrl}/current against a host root that serves
+// neither. Returns undefined when there is no path to take a parent of.
+function deriveBaseUrlFromProjectPath(projectUrl: URL): string | undefined {
+  const segments = projectUrl.pathname.split('/').filter(Boolean);
+  if (segments.length === 0) {
+    return undefined;
+  }
+  const parentPath = segments.slice(0, -1).join('/');
+  return stripTrailingSlashes(`${projectUrl.origin}${parentPath ? `/${parentPath}` : ''}`);
+}
+
+// Whether a project URL names its own deployment, and so needs nothing recorded.
+// Asked by the two WRITERS — the project_set tool and `project set` — before they
+// fall back to a global FORMIO_BASE_URL. That global is one value answering a
+// per-project question: written into a mapping for a project that derives its own
+// deployment, it replaces a per-project-correct answer with a stale one that then
+// outranks derivation for that directory forever. api.form.io is the value most
+// likely to be exported, which makes the failure a portal login sent to a
+// deployment the user does not use — the exact substitution the shape rules exist
+// to prevent.
+//
+// Answered by asking chooseBaseUrl itself, so "derivable" cannot drift from what
+// resolution actually derives.
+export function derivesOwnBaseUrl(projectUrl: string): boolean {
+  return chooseBaseUrl(projectUrl, []).baseUrlSource === 'derived';
+}
+
+export interface EnvironmentBaseUrl {
+  projectUrl: string;
+  // Read lazily: a project shape the environment cannot answer for never touches
+  // the variable, so no "Ignoring FORMIO_BASE_URL" note is emitted about a value
+  // that was never going to be consulted.
+  read: () => string | undefined;
+  onNote?: (message: string) => void;
+}
+
+// Whether FORMIO_BASE_URL may answer for THIS project. Asked by the read path and
+// by both writers, so what resolution honours and what a `project set` persists
+// cannot drift.
+//
+// FORMIO_BASE_URL is one global answering a per-project question, and the value
+// most likely to be left over in a shell is https://api.form.io — so ranking it
+// above derivation sent the portal login and the token-cache key to a deployment
+// the user does not use. Suppressing it outright is not the answer either: a
+// deployment whose API root is NOT the project URL's parent — project
+// https://forms.mysite.com/myproject served by https://forms.mysite.com/api — has
+// no other way to say so on a launch configured purely by environment, with no
+// writable ~/.formio and no committed file.
+//
+// So the environment is honoured exactly where it can only be talking about this
+// project:
+//   - a hosted-cloud project ignores it always. Its deployment is api.form.io for
+//     every project on it, and a *.form.io host is never a base URL, so nothing
+//     the variable holds can be a correction.
+//   - a project that derives its own deployment honours it only when the two share
+//     an ORIGIN. Same host is a statement about this deployment's own layout; a
+//     different host is the stale global this gate exists to reject.
+//   - a project that derives nothing honours it unconditionally. That shape names
+//     no deployment at all, and the environment is the only source a container or
+//     CI launch has.
+export function usableEnvironmentBaseUrl({
+  projectUrl,
+  read,
+  onNote,
+}: EnvironmentBaseUrl): string | undefined {
+  let parsed: URL;
+  try {
+    parsed = new URL(projectUrl);
+  } catch {
+    return read();
+  }
+
+  if (isHostedCloudProject(parsed)) {
+    return undefined;
+  }
+
+  const value = read();
+  if (!value) {
+    return undefined;
+  }
+
+  const derived = deriveBaseUrlFromProjectPath(parsed);
+  if (!derived) {
+    return value;
+  }
+  if (sameOrigin(value, parsed)) {
+    return value;
+  }
+
+  onNote?.(
+    `Ignoring FORMIO_BASE_URL (${value}): it is on another host than ${projectUrl}, whose own deployment is ${derived}. One global cannot answer for every project. Record ${value} for this directory with project_set if it is right.`
+  );
+  return undefined;
+}
+
+function sameOrigin(candidate: string, projectUrl: URL): boolean {
+  try {
+    return new URL(candidate).origin === projectUrl.origin;
+  } catch {
+    return false;
+  }
+}
+
 // Ordered candidates in, the winner and its provenance out. Precedence is stated
 // once, at the call site, as the order of the list.
-function chooseBaseUrl(candidates: ReadonlyArray<readonly [BaseUrlSource, string | undefined]>): {
-  baseUrl: string;
+//
+// The no-candidate case is decided by the shape of the project URL rather than
+// by a constant. Three outcomes, and the third is the point: a path-less
+// customer project URL leaves the base URL UNRESOLVED instead of silently
+// becoming api.form.io. The deployment is a sibling sub-domain of the same
+// parent domain, and nothing in the project URL names it — the one thing the
+// server's own guidance already says must be asked for rather than derived.
+function chooseBaseUrl(
+  resolvedProjectUrl: string,
+  candidates: ReadonlyArray<readonly [BaseUrlSource, string | undefined]>
+): {
+  baseUrl: string | undefined;
   baseUrlSource: BaseUrlSource;
 } {
   const chosen = candidates.find(([, value]) => Boolean(value));
-  return chosen?.[1]
-    ? { baseUrl: chosen[1], baseUrlSource: chosen[0] }
-    : { baseUrl: DEFAULT_BASE_URL, baseUrlSource: 'default' };
+  if (chosen?.[1]) {
+    return { baseUrl: chosen[1], baseUrlSource: chosen[0] };
+  }
+
+  let parsed: URL;
+  try {
+    parsed = new URL(resolvedProjectUrl);
+  } catch {
+    // Unparseable project URLs are rejected upstream by normalizeHttpUrl; if one
+    // reaches here it is not a deployment we can name, so say so rather than
+    // guess.
+    return { baseUrl: undefined, baseUrlSource: 'unresolved' };
+  }
+
+  // Reported as DERIVED rather than defaulted. The hosted cloud is the one
+  // deployment whose base URL is a constant, so naming it from a form.io host is a
+  // derivation from the project URL like any other — and calling it a default
+  // invited the reading the shape rules exist to remove, that the server guessed.
+  if (isHostedCloudProject(parsed)) {
+    return { baseUrl: DEFAULT_BASE_URL, baseUrlSource: 'derived' };
+  }
+
+  const derived = deriveBaseUrlFromProjectPath(parsed);
+  return derived
+    ? { baseUrl: derived, baseUrlSource: 'derived' }
+    : { baseUrl: undefined, baseUrlSource: 'unresolved' };
 }
 
 // An unreadable project map is a real problem the caller has to hear about —
@@ -161,7 +370,9 @@ function readMappedEnv({
     if (!tolerateUnreadable || !(error instanceof ProjectMapUnreadableError)) {
       throw error;
     }
-    onNote(`${error.message}\nContinuing with the pinned FORMIO_PROJECT_URL.`);
+    onNote(
+      `${error.message}\nContinuing with the committed ${COMMITTED_CONFIG_FILE}, which supplies both URLs, so the map cannot change the answer.`
+    );
     return undefined;
   }
 }
@@ -176,11 +387,12 @@ export function resolveProjectConfig(
   return resolveProject(cwd, baseConfig, options).config;
 }
 
-// Precedence: an explicit FORMIO_PROJECT_URL from the environment wins, then the
-// per-cwd mapping, then an actionable error. Environment-first keeps a pinned
-// launch (CI, a hosted runner, an .mcp.json with an explicit project)
-// deterministic even when a stale mapping exists for the same directory.
-// Precedence stays defined here for every caller.
+// Precedence, by SCOPE and narrowest first: the nearest committed formio.json,
+// then the per-cwd mapping, then FORMIO_PROJECT_URL from the environment, then an
+// actionable error. The environment is the WEAKEST source on purpose — a
+// deployment that must target one project deterministically supplies only the
+// source it wants used, rather than relying on a variable to outrank the file
+// sitting next to the code. Precedence stays defined here for every caller.
 export function resolveProject(
   cwd: string | undefined,
   baseConfig: FormioConfig,
@@ -197,81 +409,108 @@ export function resolveProject(
   // The same key project_set writes under. A client that cannot supply a cwd
   // gets the server's own process cwd on the write side, so reading only when a
   // cwd was passed produced a mapping that reported success and could never be
-  // read back: the next tool call said "no project configured", whose remedy is
-  // project_set, which writes the identical unreadable entry again.
+  // read back.
   const mapCwd = cwd || process.cwd();
-  // Read only where it can change the answer. A pin carrying its own base URL
-  // needs nothing from the map, and reading it there turned an unreadable
-  // ~/.formio/projects.json into a hard failure of a launch that never depended
-  // on the file — exactly the determinism this module promises above.
-  const mappedEnv =
-    envProjectUrl && baseConfig.baseUrl
-      ? undefined
-      : readMappedEnv({ mapCwd, cacheDir, tolerateUnreadable: Boolean(envProjectUrl), onNote });
 
-  // Falsy, not nullish, and deliberately the same test as the line above: an
-  // empty FORMIO_PROJECT_URL is an unanswered prompt, not a pinned project, and
-  // treating it as one would discard the mapping and leave project_set with no
-  // way to fix it.
-  const projectUrl = envProjectUrl || mappedEnv?.FORMIO_PROJECT_URL;
-  if (!projectUrl) {
+  // Ordered narrowest-scope-first, and read unconditionally rather than only
+  // where they can change the answer: with the committed file outranking both
+  // other sources, a pin no longer short-circuits the lookup.
+  //
+  // A broken committed file throws out of here on purpose. It is not an absent
+  // file, and answering "nothing configured" would send the caller to project_set
+  // to write a mapping this file then shadows.
+  const committed: CommittedProjectConfig | undefined = findCommittedConfig(mapCwd, { onNote });
+  // An unreadable map is tolerated ONLY when nothing is left for it to decide —
+  // a committed file supplying BOTH URLs. Otherwise it fails, and the reordering
+  // is why: the mapping now outranks the environment for both halves, so skipping
+  // it could resolve a lower-precedence value and target a project the unreadable
+  // entry would have overridden. Under the old environment-first order the map
+  // was strictly lower for the project URL, which made skipping safe; it is not
+  // safe any more.
+  const committedIsComplete = Boolean(committed?.projectUrl && committed?.baseUrl);
+  const mappedEnv = readMappedEnv({
+    mapCwd,
+    cacheDir,
+    tolerateUnreadable: committedIsComplete,
+    onNote,
+  });
+
+  // Falsy, not nullish: an empty FORMIO_PROJECT_URL is an unanswered prompt, not
+  // a pinned project.
+  const projectCandidates: ReadonlyArray<readonly [ProjectUrlSource, string | undefined]> = [
+    ['committed', committed?.projectUrl],
+    ['mapping', mappedEnv?.FORMIO_PROJECT_URL],
+    ['environment', envProjectUrl || undefined],
+  ];
+  const chosenProject = projectCandidates.find(([, value]) => Boolean(value));
+  if (!chosenProject?.[1]) {
     throw missingProjectError({
       cwd: cwd || undefined,
       mapCwd,
-      suggested: baseConfig.defaultProjectUrl,
     });
   }
+  const [projectUrlSource, projectUrl] = chosenProject as readonly [ProjectUrlSource, string];
+
   // Said out loud for the same reason project_set warns on the write side: the
   // server's process cwd is fixed at spawn and, for a plugin- or desktop-launched
-  // server, is not where the user is. Nothing else can surface this — an omitted
-  // cwd and a cwd that happens to match are indistinguishable from here — so a
-  // resolution against the wrong directory's project is otherwise silent.
-  if (!cwd && !envProjectUrl) {
+  // server, is not where the user is.
+  if (!cwd && projectUrlSource !== 'environment') {
     onNote(
-      `No cwd argument was passed, so the project was resolved from the mapping for ${mapCwd}, the MCP server's own working directory. Pass cwd on every Form.io tool call to target the user's directory.`
+      `No cwd argument was passed, so the project was resolved from ${mapCwd}, the MCP server's own working directory. Pass cwd on every Form.io tool call to target the user's directory.`
     );
   }
 
-  // Which side wins depends on which side supplied the project. When the mapping
-  // did, its base URL travels with it and outranks the environment global. When
-  // the environment pinned the project, an explicit FORMIO_BASE_URL is part of
-  // that pin and stands — and a pin carrying no base URL may borrow the mapped
-  // one, but ONLY when the mapping names the very project that was pinned.
-  // A base URL belongs to a deployment, not to a directory: lending
-  // https://forms.mysite.com to a pinned https://examples.form.io would send the
-  // portal login to a self-hosted host for a hosted project and cache the token
-  // under that host's key — the same silent wrong-host failure as defaulting a
-  // self-hosted pin to api.form.io, arrived at from the other side.
-  // getConfig leaves baseUrl undefined when the environment named none, so the
-  // default is applied last, once both have been consulted.
-  const mappedProjectUrl = mappedEnv?.FORMIO_PROJECT_URL;
-  const mappedBaseAppliesToPin =
-    envProjectUrl !== undefined &&
-    mappedProjectUrl !== undefined &&
-    stripTrailingSlashes(envProjectUrl) === stripTrailingSlashes(mappedProjectUrl);
-  const borrowableMappedBaseUrl =
-    !envProjectUrl || mappedBaseAppliesToPin ? mappedEnv?.FORMIO_BASE_URL : undefined;
-  const { baseUrl, baseUrlSource } = chooseBaseUrl(
-    envProjectUrl
-      ? [
-          ['environment', baseConfig.baseUrl],
-          ['mapping', borrowableMappedBaseUrl],
-        ]
-      : [
-          ['mapping', borrowableMappedBaseUrl],
-          ['environment', baseConfig.baseUrl],
-        ]
-  );
+  const normalizedProjectUrl = stripTrailingSlashes(projectUrl);
+  // The base URL walks the identical order. Before this it resolved
+  // mapping-first while the project URL resolved environment-first, so one pair
+  // resolved in two directions; the borrow-the-mapped-base-URL special case
+  // existed only to paper over that.
+  //
+  // With ONE exception, and it is the same exception the writers already make:
+  // FORMIO_BASE_URL is a single global answering a per-project question, so it is
+  // offered only for a project URL that names no deployment of its own. Ranked
+  // above derivation it beat the per-project-correct answer whenever the variable
+  // merely existed — api.form.io being the value most likely to be left over in a
+  // shell — which sent the portal login and the token-cache key to a deployment
+  // the user does not use. derivesOwnBaseUrl guarded that on the write side only,
+  // so the read path did it anyway and the guard bought nothing. The committed
+  // file and the mapping keep their rank: both are per-directory statements
+  // somebody wrote about THIS project, not one value standing in for every one.
+  //
+  // The shadowed global is still reported through baseUrlCandidates below, or
+  // "my FORMIO_BASE_URL did nothing" has no answer in `project get`'s output.
+  const environmentBaseUrl = usableEnvironmentBaseUrl({
+    projectUrl: normalizedProjectUrl,
+    read: () => baseConfig.baseUrl,
+    onNote,
+  });
+  const { baseUrl, baseUrlSource } = chooseBaseUrl(normalizedProjectUrl, [
+    ['committed', committed?.baseUrl],
+    ['mapping', mappedEnv?.FORMIO_BASE_URL],
+    ['environment', environmentBaseUrl],
+  ]);
 
   return {
     config: {
       ...baseConfig,
-      baseUrl: stripTrailingSlashes(baseUrl),
-      projectUrl: stripTrailingSlashes(projectUrl),
+      baseUrl: baseUrl && stripTrailingSlashes(baseUrl),
+      projectUrl: normalizedProjectUrl,
+      cwd: mapCwd,
     },
     sources: {
-      projectUrl: envProjectUrl ? 'environment' : 'mapping',
+      projectUrl: projectUrlSource,
       baseUrl: baseUrlSource,
+    },
+    ...(committed?.filePath ? { committedFilePath: committed.filePath } : {}),
+    candidates: {
+      ...(committed?.projectUrl ? { committed: committed.projectUrl } : {}),
+      ...(mappedEnv?.FORMIO_PROJECT_URL ? { mapping: mappedEnv.FORMIO_PROJECT_URL } : {}),
+      ...(envProjectUrl ? { environment: envProjectUrl } : {}),
+    },
+    baseUrlCandidates: {
+      ...(committed?.baseUrl ? { committed: committed.baseUrl } : {}),
+      ...(mappedEnv?.FORMIO_BASE_URL ? { mapping: mappedEnv.FORMIO_BASE_URL } : {}),
+      ...(baseConfig.baseUrl ? { environment: baseConfig.baseUrl } : {}),
     },
   };
 }

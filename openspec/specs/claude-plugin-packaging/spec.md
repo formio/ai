@@ -33,7 +33,13 @@ The pin SHALL be stamped rather than hand-typed. `pnpm sync:pins` reads the serv
 
 The cost of an exact pin is one window, which the spec accepts rather than closes by unpinning: `.claude-plugin/marketplace.json` installs from `./plugin`, so between the pin landing on main and npm accepting the publish, a fresh install names a version npm does not have yet and `npx` fails with `E404`. That window is one Release run, every step of which is idempotent, so a failed run is re-run; when it stays broken, publishing the server is the fix. `formio-mcp-setup` documents the `E404` for anyone who installs inside the window, and a client that does resolve a server too old to serve `project_set` surfaces it as missing tools, which every skill's preflight already routes to `formio-mcp-setup`.
 
-The bundled `server/stdio.mjs` remains built for the smoke test, which spawns it and sends `tools/list`, but it SHALL NOT be published in the `@formio/ai` tarball (`files` omits `server/`) and SHALL NOT be the command in a manifest reachable by a git clone, where the file does not exist. The `.mcpb` desktop bundle builds its own copy at `dist/mcpb/server/index.mjs`. `FORMIO_BASE_URL` SHALL continue to be supplied from `${user_config.formio_base_url}`, which is Claude Code's install-time prompt and has no equivalent in the vendor-neutral manifest.
+The bundled `server/stdio.mjs` remains built for the smoke test, which spawns it and sends `tools/list`, but it SHALL NOT be published in the `@formio/ai` tarball (`files` omits `server/`) and SHALL NOT be the command in a manifest reachable by a git clone, where the file does not exist. The `.mcpb` desktop bundle builds its own copy at `dist/mcpb/server/index.mjs`.
+
+The manifest SHALL declare no `userConfig` and SHALL pass no `env` block to the server. It launches with `command` and `args` alone. An install-time `FORMIO_BASE_URL` prompt is one global value answering a per-project question: the base URL is derived from the project URL wherever it can be, and the environment is the weakest resolution source — so it cannot override a committed `formio.json` or a working-directory mapping. Its only effect was on directories with nothing recorded, where per-project derivation is the better answer, and on a self-hosted install it silently satisfied the base URL for every project including ones on another deployment.
+
+Removing it blocks nothing. A project whose base URL cannot be derived resolves with the base URL absent, and the first call that authenticates with a JWT fails with a message naming `project set --base-url`, the `formio.json` `baseUrl` key, and the project it applies to — the same message a skill's preflight `project get` surfaces before any tool call.
+
+The `.mcpb` desktop bundle is the exception and SHALL keep its prompts, because a desktop host has no working directory to map and no repository to commit into, so an install-time value is its only practical route. Its project prompt SHALL set `FORMIO_PROJECT_URL` rather than an offering variable: the environment is the weakest source, so a value set there is overridden by a committed `formio.json` or a later `project_set`, which is exactly the "suggest without pinning" guarantee a separate offering variable used to provide. The bundle SHALL NOT reference `FORMIO_DEFAULT_PROJECT_URL`, which no longer exists.
 
 #### Scenario: Plugin manifest is loaded
 
@@ -56,12 +62,19 @@ The bundled `server/stdio.mjs` remains built for the smoke test, which spawns it
 - **WHEN** every manifest under `plugin/` is scanned for `${CLAUDE_PLUGIN_ROOT}` or `${PLUGIN_ROOT}` paths used as an MCP `command`
 - **THEN** none is found
 
-#### Scenario: User config still supplies the base URL
+#### Scenario: The manifest prompts for nothing and passes no environment
 
 - **WHEN** `plugin/.claude-plugin/plugin.json` is parsed
-- **THEN** its `formio-mcp` env maps `FORMIO_BASE_URL` to `${user_config.formio_base_url}`
-- **AND** `userConfig` declares that field
+- **THEN** it declares no `userConfig`
+- **AND** its `formio-mcp` entry has no `env` block
+- **AND** its `formio-mcp` entry declares only `command` and `args`
 
+#### Scenario: The desktop bundle prompts for a project without pinning one
+
+- **WHEN** `scripts/build-mcpb.ts` is inspected
+- **THEN** it declares a project user-config field mapped to `FORMIO_PROJECT_URL`
+- **AND** it does not reference `FORMIO_DEFAULT_PROJECT_URL`
+- **AND** it still declares a `formio_base_url` field, because a desktop host has no working directory to interview in
 ### Requirement: Plugin npm package publishes the built tree
 
 The `plugin/package.json` SHALL set `name` to `@formio/ai`, `publishConfig.access` to `public`, and `publishConfig.directory` to `../dist/plugin` so that `npm publish` uploads the built plugin tree rather than the source tree.
@@ -126,7 +139,7 @@ A `scripts/test-plugin.ts` script SHALL validate that `dist/plugin/` exists, tha
 
 ### Requirement: Plugin ships a README documenting environment variables
 
-The plugin source tree SHALL include `plugin/README.md` — copied by the build into `dist/plugin/README.md` and therefore published with `@formio/ai` — that documents every environment variable the bundled MCP server reads, marking each as required or optional and stating its default. At minimum the README SHALL list `FORMIO_PROJECT_URL` (required, no default), `FORMIO_API_KEY` (optional, default `undefined`), and `FORMIO_LOGIN_FORM` (optional, default `${FORMIO_PROJECT_URL}/user/login`), and SHALL describe the API-key vs. JWT authentication modes selected by presence/absence of `FORMIO_API_KEY`.
+The plugin source tree SHALL include `plugin/README.md` — copied by the build into `dist/plugin/README.md` and therefore published with `@formio/ai` — that documents every environment variable the bundled MCP server reads, marking each as required or optional and stating its default. At minimum the README SHALL list `FORMIO_PROJECT_URL` (optional, no default, and the weakest of the three project sources), `FORMIO_API_KEY` (optional, default `undefined`), and `FORMIO_LOGIN_FORM` (optional, default `{projectUrl}/user/login` — the resolved project URL, not the environment variable), and SHALL describe the API-key vs. JWT authentication modes selected by presence/absence of `FORMIO_API_KEY`.
 
 #### Scenario: README is published with the plugin
 

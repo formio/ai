@@ -1,10 +1,10 @@
 ## Overview
 
-Teams are Form.io's mechanism for granting a group of platform users shared access to one or more projects. This skill covers the full team lifecycle: creating and listing teams, adding and removing members, promoting members to admins, inviting users, assigning a team to a project, and deleting a team. Team CRUD is rooted at `${FORMIO_BASE_URL}/team`; the two cross-scope operations that bind a team to a project or check a member's project access live at `${FORMIO_PROJECT_URL}/...` and are labeled below.
+Teams are Form.io's mechanism for granting a group of platform users shared access to one or more projects. This skill covers the full team lifecycle: creating and listing teams, adding and removing members, promoting members to admins, inviting users, assigning a team to a project, and deleting a team. Team CRUD is rooted at `{baseUrl}/team`; the two cross-scope operations that bind a team to a project or check a member's project access live at `{projectUrl}/...` and are labeled below.
 
 ## Root URL
 
-All endpoints below are rooted at `${FORMIO_BASE_URL}` — the platform deployment endpoint, equivalent to bare `{{baseUrl}}/` in Postman. Two operations cross-reference `${FORMIO_PROJECT_URL}` (Postman `{{baseUrl}}/{{projectName}}`) and are explicitly labeled.
+All endpoints below are rooted at `{baseUrl}` — the platform deployment endpoint, equivalent to bare `{{baseUrl}}/` in Postman. Two operations cross-reference `{projectUrl}` (Postman `{{baseUrl}}/{{projectName}}`) and are explicitly labeled.
 
 ## Authentication
 
@@ -16,7 +16,7 @@ No MCP tool covers this operation — use the HTTP endpoint directly.
 
 ## Endpoints
 
-### POST ${FORMIO_BASE_URL}/team
+### POST {baseUrl}/team
 
 Create a new team owned by the calling platform user.
 
@@ -28,23 +28,23 @@ Request body:
 
 Response: the team submission document including `_id`, `form` (the Team resource form ID), `owner`, and metadata.
 
-### GET ${FORMIO_BASE_URL}/team/all
+### GET {baseUrl}/team/all
 
 List all teams the caller has visibility into (teams they own, are a member of, or admin).
 
 Response: array of team submission documents.
 
-### GET ${FORMIO_BASE_URL}/team/all (per user)
+### GET {baseUrl}/team/all (per user)
 
 Same endpoint as above; authorization context (the JWT in `x-jwt-token`) determines which teams are returned. There is no separate "teams per user" endpoint — the `/team/all` endpoint already filters by caller.
 
-### GET ${FORMIO_BASE_URL}/team/:teamId
+### GET {baseUrl}/team/:teamId
 
 Get a single team by ID.
 
 Response: the team submission document.
 
-### PUT ${FORMIO_BASE_URL}/team/:teamId
+### PUT {baseUrl}/team/:teamId
 
 Rename a team or update its metadata.
 
@@ -56,7 +56,7 @@ Request body:
 
 Response: the updated team document.
 
-### POST ${FORMIO_BASE_URL}/team/:teamId/member
+### POST {baseUrl}/team/:teamId/member
 
 Add a member to the team. Set `admin: true` to add as a team admin directly.
 
@@ -74,7 +74,7 @@ Request body:
 
 Response: the member submission document. If the email is already registered on the platform, the user is added directly; otherwise an invitation flow is triggered.
 
-### POST ${FORMIO_BASE_URL}/team/:teamId/member (add as admin)
+### POST {baseUrl}/team/:teamId/member (add as admin)
 
 Same endpoint as above — set `admin: true` in the request body:
 
@@ -82,7 +82,7 @@ Same endpoint as above — set `admin: true` in the request body:
 { "data": { "team": { "_id": "<teamId>" }, "email": "admin@example.com", "admin": true } }
 ```
 
-### PUT ${FORMIO_BASE_URL}/team/:teamId/member/:memberId
+### PUT {baseUrl}/team/:teamId/member/:memberId
 
 Promote an existing team member to admin (or demote to member). Only team admins and the team owner may invoke this.
 
@@ -92,17 +92,17 @@ Request body:
 { "data": { "email": "user@example.com", "admin": true } }
 ```
 
-### POST ${FORMIO_BASE_URL}/formio/user/login (login as team member)
+### POST {baseUrl}/formio/user/login (login as team member)
 
 Not a distinct team endpoint — this is the standard platform login flow (see `platform-auth.md`). Included in the Postman team workflow to illustrate logging in as a team member to accept an invite.
 
-### POST ${FORMIO_BASE_URL}/team/:teamId/join
+### POST {baseUrl}/team/:teamId/join
 
 Accept an outstanding team invitation. Called by the invited user (whose JWT is in `x-jwt-token`).
 
 Response: the accepted membership document.
 
-### PUT ${FORMIO_PROJECT_URL} _(project-endpoint, assign team to project)_
+### PUT {projectUrl} _(project-endpoint, assign team to project)_
 
 Cross-scope: grant a team access to a project by updating the project's access rules to include the team's roles. The full project body must be supplied (same shape as in `platform-projects.md` → Update Project). Add the team's access entries to the `access` array:
 
@@ -120,7 +120,7 @@ Cross-scope: grant a team access to a project by updating the project's access r
 
 Response: the updated project document.
 
-### GET ${FORMIO_BASE_URL}/team/:teamId/projects
+### GET {baseUrl}/team/:teamId/projects
 
 List projects a team has access to, with the team's permission level on each project.
 
@@ -138,17 +138,17 @@ Response:
 ]
 ```
 
-### GET ${FORMIO_PROJECT_URL}/form?select=title,type,modified _(project-endpoint, member access verification)_
+### GET {projectUrl}/form?select=title,type,modified _(project-endpoint, member access verification)_
 
 Cross-scope: verify a team member actually has access to a project's forms by listing them with the member's JWT. A `401`/`403` response indicates the team assignment did not propagate as expected.
 
 Response: array of form documents (projection limited by `select`).
 
-### DELETE ${FORMIO_BASE_URL}/team/:teamId/member/:memberId
+### DELETE {baseUrl}/team/:teamId/member/:memberId
 
 Remove a member from a team. Response: `200 OK`.
 
-### DELETE ${FORMIO_BASE_URL}/team/:teamId
+### DELETE {baseUrl}/team/:teamId
 
 Delete a team entirely. All member records are removed; the team's access on any project is revoked.
 

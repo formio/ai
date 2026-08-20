@@ -4,7 +4,7 @@ The Project Authentication API covers everything a project admin does to manage 
 
 ## Root URL
 
-All endpoints below are rooted at `${FORMIO_PROJECT_URL}` — the project endpoint, equivalent to `{{baseUrl}}/{{projectName}}` in Postman.
+All endpoints below are rooted at `{projectUrl}` — the project endpoint, equivalent to `{{baseUrl}}/{{projectName}}` in Postman.
 
 ## Authentication
 
@@ -16,7 +16,7 @@ No MCP tool covers this operation — use the HTTP endpoint directly.
 
 ## Endpoints
 
-### GET ${FORMIO_PROJECT_URL}/admin
+### GET {projectUrl}/admin
 
 Retrieve the `admin` resource definition — the Form.io resource that stores project admin records. Useful for discovering the admin submission schema (email/password fields, roles, access settings) before creating admins.
 
@@ -28,10 +28,10 @@ Example:
 
 ```bash
 curl -H "x-jwt-token: $FORMIO_JWT" \
-  "${FORMIO_PROJECT_URL}/admin"
+  "{projectUrl}/admin"
 ```
 
-### POST ${FORMIO_PROJECT_URL}/admin/submission
+### POST {projectUrl}/admin/submission
 
 Create a new project admin. The body is a submission against the `admin` resource — the `data` object carries the admin's email and password.
 
@@ -57,10 +57,10 @@ Example:
 ```bash
 curl -X POST -H "x-jwt-token: $FORMIO_JWT" -H "Content-Type: application/json" \
   -d '{"data":{"email":"admin@example.com","password":"CHANGEME"}}' \
-  "${FORMIO_PROJECT_URL}/admin/submission"
+  "{projectUrl}/admin/submission"
 ```
 
-### GET ${FORMIO_PROJECT_URL}/admin/submission
+### GET {projectUrl}/admin/submission
 
 List all project admin submissions.
 
@@ -72,10 +72,10 @@ Example:
 
 ```bash
 curl -H "x-jwt-token: $FORMIO_JWT" \
-  "${FORMIO_PROJECT_URL}/admin/submission"
+  "{projectUrl}/admin/submission"
 ```
 
-### GET ${FORMIO_PROJECT_URL}/admin/submission/:projectAdminId
+### GET {projectUrl}/admin/submission/:projectAdminId
 
 Retrieve a single project admin submission by its ID.
 
@@ -91,10 +91,10 @@ Example:
 
 ```bash
 curl -H "x-jwt-token: $FORMIO_JWT" \
-  "${FORMIO_PROJECT_URL}/admin/submission/69d6813b040fa2cea257285a"
+  "{projectUrl}/admin/submission/69d6813b040fa2cea257285a"
 ```
 
-### DELETE ${FORMIO_PROJECT_URL}/admin/submission/:projectAdminId
+### DELETE {projectUrl}/admin/submission/:projectAdminId
 
 Delete a project admin by ID. Irreversible — the admin loses access immediately.
 
@@ -110,10 +110,10 @@ Example:
 
 ```bash
 curl -X DELETE -H "x-jwt-token: $FORMIO_JWT" \
-  "${FORMIO_PROJECT_URL}/admin/submission/69d6813b040fa2cea257285a"
+  "{projectUrl}/admin/submission/69d6813b040fa2cea257285a"
 ```
 
-### GET ${FORMIO_PROJECT_URL}/admin/login
+### GET {projectUrl}/admin/login
 
 Retrieve the admin login form definition. This is the form whose submission endpoint accepts admin credentials in exchange for a JWT.
 
@@ -125,10 +125,10 @@ Example:
 
 ```bash
 curl -H "x-jwt-token: $FORMIO_JWT" \
-  "${FORMIO_PROJECT_URL}/admin/login"
+  "{projectUrl}/admin/login"
 ```
 
-### GET ${FORMIO_PROJECT_URL}/admin/login/action
+### GET {projectUrl}/admin/login/action
 
 List the actions attached to the admin login form. Typically includes a `login` action that validates credentials against the `admin` resource and issues a JWT.
 
@@ -140,10 +140,10 @@ Example:
 
 ```bash
 curl -H "x-jwt-token: $FORMIO_JWT" \
-  "${FORMIO_PROJECT_URL}/admin/login/action"
+  "{projectUrl}/admin/login/action"
 ```
 
-### POST ${FORMIO_PROJECT_URL}/admin/login/submission
+### POST {projectUrl}/admin/login/submission
 
 Submit admin credentials to the admin login form. On success, the response's `x-jwt-token` response header carries a JWT scoped to the admin user. Note: in normal MCP operation you already have a portal-login-issued JWT; this endpoint is documented for completeness when provisioning or testing admin credentials directly.
 
@@ -170,7 +170,7 @@ Example:
 curl -X POST -H "Content-Type: application/json" \
   -d '{"data":{"email":"admin@example.com","password":"CHANGEME"}}' \
   -D - \
-  "${FORMIO_PROJECT_URL}/admin/login/submission"
+  "{projectUrl}/admin/login/submission"
 ```
 
 ## Related Skills

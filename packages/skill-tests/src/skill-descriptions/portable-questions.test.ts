@@ -51,10 +51,8 @@ describe('no document leans on a client-built-in escape option', () => {
 describe('the batching rule survives', () => {
   const BATCHING_DOCUMENTS = [
     'plugin/skills/formio-application/SKILL.md',
-    'plugin/skills/formio-application/DEPLOYMENT.md',
     'plugin/skills/formio-application/INTENT.md',
     'plugin/skills/formio-angular/SKILL.md',
-    'plugin/skills/formio-angular/SETUP.md',
     'plugin/skills/formio-form-builder/SKILL.md',
     'plugin/skills/formio-form-builder/INTENT.md',
     'plugin/skills/formio-resource-planner/SKILL.md',
@@ -87,13 +85,24 @@ describe('the option sets each question offers survive', () => {
     expect(body).toContain('Modify / extend an existing app');
   });
 
-  it('DEPLOYMENT.md keeps both URL questions and their example shapes', () => {
-    const { body } = skillDocument('plugin/skills/formio-application/DEPLOYMENT.md');
+  // The URL interview is gone: the server owns the wording, and the skills relay
+  // whichever single value its message names. What must survive in the skills is
+  // the handoff field naming and the read surface, not a question round.
+  //
+  // The fields are `projectUrl` / `baseUrl`, not the FORMIO_* variable names they
+  // once borrowed: these are values in the orchestrator's context, and naming them
+  // after environment variables told the next phase to go read an environment that
+  // no shipped manifest populates.
+  it('angular SETUP reads the project from the server instead of interviewing', () => {
+    const { body } = skillDocument('plugin/skills/formio-angular/SETUP.md');
 
-    expect(body).toContain('https://api.form.io');
-    expect(body).toMatch(/self-hosted/i);
-    expect(body).toContain('FORMIO_PROJECT_URL');
-    expect(body).toContain('FORMIO_BASE_URL');
+    expect(body).toContain('project get');
+    expect(body).toContain('`projectUrl`');
+    expect(body).toContain('`baseUrl`');
+    expect(body).not.toContain('FORMIO_PROJECT_URL');
+    expect(body).not.toContain('FORMIO_BASE_URL');
+    expect(body).toMatch(/relay/i);
+    expect(body).not.toMatch(/three valid shapes/i);
   });
 
   it('form-builder INTENT keeps the form type and embed intent in one round', () => {

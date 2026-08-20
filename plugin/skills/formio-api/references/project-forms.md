@@ -4,7 +4,7 @@ The Forms API covers everything a project admin does with form and resource defi
 
 ## Root URL
 
-All endpoints below are rooted at `${FORMIO_PROJECT_URL}` — the project endpoint, equivalent to `{{baseUrl}}/{{projectName}}` in Postman.
+All endpoints below are rooted at `{projectUrl}` — the project endpoint, equivalent to `{{baseUrl}}/{{projectName}}` in Postman.
 
 ## Authentication
 
@@ -14,16 +14,16 @@ Every request to these endpoints MUST include an `x-jwt-token` header holding th
 
 Prefer the MCP server's first-party tools when they cover the requested operation. Call the HTTP endpoint directly only when no MCP tool applies.
 
-| Operation                | Preferred MCP tool | Fallback endpoint                          |
-| ------------------------ | ------------------ | ------------------------------------------ |
-| Create a form            | `form_create`      | `POST ${FORMIO_PROJECT_URL}/form`          |
-| Get a form by ID or name | `form_get`         | `GET ${FORMIO_PROJECT_URL}/form/:idOrName` |
-| List forms               | `form_list`        | `GET ${FORMIO_PROJECT_URL}/form`           |
-| Update a form            | `form_update`      | `PUT ${FORMIO_PROJECT_URL}/form/:idOrName` |
+| Operation                | Preferred MCP tool | Fallback endpoint                 |
+| ------------------------ | ------------------ | --------------------------------- |
+| Create a form            | `form_create`      | `POST {projectUrl}/form`          |
+| Get a form by ID or name | `form_get`         | `GET {projectUrl}/form/:idOrName` |
+| List forms               | `form_list`        | `GET {projectUrl}/form`           |
+| Update a form            | `form_update`      | `PUT {projectUrl}/form/:idOrName` |
 
 ## Endpoints
 
-### GET ${FORMIO_PROJECT_URL}/form
+### GET {projectUrl}/form
 
 List forms and resources in the project, optionally filtered by type, name, or tag.
 
@@ -43,10 +43,10 @@ Example:
 
 ```bash
 curl -H "x-jwt-token: $FORMIO_JWT" \
-  "${FORMIO_PROJECT_URL}/form?type=form&select=title,name,path,type"
+  "{projectUrl}/form?type=form&select=title,name,path,type"
 ```
 
-### GET ${FORMIO_PROJECT_URL}/form/:idOrName
+### GET {projectUrl}/form/:idOrName
 
 Retrieve a single form by its MongoDB ID or machine name. Form.io accepts either in the same path segment.
 
@@ -58,10 +58,10 @@ Example:
 
 ```bash
 curl -H "x-jwt-token: $FORMIO_JWT" \
-  "${FORMIO_PROJECT_URL}/form/user-registration"
+  "{projectUrl}/form/user-registration"
 ```
 
-### GET ${FORMIO_PROJECT_URL}/:formPath
+### GET {projectUrl}/:formPath
 
 Retrieve a form by its URL alias (path). Useful when the caller has the path but not the ID.
 
@@ -69,7 +69,7 @@ Response: same shape as the ID-based GET.
 
 Errors: `404` if no form has that path.
 
-### POST ${FORMIO_PROJECT_URL}/form
+### POST {projectUrl}/form
 
 Create a new form or resource. The request body is a form definition.
 
@@ -106,10 +106,10 @@ Example:
 ```bash
 curl -X POST -H "x-jwt-token: $FORMIO_JWT" -H "Content-Type: application/json" \
   -d @form-definition.json \
-  "${FORMIO_PROJECT_URL}/form"
+  "{projectUrl}/form"
 ```
 
-### PUT ${FORMIO_PROJECT_URL}/form/:idOrName
+### PUT {projectUrl}/form/:idOrName
 
 Replace an existing form definition. The body SHOULD include the `_id` of the form being updated (Form.io treats this as a full document replacement; omitted fields are reset to defaults).
 
@@ -121,11 +121,11 @@ Errors: `400` for validation errors; `404` if the form does not exist; `409` if 
 
 Note: prefer `PATCH` (via `runtime-submissions.md` patterns extended to forms) if partial updates are needed — this endpoint is a full replacement.
 
-### PUT ${FORMIO_PROJECT_URL}/:formPath
+### PUT {projectUrl}/:formPath
 
 Alias-based update. Equivalent to the ID-based PUT but addressed by `path`. Useful when the caller has the alias but not the ID.
 
-### GET ${FORMIO_PROJECT_URL}/form/:idOrName/export
+### GET {projectUrl}/form/:idOrName/export
 
 Export all submission data for a form as JSON (default) or CSV.
 
@@ -141,7 +141,7 @@ Example (CSV):
 
 ```bash
 curl -H "x-jwt-token: $FORMIO_JWT" \
-  "${FORMIO_PROJECT_URL}/form/example-form/export?format=csv" \
+  "{projectUrl}/form/example-form/export?format=csv" \
   -o submissions.csv
 ```
 

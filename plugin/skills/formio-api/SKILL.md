@@ -20,20 +20,30 @@ Do **not** work around missing tools by making direct HTTP requests against a Fo
 
 That ban is on **build-time** work — the configuring you do in this session. It says nothing about the application you are building: an app is expected to call the Form.io REST API **at runtime**, to log its users in and to read and write their submissions, and `formio-api`'s runtime-scope references document those endpoints for exactly that code.
 
+**Available tools are not a configured project.** Every Form.io tool resolves which project it targets from a mapping keyed on a working directory, so pass `cwd` — the user's current working directory — on every Form.io tool call; omitting it resolves against the MCP server's own directory, which is fixed at spawn and may be mapped to a different project. Before the first call that reads from or writes to a deployment, ask the server what this directory resolves to:
+
+```bash
+npx -y @formio/mcp@0.10.0 project get --cwd "$(pwd)"
+```
+
+On success, what it prints IS the configuration. There is one value to think about — the **Project URL**, the full URL of the Form.io project this work reads and writes. The **Base URL** (the deployment hosting it) is normally DERIVED from that project URL rather than supplied, so it is not a second thing to ask for. The values may come from a committed `formio.json` tracked with the application's own source, from this directory's mapping, or from the environment — the command says which. Do not ask the user to confirm or re-supply either one. On exit `1` — nothing is recorded for this directory — relay that message's own instruction to the user, ask for the single value it names, run the `project set` command it names, and re-run. On exit `3` the project IS recorded and one named value is still missing — the Base URL, for a project URL that names no deployment of its own: relay that message the same way, ask for that one value, run the `project set --base-url` command it names, and re-run. Do not re-ask for the Project URL there; that message deliberately does not request it. On exit `2` the command could not answer at all (an unreadable `~/.formio/projects.json`, a `formio.json` that will not parse, a malformed URL): do NOT interview, because a `project set` would fail for the same unreported reason and the loop would repeat with the cause never named — relay the message and stop until it is fixed. Before the first call that WRITES (`form_create`, `form_update`, `role_create`, `action_create`, `project_import`), state the resolved Project URL and Base URL in one line, so a wrong target is caught before anything is written to it.
+
+Never invent a Base URL, never reuse one from another project or an earlier session, and never edit `~/.formio/projects.json` by any means — its shape, its `0600` mode, and its merge rules belong to the server, and `project set` / `project_set` are how you reach them. The server's own messages carry the URL shapes and the remedy for each; this skill does not restate them.
+
 ## Terminology
 
 Two distinct endpoints exist. These references NEVER conflate them:
 
-- **`baseUrl` / `base_url` → platform deployment endpoint → `FORMIO_BASE_URL`** (the Postman `{{baseUrl}}` variable when used bare, without `{{projectName}}`)
-- **`projectUrl` / `{{baseUrl}}/{{projectName}}` → project endpoint → `FORMIO_PROJECT_URL`** (a separate environment variable — not a computed sub-path)
+- **`baseUrl` / `base_url` → the platform deployment endpoint**, written `{baseUrl}` as a substitution slot (the Postman `{{baseUrl}}` variable when used bare, without `{{projectName}}`)
+- **`projectUrl` / `project_url` → the project endpoint**, written `{projectUrl}` as a substitution slot (Postman composes it as `{{baseUrl}}/{{projectName}}`, which is a Postman detail rather than a rule about the URL — see below)
 
-The Postman collection composes the project endpoint as `{{baseUrl}}/{{projectName}}`, but **never build a project URL that way yourself.** A project endpoint takes one of exactly three forms, and only the third is a path under the base URL:
+Both are values `project get` reports and you substitute into the endpoint. Neither is read from the environment.
 
-- **Form.io SaaS** — the base URL is always `https://api.form.io`, and the project is its name as a subdomain of `form.io`: a project named `examples` is `https://examples.form.io`.
-- **A customer deployment with sub-domain project routes** — the base URL is the deployment host, often a subdomain of the customer's own domain (`https://forms.mysite.com`), and the project is a sibling subdomain of that same parent domain (`https://myproject.mysite.com`).
-- **A customer deployment with sub-directory project routes** — the base URL is that same kind of host (`https://forms.mysite.com`) and the project is a path under it (`https://forms.mysite.com/myproject`).
+The Postman collection composes the project endpoint as `{{baseUrl}}/{{projectName}}`, but **never build a project URL that way yourself** — only one of the deployment routings puts the project on a path under the base URL, so composing it that way is wrong for the others. Read both values from the MCP server instead, with `npx -y @formio/mcp@0.10.0 project get --cwd "$(pwd)"`, and use exactly what it prints.
 
-So `https://api.form.io/examples` is not a SaaS project URL, and a project host that differs from the base URL's host is normal rather than a mistake. Read `FORMIO_PROJECT_URL` (or the working directory's mapping) rather than deriving one, and never treat a `*.form.io` host as a base URL.
+Two consequences worth stating, because both look like mistakes and are not: `https://api.form.io/examples` is not a hosted project URL, and a project host that differs from the base URL's host is normal rather than an error. Never treat a `*.form.io` host as a base URL.
+
+The routing shapes themselves are not catalogued here. The MCP server carries them in its own guidance and in the message it raises when a URL is missing — one copy, reaching every caller including an agent with no skills installed — so relay what it says rather than reasoning about shapes in this document.
 
 ## Authentication
 
@@ -45,7 +55,7 @@ Prefer first-party MCP tools (`form_create`, `form_get`, `form_list`, `form_upda
 
 ## Scope map
 
-### Platform scope — `${FORMIO_BASE_URL}/`
+### Platform scope — `{baseUrl}/`
 
 - [platform-auth](./references/platform-auth.md) — platform-admin login, portal users, identity providers
 - [platform-projects](./references/platform-projects.md) — project CRUD, export, import
@@ -54,7 +64,7 @@ Prefer first-party MCP tools (`form_create`, `form_get`, `form_list`, `form_upda
 - [platform-tenants](./references/platform-tenants.md) — multi-tenant projects and tenant admins
 - [server-status](./references/server-status.md) — liveness, health, version diagnostics
 
-### Project scope — `${FORMIO_PROJECT_URL}/`
+### Project scope — `{projectUrl}/`
 
 - [project-auth](./references/project-auth.md) — project-admin login, admin resource
 - [project-roles](./references/project-roles.md) — role CRUD
@@ -62,7 +72,7 @@ Prefer first-party MCP tools (`form_create`, `form_get`, `form_list`, `form_upda
 - [project-form-revisions](./references/project-form-revisions.md) — revision enablement, drafts, publish
 - [project-actions](./references/project-actions.md) — form action CRUD (email, webhook, role-assignment, etc.)
 
-### Runtime scope — `${FORMIO_PROJECT_URL}/`
+### Runtime scope — `{projectUrl}/`
 
 - [runtime-auth](./references/runtime-auth.md) — end-user registration and login on the built-in `user` resource
 - [runtime-custom-users](./references/runtime-custom-users.md) — custom user resources, custom roles, Login/Role-Assignment actions
@@ -70,7 +80,7 @@ Prefer first-party MCP tools (`form_create`, `form_get`, `form_list`, `form_upda
 - [runtime-reports](./references/runtime-reports.md) — aggregation pipelines across submissions
 - [runtime-submissions](./references/runtime-submissions.md) — submission CRUD, validate, patch, revisions
 
-### PDF scope — `${FORMIO_PROJECT_URL}/pdf-proxy/`
+### PDF scope — `{projectUrl}/pdf-proxy/`
 
 - [pdf-api](./references/pdf-api.md) — PDF template upload, PDF-backed forms, submission-to-PDF download
 

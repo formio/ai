@@ -11,13 +11,17 @@ export const TEST_PROJECT_URL = 'https://formio.invalid/example';
 // formioFetch call args.
 export const TEST_BASE_URL = 'https://formio.invalid';
 
+export const TEST_CWD = '/workspace/test-cwd';
+
+// Carries the cwd resolution resolved it for, like every resolved config does:
+// the errors raised downstream name a `--cwd` repair command, and only resolution
+// knows which directory the answer belongs to.
 export const TEST_CONFIG: ResolvedFormioConfig = {
   baseUrl: TEST_BASE_URL,
   projectUrl: TEST_PROJECT_URL,
   apiKey: 'abc123',
+  cwd: TEST_CWD,
 };
-
-export const TEST_CWD = '/workspace/test-cwd';
 
 export interface ToolRegister {
   (server: McpServer, config: FormioConfig): void;

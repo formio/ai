@@ -196,46 +196,32 @@ describe('plugin/.cursor-plugin/plugin.json — Cursor manifest', () => {
     expect(shipped.length).toBeGreaterThanOrEqual(10);
   });
 
-  // Cursor's `variables` is its install-time prompt — the analogue of Claude
-  // Code's userConfig. A declared-but-unused variable, or a placeholder with no
-  // declaration, is rejected at marketplace submission.
-  it('declares exactly the variables its placeholders reference', () => {
+  // Cursor's `variables` is its install-time prompt, and a placeholder with no
+  // declaration is rejected at marketplace submission. The manifest now prompts
+  // for nothing, so this asserts a claim about the FILE — no placeholders at
+  // all — rather than comparing two empty sets, which would pass whatever was
+  // added later.
+  it('prompts for nothing and references no placeholder', () => {
     const manifest = readJson(CURSOR_MANIFEST);
-    const placeholders = new Set(
-      [...JSON.stringify(manifest.mcpServers).matchAll(/\$\{([^}]+)\}/g)].map((match) => match[1])
+    const placeholders = [...readText(CURSOR_MANIFEST).matchAll(/\$\{([^}]+)\}/g)].map(
+      (match) => match[1]
     );
-    const variables = manifest.variables as { properties?: Record<string, unknown> };
 
-    expect([...placeholders].sort()).toEqual(Object.keys(variables.properties ?? {}).sort());
+    expect(placeholders).toEqual([]);
+    expect(manifest.variables).toBeUndefined();
   });
 
-  it('defaults the base URL to the hosted cloud', () => {
-    const variables = readJson(CURSOR_MANIFEST).variables as {
-      properties: Record<string, { default?: string; title?: string }>;
-    };
+  // A deployment is shared across a developer's projects and a Form.io project is
+  // one-to-one with the application built against it, so NEITHER belongs in an
+  // install-time prompt: the base URL is derived per project from the project
+  // URL's shape when it can be, and the environment is the weakest resolution
+  // source, so a global cannot override a committed formio.json or a mapping.
+  // Both are captured per directory instead.
+  it('passes no environment block to the server', () => {
+    const servers = readJson(CURSOR_MANIFEST).mcpServers as Record<string, McpServer>;
 
-    expect(variables.properties.FORMIO_BASE_URL.default).toBe('https://api.form.io');
-  });
-
-  // A deployment is shared across a developer's projects; a Form.io project is
-  // one-to-one with the application built against it. Prompting for a project
-  // URL at install time offers one folder's answer to every later folder, and
-  // the one it is offered in is precisely the one where it is wrong. The
-  // directory mapping written by project_set is the only project scope.
-  it('prompts for the deployment only — never for a project', () => {
-    const variables = readJson(CURSOR_MANIFEST).variables as {
-      properties: Record<string, unknown>;
-    };
-
-    expect(Object.keys(variables.properties)).toEqual(['FORMIO_BASE_URL']);
-  });
-
-  // The server starts with no configuration and tells the agent to call
-  // project_set, so an install that skips configuration still works.
-  it('requires nothing at install time', () => {
-    const variables = readJson(CURSOR_MANIFEST).variables as { required?: string[] };
-
-    expect(variables.required ?? []).toEqual([]);
+    expect(servers['formio-mcp'].env).toBeUndefined();
+    expect(Object.keys(servers['formio-mcp']).sort()).toEqual(['args', 'command']);
   });
 
   it('declares the same MCP server as mcp.json', () => {
@@ -282,7 +268,7 @@ describe('the Claude manifest and the marketplace source', () => {
     expect(entry?.source).toBe('./plugin');
   });
 
-  it('launches the published server with npx while keeping the user-config prompt', () => {
+  it('launches the published server with npx and prompts for nothing', () => {
     const manifest = readJson(CLAUDE_MANIFEST) as {
       mcpServers: Record<string, McpServer>;
       userConfig?: Record<string, unknown>;
@@ -291,8 +277,8 @@ describe('the Claude manifest and the marketplace source', () => {
 
     expect(server.command).toBe('npx');
     expect(server.args?.some((arg) => arg.startsWith('@formio/mcp@'))).toBe(true);
-    expect(server.env?.FORMIO_BASE_URL).toBe('${user_config.formio_base_url}');
-    expect(Object.keys(manifest.userConfig ?? {})).toContain('formio_base_url');
+    expect(server.env).toBeUndefined();
+    expect(manifest.userConfig).toBeUndefined();
   });
 
   // An unpinned `npx -y @formio/mcp` resolves whatever the registry serves at
@@ -332,19 +318,17 @@ describe('the Claude manifest and the marketplace source', () => {
     }
   });
 
-  // The server defaults the base URL to the hosted cloud and starts with no
-  // configuration at all, so blocking an install on a value it supplies itself
-  // states a constraint that does not exist — and the docs, the Cursor manifest,
-  // and the desktop bundle all describe it as optional. Three manifests, one
-  // answer.
-  it('asks for the base URL without requiring it, and offers the same default', () => {
-    const userConfig = (readJson(CLAUDE_MANIFEST).userConfig ?? {}) as Record<
-      string,
-      { required?: boolean; default?: string }
-    >;
+  // The desktop bundle is the one install route that still prompts for a base
+  // URL, and the asymmetry is deliberate: a desktop host has no working directory
+  // to interview in, so project_set and a committed formio.json are both out of
+  // reach there. Asserted so nobody removes it later for symmetry with the CLI
+  // manifests, which have both routes available.
+  it('keeps the base-URL prompt in the desktop bundle only', () => {
+    const bundle = readText(path.join(REPO_ROOT, 'scripts/build-mcpb.ts'));
 
-    expect(userConfig.formio_base_url.required ?? false).toBe(false);
-    expect(userConfig.formio_base_url.default).toBe('https://api.form.io');
+    expect(bundle).toContain('formio_base_url');
+    expect(readJson(CLAUDE_MANIFEST).userConfig).toBeUndefined();
+    expect(readJson(CURSOR_MANIFEST).variables).toBeUndefined();
   });
 
   // Every manifest reachable by a git clone must avoid build output: dist/ does
@@ -578,12 +562,15 @@ describe('the MCP Registry entry', () => {
 
     for (const name of [
       'FORMIO_PROJECT_URL',
-      'FORMIO_DEFAULT_PROJECT_URL',
       'FORMIO_BASE_URL',
       'FORMIO_API_KEY',
       'FORMIO_FORCE_BROWSER',
     ]) {
       expect(names, `server.json environmentVariables`).toContain(name);
     }
+
+    // The offering variable is gone: the environment is the weakest resolution
+    // source, so a project set there already suggests without pinning.
+    expect(names).not.toContain('FORMIO_DEFAULT_PROJECT_URL');
   });
 });

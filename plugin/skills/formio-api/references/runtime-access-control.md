@@ -9,7 +9,7 @@ All endpoints below are regular runtime Form/Submission/Action endpoints; the ac
 
 ## Root URL
 
-All endpoints below are rooted at `${FORMIO_PROJECT_URL}` — the project endpoint, equivalent to `{{baseUrl}}/{{projectName}}` in Postman.
+All endpoints below are rooted at `{projectUrl}` — the project endpoint, equivalent to `{{baseUrl}}/{{projectName}}` in Postman.
 
 ## Authentication
 
@@ -25,7 +25,7 @@ So this document is a specification for the code you write, and a description of
 
 The endpoints below are grouped for readability; each `### METHOD PATH` subsection is independently usable.
 
-### POST ${FORMIO_PROJECT_URL}/form
+### POST {projectUrl}/form
 
 Create a form whose `submissionAccess` is configured so that each caller only sees their own submissions. The key pattern is an empty project-level `access: []` combined with `submissionAccess` entries that grant `create_own`/`read_own`/`update_own`/`delete_own` rather than `*_all`.
 
@@ -54,7 +54,7 @@ Response: the created form document with server-assigned `_id`, default project 
 
 Errors: `400` for duplicate `name`/`path` or invalid components; `401`/`403` if the caller lacks form-create permission at the project level.
 
-### POST ${FORMIO_PROJECT_URL}/:supportFormPath/submission
+### POST {projectUrl}/:supportFormPath/submission
 
 Create a submission as Employee 1. The server records the caller's user ID in the submission's `owner` field; this is what downstream "own" filters key on.
 
@@ -75,7 +75,7 @@ Response: submission document with `owner` set to the calling user's `_id`.
 
 Errors: `401`/`403` if the caller cannot create submissions on this form.
 
-### POST ${FORMIO_PROJECT_URL}/:supportFormPath/submission
+### POST {projectUrl}/:supportFormPath/submission
 
 Create a submission as Employee 2. Identical shape to the call above but with a different JWT; Form.io stamps the new caller as `owner`.
 
@@ -92,7 +92,7 @@ Create a submission as Employee 2. Identical shape to the call above but with a 
 
 Response: submission owned by Employee 2.
 
-### GET ${FORMIO_PROJECT_URL}/:supportFormPath/submission
+### GET {projectUrl}/:supportFormPath/submission
 
 List submissions as Employee 1. Because the form grants `read_own` only, the server returns exclusively submissions whose `owner` matches Employee 1's user ID — Employee 2's submissions are silently excluded from the array.
 
@@ -100,11 +100,11 @@ Response: JSON array of submissions owned by the caller.
 
 Errors: `401` missing JWT; `403` if the role lacks even `read_own`.
 
-### GET ${FORMIO_PROJECT_URL}/:supportFormPath/submission
+### GET {projectUrl}/:supportFormPath/submission
 
 List submissions as Employee 2. Same endpoint, different JWT — returns only Employee 2's submissions. This demonstrates that no client-side filtering is required; the scoping is enforced server-side.
 
-### POST ${FORMIO_PROJECT_URL}/form
+### POST {projectUrl}/form
 
 Create a **Company** resource. Companies act as groups; later each employee gains a role tied to a company they belong to.
 
@@ -129,7 +129,7 @@ Request body:
 
 Response: the created Company resource document.
 
-### POST ${FORMIO_PROJECT_URL}/:companyResourcePath/submission
+### POST {projectUrl}/:companyResourcePath/submission
 
 Create a Company record.
 
@@ -139,7 +139,7 @@ Create a Company record.
 
 Response: submission document representing Company 1.
 
-### POST ${FORMIO_PROJECT_URL}/:companyResourcePath/submission
+### POST {projectUrl}/:companyResourcePath/submission
 
 Create a second Company record.
 
@@ -149,7 +149,7 @@ Create a second Company record.
 
 Response: submission document representing Company 2.
 
-### POST ${FORMIO_PROJECT_URL}/form
+### POST {projectUrl}/form
 
 Create the **Employee Company** join resource. The `company` component sets `reference: true` and the resource participates in the Group Assignment action below. The `employee` component references the existing Employee resource.
 
@@ -187,7 +187,7 @@ Request body (abbreviated):
 
 Response: the join resource document.
 
-### POST ${FORMIO_PROJECT_URL}/form/:employeeCompanyResourceId/action
+### POST {projectUrl}/form/:employeeCompanyResourceId/action
 
 Attach the **Group Assignment** action to the join resource. On each submission the action grants the `employee` user a role matching the `company` submission — this is what makes group membership functional.
 
@@ -213,7 +213,7 @@ Response: the installed action document with `_id`, `form`, and `machineName`.
 
 Errors: `400` if `settings.group`/`settings.user` do not match component keys on the form; `401`/`403` for insufficient project permissions.
 
-### POST ${FORMIO_PROJECT_URL}/:customerCompanyResourcePath/submission
+### POST {projectUrl}/:customerCompanyResourcePath/submission
 
 Assign Employee 1 to Company 1 by creating a join submission. Because the Group Assignment action fires `after create`, Employee 1 gains a role for Company 1 as a side effect.
 
@@ -228,7 +228,7 @@ Assign Employee 1 to Company 1 by creating a join submission. Because the Group 
 
 Response: the join submission document.
 
-### POST ${FORMIO_PROJECT_URL}/:customerCompanyResourcePath/submission
+### POST {projectUrl}/:customerCompanyResourcePath/submission
 
 Assign Employee 2 to Company 2 with the same shape:
 
@@ -243,19 +243,19 @@ Assign Employee 2 to Company 2 with the same shape:
 
 Response: join submission for Employee 2 / Company 2.
 
-### GET ${FORMIO_PROJECT_URL}/:employeeResourcePath/submission/:employee1Id
+### GET {projectUrl}/:employeeResourcePath/submission/:employee1Id
 
 Verify that Employee 1's submission now lists the Company 1 role in its `roles` array — confirming the Group Assignment action took effect.
 
 Response: employee submission with a populated `roles: ["<company1-role-id>"]`.
 
-### GET ${FORMIO_PROJECT_URL}/:employeeResourcePath/submission/:employee2Id
+### GET {projectUrl}/:employeeResourcePath/submission/:employee2Id
 
 Same verification for Employee 2 / Company 2.
 
 Response: employee submission with Company 2's role in `roles`.
 
-### GET ${FORMIO_PROJECT_URL}/:customerCompanyResourcePath/submission
+### GET {projectUrl}/:customerCompanyResourcePath/submission
 
 List join submissions filtered by company ID to retrieve the members of a group.
 
@@ -269,10 +269,10 @@ Example:
 
 ```bash
 curl -H "x-jwt-token: $FORMIO_JWT" \
-  "${FORMIO_PROJECT_URL}/employee-company/submission?data.company._id=${company1Id}"
+  "{projectUrl}/employee-company/submission?data.company._id=${company1Id}"
 ```
 
-### POST ${FORMIO_PROJECT_URL}/form
+### POST {projectUrl}/form
 
 Create a **Company Report** form whose `company` component has per-component `submissionAccess` of type `read` with an empty `roles` array. On each submission the server will stamp the report's `access` with the referenced company's resource ID, so only users holding that company role can read it.
 
@@ -302,7 +302,7 @@ Request body (abbreviated):
 
 Response: the Company Report form document.
 
-### POST ${FORMIO_PROJECT_URL}/:companyReportFormPath/submission
+### POST {projectUrl}/:companyReportFormPath/submission
 
 Create a Company 1 report. The server automatically adds an entry to the submission's top-level `access` with `type: "read"` and `resources: ["<company1-id>"]`, scoping the row to Company 1 members.
 
@@ -317,7 +317,7 @@ Create a Company 1 report. The server automatically adds an entry to the submiss
 
 Response: submission document with `access: [{ "type": "read", "resources": ["${company1Id}"] }]`.
 
-### POST ${FORMIO_PROJECT_URL}/:companyReportFormPath/submission
+### POST {projectUrl}/:companyReportFormPath/submission
 
 Create a Company 2 report with the same shape:
 
@@ -332,7 +332,7 @@ Create a Company 2 report with the same shape:
 
 Response: submission scoped to Company 2.
 
-### GET ${FORMIO_PROJECT_URL}/:companyReportFormPath/submission
+### GET {projectUrl}/:companyReportFormPath/submission
 
 List reports as an Employee 1 caller. The server applies the `access[].resources` filter against the caller's roles and returns only Company 1 reports.
 
@@ -340,7 +340,7 @@ Response: JSON array of Company 1 reports.
 
 Errors: `401`/`403` on missing/invalid JWT.
 
-### GET ${FORMIO_PROJECT_URL}/:companyReportFormPath/submission
+### GET {projectUrl}/:companyReportFormPath/submission
 
 List reports as an Employee 2 caller — same endpoint, different JWT — returns only Company 2 reports, demonstrating that group-scoped row-level security is enforced entirely server-side.
 

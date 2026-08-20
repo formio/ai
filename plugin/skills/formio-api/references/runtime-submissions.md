@@ -6,7 +6,7 @@ Submission revisions require the parent form to have `submissionRevisions: "true
 
 ## Root URL
 
-All endpoints below are rooted at `${FORMIO_PROJECT_URL}` — the project endpoint, equivalent to `{{baseUrl}}/{{projectName}}` in Postman.
+All endpoints below are rooted at `{projectUrl}` — the project endpoint, equivalent to `{{baseUrl}}/{{projectName}}` in Postman.
 
 ## Authentication
 
@@ -20,7 +20,7 @@ So this document is a specification for the code you write, not a set of calls t
 
 ## Endpoints
 
-### POST ${FORMIO_PROJECT_URL}/:formPath/submission
+### POST {projectUrl}/:formPath/submission
 
 Create a new submission for the form identified by `:formPath` (the form's URL alias; the ID also works in the same segment). The server runs validation and any `before`/`after` actions attached to the form.
 
@@ -60,10 +60,10 @@ Example:
 ```bash
 curl -X POST -H "x-jwt-token: $FORMIO_JWT" -H "Content-Type: application/json" \
   -d '{"data":{"firstName":"Ashlynn","lastName":"Flatley","email":"Lucie94@yahoo.com"}}' \
-  "${FORMIO_PROJECT_URL}/onboarding-872/submission"
+  "{projectUrl}/onboarding-872/submission"
 ```
 
-### POST ${FORMIO_PROJECT_URL}/:formPath/submission (validate only)
+### POST {projectUrl}/:formPath/submission (validate only)
 
 Validate a submission payload without persisting it. Form.io exposes validation through the same endpoint shape — send the submission with the query/header convention your client library uses to request dry-run validation, or simply inspect the `400 ValidationError` response to surface form-level errors to the UI.
 
@@ -94,7 +94,7 @@ Response when invalid (`400`):
 
 Errors: `400` with `name: "ValidationError"` and a `details[]` array of per-component failures; `401`/`403` as above.
 
-### GET ${FORMIO_PROJECT_URL}/:formPath/submission
+### GET {projectUrl}/:formPath/submission
 
 List submissions for the form. Supports Form.io's standard list controls and `data.*` filters.
 
@@ -112,10 +112,10 @@ Example:
 
 ```bash
 curl -H "x-jwt-token: $FORMIO_JWT" \
-  "${FORMIO_PROJECT_URL}/onboarding-872/submission?limit=25&sort=-created"
+  "{projectUrl}/onboarding-872/submission?limit=25&sort=-created"
 ```
 
-### GET ${FORMIO_PROJECT_URL}/:formPath/submission/:submissionId
+### GET {projectUrl}/:formPath/submission/:submissionId
 
 Retrieve a single submission by ID.
 
@@ -127,10 +127,10 @@ Example:
 
 ```bash
 curl -H "x-jwt-token: $FORMIO_JWT" \
-  "${FORMIO_PROJECT_URL}/onboarding-872/submission/69dd37ba040fa2cea2579ee2"
+  "{projectUrl}/onboarding-872/submission/69dd37ba040fa2cea2579ee2"
 ```
 
-### GET ${FORMIO_PROJECT_URL}/:formPath/exists
+### GET {projectUrl}/:formPath/exists
 
 Check whether a submission matching the query exists without returning its full body. Useful for uniqueness checks (e.g., "has anyone with this email already submitted?").
 
@@ -150,10 +150,10 @@ Example:
 
 ```bash
 curl -H "x-jwt-token: $FORMIO_JWT" \
-  "${FORMIO_PROJECT_URL}/onboarding-872/exists?data.email=Lucie94@yahoo.com"
+  "{projectUrl}/onboarding-872/exists?data.email=Lucie94@yahoo.com"
 ```
 
-### PUT ${FORMIO_PROJECT_URL}/:formPath/submission/:submissionId
+### PUT {projectUrl}/:formPath/submission/:submissionId
 
 Full replace of a submission. The body SHOULD include `_id` and `form`; any field omitted from the body is treated as reset per Form.io's replace semantics. For single-field edits prefer the `PATCH` endpoint below.
 
@@ -163,7 +163,7 @@ Response: the updated submission document. When submission revisions are enabled
 
 Errors: `400` validation errors; `404` submission not found; `401`/`403` as above.
 
-### GET ${FORMIO_PROJECT_URL}/:formPath/submission/:submissionId/v
+### GET {projectUrl}/:formPath/submission/:submissionId/v
 
 List revisions of a submission. Requires `submissionRevisions: "true"` on the parent form.
 
@@ -171,7 +171,7 @@ Response: JSON array of prior submission snapshots, newest first, each with its 
 
 Errors: `404` if the form does not have revisions enabled or the submission is unknown.
 
-### GET ${FORMIO_PROJECT_URL}/:formPath/submission/:submissionId?submissionRevision=:revisionId
+### GET {projectUrl}/:formPath/submission/:submissionId?submissionRevision=:revisionId
 
 Retrieve a single historical revision of a submission by its revision `_id`.
 
@@ -179,7 +179,7 @@ Response: the submission document as it existed at that revision, including `met
 
 Errors: `404` if the revision does not exist.
 
-### PATCH ${FORMIO_PROJECT_URL}/:formPath/submission/:submissionId
+### PATCH {projectUrl}/:formPath/submission/:submissionId
 
 Apply a JSON Patch (RFC 6902) to a submission. Ideal for partial updates without round-tripping the full document.
 
@@ -202,10 +202,10 @@ Example:
 ```bash
 curl -X PATCH -H "x-jwt-token: $FORMIO_JWT" -H "Content-Type: application/json" \
   -d '[{"op":"replace","path":"/data/firstName","value":"James"}]' \
-  "${FORMIO_PROJECT_URL}/onboarding-872/submission/69dd37ba040fa2cea2579ee2"
+  "{projectUrl}/onboarding-872/submission/69dd37ba040fa2cea2579ee2"
 ```
 
-### DELETE ${FORMIO_PROJECT_URL}/:formPath/submission/:submissionId
+### DELETE {projectUrl}/:formPath/submission/:submissionId
 
 Delete a submission. Hard-deletes the document unless the form configures soft-delete behavior.
 
@@ -217,7 +217,7 @@ Example:
 
 ```bash
 curl -X DELETE -H "x-jwt-token: $FORMIO_JWT" \
-  "${FORMIO_PROJECT_URL}/onboarding-872/submission/69dd37ba040fa2cea2579ee2"
+  "{projectUrl}/onboarding-872/submission/69dd37ba040fa2cea2579ee2"
 ```
 
 ## Related Skills

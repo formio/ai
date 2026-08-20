@@ -12,7 +12,7 @@ Embedding mechanics live entirely in the `formio-form` skill — rendering, opti
 
 Pass to `formio-form`:
 
-- **The saved form URL** — `{FORMIO_PROJECT_URL}/{formPath}` from SAVE. This is the `src` the embedding skill renders.
+- **The saved form URL** — `{projectUrl}/{formPath}` from SAVE. This is the `src` the embedding skill renders.
 - The form type from INTENT (a wizard renders with its display mode intact — the embedding skill may care about page navigation).
 - The user's own words about where the form goes ("my checkout page", "the careers section"), verbatim.
 

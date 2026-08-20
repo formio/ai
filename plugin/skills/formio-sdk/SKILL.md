@@ -20,6 +20,16 @@ Do **not** work around missing tools by making direct HTTP requests against a Fo
 
 That ban is on **build-time** work — the configuring you do in this session. It says nothing about the application you are building: an app is expected to call the Form.io REST API **at runtime**, to log its users in and to read and write their submissions, and [`formio-api`](../formio-api/SKILL.md)'s runtime-scope references document those endpoints for exactly that code.
 
+**Available tools are not a configured project.** Every Form.io tool resolves which project it targets from a mapping keyed on a working directory, so pass `cwd` — the user's current working directory — on every Form.io tool call; omitting it resolves against the MCP server's own directory, which is fixed at spawn and may be mapped to a different project. Before the first call that reads from or writes to a deployment, ask the server what this directory resolves to:
+
+```bash
+npx -y @formio/mcp@0.10.0 project get --cwd "$(pwd)"
+```
+
+On success, what it prints IS the configuration. There is one value to think about — the **Project URL**, the full URL of the Form.io project this work reads and writes. The **Base URL** (the deployment hosting it) is normally DERIVED from that project URL rather than supplied, so it is not a second thing to ask for. The values may come from a committed `formio.json` tracked with the application's own source, from this directory's mapping, or from the environment — the command says which. Do not ask the user to confirm or re-supply either one. On exit `1` — nothing is recorded for this directory — relay that message's own instruction to the user, ask for the single value it names, run the `project set` command it names, and re-run. On exit `3` the project IS recorded and one named value is still missing — the Base URL, for a project URL that names no deployment of its own: relay that message the same way, ask for that one value, run the `project set --base-url` command it names, and re-run. Do not re-ask for the Project URL there; that message deliberately does not request it. On exit `2` the command could not answer at all (an unreadable `~/.formio/projects.json`, a `formio.json` that will not parse, a malformed URL): do NOT interview, because a `project set` would fail for the same unreported reason and the loop would repeat with the cause never named — relay the message and stop until it is fixed. Before the first call that WRITES (`form_create`, `form_update`, `role_create`, `action_create`, `project_import`), state the resolved Project URL and Base URL in one line, so a wrong target is caught before anything is written to it.
+
+Never invent a Base URL, never reuse one from another project or an earlier session, and never edit `~/.formio/projects.json` by any means — its shape, its `0600` mode, and its merge rules belong to the server, and `project set` / `project_set` are how you reach them. The server's own messages carry the URL shapes and the remedy for each; this skill does not restate them.
+
 ## Imports
 
 Prefer the renderer-extended SDK first; fall back to `@formio/core` only when a surface is not re-exported by `@formio/js` or `@formio/js/utils`:
@@ -44,6 +54,8 @@ Never use `@formio/js/lib/...` deep imports or `<script>` CDN-bundle tags (the s
 
 Configure the base URL and project URL exactly once at application bootstrap, **before** any `new Formio(...)` call or `Formio.createForm(...)`. Two deployment archetypes:
 
+**Where these two values come from.** The hosts below are illustrations. When you write these calls into a real application, take both URLs from the MCP server rather than typing them — run `npx -y @formio/mcp@0.10.0 project get --cwd "$(pwd)"` and use exactly what it prints: its `Project URL` for `setProjectUrl`, its `Base URL` for `setBaseUrl`. Do not hardcode an example host, do not derive either URL from the other, and do not carry a value over from another project or an earlier session — the mapping the server reports is what every build-time Form.io tool call resolves, so a different value here ships an application pointed at a deployment the tooling is not managing. If the command reports a value missing, relay its instruction, persist the answer with the `project set` command it names, and re-run it.
+
 ### Hosted (self-deployed Form.io)
 
 ```ts
@@ -53,7 +65,7 @@ Formio.setBaseUrl('https://forms.mysite.com');
 Formio.setProjectUrl('https://forms.mysite.com/myproject');
 ```
 
-- `baseUrl` is the deployment root — often a subdomain of the customer's own domain, e.g. `https://forms.mysite.com`. It never carries a path.
+- `baseUrl` is the deployment root — often a subdomain of the customer's own domain, e.g. `https://forms.mysite.com`. It MAY carry a path of its own when the deployment is mounted at a sub-path (`https://forms.mysite.com/one` serving a project at `https://forms.mysite.com/one/two`), so take it from `project get` rather than assuming a bare origin.
 - `projectUrl` follows whichever routing that deployment uses: **sub-directories** (`https://forms.mysite.com/myproject`, shown above) or **sub-domains** (`https://myproject.mysite.com` — a sibling subdomain of the same parent domain, NOT a path under `baseUrl`). This is the distinction `Formio.setPathType('Subdirectories' | 'Subdomains')` names; setting `projectUrl` explicitly is preferred over manipulating `pathType`.
 
 ### SaaS (`portal.form.io`)
@@ -72,8 +84,8 @@ Rule of thumb: if your portal lives at `portal.form.io`, you are on SaaS. Otherw
 
 Terminology:
 
-- **`baseUrl` / `base_url` → platform deployment endpoint → `FORMIO_BASE_URL`**
-- **`projectUrl` / `project_url` → project endpoint → `FORMIO_PROJECT_URL`**
+- **`baseUrl` / `base_url` → the platform deployment endpoint — the **Base URL** `project get` reports**
+- **`projectUrl` / `project_url` → the project endpoint — the **Project URL** `project get` reports**
 
 ## Authentication
 

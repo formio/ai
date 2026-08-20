@@ -6,7 +6,7 @@ The server enforces the caller's access controls before returning pipeline resul
 
 ## Root URL
 
-All endpoints below are rooted at `${FORMIO_PROJECT_URL}` — the project endpoint, equivalent to `{{baseUrl}}/{{projectName}}` in Postman.
+All endpoints below are rooted at `{projectUrl}` — the project endpoint, equivalent to `{{baseUrl}}/{{projectName}}` in Postman.
 
 ## Authentication
 
@@ -20,7 +20,7 @@ So this document is a specification for the code you write — the dashboards an
 
 ## Endpoints
 
-### POST ${FORMIO_PROJECT_URL}/report
+### POST {projectUrl}/report
 
 Execute an aggregation pipeline and receive the shaped array of results.
 
@@ -75,7 +75,7 @@ Example:
 ```bash
 curl -X POST -H "x-jwt-token: $FORMIO_JWT" -H "Content-Type: application/json" \
   -d @pipeline.json \
-  "${FORMIO_PROJECT_URL}/report"
+  "{projectUrl}/report"
 ```
 
 ## Related Skills

@@ -4,7 +4,7 @@ The Server API exposes a small set of unauthenticated, platform-wide endpoints i
 
 ## Root URL
 
-All endpoints below are rooted at `${FORMIO_BASE_URL}` — the platform deployment endpoint, equivalent to bare `{{baseUrl}}/` in Postman.
+All endpoints below are rooted at `{baseUrl}` — the platform deployment endpoint, equivalent to bare `{{baseUrl}}/` in Postman.
 
 ## Authentication
 
@@ -16,7 +16,7 @@ No MCP tool covers this operation — use the HTTP endpoint directly.
 
 ## Endpoints
 
-### GET ${FORMIO_BASE_URL}/health
+### GET {baseUrl}/health
 
 Liveness probe. Returns a plain-text `OK` body with HTTP `200` when the platform process is running and able to serve requests. Does not verify database connectivity — use `/status` for a deeper check.
 
@@ -31,10 +31,10 @@ Errors: a non-`200` response (or no response) indicates the platform is down or 
 Example:
 
 ```bash
-curl -i "${FORMIO_BASE_URL}/health"
+curl -i "{baseUrl}/health"
 ```
 
-### GET ${FORMIO_BASE_URL}/status
+### GET {baseUrl}/status
 
 Version and schema diagnostics. Returns the deployed platform version, the database schema version currently in use, and the environment identifier — handy for confirming an upgrade landed or for pinning client behavior to a known server build.
 
@@ -59,7 +59,7 @@ Errors: a non-`200` response indicates the platform is not fully initialized (fo
 Example:
 
 ```bash
-curl "${FORMIO_BASE_URL}/status"
+curl "{baseUrl}/status"
 ```
 
 ## Related Skills

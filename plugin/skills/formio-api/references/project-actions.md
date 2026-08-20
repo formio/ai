@@ -4,7 +4,7 @@ Form Actions are server-side hooks (email, webhook, save, login, role, etc.) tha
 
 ## Root URL
 
-All endpoints below are rooted at `${FORMIO_PROJECT_URL}` — the project endpoint, equivalent to `{{baseUrl}}/{{projectName}}` in Postman.
+All endpoints below are rooted at `{projectUrl}` — the project endpoint, equivalent to `{{baseUrl}}/{{projectName}}` in Postman.
 
 ## Authentication
 
@@ -16,7 +16,7 @@ No MCP tool covers this operation — use the HTTP endpoint directly.
 
 ## Endpoints
 
-### GET ${FORMIO_PROJECT_URL}/form/:formId/actions
+### GET {projectUrl}/form/:formId/actions
 
 List every action type available in the project — a catalog of what can be attached to a form. This does NOT return the actions currently configured on the form; see `GET .../action` for that.
 
@@ -50,10 +50,10 @@ Example:
 
 ```bash
 curl -H "x-jwt-token: $FORMIO_JWT" \
-  "${FORMIO_PROJECT_URL}/form/69d68907040fa2cea2572b71/actions"
+  "{projectUrl}/form/69d68907040fa2cea2572b71/actions"
 ```
 
-### GET ${FORMIO_PROJECT_URL}/form/:formId/actions/:actionName
+### GET {projectUrl}/form/:formId/actions/:actionName
 
 Retrieve detailed information about one action type, including the `settingsForm` that defines which fields the admin must fill in when attaching this action. Use this to drive a UI that configures the action.
 
@@ -70,10 +70,10 @@ Example:
 
 ```bash
 curl -H "x-jwt-token: $FORMIO_JWT" \
-  "${FORMIO_PROJECT_URL}/form/69d68907040fa2cea2572b71/actions/email"
+  "{projectUrl}/form/69d68907040fa2cea2572b71/actions/email"
 ```
 
-### POST ${FORMIO_PROJECT_URL}/form/:formId/action
+### POST {projectUrl}/form/:formId/action
 
 Attach an action instance to a form.
 
@@ -111,10 +111,10 @@ Example:
 ```bash
 curl -X POST -H "x-jwt-token: $FORMIO_JWT" -H "Content-Type: application/json" \
   -d @email-action.json \
-  "${FORMIO_PROJECT_URL}/form/69d68907040fa2cea2572b71/action"
+  "{projectUrl}/form/69d68907040fa2cea2572b71/action"
 ```
 
-### GET ${FORMIO_PROJECT_URL}/form/:formId/action
+### GET {projectUrl}/form/:formId/action
 
 List all actions currently attached to a form, in priority order.
 
@@ -145,10 +145,10 @@ Example:
 
 ```bash
 curl -H "x-jwt-token: $FORMIO_JWT" \
-  "${FORMIO_PROJECT_URL}/form/69d68907040fa2cea2572b71/action"
+  "{projectUrl}/form/69d68907040fa2cea2572b71/action"
 ```
 
-### GET ${FORMIO_PROJECT_URL}/form/:formId/action/:actionId
+### GET {projectUrl}/form/:formId/action/:actionId
 
 Retrieve a single configured action, including its full `settings`.
 
@@ -165,10 +165,10 @@ Example:
 
 ```bash
 curl -H "x-jwt-token: $FORMIO_JWT" \
-  "${FORMIO_PROJECT_URL}/form/69d68907040fa2cea2572b71/action/69d6a7f7040fa2cea2572eec"
+  "{projectUrl}/form/69d68907040fa2cea2572b71/action/69d6a7f7040fa2cea2572eec"
 ```
 
-### PUT ${FORMIO_PROJECT_URL}/form/:formId/action/:actionId
+### PUT {projectUrl}/form/:formId/action/:actionId
 
 Update a configured action. This is a full replacement of the action's editable fields — include every field you want to preserve.
 
@@ -205,10 +205,10 @@ Example:
 ```bash
 curl -X PUT -H "x-jwt-token: $FORMIO_JWT" -H "Content-Type: application/json" \
   -d @email-action.json \
-  "${FORMIO_PROJECT_URL}/form/69d68907040fa2cea2572b71/action/69d6a7f7040fa2cea2572eec"
+  "{projectUrl}/form/69d68907040fa2cea2572b71/action/69d6a7f7040fa2cea2572eec"
 ```
 
-### DELETE ${FORMIO_PROJECT_URL}/form/:formId/action/:actionId
+### DELETE {projectUrl}/form/:formId/action/:actionId
 
 Remove an action from a form. Irreversible — the action stops running immediately.
 
@@ -225,7 +225,7 @@ Example:
 
 ```bash
 curl -X DELETE -H "x-jwt-token: $FORMIO_JWT" \
-  "${FORMIO_PROJECT_URL}/form/69d68907040fa2cea2572b71/action/69d6a7f7040fa2cea2572eec"
+  "{projectUrl}/form/69d68907040fa2cea2572b71/action/69d6a7f7040fa2cea2572eec"
 ```
 
 ## Related Skills

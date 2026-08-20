@@ -66,10 +66,25 @@ Plugin installation coming soon
 
 ### Project Setup <!-- omit from toc -->
 
-Once this plugin has been installed, it will then prompt you for the following configurations:
+Neither install route asks for a URL. Both are resolved per working directory, so one install can serve several projects, and the answer travels with the code rather than with your machine. The first Form.io tool call that needs a project reports what is missing and names the command that supplies it:
+
+```bash
+# What does this directory resolve to?
+npx -y @formio/mcp@0.10.0 project get --cwd "$(pwd)"
+
+# Record it for this machine…
+npx -y @formio/mcp@0.10.0 project set --project-url "<project url>" --cwd "$(pwd)"
+
+# …or commit it with the application, tracked in git and shared with everyone who clones it
+npx -y @formio/mcp@0.10.0 project set --project-url "<project url>" --scope repo --cwd "$(pwd)"
+```
+
+The skills do this for you: each one probes `project get` before its first call and asks only for whichever value the server says is missing. Two values can be involved:
 
 - **Project URL** — the endpoint for your project. On our SaaS environment (https://portal.form.io) that is a sub-domain such as `https://myproject.form.io`. Self-hosted, it depends on how your deployment routes projects: a sub-directory (`https://forms.mysite.com/myproject`) or a sub-domain of your own domain (`https://myproject.mysite.com`).
-- **Base URL** — the endpoint for the deployment. On our SaaS environment it is **always** `https://api.form.io` — never your project's `*.form.io` sub-domain. Self-hosted, it is the deployment host, often a sub-domain of your own domain, e.g. `https://forms.mysite.com`. In the sub-domain routing case the project host and the base host differ by design, so neither can be worked out from the other.
+- **Base URL** — the endpoint for the deployment. On our SaaS environment it is **always** `https://api.form.io` — never your project's `*.form.io` sub-domain. Self-hosted, it is the deployment host, often a sub-domain of your own domain, e.g. `https://forms.mysite.com`.
+
+You usually only supply the first. The Base URL is worked out from the Project URL wherever it can be — `https://api.form.io` for a `*.form.io` project, and the parent path for a sub-directory-routed one. The exception is the sub-domain routing case, where the project host and the deployment host differ by design and neither can be derived from the other; there the server asks for the Base URL explicitly rather than guessing.
 
 ## What you get
 
@@ -258,7 +273,7 @@ The bundled `@formio/mcp` server exposes these tools. Skills prefer these over r
 | --- | --- |
 | `project_export` | Export the project's complete template (roles, resources, forms, actions) as a portable JSON document. Use before `project_import` to snapshot. |
 | `project_import` | Import a template JSON — additively merges roles, resources, forms, and actions in one call. **Same-machine-name items are overwritten in place; everything else is preserved.** |
-| `project_set` | Persist a per-cwd Project URL mapping in `~/.formio/projects.json`, so one server can serve several workspaces. Registered in every client. An explicit `FORMIO_PROJECT_URL` in the server environment takes precedence over the mapping. |
+| `project_set` | Persist a Project URL for a directory — in `~/.formio/projects.json` by default, or in a committed `formio.json` with `scope: "repo"`, so the target travels with the code. One server can serve several workspaces. Registered in every client. A mapping written here overrides `FORMIO_PROJECT_URL` in the server environment, which is the weakest source. |
 
 ### Diagnostic
 
@@ -279,9 +294,9 @@ The MCP server supports two authentication modes:
 
 When `FORMIO_LOGIN_FORM` is unset, the server probes these candidates on the first login attempt and caches the first one that responds (1.5-second timeout per candidate):
 
-1. `${FORMIO_BASE_URL}/formio/user/login` (portal-base)
-2. `${FORMIO_PROJECT_URL}/admin/login` (project admin)
-3. `${FORMIO_PROJECT_URL}/user/login` (project user)
+1. `{baseUrl}/formio/user/login` (portal-base)
+2. `{projectUrl}/admin/login` (project admin)
+3. `{projectUrl}/user/login` (project user)
 
 The probe runs lazily — only when the local auth page is actually served.
 
@@ -291,16 +306,15 @@ The probe runs lazily — only when the local auth page is actually served.
 
 | Name | Required | Default | Purpose | Hosted SaaS example | Self-hosted example |
 | --- | :-: | --- | --- | --- | --- |
-| `FORMIO_BASE_URL` | no | `https://api.form.io` | Full base URL of your Form.io deployment — always `https://api.form.io` on the hosted cloud, never a project's `*.form.io` sub-domain. | `https://api.form.io` | `https://forms.example.com` |
-| `FORMIO_PROJECT_URL` | yes\* | — | Full URL of your Form.io project. Takes precedence over any per-directory mapping written by `project_set`. Self-hosted, it is a sub-directory of the deployment or a sub-domain of your own domain (`https://myproject.example.com`), depending on how that deployment routes projects. | `https://myproject.form.io` | `https://forms.example.com/myproject` |
-| `FORMIO_DEFAULT_PROJECT_URL` | no | — | A project URL to **offer**, not to apply. When set and the working directory has no mapping, the server names it as the suggested project so the agent can confirm it and persist it with `project_set`. It never changes what a tool resolves — the opposite of `FORMIO_PROJECT_URL`, which pins the server and cannot be redirected by `project_set`. |
+| `FORMIO_BASE_URL` | no | derived, see note | Full base URL of your Form.io deployment. The WEAKEST of three sources: a committed `formio.json` wins, then the per-directory mapping, then this. When nothing supplies one it is derived from the project URL's shape, and a project URL that names no deployment raises an actionable error rather than defaulting. | `https://api.form.io` | `https://forms.example.com` |
+| `FORMIO_PROJECT_URL` | yes\* | — | Full URL of your Form.io project. The WEAKEST of the three sources: a committed `formio.json` found by walking up from the working directory wins, then a per-directory mapping written by `project_set`, then this. Self-hosted, it is a sub-directory of the deployment or a sub-domain of your own domain (`https://myproject.example.com`), depending on how that deployment routes projects. | `https://myproject.form.io` | `https://forms.example.com/myproject` |
 | `FORMIO_API_KEY` | no | `undefined` | Long-lived project API key. When set, the server skips the browser login flow — the only way to authenticate on a host with no browser. | `CHANGEME` | `CHANGEME` |
 | `FORMIO_LOGIN_FORM` | no | Auto-resolved | Override the portal login form URL used by the JWT login flow. | `https://formio.form.io/user/login` | `https://forms.example.com/formio/user/login` |
 | `FORMIO_FORCE_BROWSER` | no | `0` | When `1`, attempt the browser login even where the server detects no browser is available (CI, a container, SSH with no display). | — | — |
 | `FORMIO_AUTH_HOST` / `FORMIO_AUTH_PORT` | no | `127.0.0.1` / ephemeral | Bind address and port for the login server. Set both when running in a container so the login page is reachable through a published port. | — | `0.0.0.0` / `43117` |
 | `FORMIO_INSECURE_TLS` | no | `false` | When `true`, skips TLS certificate verification (sets `NODE_TLS_REJECT_UNAUTHORIZED=0`) — for self-hosted deployments behind self-signed certs. Do not use against production. | — | `true` |
 
-<sub>\* Not at startup — the server starts and lists every tool without it, and only errors when a tool actually needs a project. The alternative is the `project_set` tool, which maps a working directory to a project in `~/.formio/projects.json` so one server can serve several workspaces. Resolution order: `FORMIO_PROJECT_URL`, then the mapping for the caller's `cwd`, then the error. Map a directory before any client connects with `npx -y @formio/mcp@0.10.0 project set --project-url <url> --base-url <url> --cwd <path>`; `project get --cwd <path>` prints what resolves and which source won, exiting `0` when it resolved, `1` when nothing is mapped, and `2` when the command itself failed.</sub>
+<sub>\* Not at startup — the server starts and lists every tool without it, and only errors when a tool actually needs a project. The alternative is the `project_set` tool, which maps a working directory to a project in `~/.formio/projects.json` so one server can serve several workspaces. Resolution runs by scope, narrowest first: a committed `formio.json` found by walking up from the caller's `cwd`, then the mapping for that `cwd`, then `FORMIO_PROJECT_URL` in the environment as the weakest source, then the error. Map a directory before any client connects with `npx -y @formio/mcp@0.10.0 project set --project-url <url> --base-url <url> --cwd <path>`; `project get --cwd <path>` prints what resolves and which source won, exiting `0` when it resolved, `1` when nothing is mapped, and `2` when the command itself failed.</sub>
 
 ---
 

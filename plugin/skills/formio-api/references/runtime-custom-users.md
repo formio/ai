@@ -4,7 +4,7 @@ This skill covers the end-user (runtime) flow for building custom user types bey
 
 ## Root URL
 
-All endpoints below are rooted at `${FORMIO_PROJECT_URL}` — the project endpoint, equivalent to `{{baseUrl}}/{{projectName}}` in Postman.
+All endpoints below are rooted at `{projectUrl}` — the project endpoint, equivalent to `{{baseUrl}}/{{projectName}}` in Postman.
 
 ## Authentication
 
@@ -18,7 +18,7 @@ So this document is a specification for the code you write — how the applicati
 
 ## Endpoints
 
-### POST ${FORMIO_PROJECT_URL}/form
+### POST {projectUrl}/form
 
 Create a custom user type as a Form.io resource. The resource components define the fields collected at registration — at minimum `email` and `password`.
 
@@ -61,7 +61,7 @@ Response: the created resource document with server-assigned `_id`, `machineName
 
 Errors: `400` for duplicate `name`/`path` or invalid component schema; `401`/`403` for insufficient access.
 
-### POST ${FORMIO_PROJECT_URL}/role
+### POST {projectUrl}/role
 
 Create a custom role to be assigned to the custom user type (e.g., `Employee`).
 
@@ -80,7 +80,7 @@ Response: the created role document: `_id`, `title`, `description`, `default`, `
 
 Errors: `400` for missing/duplicate `title`; `401`/`403` for insufficient access.
 
-### POST ${FORMIO_PROJECT_URL}/form/:employeeResourceId/action
+### POST {projectUrl}/form/:employeeResourceId/action
 
 Attach a `Role Assignment` action to the custom user resource so that every new submission (registration) receives the custom role.
 
@@ -108,7 +108,7 @@ Response: the created action document with `_id`, `form` (the resource ID), `mac
 
 Errors: `400` for invalid `settings.role` or missing handler/method; `404` if the resource ID does not exist.
 
-### POST ${FORMIO_PROJECT_URL}/:employeeResourcePath/submission
+### POST {projectUrl}/:employeeResourcePath/submission
 
 Register a new custom user by submitting to the custom resource's path. The `after/create` Role Assignment action adds the custom role automatically.
 
@@ -136,10 +136,10 @@ Example:
 ```bash
 curl -X POST -H "Content-Type: application/json" \
   -d @employee.json \
-  "${FORMIO_PROJECT_URL}/employee-112/submission"
+  "{projectUrl}/employee-112/submission"
 ```
 
-### POST ${FORMIO_PROJECT_URL}/form (Employee Login Form)
+### POST {projectUrl}/form (Employee Login Form)
 
 Create the login form for the custom user type. This is a regular `form` (not a resource) with `email`, `password`, and typically a `verifyPassword` component for client-side confirmation.
 
@@ -176,7 +176,7 @@ Response: the created form document. Persist `_id` as `employeeLoginFormId`, `na
 
 Errors: `400` for duplicate path/name; `401`/`403` for insufficient access.
 
-### PUT ${FORMIO_PROJECT_URL}/:employeeLoginFormPath
+### PUT {projectUrl}/:employeeLoginFormPath
 
 Update the custom login form to allow anonymous submissions so unauthenticated users can log in. Full-document PUT — send the complete form definition plus an `access` array that includes the `Anonymous` role for `create_own`/`read_all` as appropriate.
 
@@ -186,7 +186,7 @@ Response: the updated form document with the expanded `access` list.
 
 Errors: `400` for invalid access entries; `404` if the form path does not exist.
 
-### GET ${FORMIO_PROJECT_URL}/:employeeLoginFormPath/action
+### GET {projectUrl}/:employeeLoginFormPath/action
 
 List actions currently attached to the custom login form. On fresh forms this returns the default `Save Submission` action (`name: "save"`), which must be removed before attaching a `Login` action.
 
@@ -198,10 +198,10 @@ Example:
 
 ```bash
 curl -H "x-jwt-token: $FORMIO_JWT" \
-  "${FORMIO_PROJECT_URL}/employee/login-374/action"
+  "{projectUrl}/employee/login-374/action"
 ```
 
-### DELETE ${FORMIO_PROJECT_URL}/:employeeLoginFormPath/action/:employeeLoginSaveActionId
+### DELETE {projectUrl}/:employeeLoginFormPath/action/:employeeLoginSaveActionId
 
 Remove the default `Save Submission` action from the custom login form — login submissions must NOT be persisted, so this action has to go before the `Login` action is added.
 
@@ -209,7 +209,7 @@ Response: plain text `OK`.
 
 Errors: `404` if the action ID does not exist on that form.
 
-### POST ${FORMIO_PROJECT_URL}/:employeeLoginFormPath/action
+### POST {projectUrl}/:employeeLoginFormPath/action
 
 Attach the `Login` action to the custom login form. This action matches the submitted credentials against one or more user resources and issues a JWT on success.
 
@@ -240,7 +240,7 @@ Response: the created action document.
 
 Errors: `400` for missing `resources` or invalid field references; `404` if the form path does not exist.
 
-### POST ${FORMIO_PROJECT_URL}/:employeeLoginFormPath/submission
+### POST {projectUrl}/:employeeLoginFormPath/submission
 
 Log in a custom user by submitting to the custom login form. The `before/create` Login action validates the credentials against the configured `resources` and returns the authenticated user's submission document, setting the `x-jwt-token` response header.
 
@@ -267,7 +267,7 @@ Example:
 ```bash
 curl -X POST -H "Content-Type: application/json" \
   -d '{"data":{"email":"Samir.Schmeler92@yahoo.com","password":"CHANGEME","verifyPassword":"CHANGEME"}}' \
-  "${FORMIO_PROJECT_URL}/employee/login-374/submission"
+  "{projectUrl}/employee/login-374/submission"
 ```
 
 ## Related Skills

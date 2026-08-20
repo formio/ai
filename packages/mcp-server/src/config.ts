@@ -1,5 +1,31 @@
 export const DEFAULT_BASE_URL = 'https://api.form.io';
 
+// What a Project URL is, with an example per deployment kind. This is the guidance
+// the unset-project error and the server's instructions carry, because the project
+// URL is the one value a user is asked for.
+//
+// It deliberately does NOT explain the base URL. That value is derived from
+// whichever project URL the user is about to supply, so guidance about it cannot be
+// acted on before that answer exists — and carrying it here made a message asking
+// for one value read as asking for two.
+export const PROJECT_URL_GUIDANCE = [
+  'A Project URL is the full URL of one Form.io project — the project an application reads and writes.',
+  `On Form.io's hosted cloud it is the project's name as a sub-domain of form.io: a project named examples is https://examples.form.io.`,
+  'On a deployment the customer hosts, it is EITHER a sub-directory of that deployment (https://forms.mysite.com/myproject) OR a sibling sub-domain of the same parent domain (https://myproject.mysite.com), depending on how that deployment routes projects.',
+  'A *.form.io host is never a Base URL, and https://api.form.io/<project> is not a hosted project URL. Never build a Project URL by appending a project name to a deployment URL — in the sub-domain shape the two hosts differ by design, so neither can be built from the other.',
+].join(' ');
+
+// Why a base URL sometimes has to be asked for. Carried ONLY by the message raised
+// when it cannot be derived, which is the one place a reader can act on it.
+// Deliberately names no example base URL. A reader who reaches this message has a
+// project URL that is NOT on a form.io host — that is why it could not be
+// derived — so citing api.form.io here would offer the one value that is certainly
+// wrong for them, which is the failure the unresolved state exists to prevent.
+export const BASE_URL_UNRESOLVED_GUIDANCE = [
+  'A Base URL is the deployment hosting a project, and it is normally derived from the project URL rather than supplied — a project addressed as a sub-directory is served by its parent path, so https://forms.mysite.com/one/two is served by https://forms.mysite.com/one.',
+  'It cannot be derived from a project URL that carries no path on a customer domain: there the deployment is a sibling sub-domain of the same parent domain, and nothing in the project URL names it. Ask the user for it.',
+].join(' ');
+
 // Form.io URLs are compared and concatenated in several places, so they are
 // stored without a trailing slash wherever they enter the process.
 export function stripTrailingSlashes(url: string): string {
@@ -33,7 +59,6 @@ export function normalizeHttpUrl(input: string, label: string): string {
 export interface FormioConfig {
   baseUrl?: string;
   projectUrl?: string;
-  defaultProjectUrl?: string;
   apiKey?: string;
   loginFormUrl?: string;
   jwt?: string;
@@ -44,11 +69,29 @@ export interface FormioConfig {
 }
 
 // After resolveProjectConfig has merged in the cwd's mapped project URL.
-// baseUrl is guaranteed there: resolution applies DEFAULT_BASE_URL last, once
-// the mapping has had its say.
+//
+// projectUrl is guaranteed; baseUrl is NOT. Resolution defaults to
+// DEFAULT_BASE_URL only for a form.io-hosted project and derives it from a
+// sub-directory-routed one, but a path-less customer project URL names no
+// deployment and none can be invented — https://api.form.io there points the
+// portal login and the token-cache key at a host the user does not use.
+//
+// Optional rather than sentinel-filled because the requirement is narrower than
+// the config: baseUrl is read only by the authentication path (the JWT cache
+// key, the login-form candidates, ${baseUrl}/current), and an API-key deployment
+// never reads it at all. The type says so, and requireBaseUrl raises the
+// actionable error at the point something needs the value.
 export interface ResolvedFormioConfig extends FormioConfig {
-  baseUrl: string;
+  baseUrl?: string;
   projectUrl: string;
+  // The directory this configuration was resolved for — the cwd argument when a
+  // caller passed one, and the server's own working directory when it did not.
+  //
+  // Carried because the errors raised downstream name a repair command that takes
+  // `--cwd`, and a message printing a literal `<cwd>` placeholder is not a command
+  // anybody can run. Resolution is the only step that knows which directory the
+  // answer belongs to.
+  cwd?: string;
 }
 
 // One behavior for every agent: no environment variable switches the defaults,
@@ -87,10 +130,6 @@ export function getConfig(): FormioConfig {
   return {
     baseUrl,
     projectUrl,
-    defaultProjectUrl: readHttpUrlEnv({
-      raw: process.env.FORMIO_DEFAULT_PROJECT_URL,
-      name: 'FORMIO_DEFAULT_PROJECT_URL',
-    }),
     apiKey: apiKey || undefined,
     loginFormUrl: loginFormUrl || undefined,
     jwt: undefined,

@@ -24,11 +24,14 @@ startCommand:
           writes Form.io data; leave it blank only to look around first.
       formioBaseUrl:
         type: string
-        title: Base URL
-        default: https://api.form.io
+        title: Base URL (only if it cannot be derived)
         description: >-
-          Base URL of the deployment. Leave as the default for Form.io SaaS; set it
-          when self-hosting.
+          Base URL of the deployment. Usually leave it blank: it is derived from the
+          project URL — https://api.form.io for a project on a form.io host, the
+          parent path for a sub-directory-routed one. Set it only when your project
+          URL is a plain sub-domain of your own domain, whose deployment is a sibling
+          sub-domain nothing in the project URL names. Defaulting it to api.form.io
+          would send a self-hosted login to a deployment you do not use.
       formioApiKey:
         type: string
         title: Project API key
@@ -48,15 +51,12 @@ startCommand:
       command: 'npx',
       args: ['-y', '@formio/mcp'],
       env: Object.assign(
-        {
-          FORMIO_PROJECT_URL: config.formioProjectUrl,
-          FORMIO_BASE_URL: config.formioBaseUrl || 'https://api.form.io',
-        },
+        { FORMIO_PROJECT_URL: config.formioProjectUrl },
+        config.formioBaseUrl ? { FORMIO_BASE_URL: config.formioBaseUrl } : {},
         config.formioApiKey ? { FORMIO_API_KEY: config.formioApiKey } : {},
         config.formioInsecureTls ? { FORMIO_INSECURE_TLS: '1' } : {}
       ),
     })
   exampleConfig:
     formioProjectUrl: https://myproject.form.io
-    formioBaseUrl: https://api.form.io
     formioApiKey: your-api-key

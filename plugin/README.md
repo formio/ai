@@ -13,8 +13,8 @@ The plugin directory carries three manifests over one `skills/` tree and one `mc
 | Manifest | Read by | Components consumed |
 | --- | --- | --- |
 | `plugin.json` (Agent Plugins 1.0.0) | Codex/ChatGPT, Kiro, VS Code | `skills/`, `mcp.json` |
-| `.cursor-plugin/plugin.json` | Cursor | `skills/`, its own `mcpServers`, plus `variables` for the install-time prompt |
-| `.claude-plugin/plugin.json` | Claude Code | `skills/`, its own `mcpServers`, and `userConfig` for the install-time prompt |
+| `.cursor-plugin/plugin.json` | Cursor | `skills/` and its own `mcpServers`; no install-time prompt |
+| `.claude-plugin/plugin.json` | Claude Code | `skills/` and its own `mcpServers`; no install-time prompt |
 
 
 Installing without a plugin also works: `npx skills add formio/ai` installs `skills/` into any agent, and the bundled `formio-mcp-setup` skill connects the server on first use.
@@ -48,7 +48,7 @@ Every step has an approval gate before any file is written or any MCP call hits 
 
 | Skill | Purpose |
 | --- | --- |
-| `formio-application` | Default "build me an app" orchestrator. Five-step pipeline (Intent → Plan → Deployment → Import → Framework), start to finish in one invocation. |
+| `formio-application` | Default "build me an app" orchestrator. Four-step pipeline (Intent → Plan → Import → Framework), start to finish in one invocation. |
 | `formio-form-builder` | Default "build me a form" orchestrator — webform or wizard from intent to a saved form, plus field edits to existing forms. |
 | `formio-form` | Embeds and renders forms in any web application with `@formio/js` — pre-fill, conditionals, calculated values, custom validation. |
 | `formio-resource-planner` | Plans resources, fields, roles, actions, access — emits paired `template.md` + `template.json`. |
@@ -64,13 +64,12 @@ See the [root README's "How it works"](https://github.com/formio/ai#how-it-works
 
 ## Environment variables
 
-Install-time prompts vary by client: Claude Code and Cursor ask for `FORMIO_BASE_URL`, and clients reading the vendor-neutral manifest ask for nothing. No client prompts for a project URL — a project is one-to-one with the application built against it, so the agent captures it per working directory and persists it with `project_set`. Every other variable is read from `process.env`. Nothing is required — the server starts unconfigured and the agent asks for a project when one is first needed.
+No client prompts for anything at install time. Both URLs are resolved per directory instead — from a committed `formio.json` tracked with the application's own source, from the working-directory mapping `project_set` writes, or from the environment as a last resort. A project is one-to-one with the application built against it, and a base URL is derived from the project URL's shape when it can be, so a value typed once at install is right for one directory and wrong for the next. The `.mcpb` desktop bundle is the exception: a desktop host has no working directory to interview in, so it still asks.
 
 | Name | Required | Default | Purpose |
 | --- | :-: | --- | --- |
-| `FORMIO_BASE_URL` | no | `https://api.form.io` | Full base URL of your Form.io deployment. Acts as the global fallback when a directory's mapping does not carry its own base URL. |
-| `FORMIO_PROJECT_URL` | no\* | — | Full URL of the Form.io project the MCP server should target. The plugin leaves it unset and routes per-cwd instead; when it *is* set it takes precedence over every mapping. |
-| `FORMIO_DEFAULT_PROJECT_URL` | no | — | A project URL to **offer**, not to apply. When set and the working directory has no mapping, the server names it as the suggested project so the agent can confirm it and persist it with `project_set`. It never changes what a tool resolves — the opposite of `FORMIO_PROJECT_URL`, which pins the server and cannot be redirected by `project_set`. |
+| `FORMIO_BASE_URL` | no | derived, see note | Full base URL of your Form.io deployment. The WEAKEST source: a committed `formio.json` wins, then the directory's mapping, then this. When nothing supplies one it is derived from the project URL's shape, and a project URL that names no deployment yields an actionable error rather than a guess. |
+| `FORMIO_PROJECT_URL` | no\* | — | Full URL of the Form.io project the MCP server should target. The WEAKEST source: a committed `formio.json` wins, then the directory's mapping, then this. The plugin leaves it unset and routes per-cwd instead. |
 | `FORMIO_API_KEY` | no | `undefined` | Long-lived project API key. When set, the server skips the browser login flow and attaches `x-token`. |
 | `FORMIO_LOGIN_FORM` | no | Auto-resolved | Override the portal login form URL. |
 | `FORMIO_FORCE_BROWSER` | no | `0` | Set to `1` to attempt the browser login even where the server detects no browser (CI, a container, SSH with no display). |
@@ -87,9 +86,9 @@ Install-time prompts vary by client: Claude Code and Cursor ask for `FORMIO_BASE
 
 When `FORMIO_LOGIN_FORM` is unset, the server probes (in order, 1.5s timeout each) on the first login attempt and caches the first responder:
 
-1. `${FORMIO_BASE_URL}/formio/user/login` (portal-base)
-2. `${FORMIO_PROJECT_URL}/admin/login` (project admin)
-3. `${FORMIO_PROJECT_URL}/user/login` (project user)
+1. `{baseUrl}/formio/user/login` (portal-base)
+2. `{projectUrl}/admin/login` (project admin)
+3. `{projectUrl}/user/login` (project user)
 
 ## License
 

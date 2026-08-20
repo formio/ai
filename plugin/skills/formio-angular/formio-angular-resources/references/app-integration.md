@@ -1,5 +1,7 @@
 # App integration — AppModule, routing, config, auth, styling
 
+> **`FormioAppConfig` renames both URLs.** `appUrl` is the **Project URL** — the project this application reads and writes, and the one value anyone supplies. `apiUrl` is the **Base URL** — the deployment hosting it, which is normally derived from the Project URL rather than supplied. Take both from `npx -y @formio/mcp@0.10.0 project get --cwd "<workspace root>"`; never compose, derive, or hand-type either one yourself.
+
 Every resource module you generate plugs into a shared foundation. This file is the canonical shape of that foundation, matching the angular-demo's AppModule but trimmed to only what this skill's output needs.
 
 ## Contents
@@ -110,8 +112,8 @@ import { FormioAppConfig } from '@formio/angular';
 import { FormioAuthConfig } from '@formio/angular/auth';
 
 export const AppConfig: FormioAppConfig = {
-  appUrl: 'YOUR_FORMIO_PROJECT_URL', // e.g. https://myproject.form.io
-  apiUrl: 'YOUR_FORMIO_BASE_URL', // e.g. https://api.form.io — usually the hosted API
+  appUrl: '{projectUrl}', // Project URL — from `project get`, never hand-typed
+  apiUrl: '{baseUrl}', // Base URL — the deployment; from `project get`, never hand-typed
 };
 
 export const AuthConfig: FormioAuthConfig = {
@@ -124,8 +126,8 @@ Swap `userLogin` / `userRegister` for whatever the Resource Map called them. If 
 
 **`appUrl` vs `apiUrl`:**
 
-- `appUrl` = project URL = `FORMIO_PROJECT_URL`. This is what `FormioResourceService` calls to load forms and submissions. It is the value every `form_*` MCP tool uses and every `formio-api/references/project-*` / `formio-api/references/runtime-*` skill means by "project URL."
-- `apiUrl` = base URL = `FORMIO_BASE_URL`. Used for cross-project concerns (team / project / tenant management). For a single-project Angular app, `apiUrl` is usually the same `https://api.form.io` or a self-hosted platform root.
+- `appUrl` = the **Project URL** that `project get` reported. This is what `FormioResourceService` calls to load forms and submissions. It is the value every `form_*` MCP tool uses and every `formio-api/references/project-*` / `formio-api/references/runtime-*` skill means by "project URL."
+- `apiUrl` = the **Base URL** that `project get` reported. Used for cross-project concerns (team / project / tenant management). Take it from that command and nowhere else — do not fill in `https://api.form.io` because the app has one project, since that value is correct only for a project on a `form.io` host and points a self-hosted app's login at a deployment it does not use.
 
 ## 4. `AppComponent` and `HomeComponent`
 

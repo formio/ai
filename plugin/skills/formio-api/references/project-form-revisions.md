@@ -4,7 +4,7 @@ The Form Revisions API gives a project admin a draft/publish workflow for form d
 
 ## Root URL
 
-All endpoints below are rooted at `${FORMIO_PROJECT_URL}` — the project endpoint, equivalent to `{{baseUrl}}/{{projectName}}` in Postman.
+All endpoints below are rooted at `{projectUrl}` — the project endpoint, equivalent to `{{baseUrl}}/{{projectName}}` in Postman.
 
 ## Authentication
 
@@ -55,7 +55,7 @@ On cancel, the tool throws and no update is performed.
 
 ## Endpoints
 
-### PUT ${FORMIO_PROJECT_URL}/form/:formId
+### PUT {projectUrl}/form/:formId
 
 Enable form revisions on an existing form by setting `revisions` on the form document. This endpoint is the standard form update (see `project-forms.md`), but when a form is saved with `revisions` turned on, subsequent draft/publish operations become available on that form. Once enabled, every `PUT` to this path creates a new published revision.
 
@@ -102,10 +102,10 @@ Example:
 ```bash
 curl -X PUT -H "x-jwt-token: $FORMIO_JWT" -H "Content-Type: application/json" \
   -d @form.json \
-  "${FORMIO_PROJECT_URL}/form/69d69ce1040fa2cea2572c71"
+  "{projectUrl}/form/69d69ce1040fa2cea2572c71"
 ```
 
-### PUT ${FORMIO_PROJECT_URL}/form/:formId/draft
+### PUT {projectUrl}/form/:formId/draft
 
 Save an in-progress draft of a revisioned form. Drafts do not affect live submissions; they are a working copy that the admin iterates on until ready to publish.
 
@@ -124,10 +124,10 @@ Example:
 ```bash
 curl -X PUT -H "x-jwt-token: $FORMIO_JWT" -H "Content-Type: application/json" \
   -d @draft.json \
-  "${FORMIO_PROJECT_URL}/form/69d69ce1040fa2cea2572c71/draft"
+  "{projectUrl}/form/69d69ce1040fa2cea2572c71/draft"
 ```
 
-### GET ${FORMIO_PROJECT_URL}/form/:formId/draft
+### GET {projectUrl}/form/:formId/draft
 
 Retrieve the current draft for a revisioned form.
 
@@ -141,10 +141,10 @@ Example:
 
 ```bash
 curl -H "x-jwt-token: $FORMIO_JWT" \
-  "${FORMIO_PROJECT_URL}/form/69d69ce1040fa2cea2572c71/draft"
+  "{projectUrl}/form/69d69ce1040fa2cea2572c71/draft"
 ```
 
-### PUT ${FORMIO_PROJECT_URL}/form/:formId
+### PUT {projectUrl}/form/:formId
 
 Publish a draft. Publishing is done by issuing a standard `PUT` to the form endpoint with the desired definition — Form.io treats that save as the next published revision when revisions are enabled. After publishing, the draft is cleared and the new revision is appended to the revision list.
 
@@ -163,10 +163,10 @@ Example:
 ```bash
 curl -X PUT -H "x-jwt-token: $FORMIO_JWT" -H "Content-Type: application/json" \
   -d @published.json \
-  "${FORMIO_PROJECT_URL}/form/69d69ce1040fa2cea2572c71"
+  "{projectUrl}/form/69d69ce1040fa2cea2572c71"
 ```
 
-### GET ${FORMIO_PROJECT_URL}/form/:formId/v
+### GET {projectUrl}/form/:formId/v
 
 List every revision of a form, ordered oldest to newest. Each revision is a full snapshot of the form definition at publish time.
 
@@ -182,10 +182,10 @@ Example:
 
 ```bash
 curl -H "x-jwt-token: $FORMIO_JWT" \
-  "${FORMIO_PROJECT_URL}/form/69d69ce1040fa2cea2572c71/v"
+  "{projectUrl}/form/69d69ce1040fa2cea2572c71/v"
 ```
 
-### GET ${FORMIO_PROJECT_URL}/form/:formId/v/:version
+### GET {projectUrl}/form/:formId/v/:version
 
 Retrieve a specific form revision by sequential version number (`1`, `2`, ...) or by revision `_id`.
 
@@ -203,11 +203,11 @@ Examples:
 ```bash
 # by sequential version number
 curl -H "x-jwt-token: $FORMIO_JWT" \
-  "${FORMIO_PROJECT_URL}/form/69d69ce1040fa2cea2572c71/v/2"
+  "{projectUrl}/form/69d69ce1040fa2cea2572c71/v/2"
 
 # by revision _id
 curl -H "x-jwt-token: $FORMIO_JWT" \
-  "${FORMIO_PROJECT_URL}/form/69d69ce1040fa2cea2572c71/v/69d69df5040fa2cea2572ce4"
+  "{projectUrl}/form/69d69ce1040fa2cea2572c71/v/69d69df5040fa2cea2572ce4"
 ```
 
 ## Related Skills

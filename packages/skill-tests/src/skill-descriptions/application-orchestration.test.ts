@@ -1,7 +1,8 @@
-// The orchestrator's MCP-configuration step is gone: writing
-// env.FORMIO_PROJECT_URL into a client config pins the server and defeats the
-// project_set call the step before it makes. What remains is a five-step flow
-// with no restart boundary on either branch.
+// The orchestrator's MCP-configuration step is gone: writing configuration into a
+// client config file is the wrong scope for a per-directory value — one answer for
+// every directory that client opens — and it duplicated the project_set call the
+// step before it makes. What remains is a four-step flow — Intent, Plan, Import,
+// Framework — with no restart boundary on either branch.
 
 import { describe, expect, it } from 'vitest';
 import { liveSkillDocuments, skillDocument, skillDocumentExists } from './helpers.js';
@@ -62,32 +63,42 @@ describe('no skill halts for an MCP reload', () => {
 });
 
 describe('formio-application orchestration', () => {
-  it('enumerates exactly five steps', () => {
+  it('enumerates exactly four steps', () => {
     const { body } = skillDocument(SKILL_MD);
     const stepHeadings = [...body.matchAll(/^### Step (\d[\w.]*) — (.+)$/gm)].map((match) => ({
       number: match[1],
       title: match[2],
     }));
 
+    // No Deployment step: the project configuration is resolved by the Preflight,
+    // which runs before every step by definition — so ordering it ahead of Plan
+    // needed no step of its own.
     expect(stepHeadings.map((step) => `${step.number} ${step.title}`)).toEqual([
       '1 Intent',
       '2 Plan',
-      // Both branches: modify-existing skips the interview, not the mapping.
-      '3 Deployment',
-      '4 Import',
-      '4.5 Auth handoff (conditional)',
-      '5 Framework routing',
+      '3 Import',
+      '3.5 Auth handoff (conditional)',
+      '4 Framework routing',
     ]);
   });
 
-  it('links only the four surviving sibling documents', () => {
+  it('resolves the project configuration in the preflight, not in a step', () => {
+    const { body } = skillDocument(SKILL_MD);
+    const preflight = body.slice(body.indexOf('## Preflight'), body.indexOf('## Stance'));
+
+    expect(preflight).toMatch(/project get/);
+    expect(preflight).toMatch(/--cwd/);
+    expect(body).not.toMatch(/### Step \d[\w.]* — Deployment/);
+  });
+
+  it('links only the three surviving sibling documents', () => {
     const { body } = skillDocument(SKILL_MD);
     const linked = new Set([...body.matchAll(/\(\.\/([A-Z_]+\.md)\)/g)].map((match) => match[1]));
 
-    expect([...linked].sort()).toEqual(['DEPLOYMENT.md', 'FRAMEWORK.md', 'IMPORT.md', 'INTENT.md']);
+    expect([...linked].sort()).toEqual(['FRAMEWORK.md', 'IMPORT.md', 'INTENT.md']);
   });
 
-  it('states that Deployment and Import run in one invocation, resolved at tool-call time', () => {
+  it('states that the mapping and Import run in one invocation, resolved at tool-call time', () => {
     const { body } = skillDocument(SKILL_MD);
 
     expect(body).toMatch(/same invocation/i);
@@ -116,7 +127,17 @@ describe('formio-application orchestration', () => {
 // nothing to do with the orchestrator, so the ban covers the orchestrator's own
 // documents plus any cross-reference that names formio-application explicitly.
 describe('step numbering after the deletion', () => {
-  const RETIRED_REFERENCES = ['Step 6', 'Step 5.5', 'Step 5 (Import)', 'Steps 5–6', 'Steps 2–5'];
+  const RETIRED_REFERENCES = [
+    'Step 6',
+    'Step 5.5',
+    'Step 5 (Import)',
+    'Steps 5–6',
+    'Steps 2–5',
+    // Retired with the Deployment step itself.
+    'Step 5',
+    'Step 4.5',
+    'Step 3 (Deployment)',
+  ];
 
   const orchestratorDocuments = () =>
     liveSkillDocuments().filter((doc) => doc.path.startsWith(APPLICATION));
@@ -137,17 +158,17 @@ describe('step numbering after the deletion', () => {
     expect(offenders).toEqual([]);
   });
 
-  it('IMPORT.md is Step 4 and hands off to Step 5', () => {
+  it('IMPORT.md is Step 3 and hands off to Step 4', () => {
     const { body } = skillDocument(`${APPLICATION}/IMPORT.md`);
 
-    expect(body).toMatch(/during Step 4/);
-    expect(body).toMatch(/What Step 4 hands to Step 5/);
+    expect(body).toMatch(/during Step 3/);
+    expect(body).toMatch(/What Step 3 hands to Step 4/);
   });
 
-  it('FRAMEWORK.md identifies itself as Step 5 with a Step 5a pre-check', () => {
+  it('FRAMEWORK.md identifies itself as Step 4 with a Step 4a pre-check', () => {
     const { body } = skillDocument(`${APPLICATION}/FRAMEWORK.md`);
 
-    expect(body).toMatch(/Step 5a/);
-    expect(body).not.toMatch(/Step 6a|Step 6\b/);
+    expect(body).toMatch(/Step 4a/);
+    expect(body).not.toMatch(/Step 5a|Step 5\b/);
   });
 });

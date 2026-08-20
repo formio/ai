@@ -86,14 +86,17 @@ describe('pnpm build:mcpb', () => {
     expect(Object.keys(cfg).sort()).toEqual([
       'formio_api_key',
       'formio_base_url',
-      'formio_default_project_url',
+      'formio_project_url',
     ]);
     // Nothing here is required. The server starts with an empty environment and
     // serves its whole tool list; the tools that need a project raise an
     // actionable error at call time. A host that blocks installation on a value
     // the server runs without is describing a constraint that does not exist.
-    expect(cfg.formio_default_project_url.required).toBeFalsy();
-    expect(cfg.formio_default_project_url.description).toMatch(/https/);
+    expect(cfg.formio_project_url.required).toBeFalsy();
+    expect(cfg.formio_project_url.description).toMatch(/https/);
+    // The offering variable is gone: the environment is the weakest resolution
+    // source, so a project set there is already overridden by both stronger ones.
+    expect(cfg.formio_default_project_url).toBeUndefined();
     expect(cfg.formio_base_url.required).toBeFalsy();
     // An API key is a credential: it must never be stored in plain text by the host.
     expect(cfg.formio_api_key.sensitive).toBe(true);
@@ -102,13 +105,14 @@ describe('pnpm build:mcpb', () => {
 
   it('1.5 wires each user_config entry through to the env var the server reads', () => {
     const env = readManifest().server.mcp_config.env ?? {};
-    expect(env.FORMIO_DEFAULT_PROJECT_URL).toBe('${user_config.formio_default_project_url}');
+    expect(env.FORMIO_PROJECT_URL).toBe('${user_config.formio_project_url}');
+    expect(env.FORMIO_DEFAULT_PROJECT_URL).toBeUndefined();
     expect(env.FORMIO_BASE_URL).toBe('${user_config.formio_base_url}');
     expect(env.FORMIO_API_KEY).toBe('${user_config.formio_api_key}');
-    // The install answer is a suggestion the agent confirms, never a pin: an
-    // answer given once at install must not outrank a project_set mapping in
-    // every directory the user later works in.
-    expect(env.FORMIO_PROJECT_URL).toBeUndefined();
+    // The install answer still must not outrank a per-folder mapping — and no
+    // longer can. The environment is the weakest resolution source, so a project
+    // set here is overridden by a committed formio.json and by any project_set
+    // mapping, which is what the separate offering variable used to guarantee.
     // Plugin-only behaviour must not leak into the desktop bundle: with it set the
     // server would ignore FORMIO_PROJECT_URL and expect a per-cwd project map.
     expect(env.FORMIO_PLUGIN_CONTEXT).toBeUndefined();
