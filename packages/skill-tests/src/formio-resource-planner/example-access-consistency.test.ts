@@ -287,6 +287,14 @@ describe.each(exampleDirs())('planner example %s', (example) => {
         ).toBe(true);
         continue;
       }
+      if (/^role\(/.test(row.create)) {
+        // `role(<r>)` layers a role onto whichever underlying rule the cell
+        // names, so it maps to no single entry type — the sibling
+        // read/update/delete test skips it for the same reason via
+        // `staticScopes`. Treating it as `own` would demand a `create_own`
+        // entry the token never promised.
+        continue;
+      }
       const wanted = row.create === 'all' ? 'create_all' : 'create_own';
       expect(
         grants(entries, wanted, row.actor),
@@ -363,6 +371,17 @@ describe.each(exampleDirs())('planner example %s', (example) => {
       if (savedInto.has(machineName)) {
         continue; // rows arrive via another form's Save; that form owns the create path
       }
+      if (
+        flatten(entry.components).some((component) => fieldBasedOperations(component).has('create'))
+      ) {
+        // A create-conferring field-based block IS a create path, and the row it
+        // creates is owned by whoever submitted it — verified live: a member
+        // creating through the block alone owns the resulting row. So `_own`
+        // grants here are not inert, and demanding a static create grant would
+        // contradict "never pairs a create-conferring field-based block with a
+        // static create grant" below.
+        continue;
+      }
       const entries = entry.submissionAccess ?? [];
       for (const access of entries) {
         if (!/_own$/.test(access.type ?? '') || access.type === 'create_own') {
@@ -376,6 +395,54 @@ describe.each(exampleDirs())('planner example %s', (example) => {
           expect(
             canCreate,
             `${machineName}: ${access.type} for ${role} is inert — that role has no create grant here, so every row is owned by whoever does create them (the administrator). Use the group-reference field-based block if ${role} should see these rows.`
+          ).toBe(true);
+        }
+      }
+    }
+  });
+
+  it('confers nothing through a field-based block that the Access Matrix withholds', () => {
+    // The other direction of the matrix rule, and the one that actually bites:
+    // the block is what runs at runtime, so when the two disagree the block
+    // wins. A four-entry (`admin`-equivalent) block beside a `delete | —` cell
+    // silently lets any member permanently delete any of their group's rows —
+    // the exact defect this PR fixed by hand in the CRM example. Without this
+    // assertion that fix is unguarded: flipping a `delete | group` cell to `—`
+    // while leaving the four-entry block in place otherwise keeps the suite
+    // green.
+    for (const [machineName, entry] of resourceEntries(template)) {
+      const conferred = new Set(
+        flatten(entry.components).flatMap((component) => [...fieldBasedOperations(component)])
+      );
+      if (conferred.size === 0) {
+        continue;
+      }
+      // Only actors the matrix actually places inside the group: a row of all
+      // `—` describes somebody the block was never meant to serve, and the
+      // block cannot tell personas apart anyway (its `roles` are empty).
+      const groupRows = matrix.filter(
+        (row) =>
+          machineNameOf(row.resource) === machineName &&
+          row.actor !== 'administrator' &&
+          OPERATIONS.some((operation) => row[operation].startsWith('group'))
+      );
+      for (const row of groupRows) {
+        const promised = OPERATIONS.filter((operation) => row[operation].startsWith('group'));
+        const excess = [...conferred].filter(
+          (operation) => !promised.includes(operation as Operation)
+        );
+        expect(
+          excess,
+          `${machineName}: the field-based block confers ${excess.join(', ')} to every group member, but the Access Matrix says ${excess.map((operation) => `${operation} = \`${row[operation as Operation]}\``).join(', ')} for ${row.actor}. The block is what runs, so the matrix is describing an app that does not exist — narrow the entry types (see "Choosing the types") or widen the matrix deliberately.`
+        ).toEqual([]);
+
+        // A `read | group` promise needs a type the index filter honours
+        // (submissionResourceAccessFilter.js:20-56); `update`/`delete` alone
+        // leave members able to touch rows they can never list.
+        if (row.read.startsWith('group')) {
+          expect(
+            listVisibleViaBlock(entry),
+            `${machineName}: the matrix promises ${row.actor} read = \`${row.read}\`, but the field-based block carries no list-visible type (${[...LIST_VISIBLE].join('/')}), so every row stays invisible to an index request`
           ).toBe(true);
         }
       }

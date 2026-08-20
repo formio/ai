@@ -40,7 +40,7 @@ Ask (together):
 
 - Is access **owner-level** (users see only their own records)?
 - **Group-level** (users see everything in their team / project / tenant)?
-  - If group-level: **who creates the groups** — an administrator through the portal, or end users inside the app? End-user group creation needs `create_all` + `read_own` + `update_own` on the group resource for that role, and the group-creation flow must also write the creator's membership row, or the creator ends up locked out of the group they just made.
+  - If group-level: **who creates the groups** — an administrator through the portal, or end users inside the app? End-user group creation needs `create_all` + `read_all` + `update_own` on the group resource for that role (`read_all` rather than `read_own`, because a member who did not create the group must still read its row to populate the reference select), and the group-creation flow must also write the creator's membership row, or the creator ends up locked out of the group they just made.
 - **Role-level** (admins see all, members see some, viewers see read-only)?
 - **Tenant-level** (strict multi-tenant isolation)?
 - Or some combination — e.g., "admins see everything, members see only their group's data."

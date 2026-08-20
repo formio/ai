@@ -330,11 +330,11 @@
         },
         {
           "type": "read_own",
-          "roles": ["authenticated"]
+          "roles": ["salesRep"]
         },
         {
           "type": "update_own",
-          "roles": ["authenticated"]
+          "roles": ["salesRep"]
         }
       ]
     },

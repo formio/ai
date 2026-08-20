@@ -152,7 +152,7 @@ Layout:
 | Project | administrator | all | all | all | all | full admin |
 | Project | authenticated | — | all | — | — | Project is the group — `read_all` so the project select can populate; never `group` in a group resource's own row |
 | Task | administrator | all | all | all | all |  |
-| Task | authenticated | group | group | group | — | inherits via Task.project; the block is `write`, so members cannot delete |
+| Task | authenticated | group | group | group | — | inherits via Task.project; the block is `write`, so members cannot delete. The checked-in `examples/task-manager/` makes the OTHER choice for the same resource — a four-entry block and `delete | group` — because a task list is disposable; both are correct, and the matrix must say whichever the block does |
 | ProjectUser | administrator | all | all | all | all | admin-managed membership |
 | ProjectUser | authenticated | — | group | — | — | read-only field-based block on ProjectUser.project; `own` would be inert — the admin creates and owns these rows |
 ```

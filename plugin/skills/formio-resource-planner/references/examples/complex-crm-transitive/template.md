@@ -66,7 +66,7 @@ This app exercises **transitive group access**: the group (`Team`) sits two leve
 
 - administrator: full access to all resources and memberships; creates Teams and TeamUser rows
 - salesRep: default role on self-registration; access to Accounts, Contacts, Deals, and Activities is narrowed by TeamUser membership at runtime
-- authenticated: baseline role issued by Login; salesRep is layered on top
+- authenticated: declared but assigned to nobody in this example — Form.io issues roles only through a Role Assignment action, and this project's `userRegister:role` assigns `salesRep`. A grant naming `authenticated` here would be held by no user.
 - anonymous: default for unauthenticated visitors; may reach only login/register forms
 
 ## Access Matrix
@@ -74,7 +74,7 @@ This app exercises **transitive group access**: the group (`Team`) sits two leve
 | Resource | Actor | create | read | update | delete | Notes |
 | --- | --- | --- | --- | --- | --- | --- |
 | User | administrator | all | all | all | all |  |
-| User | authenticated | — | own | own | — | owner-level access to own record |
+| User | salesRep | — | own | own | — | owner-level access to own record; `salesRep` is the role registration actually assigns, so the grant must name it |
 | Team | administrator | all | all | all | all | admin creates teams |
 | Team | salesRep | — | all | — | — | `read_all` is required, not a convenience: nothing stamps a group row's own `access`, and it must be readable to populate the `team` select whose value authorizes group-based create. Trade-off: every rep can read every Team row |
 | TeamUser | administrator | all | all | all | all | admin manages memberships |

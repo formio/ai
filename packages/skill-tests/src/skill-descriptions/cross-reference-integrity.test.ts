@@ -104,9 +104,12 @@ function hasHeading(path: string, wanted: string): boolean {
 // The skill directory owning a document — the parent of `references/`, so a bare
 // `SKILL.md` cited from inside `references/` resolves to its own skill.
 function skillRootOf(path: string): string {
-  const rel = path.slice(skillsRoot.length + 1);
-  const [top] = rel.split('/');
-  const nested = join(skillsRoot, top, rel.split('/')[1] ?? '');
+  // `path` is platform-separated (it came through `join`), so split on either
+  // separator: on Windows a `/`-only split yields the whole relative path as
+  // `top` and every candidate built from it is nonsense.
+  const segments = path.slice(skillsRoot.length + 1).split(/[/\\]/);
+  const [top] = segments;
+  const nested = join(skillsRoot, top, segments[1] ?? '');
   return existsSync(join(nested, 'SKILL.md')) ? nested : join(skillsRoot, top);
 }
 
