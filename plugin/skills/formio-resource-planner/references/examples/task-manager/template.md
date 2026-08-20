@@ -42,11 +42,11 @@ A multi-user task manager where each Project has a set of Tasks and a team of Us
 | Resource | Actor | create | read | update | delete | Notes |
 | --- | --- | --- | --- | --- | --- | --- |
 | Project | administrator | all | all | all | all | full admin |
-| Project | authenticated | — | group | group | — | group-via-ProjectUser |
+| Project | authenticated | — | all | — | — | `read_all` is required: nothing stamps a group row's own `access`, and it must be readable to populate the `project` select whose value authorizes group-based create. Members cannot update a Project — that is admin/portal work |
 | Task | administrator | all | all | all | all |  |
-| Task | authenticated | group | group | group | — | inherits via Task.project |
+| Task | authenticated | group | group | group | group | inherits via Task.project — all four ops come from the block, create included |
 | ProjectUser | administrator | all | all | all | all | admin-managed membership |
-| ProjectUser | authenticated | — | own | — | — | user sees their own memberships |
+| ProjectUser | authenticated | — | group | — | — | sees membership rows of projects they belong to (read-only field-based block on ProjectUser.project); `read_own` would be inert — admin creates and therefore owns these rows |
 | User | administrator | all | all | all | all |  |
 | User | authenticated | — | own | own | — | owner-level access to own record |
 

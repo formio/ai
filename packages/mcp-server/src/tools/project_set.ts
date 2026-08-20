@@ -134,8 +134,21 @@ export function registerProjectSetTool(server: McpServer, options: ProjectSetOpt
         ? normalizeHttpUrl(projectUrl, 'projectUrl')
         : normalizedPrevious;
       // What this directory will resolve to once the write lands, whichever record
-      // holds it — the value the derivation questions below are about.
-      const effectiveProjectUrl = (normalized ?? committedProjectUrl) as string;
+      // holds it — the value the derivation questions below are about. Committed
+      // first, because that is the order resolveProjectConfig reads them in: a
+      // committed formio.json outranks the mapping, so when both name a project
+      // the mapping is not what governs this directory. Preferring the mapping
+      // here reported a project that does not resolve and asked the base-URL
+      // questions against it.
+      const effectiveProjectUrl = (committedProjectUrl ?? normalized) as string;
+      // A mapping write that lands under a committed file naming a DIFFERENT
+      // project is still worth making — it is what this directory falls back to
+      // if that file is removed — but it does not take effect now, and the caller
+      // has to be told rather than left to wonder why their forms are elsewhere.
+      const shadowedByCommitted =
+        Boolean(committedProjectUrl) && Boolean(normalized) && committedProjectUrl !== normalized
+          ? ` Note: the committed ${COMMITTED_CONFIG_FILE} for this directory names ${committedProjectUrl}, which outranks the mapping — that stays the active project until the file changes.`
+          : '';
       const repointed = Boolean(normalizedPrevious) && normalized !== normalizedPrevious;
       // Read tolerantly, exactly like the environment global below it. A stored
       // base URL is data rather than the caller's typing, and this call is the
@@ -193,6 +206,7 @@ export function registerProjectSetTool(server: McpServer, options: ProjectSetOpt
           (normalized
             ? `Active project is already ${effectiveProjectUrl} and persisted for ${entryCwd}; no change`
             : `Active project is already ${effectiveProjectUrl}, recorded in the committed ${COMMITTED_CONFIG_FILE} rather than in the mapping for ${entryCwd}${baseUrl ? `, whose Base URL ${baseUrl} is already mapped there` : ''}; no change`) +
+          shadowedByCommitted +
           serverCwdWarning;
         return toMcpStructuredResult(
           {
@@ -221,6 +235,7 @@ export function registerProjectSetTool(server: McpServer, options: ProjectSetOpt
             ? `Active project set to ${normalized} (was ${previousMapped}; persisted for ${entryCwd})`
             : `Active project set to ${normalized}; mapping persisted for ${entryCwd}`
           : `Base URL ${baseUrl} persisted for ${entryCwd}; the project stays recorded in the committed ${COMMITTED_CONFIG_FILE} as ${effectiveProjectUrl}`) +
+        shadowedByCommitted +
         serverCwdWarning;
       return toMcpStructuredResult(
         {

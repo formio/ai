@@ -35,4 +35,4 @@ When the user's request implies a bespoke form over a data-model record, instruc
 - Model the bespoke collection as a separate **Form** that **references** the established Resource via a disabled, pre-selected Select OR via the submission `owner` — never via a nested form that creates the record.
 - Never attach a Save action that creates the referenced Resource from the bespoke Form.
 
-See `formio-resource-planner` → "Resources vs. Forms — the core modeling decision" for the field-level shapes the planner emits.
+See `formio-resource-planner/SKILL.md` → "Resources vs. Forms — the core modeling decision" for the field-level shapes the planner emits.

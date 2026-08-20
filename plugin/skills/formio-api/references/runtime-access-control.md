@@ -3,7 +3,7 @@
 This skill documents the runtime HTTP calls that demonstrate Form.io's two most common multi-tenant access patterns:
 
 - **Own-access patterns** — a form whose `submissionAccess` is configured so that each end user can only read and modify submissions where they are the `owner`. The same `GET /:formPath/submission` endpoint transparently returns different results per caller.
-- **Group-permission patterns** — a "join" resource plus a Group Assignment action grants users roles derived from resource membership (e.g., employees tied to companies), and per-submission `access` entries scope reads to members of the right group. This enables row-level security across a project.
+- **Group-permission patterns** — a "join" resource plus a Group Assignment action grants users roles derived from resource membership (e.g., employees tied to companies), and per-submission `access` entries scope reads to members of the right group. This enables row-level security across a project. The per-component block controls what gets **stamped onto a saved row**, and the same block also authorizes creates: on a POST the server reads the group reference out of the submitted payload and grants create for that group, so no form-level `create_own` is needed. Entry types are `read`, `create`, `update`, `delete`, plus the shorthands `write` (read + create + update) and `admin` (all four); only `read`, `write`, and `admin` make a row appear in an index request. One thing the block never covers is the group resource itself — nothing stamps a group row's own `access`, so reading the group record requires a real `read_all` grant.
 
 All endpoints below are regular runtime Form/Submission/Action endpoints; the access behavior is produced by how the forms and actions are configured, not by special URLs. For the form and action definitions themselves see `project-forms.md` and `project-actions.md`.
 
@@ -201,7 +201,7 @@ Request body:
     "title": "Group Assignment",
     "settings": { "group": "company", "user": "employee" },
     "handler": ["after"],
-    "method": ["create"],
+    "method": ["create", "update", "delete"],
     "condition": {},
     "submit": true
   },
@@ -350,3 +350,4 @@ List reports as an Employee 2 caller — same endpoint, different JWT — return
 - [project-forms](./project-forms.md) — creating forms and resources with the `access` / `submissionAccess` arrays used above
 - [project-actions](./project-actions.md) — the Group Assignment and related actions that produce role membership
 - [project-roles](./project-roles.md) — defining the project roles that pair with group permissions
+- [`../../formio-auth/references/group-permissions.md`](../../formio-auth/references/group-permissions.md) — the configuration side of these patterns: membership shapes, the field-based block and its entry-type menu, the assigner's update-access requirement, and transitive mirrors

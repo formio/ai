@@ -66,25 +66,27 @@ This app exercises **transitive group access**: the group (`Team`) sits two leve
 
 - administrator: full access to all resources and memberships; creates Teams and TeamUser rows
 - salesRep: default role on self-registration; access to Accounts, Contacts, Deals, and Activities is narrowed by TeamUser membership at runtime
-- authenticated: baseline role issued by Login; salesRep is layered on top
+- authenticated: declared but assigned to nobody in this example — Form.io issues roles only through a Role Assignment action, and this project's `userRegister:role` assigns `salesRep`. A grant naming `authenticated` here would be held by no user.
 - anonymous: default for unauthenticated visitors; may reach only login/register forms
 
 ## Access Matrix
 
 | Resource | Actor | create | read | update | delete | Notes |
 | --- | --- | --- | --- | --- | --- | --- |
+| User | administrator | all | all | all | all |  |
+| User | salesRep | — | own | own | — | owner-level access to own record; `salesRep` is the role registration actually assigns, so the grant must name it |
 | Team | administrator | all | all | all | all | admin creates teams |
-| Team | salesRep | — | all | — | — | read-only; needed to render team names |
+| Team | salesRep | — | all | — | — | `read_all` is required, not a convenience: nothing stamps a group row's own `access`, and it must be readable to populate the `team` select whose value authorizes group-based create. Trade-off: every rep can read every Team row |
 | TeamUser | administrator | all | all | all | all | admin manages memberships |
-| TeamUser | salesRep | — | own | — | — | rep sees their own membership rows |
+| TeamUser | salesRep | — | group | — | — | sees their own teams' membership rows (read-only field-based block on TeamUser.team); `read_own` would be inert — admin creates and therefore owns these rows |
 | Account | administrator | all | all | all | all |  |
-| Account | salesRep | group | group | group | — | group-via-TeamUser (field-based on Account.team) |
+| Account | salesRep | group | group | group | — | group-via-TeamUser (field-based on Account.team is `write`: read + create + update, no delete — customer records are an audit obligation, so deletion stays with the administrator) |
 | Contact | administrator | all | all | all | all |  |
-| Contact | salesRep | group | group | group | — | transitive via hidden `team` mirror |
+| Contact | salesRep | group | group | group | — | transitive via hidden `team` mirror (`write`) |
 | Deal | administrator | all | all | all | all |  |
-| Deal | salesRep | group | group | group | — | transitive via hidden `team` mirror |
+| Deal | salesRep | group | group | group | — | transitive via hidden `team` mirror (`write`) |
 | Activity | administrator | all | all | all | all |  |
-| Activity | salesRep | group | group | group | — | transitive via hidden `team` mirror |
+| Activity | salesRep | group | group | group | — | transitive via hidden `team` mirror (`write`) |
 
 ## ER Diagram
 
@@ -164,7 +166,7 @@ Runtime propagation narrative:
 1. User signs up on `userRegister` → Save writes into `user` resource → Role Assignment grants `salesRep` → Login issues JWT.
 2. Admin creates a `TeamUser(team, user)` row → Group Assignment writes an ACL entry onto that Team submission.
 3. `Account.team` carries a field-based `submissionAccess` block (4 entries, empty roles) → Form.io propagates the Team's ACL onto each Account whose `team` matches → `salesRep` can create/read/update Accounts under their Team(s).
-4. `Contact` / `Deal` / `Activity` each carry a hidden `team` select mirroring `Account.team` — `calculateValue: value = data.account.data.team;`, `refreshOn: account`, `hidden: true`, same four-entry field-based `submissionAccess`. The mirror propagates the same ACL to the grandchild row on submit.
+4. `Contact` / `Deal` / `Activity` each carry a hidden `team` select mirroring `Account.team` — `calculateValue: value = data.account.data.team;`, `refreshOn: account`, `hidden: true`, same field-based `submissionAccess` (`write`). The mirror propagates the same ACL to the grandchild row on submit.
 
 Owner rules: none — all row-level access is group- or role-driven.
 

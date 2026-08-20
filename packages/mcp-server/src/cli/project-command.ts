@@ -197,8 +197,11 @@ function runSet(flags: Record<string, string>, context: CommandContext): Project
     ? normalizeHttpUrl(flags['project-url'], 'projectUrl')
     : normalizedMapped;
   // What this directory will resolve to once the write lands — the value the
-  // derivation questions below are about, whichever record holds it.
-  const effectiveProjectUrl = (projectUrl ?? committedProjectUrl) as string;
+  // derivation questions below are about, whichever record holds it. Committed
+  // first, matching the order resolveProjectConfig reads them in: a committed
+  // formio.json outranks the mapping, so where both name a project the mapping is
+  // not what governs this directory.
+  const effectiveProjectUrl = (committedProjectUrl ?? projectUrl) as string;
   const repointed = Boolean(normalizedMapped) && projectUrl !== normalizedMapped;
   // Falsy, not nullish, at every link: an empty FORMIO_BASE_URL is a prompt the
   // user cleared, not a deployment. A nullish chain would stop there, hand the
@@ -265,6 +268,15 @@ function runSet(flags: Record<string, string>, context: CommandContext): Project
     [
       projectUrl ? `Project set for ${cwd}` : `Base URL set for ${cwd}`,
       `Project URL: ${effectiveProjectUrl}`,
+      // A mapping write under a committed file naming a different project still
+      // belongs on disk — it is the fallback if that file goes away — but it does
+      // not take effect now, and silence here reads as "your project is now X".
+      ...(committedProjectUrl && projectUrl && committedProjectUrl !== projectUrl
+        ? [
+            ``,
+            `Note: the committed ${COMMITTED_CONFIG_FILE} names ${committedProjectUrl}, which outranks the mapping just written (${projectUrl}). ${committedProjectUrl} stays the active project for this directory until that file changes.`,
+          ]
+        : []),
       ...(baseUrl ? [`Base URL:    ${baseUrl}`] : []),
       ...(projectUrl
         ? []
