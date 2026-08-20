@@ -159,7 +159,7 @@ Common combinations:
 ]
 ```
 
-Group-based access is enforced at runtime from the field-based block on the group-reference `select` — including **create**. On a write the server rebuilds the row's own `access` array from that block (`{ type, resources: [<groupSubmissionId>] }` per entry), and on a request it resolves the caller's group memberships against it. You therefore do NOT add `create_own` / `read_all` / etc. to a group-scoped child resource for the group's sake; the block is the whole mechanism. Two things the block does NOT cover, both real and both easy to miss: the **group resource itself** (nothing stamps a group row's own `access`, so the group needs a real `read_all` for the end-user role — see "The group resource needs its own read grant" below), and a create whose payload does not carry the group reference (see "What group-based create actually requires").
+Group-based access is enforced at runtime from the field-based block on the group-reference `select` — including **create**. On a write the server rebuilds the row's own `access` array from that block (`{ type, resources: [<groupSubmissionId>] }` per entry), and on a request it resolves the caller's group memberships against it. You therefore do NOT add `create_own` / `read_all` / etc. to a group-scoped child resource for the group's sake; the block is the whole mechanism. Two things the block does NOT cover, both real and both easy to miss: the **group resource itself** (nothing stamps a group row's own `access`, so the group needs a real `read_all` for the end-user role — see "Part 3 — the group resource needs its own read grant" below), and a create whose payload does not carry the group reference (see "What group-based create actually requires").
 
 ## Component shapes
 
@@ -303,7 +303,7 @@ Never add `valueProperty` to a `dataSrc: "resource"` select — the `reference: 
 
 ### select — reference to a **group** resource (field-based submission access)
 
-When this select points at a resource that acts as the **group** for a Group Assignment action (e.g., `Task.project` points at `Project`, which is the group), the select component itself carries a `submissionAccess` block with four empty-role entries. This is how Form.io propagates the group's ACL to the child resource. Without this block, child-resource access does **not** inherit from the group and group permissions don't work end-to-end.
+When this select points at a resource that acts as the **group** for a Group Assignment action (e.g., `Task.project` points at `Project`, which is the group), the select component itself carries a `submissionAccess` block whose entries have empty `roles` arrays. On every write the server rebuilds the saved row's own `access` from that block, keyed to the referenced group submission, and resolves the caller's group memberships against it per request. Which entry types to include is a deliberate decision — see "Choosing the types" below. Without this block, child-resource access does **not** inherit from the group and group permissions don't work end-to-end.
 
 ```jsonc
 {
@@ -363,7 +363,7 @@ When **not** to include it: on selects that are not group references — e.g., `
 When a resource is **two or more levels below** the group in the hierarchy (e.g., `Contact`/`Deal`/`Activity` under `Account`, where `Team` is the group on `Account`), the sub-resource cannot simply point at the group resource — it has no direct relationship to the group. Instead, it carries **two** reference selects:
 
 1. A **normal parent reference** pointing at the immediate parent (e.g., `account` on `Contact`), using the standard resource-select shape (`reference: true`, no `submissionAccess`). This is what the user picks.
-2. A **hidden, calculated mirror of the group field** (e.g., `team` on `Contact`), auto-populated from the parent's group value. This carries the four-entry `submissionAccess` block that actually propagates group access to the sub-resource.
+2. A **hidden, calculated mirror of the group field** (e.g., `team` on `Contact`), auto-populated from the parent's group value. This carries the same field-based `submissionAccess` block as a direct group-reference select — the same type choice applies (see "Choosing the types") — and it is what propagates group access to the sub-resource.
 
 The mirrored field is invisible to the user — it exists purely to carry the group reference into the sub-resource's submission so Form.io can enforce group access on reads.
 
@@ -705,7 +705,7 @@ Rules:
 
 Group-based access is configured in **three places** that must be in sync. The first two are the mechanism; the third is the one every reader forgets, because it is a grant on the group resource rather than on the children:
 
-**Half 1 — the action on the join resource.**
+**Part 1 — the action on the join resource.**
 
 Attach Group Assignment to the join resource (e.g., `ProjectUser`, `CompanyUser`) whose two fields identify a group and a user. The action stores ACLs on the referenced group submissions at runtime.
 
@@ -731,11 +731,11 @@ All three methods are required, not a stylistic choice. The action computes memb
 
 Do not attach Group Assignment to non-join resources.
 
-**Half 2 — field-based `submissionAccess` on every child's group-reference select.**
+**Part 2 — field-based `submissionAccess` on every child's group-reference select.**
 
-Every child resource that should inherit the group's access (e.g., `Task` inheriting from `Project`, `Contact`/`Deal` inheriting from `Company`) needs a `submissionAccess` block on its `select` component that points at the group resource. See "`select` — reference to a **group** resource" in the Component shapes section above for the exact shape. The four empty-role entries (`read`, `create`, `update`, `delete`) tell Form.io to resolve access at runtime by looking up the referenced submission's ACL, populated by the Group Assignment action on the join.
+Every child resource that should inherit the group's access (e.g., `Task` inheriting from `Project`, `Contact`/`Deal` inheriting from `Company`) needs a `submissionAccess` block on its `select` component that points at the group resource. See "`select` — reference to a **group** resource" in the Component shapes section above for the exact shape. Each entry has an empty `roles` array, and on every write the server stamps those types onto the saved row's own `access`, keyed to the referenced group; a request is then resolved against that stamp by the caller's memberships. Choose the entry types deliberately — see "Choosing the types" — rather than emitting all four by reflex.
 
-Without Half 2, a logged-in user with a ProjectUser membership can see the Project row but **cannot** see the Tasks attached to it — the child's access does not automatically propagate.
+Without Part 2, a logged-in user with a ProjectUser membership can see the Project row but **cannot** see the Tasks attached to it — the child's access does not automatically propagate.
 
 **What group-based create actually requires.**
 
@@ -747,13 +747,13 @@ Create is authorized by the block, not by a form-level grant: on a POST the serv
 
 Precondition 2 has a corollary that bites first in practice: populating that select requires read access on the group resource (next section). No read on the group means an empty select, which means no group reference in the payload, which means every create fails.
 
-**The group resource needs its own read grant.**
+**Part 3 — the group resource needs its own read grant.**
 
 Nothing stamps a group row's own `access` — the server builds a row's `access` from that row's components, and a group resource carries no reference to itself. Group membership does not help either: reference population and read checks consult `read_all` roles and ownership, never group ids. So the group resource needs `read_all` including the end-user role, both to render the group's name and to populate the `dataSrc: "resource"` select whose value authorizes group-based create. Note the trade-off explicitly in the plan: this makes every group row readable by every end user. There is no membership-scoped read of a group's own record.
 
 **Transitive access — 2+ levels below the group.**
 
-When a resource is not a direct child of the group but a grandchild (or deeper) — e.g., `Contact` under `Account`, with `Team` as the group on `Account` — Half 2 cannot point at the group directly because the sub-resource has no relationship with the group. Instead, add **both** a parent reference and a hidden, calculated mirror of the group field to the sub-resource. The mirror is invisible, auto-populated from the parent, uses `reference: true` like the parent select, and carries the same field-based `submissionAccess` block. What matters mechanically is that the calculated value is the referenced submission OBJECT: the stamping step skips any value without an `_id`.
+When a resource is not a direct child of the group but a grandchild (or deeper) — e.g., `Contact` under `Account`, with `Team` as the group on `Account` — Part 2 cannot point at the group directly because the sub-resource has no relationship with the group. Instead, add **both** a parent reference and a hidden, calculated mirror of the group field to the sub-resource. The mirror is invisible, auto-populated from the parent, uses `reference: true` like the parent select, and carries the same field-based `submissionAccess` block. What matters mechanically is that the calculated value is the referenced submission OBJECT: the stamping step skips any value without an `_id`.
 
 See "`select` — transitive group-access mirror" in Component shapes for the exact shape and the `calculateValue` pattern. Every level of the hierarchy below the direct child repeats this mirror so access flows all the way down. Note the mirror is **client-supplied at create time**: the permission check reads the mirrored key from the request body before `calculateValue` is evaluated server-side, so a client that posts only the parent reference is refused. A rendered form satisfies this automatically (Form.io calculates client-side and submits the value); a non-browser client must send the mirrored value explicitly.
 
@@ -773,10 +773,10 @@ Before emitting the Phase B JSON, walk through this list:
 - [ ] Every Role Assignment action references a role that exists in `roles`.
 - [ ] **When `roles` declares 2+ assignable personas, the `user` resource has the `role` selectboxes component and one conditional `user:role<Persona>` action per persona** (see "Multi-role user systems"). Direct `roles` writes are stripped by the API, so without these actions the non-self-register personas cannot be assigned at all.
 - [ ] Every Group Assignment action's `settings.group` and `settings.user` match field keys on the join resource it's attached to.
-- [ ] **Every child resource whose access flows from a group has a four-entry `submissionAccess` (`read`, `create`, `update`, `delete`, roles: `[]`) on the `select` component that references the group.** Missing this block silently breaks group permissions on the child.
+- [ ] **Every child resource whose access flows from a group has a field-based `submissionAccess` block (entries with `roles: []`) on the `select` component that references the group, and its entry types match that resource's Access Matrix row.** Missing the block silently breaks group permissions on the child; emitting all four entries (equivalently `admin`) when the matrix's `delete` column says `—` silently grants every member permanent delete. Use `write` when deletion stays with administrators — see "Choosing the types".
 - [ ] **If end users create groups at runtime, the plan says who writes the creator's membership row.** Creating a group confers no membership in it, so without that write the creator holds no group role and every child operation under their own group is refused. The group resource also needs `create_all` + `read_own` + `update_own` for that role, since the assignment is verified against the requester's update access on the group being assigned into.
 - [ ] **Every resource an end user creates at runtime can actually be created by that user.** For an owner-scoped resource that means `create_own` for their role in its own `submissionAccess`. For a group-scoped child it means the field-based block carries `create`, `write`, or `admin` AND the group reference is populated in the payload at submit time — do not also add `create_own`, which would authorize creating rows outside the group. Walk the app's primary flow and confirm every POST the user makes is covered by one of the two.
-- [ ] **Every resource 2+ levels below the group has a hidden, calculated mirror of the group select** (`hidden: true`, `calculateValue: "value = data.<parent>.data.<group>;"`, `refreshOn: "<parent>"`, `reference: true`) carrying the same four-entry `submissionAccess` block. Without the mirror, group access stops at the direct child and grandchildren are invisible to group members.
+- [ ] **Every resource 2+ levels below the group has a hidden, calculated mirror of the group select** (`hidden: true`, `calculateValue: "value = data.<parent>.data.<group>;"`, `refreshOn: "<parent>"`, `reference: true`) carrying the same field-based `submissionAccess` block as the direct child's group-reference select — same entry types, same Access Matrix row. Without the mirror, group access stops at the direct child and grandchildren are invisible to group members.
 - [ ] The `user` resource is present if the plan has any authentication.
 - [ ] **No login form has a `save` action that sets `settings.resource`.** A login-form `save` pointing to any underlying resource is always wrong (it tries to create a new record in that resource on every login — e.g. a new user). A login form emits ONLY `<name>:login` by default; a plain `save` (empty `settings`, no `resource`) is allowed ONLY when the user asked for a login audit trail.
 - [ ] **Every form/resource meant to be submitted from the UI ends its `components` array with a submit button** (`{ "type": "button", "key": "submit", "action": "submit", ... }`). Exceptions: a `display: "wizard"` form (the wizard renders its own submit — never add a manual one) and an embedded/client-only or programmatically-submitted form (no user-facing submit).

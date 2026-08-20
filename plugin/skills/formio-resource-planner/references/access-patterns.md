@@ -19,7 +19,7 @@ When a child resource's access flows from a group, the plan must include all thr
 2. **A field-based `submissionAccess` block on the child's group-reference select component** (e.g., on `Task.project`, on `Contact.company`), with `roles: []` on each entry. On every write the server rebuilds that row's own `access` from this block, keyed to the referenced group. The entry types decide what members may do — `read`, `create`, `update`, `delete`, or the shorthands `write` (read + create + update, no delete) and `admin` (all four). This block is the whole mechanism, create included; a group-scoped child needs no `create_own`, and adding one would authorize creating rows outside the group.
 3. **A `read_all` grant for the end-user role on the group resource itself.** Nothing stamps a group row's own `access`, and group membership does not confer read of the group record. Without this the group's name cannot render and — more damagingly — the `dataSrc: "resource"` select cannot populate, so no group reference reaches the payload and every group-scoped create fails. The cost is that every end user can read every group row; the group model offers no membership-scoped alternative here.
 
-## Three silent failure modes
+## Four silent failure modes
 
 **Missing part 2.** The user logs in and sees the Project they're a member of, but not the Tasks attached to it — the child's access never inherits.
 
@@ -35,7 +35,7 @@ See `template-json.md` → "Choosing the types" for the full type menu and the d
 
 ## Transitive group access — 2+ levels below the group
 
-Half 2 above covers **direct children** of the group. When the hierarchy goes deeper — e.g., `Team` is the group on `Account`, and `Contact`, `Deal`, `Activity` sit under `Account` — the grandchildren have no direct relationship with the group, so a plain group-reference select won't work. Use this pattern instead:
+Part 2 above covers **direct children** of the group. When the hierarchy goes deeper — e.g., `Team` is the group on `Account`, and `Contact`, `Deal`, `Activity` sit under `Account` — the grandchildren have no direct relationship with the group, so a plain group-reference select won't work. Use this pattern instead:
 
 Each sub-resource (grandchild or deeper) carries **two** reference selects:
 
@@ -44,7 +44,7 @@ Each sub-resource (grandchild or deeper) carries **two** reference selects:
    - `hidden: true` — invisible to the user
    - `calculateValue: "value = data.<parent>.data.<group>;"` — auto-populated from the parent's resolved group reference (e.g., `value = data.account.data.team;`)
    - `refreshOn: "<parent>"` — recalculate when the parent selection changes
-   - Everything else is the same: `reference: true`, `validate.required: true`, and the four-entry `submissionAccess` block
+   - Everything else is the same: `reference: true`, `validate.required: true`, and the same field-based `submissionAccess` block as the direct child's group-reference select — same entry types
 
 Every level of the hierarchy below the direct child repeats this mirror, so group access flows all the way down. A Contact, a Deal, an Activity-under-Deal — each one gets its own `team` mirror on the form.
 

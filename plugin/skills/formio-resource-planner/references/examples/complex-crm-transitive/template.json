@@ -552,19 +552,7 @@
           "tableView": true,
           "submissionAccess": [
             {
-              "type": "read",
-              "roles": []
-            },
-            {
-              "type": "create",
-              "roles": []
-            },
-            {
-              "type": "update",
-              "roles": []
-            },
-            {
-              "type": "delete",
+              "type": "write",
               "roles": []
             }
           ]
@@ -711,19 +699,7 @@
           "tableView": true,
           "submissionAccess": [
             {
-              "type": "read",
-              "roles": []
-            },
-            {
-              "type": "create",
-              "roles": []
-            },
-            {
-              "type": "update",
-              "roles": []
-            },
-            {
-              "type": "delete",
+              "type": "write",
               "roles": []
             }
           ]
@@ -879,19 +855,7 @@
           "tableView": true,
           "submissionAccess": [
             {
-              "type": "read",
-              "roles": []
-            },
-            {
-              "type": "create",
-              "roles": []
-            },
-            {
-              "type": "update",
-              "roles": []
-            },
-            {
-              "type": "delete",
+              "type": "write",
               "roles": []
             }
           ]
@@ -1060,19 +1024,7 @@
           "tableView": true,
           "submissionAccess": [
             {
-              "type": "read",
-              "roles": []
-            },
-            {
-              "type": "create",
-              "roles": []
-            },
-            {
-              "type": "update",
-              "roles": []
-            },
-            {
-              "type": "delete",
+              "type": "write",
               "roles": []
             }
           ]

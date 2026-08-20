@@ -150,11 +150,11 @@ Layout:
 | Resource | Actor | create | read | update | delete | Notes |
 | --- | --- | --- | --- | --- | --- | --- |
 | Project | administrator | all | all | all | all | full admin |
-| Project | authenticated | — | group | group | — | group-via-ProjectUser |
+| Project | authenticated | — | all | — | — | Project is the group — `read_all` so the project select can populate; never `group` in a group resource's own row |
 | Task | administrator | all | all | all | all |  |
-| Task | authenticated | group | group | group | — | inherits via Task.project |
+| Task | authenticated | group | group | group | — | inherits via Task.project; the block is `write`, so members cannot delete |
 | ProjectUser | administrator | all | all | all | all | admin-managed membership |
-| ProjectUser | authenticated | — | own | — | — | user sees their own memberships |
+| ProjectUser | authenticated | — | group | — | — | read-only field-based block on ProjectUser.project; `own` would be inert — the admin creates and owns these rows |
 ```
 
 One row per (resource, actor) pair with a non-trivial rule. Do not enumerate irrelevant actors — if a resource is admin-only, two rows (administrator + `authenticated: — / — / — / —`) are sufficient.

@@ -225,6 +225,21 @@ function groupResourcesOf(template: Template): Set<string> {
   return new Set(named);
 }
 
+describe('planner examples as a set', () => {
+  // The per-example group rules below are conditional on the example carrying a
+  // Group Assignment action, so keep the library's coverage of them explicit
+  // here rather than implicitly per example.
+  it('includes at least one example exercising group permissions', () => {
+    const withGroupActions = exampleDirs().filter((example) => {
+      const template = JSON.parse(
+        readFileSync(join(examplesRoot, example, 'template.json'), 'utf8')
+      ) as Template;
+      return Object.values(template.actions ?? {}).some((action) => action.name === 'group');
+    });
+    expect(withGroupActions).not.toEqual([]);
+  });
+});
+
 describe.each(exampleDirs())('planner example %s', (example) => {
   const dir = join(examplesRoot, example);
   const template = JSON.parse(readFileSync(join(dir, 'template.json'), 'utf8')) as Template;
@@ -299,10 +314,16 @@ describe.each(exampleDirs())('planner example %s', (example) => {
   });
 
   it('grants no more than the Access Matrix promises', () => {
-    const justified: Record<string, string[]> = {
-      _all: ['all'],
-      _own: ['own', 'group'], // `create | group` legitimately maps to create_own
-    };
+    // Per template-md.md's "Token → `template.json` mapping": `all` is the ONLY
+    // cell an `_all` grant realizes and `own` the only one an `_own` grant
+    // realizes. A `group` cell realizes NOTHING in `submissionAccess` — the
+    // field-based block is the whole mechanism — so a static grant sitting next
+    // to a `group` cell is exactly the over-grant this suite exists to catch
+    // (`create_own` beside `create | group` additionally authorizes creating
+    // rows in groups the caller does not belong to). `role(<r>)` layers a role
+    // onto whichever underlying rule the cell names, so it justifies either.
+    const justifies = (scope: string, cell: string): boolean =>
+      /^role\(/.test(cell) || (scope === '_all' ? cell === 'all' : cell === 'own');
     for (const [machineName, entry] of resourceEntries(template)) {
       for (const access of entry.submissionAccess ?? []) {
         const parsed = /^(create|read|update|delete)(_all|_own)$/.exec(access.type ?? '');
@@ -320,7 +341,7 @@ describe.each(exampleDirs())('planner example %s', (example) => {
           );
           const cell = row?.[operation as Operation];
           expect(
-            cell !== undefined && justified[scope].includes(cell),
+            cell !== undefined && justifies(scope, cell),
             `${machineName}: submissionAccess grants ${access.type} to ${role}, but the Access Matrix says ${operation} = ${cell === undefined ? '(no row for this actor)' : `\`${cell}\``}. A grant wider than the matrix is a leak — every ${role} would reach every row.`
           ).toBe(true);
         }
@@ -361,16 +382,48 @@ describe.each(exampleDirs())('planner example %s', (example) => {
     }
   });
 
+  it('never pairs a create-conferring field-based block with a static create grant', () => {
+    // permissionHandler.js:390-392 authorizes a group-scoped create FROM the
+    // submitted group reference, and that path is self-policing: a non-member,
+    // a member naming a group they do not belong to, and a payload carrying no
+    // group reference are all refused. A static create grant beside the block
+    // bypasses every one of those checks. Verified live against a Form.io
+    // project: with the block alone, all three attempts return 401; adding
+    // `create_own` let a non-member stamp a row into another group's ACL, and
+    // let a payload with no group reference save with `access: []` — a row no
+    // member can see or delete, because addSubmissionResourceAccess had nothing
+    // to stamp from. `validate.required` on the reference does not backstop it;
+    // on a hidden mirror it is not enforced server-side at all.
+    for (const [machineName, entry] of resourceEntries(template)) {
+      const blockCreates = flatten(entry.components).some((component) =>
+        fieldBasedOperations(component).has('create')
+      );
+      if (!blockCreates) {
+        continue;
+      }
+      const offenders = (entry.submissionAccess ?? []).filter(
+        (access) =>
+          /^create_(all|own)$/.test(access.type ?? '') &&
+          (access.roles ?? []).some((role) => role !== 'administrator')
+      );
+      expect(
+        offenders.map((access) => access.type),
+        `${machineName}: its group-reference block already authorizes create for members, so a static ${offenders.map((access) => access.type).join(' / ')} grant only adds the creates the block refuses — creating into a group the caller does not belong to, and creating with no group reference at all (which saves an ACL-less row nobody can reach). Drop the grant and let the block authorize the create.`
+      ).toEqual([]);
+    }
+  });
+
   it('lets every Group Assignment action fire on update and delete, not just create', () => {
     // GroupAction.resolve() computes membership by diffing the submitted row against
     // req.previousSubmission into groupsToAdd/groupsToRemove, so a membership MOVE
     // fires on update and a REVOCATION fires on delete. `method: ["create"]` means
     // neither ever runs: memberships can be granted and never moved or withdrawn.
     // GroupAction.info() itself defaults to all three.
+    // Not every example is a group-permissions example; this rule only has
+    // something to say about the ones that carry a Group Assignment action.
     const groupActions = Object.entries(template.actions ?? {}).filter(
       ([, action]) => action.name === 'group'
     );
-    expect(groupActions.length).toBeGreaterThan(0);
     for (const [key, action] of groupActions) {
       expect(
         [...(action.method ?? [])].sort(),

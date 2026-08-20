@@ -80,13 +80,13 @@ This app exercises **transitive group access**: the group (`Team`) sits two leve
 | TeamUser | administrator | all | all | all | all | admin manages memberships |
 | TeamUser | salesRep | — | group | — | — | sees their own teams' membership rows (read-only field-based block on TeamUser.team); `read_own` would be inert — admin creates and therefore owns these rows |
 | Account | administrator | all | all | all | all |  |
-| Account | salesRep | group | group | group | group | group-via-TeamUser (field-based on Account.team); all four ops come from the block — create included |
+| Account | salesRep | group | group | group | — | group-via-TeamUser (field-based on Account.team is `write`: read + create + update, no delete — customer records are an audit obligation, so deletion stays with the administrator) |
 | Contact | administrator | all | all | all | all |  |
-| Contact | salesRep | group | group | group | group | transitive via hidden `team` mirror |
+| Contact | salesRep | group | group | group | — | transitive via hidden `team` mirror (`write`) |
 | Deal | administrator | all | all | all | all |  |
-| Deal | salesRep | group | group | group | group | transitive via hidden `team` mirror |
+| Deal | salesRep | group | group | group | — | transitive via hidden `team` mirror (`write`) |
 | Activity | administrator | all | all | all | all |  |
-| Activity | salesRep | group | group | group | group | transitive via hidden `team` mirror |
+| Activity | salesRep | group | group | group | — | transitive via hidden `team` mirror (`write`) |
 
 ## ER Diagram
 
@@ -166,7 +166,7 @@ Runtime propagation narrative:
 1. User signs up on `userRegister` → Save writes into `user` resource → Role Assignment grants `salesRep` → Login issues JWT.
 2. Admin creates a `TeamUser(team, user)` row → Group Assignment writes an ACL entry onto that Team submission.
 3. `Account.team` carries a field-based `submissionAccess` block (4 entries, empty roles) → Form.io propagates the Team's ACL onto each Account whose `team` matches → `salesRep` can create/read/update Accounts under their Team(s).
-4. `Contact` / `Deal` / `Activity` each carry a hidden `team` select mirroring `Account.team` — `calculateValue: value = data.account.data.team;`, `refreshOn: account`, `hidden: true`, same four-entry field-based `submissionAccess`. The mirror propagates the same ACL to the grandchild row on submit.
+4. `Contact` / `Deal` / `Activity` each carry a hidden `team` select mirroring `Account.team` — `calculateValue: value = data.account.data.team;`, `refreshOn: account`, `hidden: true`, same field-based `submissionAccess` (`write`). The mirror propagates the same ACL to the grandchild row on submit.
 
 Owner rules: none — all row-level access is group- or role-driven.
 

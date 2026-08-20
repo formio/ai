@@ -161,7 +161,7 @@ A multi-user task manager where each Project has a set of Tasks and a team of Us
   Purpose: container for tasks assigned to a team of users.
   Fields:
     - name: textfield — human-readable project name
-  Access: members of the project (group-via-ProjectUser); readable by `authenticated` via `read_all` so the project select can populate
+  Access: admin-managed (Project is the group, so nothing stamps its own rows); `read_all` for `authenticated` so the project select can populate
   Actions:
     - (save only)
 
@@ -170,7 +170,7 @@ A multi-user task manager where each Project has a set of Tasks and a team of Us
   Fields:
     - description: textfield — what needs doing
     - project: select (resource=Project, reference=true, field-based access) — parent project; carries the group ACL
-  Access: read/update limited to members of the task's project (inherited via Task.project)
+  Access: members of the task's project, inherited via the field-based block on Task.project (create, read, update, delete — the four-entry form)
   Actions:
     - (save only)
 
@@ -179,7 +179,7 @@ A multi-user task manager where each Project has a set of Tasks and a team of Us
   Fields:
     - project: select (resource=Project)
     - user: select (resource=User)
-  Access: admins only (managing membership is an admin operation)
+  Access: admin-managed; members read their own projects' membership rows via a read-only field-based block on ProjectUser.project
   Actions:
     - Group Assignment: group=project, user=user
 
@@ -200,14 +200,14 @@ A multi-user task manager where each Project has a set of Tasks and a team of Us
 
 ## Access Matrix
 
-| Resource    | Actor          | create | read  | update | delete | Notes                             |
-| ----------- | -------------- | ------ | ----- | ------ | ------ | --------------------------------- |
-| Project     | administrator  | all    | all   | all    | all    | full admin                        |
-| Project     | authenticated  | —      | group | group  | —      | group-via-ProjectUser             |
-| Task        | administrator  | all    | all   | all    | all    |                                   |
-| Task        | authenticated  | group  | group | group  | —      | inherits via Task.project         |
-| ProjectUser | administrator  | all    | all   | all    | all    | admin-managed membership          |
-| ProjectUser | authenticated  | —      | own   | —      | —      | user sees their own memberships   |
+| Resource    | Actor          | create | read  | update | delete | Notes                                                                       |
+| ----------- | -------------- | ------ | ----- | ------ | ------ | --------------------------------------------------------------------------- |
+| Project     | administrator  | all    | all   | all    | all    | full admin                                                                  |
+| Project     | authenticated  | —      | all   | —      | —      | Project is the group — `read_all` so the project select can populate        |
+| Task        | administrator  | all    | all   | all    | all    |                                                                             |
+| Task        | authenticated  | group  | group | group  | group  | inherits via Task.project — all four ops come from the block                |
+| ProjectUser | administrator  | all    | all   | all    | all    | admin-managed membership                                                    |
+| ProjectUser | authenticated  | —      | group | —      | —      | read-only field-based block on ProjectUser.project; `own` would be inert    |
 
 ## ER Diagram
 

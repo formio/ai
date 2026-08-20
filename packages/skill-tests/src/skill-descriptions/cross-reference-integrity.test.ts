@@ -24,8 +24,20 @@ import { allSkillDocuments } from './helpers.js';
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../../../..');
 const skillsRoot = join(repoRoot, 'plugin/skills');
 
-// "lines 555–590", "line 162" — en dash, em dash, or hyphen.
-const LINE_CITATION = /\blines?\s+\d+(?:\s*[–—-]\s*\d+)?\b/i;
+// Every spelling of a line-number citation the library could reach for:
+// "lines 555–590" / "line 162" (en dash, em dash, or hyphen), the `file.md:555`
+// and `file.md:555-590` colon forms, and GitHub's `#L555` / `#L555-L590`
+// anchors. Banning only the prose form leaves the other two as open doors to
+// exactly the rot this rule exists to stop.
+const LINE_CITATIONS = [
+  /\blines?\s+\d+(?:\s*[–—-]\s*\d+)?\b/i,
+  /\.md:\d+(?:\s*[–—-]\s*\d+)?\b/i,
+  /#L\d+(?:[-–—]L?\d+)?\b/,
+];
+
+function citesALineNumber(line: string): boolean {
+  return LINE_CITATIONS.some((pattern) => pattern.test(line));
+}
 
 // `→ "X"`, `see "X"`, `under "X"` — the citation forms the library uses.
 const CITATION = /(?:→|->|\bsee\b|\bunder\b)\s+"([^"]{3,140})"/g;
@@ -132,7 +144,7 @@ describe('skill cross-references', () => {
     const offenders = docs.flatMap((doc) =>
       doc.lines
         .map((line, index) => ({ line, number: index + 1 }))
-        .filter(({ line }) => LINE_CITATION.test(line))
+        .filter(({ line }) => citesALineNumber(line))
         .map(({ line, number }) => `${doc.rel}:${number} — ${line.trim().slice(0, 160)}`)
     );
     expect(

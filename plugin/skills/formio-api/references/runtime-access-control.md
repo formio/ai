@@ -350,4 +350,4 @@ List reports as an Employee 2 caller — same endpoint, different JWT — return
 - [project-forms](./project-forms.md) — creating forms and resources with the `access` / `submissionAccess` arrays used above
 - [project-actions](./project-actions.md) — the Group Assignment and related actions that produce role membership
 - [project-roles](./project-roles.md) — defining the project roles that pair with group permissions
-- [`../../formio-auth/references/group-permissions.md`](../../formio-auth/references/group-permissions.md) — the configuration side of these patterns: membership shapes, the field-based block, transitive mirrors, and the token-refresh delay on membership changes
+- [`../../formio-auth/references/group-permissions.md`](../../formio-auth/references/group-permissions.md) — the configuration side of these patterns: membership shapes, the field-based block and its entry-type menu, the assigner's update-access requirement, and transitive mirrors

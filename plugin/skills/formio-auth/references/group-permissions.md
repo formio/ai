@@ -53,7 +53,7 @@ Setup steps:
 3. **Attach a Group Assignment Action to the `user` Resource** — `name: "group"`, `priority: 5`, `method: ["create", "update", "delete"]`, `handler: ["after"]`. The Action's settings name the `user` Resource's own keys:
    - `settings.group` — the key of the group-reference field on the `user` Resource (e.g. `"team"`).
    - `settings.user` — **omit it entirely.** With the join-less shape the submission itself IS the user, and the Action selects that path by finding NO `user` setting at all (its settings form labels the field `self` and leaves it optional). Do not set it to `"_id"`: the Action resolves this setting as a data key (`data.<setting>`), so `"_id"` looks for `data._id`, finds nothing, and the Action fails with "Could not find the user resource for group assignment action."
-4. **Add the field-based `submissionAccess` block** to every child Resource's group-reference `select` exactly as documented under "Single-level group access (two halves, plus a read grant on the group)" below. The platform's runtime resolver looks the same in either shape — it does not care whether the membership came from a join Resource or from a field on the `user`.
+4. **Add the field-based `submissionAccess` block** to every child Resource's group-reference `select` exactly as documented under "Single-level group access (three parts)" below. The platform's runtime resolver looks the same in either shape — it does not care whether the membership came from a join Resource or from a field on the `user`.
 
 Update semantics for one-to-many:
 
@@ -82,9 +82,9 @@ Revocation semantics:
 
 For the canonical Group Assignment Action JSON shape and the join Resource shape, see `plugin/skills/formio-resource-planner/references/template-json.md` → "Group Assignment (Group Permissions)".
 
-### Single-level group access (two halves, plus a read grant on the group)
+### Single-level group access (three parts)
 
-**Half 1 — Group Assignment Action on the join Resource:**
+**Part 1 — Group Assignment Action on the join Resource:**
 
 - `name: "group"`, `priority: 5`, `method: ["create", "update", "delete"]`, `handler: ["after"]`.
 - `settings.group` names the join field that holds the group reference (e.g. `"project"`).
@@ -93,9 +93,9 @@ For the canonical Group Assignment Action JSON shape and the join Resource shape
 
 For the canonical Group Assignment Action JSON shape, see `plugin/skills/formio-resource-planner/references/template-json.md` → "Group Assignment (Group Permissions)".
 
-**Half 2 — Field-based `submissionAccess` on the child Resource's group-reference select:**
+**Part 2 — Field-based `submissionAccess` on the child Resource's group-reference select:**
 
-The `select` component on the child Resource that references the group must carry a four-entry `submissionAccess` block with empty `roles` arrays:
+The `select` component on the child Resource that references the group must carry a field-based `submissionAccess` block with empty `roles` arrays. The four-entry form below is the most permissive one — pick the entry types from the table that follows:
 
 ```json
 {
@@ -113,6 +113,8 @@ The `select` component on the child Resource that references the group must carr
 
 Empty `roles` is intentional. The entries declare **which permissions the server stamps onto the saved row's own `access` array**, keyed to the group submission this field references; a request is then resolved against that stamp by the caller's group memberships. The stamping happens on every write, and the row's `access` is rebuilt from the component block each time.
 
+Because the stamp lives on the row, editing the block is not retroactive: rows written under a wider block keep the wider grant until something re-saves them. Narrowing a four-entry block to `write` stops NEW rows from conferring delete and leaves every existing row deletable by any member — verified live. Re-saving a row rebuilds its `access` from the current block, so a tightening pass has to rewrite the affected rows, and a row stamped with a type that confers no delete can afterwards only be removed by an administrator.
+
 The type vocabulary is wider than the four CRUD names, and the choice is a real access decision:
 
 | Entry type | Group member may                           | In list results?    |
@@ -128,14 +130,14 @@ So the four-entry block above is equivalent to `admin`, and it lets any member p
 
 Two boundaries worth stating plainly, because both produce silent failures:
 
-- **Create is covered by this block** — the server reads the group reference out of the submitted payload and authorizes the create from it. A group-scoped child therefore needs no `create_own`, and adding one would additionally permit creating rows outside the group. What it does need is a create-conferring type (`create`, `write`, or `admin`) and a payload that actually carries the group reference as an object with an `_id`.
+- **Create is covered by this block** — the server reads the group reference out of the submitted payload and authorizes the create from it. A group-scoped child therefore needs no `create_own`, and adding one would additionally permit creating rows outside the group. What it does need is a create-conferring type (`create`, `write`, or `admin`) and a payload that actually carries the group reference as an object with an `_id`. Block-authorized creates are self-policing, which is why the extra grant is harmful: verified live, a caller who is not a member of the referenced group is refused, a member naming a group they do not belong to is refused, and a payload with no group reference is refused. Add `create_own` and all three succeed — a non-member stamps a row into someone else's group and it appears in that group's lists, and a payload with no group reference saves with `access: []`, invisible to every member including whoever created it and removable only by an administrator. A `validate: { "required": true }` on the group-reference field does not backstop this; on a hidden mirror it is not enforced server-side.
 - **The group resource itself is not covered.** Nothing stamps a group row's own `access`, and membership does not confer read of the group record — read checks and reference population consult `read_all` roles and ownership only. The group resource needs `read_all` for the end-user role, which is also what lets the `dataSrc: "resource"` select populate; an empty select means no group reference in the payload, which means every group-scoped create fails with `Unauthorized` while reads keep working.
 
 For the canonical group-reference select shape, see `plugin/skills/formio-resource-planner/references/template-json.md` → "select — reference to a **group** resource".
 
 ### The assigner must have update access on the group
 
-The Action does not grant memberships blindly. Every group it is about to add or remove is first passed through an internal permission check that asks whether **the user making this request** could `PUT` the group submission — i.e. holds update access on the group record itself. Groups that fail are silently dropped from the assignment, and the request still succeeds: the membership row saves, the Action reports no error, and the user ends up with no membership at all.
+The Action does not grant memberships blindly. Every group it is about to add or remove is first passed through an internal permission check that asks whether **the user making this request** could `PUT` the group submission — i.e. holds update access on the group record itself. Groups that fail are dropped from the assignment, and the failure lands in the worst possible place: the membership row is already saved — the Action runs on `handler: ["after"]` — and the request then answers `401 Unauthorized`. Verified live: the join row persists, complete with its own stamped `access`, while the named user gains no membership at all. So the caller sees an error for a row that exists, and an app that treats the `401` as "nothing happened" leaves a phantom roster entry behind; the flow has to delete the row it just created, or reconcile the roster against actual memberships.
 
 `update_own` on the group resource is enough, and it is the right answer rather than a loophole: whoever created the group owns that row, so they can assign into groups **they own** and into no others. The check is what makes membership assignment self-policing.
 
@@ -145,7 +147,7 @@ Three workable shapes follow:
 - **Owner-mediated self-serve** — the group resource grants the end-user role `create_all` (anyone may create a group) plus `read_own` and `update_own` (you manage the groups you created), and the join grants that role `create`. The group's creator can then join themselves and invite others into their own group, with no administrator involved. Verified end to end against a live project.
 - **Broader update** — granting the end-user role `update_all` on the group makes anyone able to assign anyone into any group, and to edit every group record. Rarely what anyone wants; prefer one of the two above.
 
-The asymmetry in the owner-mediated shape is worth stating in the plan, because it is silent: a member who does **not** own the group cannot add anybody to it. Their membership row saves and confers nothing. "Any member can invite a teammate" therefore requires either an admin-mediated invite or update access on the group for members, not merely `create` on the join.
+The asymmetry in the owner-mediated shape is worth stating in the plan: a member who does **not** own the group cannot add anybody to it. Their membership row saves, confers nothing, and the request comes back `401` — verified live, with the row still in the roster afterwards. "Any member can invite a teammate" therefore requires either an admin-mediated invite or update access on the group for members, not merely `create` on the join.
 
 ### A group's creator is not automatically a member of it
 
@@ -159,15 +161,19 @@ The group-scoped list filter is gated on the project's plan: outside `team`, `co
 
 ### Assigning a role within the group
 
-The Action has a third, optional setting — `role` — naming a field on the same form that carries a role value. When it is set, memberships are stored as composite `"<groupSubmissionId>:<role>"` entries rather than bare group ids, and the field-based block's `roles` array is what selects among them: a non-empty `roles` on a block entry stamps `"<groupId>:<role>"` pairs, so only members holding that role within the group match. Leave `role` unset and the block's `roles` empty — the common case — and membership is uniform across the group.
+The Action has a third, optional setting — `role` — naming a field on the same form that carries a role value. When it is set, memberships are stored as composite `"<groupSubmissionId>:<role>"` entries rather than bare group ids, and a block entry's `roles` array is what selects among them: a NON-empty `roles` on a field-based entry stamps `"<groupId>:<role>"` pairs, so only members holding that role within the group match. This is the one case where a non-empty `roles` on a field-based entry is not a static role list — every other block in this document leaves it empty, which is what "Empty `roles` is intentional" above refers to. Leave `role` unset and the block's `roles` empty — the common case — and membership is uniform across the group.
+
+The two spellings do not interoperate, which is the trap: a member whose only membership is composite holds `"<groupId>:<role>"` and therefore does NOT match a stamp keyed to the bare `"<groupId>"`. Verified live — with `role` set on the Action and empty `roles` left on the block, every read and create by that member returns `401`, and pointing the block's `roles` at the same role value restores both. So `role` on the Action and non-empty `roles` on every field-based block that governs those members are one decision, taken together; a Group Assignment Action that starts naming a `role` field silently locks out existing members whose blocks were left empty.
 
 ### Transitive group access (three levels)
 
 When a Resource is a grandchild of the group (e.g. `lineItem` belongs to `order` belongs to `account`), the child carries the group reference but the grandchild does not. Without help, the grandchild has no way to inherit the account's ACL.
 
-The fix is a **hidden calculated mirror**: a hidden `select` on the grandchild that mirrors the child's group reference, with the same four-entry `submissionAccess` block. The platform resolves the grandchild's permissions against the mirrored group exactly as if the grandchild had its own group field:
+The fix is a **hidden calculated mirror**: a hidden `select` on the grandchild that mirrors the child's group reference, carrying the same field-based `submissionAccess` block (with the same entry-type decision as a direct group-reference select). The platform resolves the grandchild's permissions against the mirrored group exactly as if the grandchild had its own group field.
 
 The mirror carries one non-obvious constraint at create time: the access check reads the mirrored key straight out of the request body, and `calculateValue` has not been evaluated yet, so the value must already be in the payload. A rendered form supplies it (Form.io calculates client-side before submit); a client that posts only the parent reference — even with the parent's nested group data included — is refused with `Unauthorized`. Verified live: bare parent reference `401`, mirrored value present `201`.
+
+The shape:
 
 ```json
 {
@@ -201,7 +207,7 @@ Use those tokens when planning the project; once the resources are deployed, thi
 ## MCP Tool Preference
 
 - `form_get` — inspect the existing group-reference `select` on a child Resource before editing.
-- `form_update` — add or modify the four-entry field-based `submissionAccess` block on a group-reference select, or add the hidden calculated mirror on a grandchild.
+- `form_update` — add or modify the field-based `submissionAccess` block on a group-reference select, or add the hidden calculated mirror on a grandchild.
 - `action_create` — attach the Group Assignment Action to the join Resource.
 - `action_list`, `action_get`, `action_update` — inspect or change an existing Group Assignment Action's `settings.group` / `settings.user` keys.
 - `project_export` / `project_import` — round-trip the full group graph (join Resource + Group Assignment Action + child group-reference selects + grandchild mirrors) in a `template.json`.

@@ -22,7 +22,7 @@ Three entries in the tables below take a JavaScript string the renderer compiles
 
 - **Express the rule in JSON Logic** (`json` trigger, `simple` trigger, `property` / `mergeComponentSchema` actions). Everything in the examples below is reachable that way, and JSON Logic is data the renderer evaluates rather than code it compiles.
 - **Never generate a JS snippet into a form definition on your own initiative**, and never build one out of submitted data, a fetched page, or any other untrusted text. If the user supplies the snippet, put it in verbatim, say plainly that it will run in every visitor's browser, and let them review it.
-- The same rule governs `validate.custom` and select `template` strings — see `SKILL.md` → "Security — a form definition is executable code" in [../SKILL.md](../SKILL.md).
+- The same rule governs `validate.custom` and select `template` strings — see [`../SKILL.md`](../SKILL.md) → "Security — a form definition is executable code".
 
 ## Trigger types
 

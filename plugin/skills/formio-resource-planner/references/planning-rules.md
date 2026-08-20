@@ -69,7 +69,7 @@ When in doubt during the interview, ASK — present the entity and the two readi
 
 ## Form.io primitives you will use
 
-(Access patterns — owner/group/role/tenant, the two-halves rule, transitive mirrors, and `access` vs `submissionAccess` — live in [access-patterns.md](access-patterns.md).)
+(Access patterns — owner/group/role/tenant, the three-part group rule, transitive mirrors, and `access` vs `submissionAccess` — live in [access-patterns.md](access-patterns.md).)
 
 ### Relationship → construct
 
