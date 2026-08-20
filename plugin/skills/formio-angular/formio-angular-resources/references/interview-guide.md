@@ -10,7 +10,7 @@ Ask in ONE question round, using the client's structured question mechanism (in 
 
 1. **New or existing Angular workspace?** If existing: path to the workspace root (should contain `angular.json`). If new: the desired app name (kebab-case).
 2. **Form.io project URL** (`projectUrl`) — the value that goes into `FormioAppConfig.appUrl`. Not a question to ask: resolve it with `npx -y @formio/mcp@0.10.0 project get --cwd "<workspace root>"` and reconcile against `src/app/config.ts`, asking only for whichever value that command reports missing.
-3. **Design language** — what the ViewComponent templates should lean on: **Bootstrap 5** (matches angular-demo, default), **Tailwind**, **Material** (`@angular/material`), **the workspace's existing design system** (for existing workspaces, read their styles and match), or **unstyled HTML** (minimum viable, user will restyle). The routing shape is the same regardless; only the template classes and markup change.
+3. **Design language** — what the ViewComponent templates should lean on: **Bootstrap 5** (matches angular-demo, default), **Tailwind**, **Material** (`@angular/material`), **the workspace's existing design system** (for existing workspaces, read their styles and match), or **unstyled HTML** (minimum viable, user will restyle). The routing shape is the same regardless; only the template classes and markup change. The answer also picks the vocabulary for the shell's page-layout wrapper (see the parent skill's `AUTH.md` → "Page layout contract") — the wrapper itself is required in every language.
 
 ## Reading the template pair
 

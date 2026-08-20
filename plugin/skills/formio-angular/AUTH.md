@@ -11,12 +11,12 @@ Before generating anything, inspect the target workspace:
 1. Read `src/app/app-module.ts`. Check for an `import { AuthModule } from './auth/auth.module'` (or equivalent path) and an entry for `AuthModule` inside `@NgModule({ imports: [...] })`.
 2. Read `src/app/auth/auth.module.ts` if it exists. Check that it (a) configures `FormioAuthConfig` (typically by declaring an `AuthConfig` object and providing it) AND (b) mounts `RouterModule.forChild(FormioAuthRoutes())` so the login/register URLs resolve. A file that configures the provider but does not mount `FormioAuthRoutes()` is half-wired — treat that as "needs regeneration" and run the phase.
 3. Read `src/app/app-routing-module.ts`. Check for a route whose `path` is `'auth'` with a `loadChildren` entry pointing at `./auth/auth.module`. Missing this route means `/auth/login` is a dead URL even when `AuthModule` is correct. ALSO check that the authenticated routes carry `canActivate: [authGuard]` — a routing module that mounts the resource routes but leaves them unguarded is half-wired (anonymous visitors can navigate straight into them); treat that as "needs the guard added" and run the phase.
-4. Read `src/app/app.component.ts` (or `app/app.ts`). Check for `FormioAuthService` import + `onLogin` + `onLogout` subscriptions + `router.navigate` calls.
+4. Read `src/app/app.ts` (or `src/app/app.component.ts` on legacy naming). Check for `FormioAuthService` import + `onLogin` + `onLogout` subscriptions + `router.navigate` calls.
 5. Read `src/app/auth/auth.guard.ts`. Check that it exports an `authGuard` `CanActivateFn` that reads `FormioAuthService.authenticated` and redirects unauthenticated visitors to `/auth/login`. Missing this file (or a routing module that never references it) means protected routes are reachable while anonymous — run the phase to add it.
 
 If ALL five conditions hold, **skip this phase**. Tell the user which files triggered the skip:
 
-> Skipping AUTH — `src/app/auth/auth.module.ts` already configures `FormioAuthConfig` and mounts `FormioAuthRoutes()`, `src/app/auth/auth.guard.ts` exports `authGuard`, `AppModule` already imports `AuthModule`, `AppRoutingModule` has the `/auth` lazy route and applies `canActivate: [authGuard]` on the authenticated routes, and `AppComponent` subscribes to `FormioAuthService.onLogin` / `onLogout`. Moving to Resources. Say if you want to regenerate the auth wiring anyway.
+> Skipping AUTH — `src/app/auth/auth.module.ts` already configures `FormioAuthConfig` and mounts `FormioAuthRoutes()`, `src/app/auth/auth.guard.ts` exports `authGuard`, `AppModule` already imports `AuthModule`, `AppRoutingModule` has the `/auth` lazy route and applies `canActivate: [authGuard]` on the authenticated routes, and the root component subscribes to `FormioAuthService.onLogin` / `onLogout`. Moving to Resources. Say if you want to regenerate the auth wiring anyway.
 
 If only a subset is already wired, run the phase and regenerate ONLY the missing pieces (don't clobber user-customized files). If the user wants to fully regenerate, run the phase as normal and overwrite.
 
@@ -112,7 +112,7 @@ export class AppModule {}
 
 **Config wiring:** the `{ provide: FormioAppConfig, useValue: AppConfig }` provider is all that is needed — `FormioModule` reads it in its constructor and configures the SDK (`Formio.setBaseUrl`/`setProjectUrl`) at bootstrap. See CONFIG.md.
 
-**Why `FormioAuthRoutes()` matters.** Without it, the `AuthModule` registers the providers + components but does NOT map any URL to the login/register form — so `router.navigate(['/auth/login'])` from `app.component.ts` (or `app/app.ts`) resolves to an empty outlet and the user sees a blank page. `FormioAuthRoutes()` returns a pre-built `Routes` array that wires `login` → `FormioAuthLoginComponent`, `register` → `FormioAuthRegisterComponent`, and `logout` → a redirect, which is why mounting it via `RouterModule.forChild(...)` is required, not optional. Customization (override login/register components, tweak the redirect target) is handled by passing an options object to the function — see the optional "Customizing the login and register components" section below.
+**Why `FormioAuthRoutes()` matters.** Without it, the `AuthModule` registers the providers + components but does NOT map any URL to the login/register form — so `router.navigate(['/auth/login'])` from `app.ts` (or `app.component.ts` on legacy naming) resolves to an empty outlet and the user sees a blank page. `FormioAuthRoutes()` returns a pre-built `Routes` array that wires `login` → `FormioAuthLoginComponent`, `register` → `FormioAuthRegisterComponent`, and `logout` → a redirect, which is why mounting it via `RouterModule.forChild(...)` is required, not optional. Customization (override login/register components, tweak the redirect target) is handled by passing an options object to the function — see the optional "Customizing the login and register components" section below.
 
 **Worked example** — default user resource with planner-emitted `template.json.forms` containing `{ name: 'userLogin', path: 'user/login' }` and `{ name: 'userRegister', path: 'user/register' }`:
 
@@ -161,7 +161,7 @@ Match the position in the imports array shown above. `AuthModule` goes after `Fo
 
 ## `src/app/app-routing-module.ts` edits — mount `AuthModule` under `/auth`
 
-The `FormioAuthRoutes()` array you attached inside `AuthModule` wires the `login` / `register` / `logout` child paths, but it still needs a parent path to live under. The convention (matching the wiki and the `angular-demo`) is to mount `AuthModule` at `/auth` via lazy loading, so the final URLs are `/auth/login`, `/auth/register`, and `/auth/logout`. Those are the exact URLs the `app.component.ts` subscriptions below redirect to.
+The `FormioAuthRoutes()` array you attached inside `AuthModule` wires the `login` / `register` / `logout` child paths, but it still needs a parent path to live under. The convention (matching the wiki and the `angular-demo`) is to mount `AuthModule` at `/auth` via lazy loading, so the final URLs are `/auth/login`, `/auth/register`, and `/auth/logout`. Those are the exact URLs the root-component subscriptions below redirect to.
 
 Open `src/app/app-routing-module.ts` (generated by `angular-new-app` when routing was enabled) and add the `auth` route to the `Routes` array:
 
@@ -178,14 +178,14 @@ const routes: Routes = [
 Notes:
 
 - Use the dynamic `import(...)` form, not the legacy `'./auth/auth.module#AuthModule'` string — the string form was removed in Angular 9+ and `angular-new-app` defaults to the dynamic form on every currently-supported Angular major.
-- Keep `path: 'auth'` exactly. Changing it (e.g. to `path: 'account'`) silently breaks the redirect targets in `app.component.ts` unless you change both together.
+- Keep `path: 'auth'` exactly. Changing it (e.g. to `path: 'account'`) silently breaks the redirect targets in the root component unless you change both together.
 - If the workspace was scaffolded without `app-routing-module.ts` (the user answered "no" to routing during `angular-new-app`'s interview), BOOTSTRAP should have re-prompted them; if you find yourself here with no routing module, stop and tell the user — do NOT synthesize a routing module from scratch.
 
-## `src/app/app.component.ts` (or `src/app/app.ts`) edits — subscribe to authentication events and redirect
+## `src/app/app.ts` (or `src/app/app.component.ts` on legacy naming) edits — subscribe to authentication events and redirect
 
 ### Why this step exists
 
-Without this edit, a successful login leaves the user stranded on the Login page. `FormioAuth` module posts the submission, gets a JWT, emits an `onLogin` event on `FormioAuthService` — and that is where its job ends. The view does NOT change on its own because the login route is still the active route. Something in the application shell has to listen for the event and navigate the router. `app.component.ts` is the right place because it is the one component that is instantiated exactly once for the life of the app, so a single subscription there covers every login/logout that ever happens.
+Without this edit, a successful login leaves the user stranded on the Login page. `FormioAuth` module posts the submission, gets a JWT, emits an `onLogin` event on `FormioAuthService` — and that is where its job ends. The view does NOT change on its own because the login route is still the active route. Something in the application shell has to listen for the event and navigate the router. The root component is the right place because it is the one component that is instantiated exactly once for the life of the app, so a single subscription there covers every login/logout that ever happens.
 
 The canonical reference for the event surface is the Form.io Angular wiki: https://github.com/formio/angular/wiki/User-Authentication#authentication-events. Read it first if any detail below diverges from upstream — the wiki is the source of truth.
 
@@ -200,9 +200,9 @@ The canonical reference for the event surface is the Form.io Angular wiki: https
 - **`onError`** — emitted when the auth request itself fails (bad credentials, network error, form validation failure). Do NOT navigate on `onError`; `FormioAuth`'s built-in login component already renders the error alert on-screen. Optionally log it for diagnostics.
 - **`ready`** — a Promise (not an EventEmitter) that resolves once every auth subsystem has finished initializing (JWT restore attempt, user fetch). `await auth.ready` in an APP_INITIALIZER or in an auth-guard's `canActivate` to block first render until you know whether the user is authenticated. Prevents the "flash of login form" a returning user sees before the token is restored.
 
-### Canonical `app.component.ts`
+### Canonical root component
 
-Edit the file `src/app/app.component.ts` (or `src/app/app.ts`) the Angular CLI generated. Add the `FormioAuthService` dependency, subscribe in `ngOnInit`, and navigate with Angular's `Router`. Unsubscribe in `ngOnDestroy` so hot-reload / test teardown does not leak the subscription.
+Edit the root component file the Angular CLI generated — `src/app/app.ts` on Angular 20+ default naming, `src/app/app.component.ts` on legacy naming. Add the `FormioAuthService` dependency, subscribe in `ngOnInit`, and navigate with Angular's `Router`. Unsubscribe in `ngOnDestroy` so hot-reload / test teardown does not leak the subscription.
 
 ```ts
 import { Component, OnDestroy, OnInit } from '@angular/core';
@@ -212,11 +212,11 @@ import { Subscription } from 'rxjs';
 
 @Component({
   selector: 'app-root',
-  templateUrl: './app.component.html',
-  styleUrls: ['./app.component.scss'],
+  templateUrl: './app.html', // legacy naming: './app.component.html'
+  styleUrl: './app.scss', // legacy naming: styleUrls: ['./app.component.scss']
   standalone: false,
 })
-export class AppComponent implements OnInit, OnDestroy {
+export class App implements OnInit, OnDestroy {
   private subs = new Subscription();
 
   constructor(
@@ -268,22 +268,57 @@ Notes:
 - Inject `FormioAuthService` as `public` so the template can read `auth.authenticated` / `auth.user` for conditional rendering (nav chrome, "logged in as …" labels) without an extra getter.
 - Need to gate something on "auth has finished booting"? `await this.auth.ready` in an async method, or use `.then(...)` on the Promise — it resolves exactly once, after the JWT-restore attempt completes. Wire it into an `APP_INITIALIZER` factory if you need the whole app to wait.
 
-### Skip-if-already-wired detection (for `app.component.ts`)
+### Skip-if-already-wired detection (for the root component)
 
-Before overwriting an existing `app.component.ts`:
+Before overwriting an existing root component:
 
-1. Read `src/app/app.component.ts` (or `src/app/app.ts`). If it already imports `FormioAuthService` AND calls `.onLogin.subscribe(` AND `.onLogout.subscribe(` AND calls `router.navigate`, the wiring is already in place — skip the edit. Tell the user: "Skipping `app.component.ts` edit — it already subscribes to `FormioAuthService.onLogin` / `onLogout` and navigates on events."
+1. Read `src/app/app.ts` (or `src/app/app.component.ts` on legacy naming). If it already imports `FormioAuthService` AND calls `.onLogin.subscribe(` AND `.onLogout.subscribe(` AND calls `router.navigate`, the wiring is already in place — skip the edit. Tell the user: "Skipping the root-component edit — it already subscribes to `FormioAuthService.onLogin` / `onLogout` and navigates on events."
 2. If only a subset is present (e.g. `onLogin.subscribe` but no `onLogout.subscribe`, or using the stale `.login` / `.logout` names from older versions of this skill), show a diff and ask whether to merge the missing piece (or rename the stale subscriptions) or leave as-is. Never silently rewrite a file the user has customized.
 3. If the file does not yet subscribe at all, apply the template above and cite the wiki link in a one-line comment above the subscriptions so future readers know where the shape came from.
 
-## `src/app/app.component.html` — auth-aware nav chrome (optional but recommended)
+## `src/app/app.html` (or `src/app/app.component.html` on legacy naming) — shell layout (REQUIRED) + auth-aware nav chrome (recommended)
 
-**Consult `frontend-design` first — with the Bootstrap 5 brief from BOOTSTRAP Step 7d.** Per the parent skill's Stance, every UI-authoring step in this skill loads `frontend-design` before writing. Prepend the `FRONTEND_DESIGN_BRIEF` that BOOTSTRAP Step 7d stashed — it pins the advice to the Bootstrap 5 + Bootstrap Icons stack already wired into `angular.json`, names the utility classes to reach for, and forbids Tailwind / Material / custom design-token systems that would clash. The nav block below is a starting skeleton that satisfies the auth-wiring requirements (`*ngIf` on `auth.authenticated`, `(click)="auth.logout()"`, `routerLink` to `/auth/login`); the visual-design decisions on top of that — spacing, typography, container width, mobile behavior, active-state styling, brand placement, empty vs. authenticated layouts — should come from `frontend-design`'s Bootstrap-5-briefed guidance, not from memory. Load `frontend-design` with the brief, let it review the skeleton, then apply its recommendations before emitting the final HTML/SCSS.
+Two different things live in this file, with two different obligation levels. The **shell layout wrapper** around `<router-outlet>` is REQUIRED — without it every routed page in the app renders flush against the viewport edges, and no later phase can repair that (see "Page layout contract" immediately below). The **auth-aware nav chrome** is recommended — strongly advised, but an app without it still lays out correctly.
 
-`FormioAuthService` exposes `authenticated` (boolean) and `user` (submission object) as properties, and `logout()` as a method. Wire them into the root template so the nav bar reacts to login state without any extra plumbing. Typical `app.component.html` addition (keep whatever shell the Angular CLI scaffolded; add this block inside your nav):
+### Page layout contract
+
+The shell's `<router-outlet>` wrapper is the only layout boundary that applies to every route. Most routed surfaces are library components mounted directly by `FormioResourceRoutes()` and `FormioAuthRoutes()` — create, edit, delete, index, login, register — and generated code never authors their templates, so it cannot wrap them. Horizontal gutters, max content width, and vertical rhythm therefore belong on the shell, regardless of which design language was selected. Page templates MUST NOT add their own page-level layout wrapper: that double-pads the routes you control while leaving the ones you do not still unpadded, which masks the gap instead of closing it.
+
+| Route | Component | Can generated code wrap it? |
+| --- | --- | --- |
+| `/<resource>` | `FormioResourceIndexComponent` | only via the optional index override |
+| `/<resource>/new` | `FormioResourceCreateComponent` | no |
+| `/<resource>/:id/edit` | `FormioResourceEditComponent` | no |
+| `/<resource>/:id/delete` | `FormioResourceDeleteComponent` | no |
+| `/auth/login`, `/auth/register` | `FormioAuthLoginComponent` / `FormioAuthRegisterComponent` | no |
+
+The shell wraps `<router-outlet>` in a single page-layout element that supplies the app's horizontal gutters, max content width, and top spacing. The wrapper element and its position are fixed; its classes are not — express them in the design language selected for this app.
 
 ```html
-<nav class="navbar navbar-expand navbar-light bg-light px-3">
+</nav>
+<main class="<page-layout classes for the selected design language>">
+  <router-outlet></router-outlet>
+</main>
+```
+
+Illustrative realizations, not normative markup:
+
+- **Bootstrap 5** (what BOOTSTRAP installs by default): `container-xxl px-3 px-md-4 py-4`.
+- **Tailwind**: `mx-auto max-w-screen-2xl px-4 py-6 sm:px-6`.
+- **Angular Material**: a layout container carrying the app's own gutter tokens — Material ships no container primitive, so define one in the app's theme rather than inventing per-page margins.
+- **The workspace's existing design system**: whatever that system's page/content wrapper already is. Use it; do not introduce a parallel one.
+- **Unstyled HTML**: a `<main>` with a minimal padding rule, since there are no utilities to reach for.
+
+If the navbar carries its own inner container, its gutters must be consistent with the content wrapper's — otherwise the brand does not align with the content beneath it. Consistency is the requirement; the specific classes follow from the design language.
+
+### Auth-aware nav chrome
+
+**Consult `frontend-design` first — with the design brief from BOOTSTRAP Step 7d.** Per the parent skill's Stance, every UI-authoring step in this skill loads `frontend-design` before writing. Prepend the `FRONTEND_DESIGN_BRIEF` that BOOTSTRAP Step 7d stashed — it pins the advice to the stack wired into `angular.json` (Bootstrap 5 + Bootstrap Icons unless a different design language was selected, in which case substitute that language's equivalents per the brief's own top note), names the vocabulary to reach for, and forbids mixing in a competing design-token system. The nav block below is a starting skeleton that satisfies the auth-wiring requirements (`*ngIf` on `auth.authenticated`, `(click)="auth.logout()"`, `routerLink` to `/auth/login`); the visual-design decisions on top of that — spacing, typography, content width, mobile behavior, active-state styling, brand placement, empty vs. authenticated layouts — should come from `frontend-design`'s briefed guidance, not from memory. Load `frontend-design` with the brief, let it review the skeleton, then apply its recommendations before emitting the final HTML/SCSS.
+
+`FormioAuthService` exposes `authenticated` (boolean) and `user` (submission object) as properties, and `logout()` as a method. Wire them into the root template so the nav bar reacts to login state without any extra plumbing. Typical addition (keep whatever shell the Angular CLI scaffolded; add this block inside your nav, and keep the required page-layout wrapper from the contract above around `<router-outlet>`):
+
+```html
+<nav class="navbar navbar-expand navbar-light bg-light px-3 px-md-4">
   <a class="navbar-brand" routerLink="/">{{ appName }}</a>
   <ul class="navbar-nav ms-auto">
     <li class="nav-item" *ngIf="!auth.authenticated">
@@ -300,11 +335,15 @@ Before overwriting an existing `app.component.ts`:
     </li>
   </ul>
 </nav>
-<router-outlet></router-outlet>
+<main class="container-xxl px-3 px-md-4 py-4">
+  <router-outlet></router-outlet>
+</main>
 ```
 
 Notes:
 
+- The `<main>` wrapper is the page-layout element the contract above requires, shown here in its Bootstrap 5 realization because that is the default stack. Swap the classes — never the element or its position — for a different design language.
+- The nav's own `px-3 px-md-4` matches the wrapper's horizontal padding so the brand lines up with the content below it.
 - The template talks to `auth` directly because the component injected it as `public` above — no extra bindings, no extra getters.
 - `(click)="auth.logout()"` does NOT need to navigate; `FormioAuthService.logout()` clears the JWT and emits `onLogout`, which the `ngOnInit` subscription above catches and routes to `/auth/login`.
 - `routerLinkActive="active"` is Bootstrap-friendly because Bootstrap 5's `.nav-link.active` styling is already in the stylesheet BOOTSTRAP installed.
@@ -346,7 +385,7 @@ The custom register component follows the identical pattern against `FormioAuthR
 
 ## `src/app/auth/auth.guard.ts` — REQUIRED route guard for authenticated routes
 
-**This file is not optional whenever any route requires an authenticated user.** Subscribing to `onLogin` / `onLogout` in `app.component.ts` only redirects on auth _events_ — it does NOT stop an anonymous visitor from clicking a `routerLink` (or deep-linking) straight into a route that needs a JWT. Without a `canActivate` guard, the anonymous user lands on the resource page, `FormioResourceService` fires its load request, the backend returns `401` / `403`, and the user sees a broken or empty screen instead of being sent to the login form. A guard is the only thing that gates navigation _before_ the route activates.
+**This file is not optional whenever any route requires an authenticated user.** Subscribing to `onLogin` / `onLogout` in the root component only redirects on auth _events_ — it does NOT stop an anonymous visitor from clicking a `routerLink` (or deep-linking) straight into a route that needs a JWT. Without a `canActivate` guard, the anonymous user lands on the resource page, `FormioResourceService` fires its load request, the backend returns `401` / `403`, and the user sees a broken or empty screen instead of being sent to the login form. A guard is the only thing that gates navigation _before_ the route activates.
 
 Write this functional guard whenever the app has any non-public resource route (i.e. the Access Matrix shows the `anonymous` actor has no access — almost every authenticated app):
 
@@ -431,14 +470,16 @@ Files to edit
     + import { authGuard } from './auth/auth.guard'
     + add { path: 'auth', loadChildren: () => import('./auth/auth.module').then(m => m.AuthModule) } to Routes (NO guard — login must stay reachable)
     + add canActivate: [authGuard] to every authenticated app-shell route
-  src/app/app.component.ts (or `src/app/app.ts`)
+  src/app/app.ts (or `src/app/app.component.ts`)
     + import FormioAuthService from '@formio/angular/auth' and Router from '@angular/router'
     + subscribe to auth.onLogin    → router.navigate(['/'])           (post-login redirect)
     + subscribe to auth.onRegister → router.navigate(['/'])           (post-register redirect)
     + subscribe to auth.onLogout   → router.navigate(['/auth/login']) (post-logout redirect)
     + unsubscribe in ngOnDestroy
-  src/app/app.component.html
-    + auth-aware nav chrome using *ngIf="!auth.authenticated" / *ngIf="auth.authenticated" / (click)="auth.logout()"
+  src/app/app.html (or `src/app/app.component.html`)
+    + REQUIRED shell layout: page-layout wrapper (horizontal gutters + max content width + top spacing)
+      around <router-outlet>, expressed in the selected design language
+    + auth-aware nav chrome using the framework's conditional rendering and auth.logout()
 
 Proceed with these writes? (Resources is next — load the nested sub-skill file `./formio-angular-resources/SKILL.md` under this skill.)
 ```
@@ -449,6 +490,6 @@ Wait for explicit approval. If the user declines, stop — do not write partial 
 
 Write `auth.module.ts` and edit `app-module.ts`. Then tell the user what was written and what the next phase is:
 
-> Wrote `src/app/auth/auth.module.ts` (with `FormioAuthRoutes()` mounted via `RouterModule.forChild`) and `src/app/auth/auth.guard.ts` (the `authGuard` `CanActivateFn`), updated `src/app/app-module.ts`, added the `/auth` lazy-load route plus `canActivate: [authGuard]` on the authenticated app-shell routes in `src/app/app-routing-module.ts`, wired `src/app/app.component.ts` (or `src/app/app.ts`) to subscribe to `FormioAuthService.onLogin` / `onRegister` / `onLogout` (redirect to `/` on login/register, to `/auth/login` on logout), and updated `src/app/app.component.html` with auth-aware nav chrome. Loading `./formio-angular-resources/SKILL.md` (the nested Resources sub-skill of this skill) for per-resource NgModule scaffolding.
+> Wrote `src/app/auth/auth.module.ts` (with `FormioAuthRoutes()` mounted via `RouterModule.forChild`) and `src/app/auth/auth.guard.ts` (the `authGuard` `CanActivateFn`), updated `src/app/app-module.ts`, added the `/auth` lazy-load route plus `canActivate: [authGuard]` on the authenticated app-shell routes in `src/app/app-routing-module.ts`, wired `src/app/app.ts` (or `src/app/app.component.ts`) to subscribe to `FormioAuthService.onLogin` / `onRegister` / `onLogout` (redirect to `/` on login/register, to `/auth/login` on logout), and updated `src/app/app.html` (or `src/app/app.component.html`) with the required page-layout wrapper around `<router-outlet>` plus auth-aware nav chrome. Loading `./formio-angular-resources/SKILL.md` (the nested Resources sub-skill of this skill) for per-resource NgModule scaffolding.
 
 Hand off to the sub-skill with the context described in the parent `SKILL.md`'s "Handoff contract with the Resources sub-skill (`./formio-angular-resources/SKILL.md`)" section. The sub-skill is a sub-folder of this skill — load that file directly, do NOT attempt to invoke a top-level skill named `formio-angular-resources`.

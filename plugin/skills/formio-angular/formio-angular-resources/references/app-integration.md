@@ -9,7 +9,7 @@ Every resource module you generate plugs into a shared foundation. This file is 
 1. `AppModule`
 2. `AppRoutingModule`
 3. `AppConfig` (FormioAppConfig + FormioAuthConfig)
-4. `AppComponent` and `HomeComponent`
+4. Root component (`App`) and `HomeComponent`
 5. `AuthModule` and `authGuard`
 6. `angular.json` — Bootstrap 5 + FontAwesome
 7. Logout route
@@ -35,13 +35,13 @@ import { FormioResources } from '@formio/angular/resource';
 
 import { AppConfig, AuthConfig } from './config';
 import { AppRoutingModule } from './app-routing.module';
-import { AppComponent } from './app.component';
+import { App } from './app'; // legacy naming: `import { AppComponent } from './app.component';`
 import { HomeComponent } from './home/home.component';
 
 (Formio as any).icons = 'fontawesome';
 
 @NgModule({
-  declarations: [AppComponent, HomeComponent],
+  declarations: [App, HomeComponent],
   imports: [BrowserModule, CommonModule, FormioModule, FormioGrid, AppRoutingModule],
   providers: [
     // provideZonelessChangeDetection() is added by BOOTSTRAP (see BOOTSTRAP.md Step 6).
@@ -50,7 +50,7 @@ import { HomeComponent } from './home/home.component';
     { provide: FormioAppConfig, useValue: AppConfig },
     { provide: FormioAuthConfig, useValue: AuthConfig },
   ],
-  bootstrap: [AppComponent],
+  bootstrap: [App],
 })
 export class AppModule {}
 ```
@@ -129,9 +129,9 @@ Swap `userLogin` / `userRegister` for whatever the Resource Map called them. If 
 - `appUrl` = the **Project URL** that `project get` reported. This is what `FormioResourceService` calls to load forms and submissions. It is the value every `form_*` MCP tool uses and every `formio-api/references/project-*` / `formio-api/references/runtime-*` skill means by "project URL."
 - `apiUrl` = the **Base URL** that `project get` reported. Used for cross-project concerns (team / project / tenant management). Take it from that command and nowhere else — do not fill in `https://api.form.io` because the app has one project, since that value is correct only for a project on a `form.io` host and points a self-hosted app's login at a deployment it does not use.
 
-## 4. `AppComponent` and `HomeComponent`
+## 4. Root component (`App`) and `HomeComponent`
 
-`src/app/app.component.ts`:
+`src/app/app.ts` (legacy naming: `src/app/app.component.ts`, class `AppComponent`):
 
 ```typescript
 import { Component } from '@angular/core';
@@ -139,42 +139,25 @@ import { FormioAuthService } from '@formio/angular/auth';
 
 @Component({
   selector: 'app-root',
-  templateUrl: './app.component.html',
-  styleUrls: ['./app.component.scss'],
+  templateUrl: './app.html', // legacy naming: './app.component.html'
+  styleUrl: './app.scss', // legacy naming: styleUrls: ['./app.component.scss']
   standalone: false,
 })
-export class AppComponent {
+export class App {
   constructor(public auth: FormioAuthService) {}
 }
 ```
 
-`src/app/app.component.html`:
+Match whatever `ng new` actually emitted in this workspace — Angular 20+ generates `app.ts` / `app.html` / `app.scss` with class `App` and singular `styleUrl`; older workspaces use the `app.component.*` / `AppComponent` / `styleUrls` set. Do not rename existing files to match this doc.
 
-```html
-<nav class="navbar navbar-expand-lg navbar-light bg-light">
-  <div class="container-fluid">
-    <a class="navbar-brand" routerLink="/">{{ appTitle }}</a>
-    <ul class="navbar-nav me-auto">
-      <!-- one <li> per browsable resource: -->
-      <li class="nav-item"><a class="nav-link" routerLink="/<kebab>"><Resource></a></li>
-    </ul>
-    <ul class="navbar-nav">
-      <li class="nav-item" *ngIf="!auth.authenticated">
-        <a class="nav-link" routerLink="/auth/login">Login</a>
-      </li>
-      <li class="nav-item" *ngIf="!auth.authenticated">
-        <a class="nav-link" routerLink="/auth/register">Register</a>
-      </li>
-      <li class="nav-item" *ngIf="auth.authenticated">
-        <a class="nav-link" (click)="auth.logout()" style="cursor: pointer;">Logout</a>
-      </li>
-    </ul>
-  </div>
-</nav>
-<div class="container" style="margin-top: 20px;">
-  <router-outlet></router-outlet>
-</div>
-```
+### The app shell template — owned by AUTH, not by this file
+
+The shell template (`src/app/app.html`, legacy `src/app/app.component.html`) is specified in ONE place: the parent skill's `AUTH.md`, in its shell-template section and its "Page layout contract" subsection. Read it there. It carries the navbar skeleton, the auth-state conditionals, and — load-bearing — the **page layout contract**: the shell wraps `<router-outlet>` in a single page-layout element that owns the app's horizontal gutters, max content width, and top spacing, because most routed surfaces are library components (`FormioResourceCreate/Edit/Delete/Index`, `FormioAuthLogin/Register`) that generated code cannot wrap.
+
+By the time this file is consulted the shell already exists. Two edits belong here, and nothing else:
+
+- Add one `<li class="nav-item"><a class="nav-link" routerLink="/<kebab>"><Resource></a></li>` per browsable resource to the navbar's left-hand `<ul>`.
+- Verify the page-layout wrapper around `<router-outlet>` is present. If it is missing, add it per AUTH.md's contract — do not compensate with per-page wrappers inside the resource templates.
 
 `src/app/home/home.component.ts`:
 
@@ -348,5 +331,6 @@ When mode is "existing workspace," before writing `app-module.ts` / `app-routing
 2. Merge: add new `import` lines, add new entries to `imports: [...]`, `declarations: [...]`, `providers: [...]`, `routes: [...]`. Leave untouched everything you didn't add.
 3. If the file declares `FormioAppConfig` / `FormioResources` / `FormioAuthService` already, do NOT re-declare. Verify the existing `appUrl` matches what the user gave — if not, flag a conflict and ask.
 4. Same for `angular.json` styles — append, don't replace.
+5. Read the shell template (`src/app/app.html`, legacy `app.component.html`). If `<router-outlet>` is not inside a page-layout element that supplies horizontal gutters and a max content width, add one per the parent skill's `AUTH.md` → "Page layout contract" — it is the only thing that pads the library-rendered routes. Report it in the Phase A plan as a shell modification.
 
 In the Phase A plan, be explicit about which existing files will be modified and what will be added to each. The user should be able to read the plan and know exactly what the diff will look like before you touch their code.
