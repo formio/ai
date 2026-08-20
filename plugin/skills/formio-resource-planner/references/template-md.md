@@ -75,10 +75,15 @@ Auth forms (login / register) are NOT listed here — they belong under `## User
 One block per form. Call out which Resource (if any) the form **references** (a record established earlier in the flow) and how. A bespoke form references an existing record — it never creates that record on submit; see `SKILL.md` → "Resources vs. Forms" and `formio-application/references/resource-vs-form-anti-pattern.md` → "Using Resources within Forms" for the anti-pattern.
 
 ```markdown
-- <FormName> (type: form) Purpose: <1 sentence — the specific interaction this form captures> References: <ResourceName via disabled pre-selected Select | owner (1:1 with the user) | none> Fields:
-  - <key>: <component> — <bespoke field specific to this form>
-  - ... Access: <who can submit / who can read> Actions:
-  - <action name>: <key settings> ← Save to its OWN submission only; never a Save that creates the referenced Resource
+- <FormName> (type: form)
+  Purpose: <1 sentence — the specific interaction this form captures>
+  References: <ResourceName via disabled pre-selected Select | owner (1:1 with the user) | none>
+  Fields:
+    - <key>: <component> — <bespoke field specific to this form>
+    - ...
+  Access: <who can submit / who can read>
+  Actions:
+    - <action name>: <key settings>   ← Save to its OWN submission only; never a Save that creates the referenced Resource
 ```
 
 Forms may also appear in the ER Diagram (wired to any Resource they reference) and in the Access Flow Diagram when their submission access is non-trivial, but this is optional — the grader does not require forms to appear in either diagram.

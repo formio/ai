@@ -166,11 +166,12 @@ function flatten(components: Component[] | undefined): Component[] {
   ]);
 }
 
-// A field-based block is one or more bare CRUD entries with empty `roles` — the
-// marker that tells the server to stamp the saved row's ACL from the referenced
-// group. The four-entry form is the common one, but a read-only block
-// (`{ "type": "read", "roles": [] }`) is equally canonical, and is the right
-// instrument when group members should SEE rows an administrator alone manages.
+// A field-based block is one or more CRUD entries on the group-reference
+// COMPONENT — the marker that tells the server to stamp the saved row's ACL from
+// the referenced group. The four-entry form is the common one, but a read-only
+// block (`{ "type": "read", "roles": [] }`) is equally canonical, and is the
+// right instrument when group members should SEE rows an administrator alone
+// manages.
 // Row-access type -> the operations it actually confers (permissionHandler.js:45-125).
 const IMPLIED_OPERATIONS: Record<string, Operation[]> = {
   read: ['read'],
@@ -185,24 +186,29 @@ const IMPLIED_OPERATIONS: Record<string, Operation[]> = {
 // (submissionResourceAccessFilter.js:20-56).
 const LIST_VISIBLE = new Set(['read', 'write', 'admin']);
 
+// `roles` is NOT part of what makes an entry field-based: a COMPONENT-level
+// `submissionAccess` entry is always stamped from the referenced submission, and
+// a non-empty `roles` only narrows which memberships match — it keys the stamp
+// to `"<groupId>:<role>"` instead of the bare `"<groupId>"` (the Group
+// Assignment `role` setting, documented in
+// `formio-auth/references/group-permissions.md` → "Assigning a role within the
+// group"). Verified live: a block of `{ "type": "admin", "roles": ["lead"] }`
+// stamped `<groupId>:lead` and conferred all four operations on members holding
+// that role. Filtering on empty `roles` here would let exactly that block confer
+// delete while registering as nothing, so the over-grant rules below would miss
+// it.
 function fieldBasedOperations(component: Component): Set<string> {
   const entries = component.submissionAccess ?? [];
-  const bare = entries.filter(
-    (entry) =>
-      entry.type !== undefined &&
-      IMPLIED_OPERATIONS[entry.type] !== undefined &&
-      (entry.roles ?? []).length === 0
+  const blockEntries = entries.filter(
+    (entry) => entry.type !== undefined && IMPLIED_OPERATIONS[entry.type] !== undefined
   );
-  return new Set(bare.flatMap((entry) => IMPLIED_OPERATIONS[entry.type as string]));
+  return new Set(blockEntries.flatMap((entry) => IMPLIED_OPERATIONS[entry.type as string]));
 }
 
 function listVisibleViaBlock(entry: FormEntry | undefined): boolean {
   return flatten(entry?.components).some((component) =>
     (component.submissionAccess ?? []).some(
-      (access) =>
-        access.type !== undefined &&
-        LIST_VISIBLE.has(access.type) &&
-        (access.roles ?? []).length === 0
+      (access) => access.type !== undefined && LIST_VISIBLE.has(access.type)
     )
   );
 }
@@ -240,10 +246,27 @@ describe('planner examples as a set', () => {
   });
 });
 
-describe.each(exampleDirs())('planner example %s', (example) => {
+// These reads run in the `describe.each` factory, so a fixture that cannot be
+// parsed aborts collection for the whole file rather than failing one test. That
+// is loud enough, but the raw `JSON.parse` / "no `## Access Matrix` section"
+// error does not say WHICH example broke — name it here.
+function fixturesOf(example: string): { template: Template; matrix: MatrixRow[] } {
   const dir = join(examplesRoot, example);
-  const template = JSON.parse(readFileSync(join(dir, 'template.json'), 'utf8')) as Template;
-  const matrix = parseAccessMatrix(readFileSync(join(dir, 'template.md'), 'utf8'));
+  try {
+    return {
+      template: JSON.parse(readFileSync(join(dir, 'template.json'), 'utf8')) as Template,
+      matrix: parseAccessMatrix(readFileSync(join(dir, 'template.md'), 'utf8')),
+    };
+  } catch (cause) {
+    throw new Error(
+      `planner example ${example}: could not read its fixtures — ${cause instanceof Error ? cause.message : String(cause)}`,
+      { cause }
+    );
+  }
+}
+
+describe.each(exampleDirs())('planner example %s', (example) => {
+  const { template, matrix } = fixturesOf(example);
 
   it('has a non-empty Access Matrix', () => {
     expect(matrix.length).toBeGreaterThan(0);
@@ -417,29 +440,37 @@ describe.each(exampleDirs())('planner example %s', (example) => {
       if (conferred.size === 0) {
         continue;
       }
+      // Cells the block is allowed to be the mechanism for. `group` / `group(<j>)`
+      // name it outright; `role(<r>)` is defined as a role layered on top of
+      // whichever underlying rule applies, and a block entry carrying
+      // `roles: ["<r>"]` is exactly that layering — so treating a `role(<r>)`
+      // cell as withheld would reject the shape the vocabulary prescribes. The
+      // sibling create-cell rule skips the token for the same reason.
+      const blockMayRealize = (cell: string): boolean =>
+        cell.startsWith('group') || /^role\(/.test(cell);
       // Only actors the matrix actually places inside the group: a row of all
-      // `—` describes somebody the block was never meant to serve, and the
-      // block cannot tell personas apart anyway (its `roles` are empty).
+      // `—` describes somebody the block was never meant to serve, and an
+      // empty-`roles` block cannot tell personas apart anyway.
       const groupRows = matrix.filter(
         (row) =>
           machineNameOf(row.resource) === machineName &&
           row.actor !== 'administrator' &&
-          OPERATIONS.some((operation) => row[operation].startsWith('group'))
+          OPERATIONS.some((operation) => blockMayRealize(row[operation]))
       );
       for (const row of groupRows) {
-        const promised = OPERATIONS.filter((operation) => row[operation].startsWith('group'));
+        const promised = OPERATIONS.filter((operation) => blockMayRealize(row[operation]));
         const excess = [...conferred].filter(
           (operation) => !promised.includes(operation as Operation)
         );
         expect(
           excess,
-          `${machineName}: the field-based block confers ${excess.join(', ')} to every group member, but the Access Matrix says ${excess.map((operation) => `${operation} = \`${row[operation as Operation]}\``).join(', ')} for ${row.actor}. The block is what runs, so the matrix is describing an app that does not exist — narrow the entry types (see "Choosing the types") or widen the matrix deliberately.`
+          `${machineName}: the field-based block confers ${excess.join(', ')} to the group members its entries match, but the Access Matrix says ${excess.map((operation) => `${operation} = \`${row[operation as Operation]}\``).join(', ')} for ${row.actor}. The block is what runs, so the matrix is describing an app that does not exist — narrow the entry types (see "Choosing the types") or widen the matrix deliberately.`
         ).toEqual([]);
 
         // A `read | group` promise needs a type the index filter honours
         // (submissionResourceAccessFilter.js:20-56); `update`/`delete` alone
         // leave members able to touch rows they can never list.
-        if (row.read.startsWith('group')) {
+        if (blockMayRealize(row.read)) {
           expect(
             listVisibleViaBlock(entry),
             `${machineName}: the matrix promises ${row.actor} read = \`${row.read}\`, but the field-based block carries no list-visible type (${[...LIST_VISIBLE].join('/')}), so every row stays invisible to an index request`
