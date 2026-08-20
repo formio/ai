@@ -77,7 +77,7 @@ Notes:
 
 - This is a literal array of `{ type, roles }` objects — same vocabulary as `submissionAccess`, different scope.
 - Unless the plan says otherwise, emit the default shape above verbatim. Tightening it (e.g., dropping `anonymous` from `read_all`) locks anonymous users out of the portal's form list and usually is NOT what the user wants.
-- If the plan includes custom roles that should see the project (e.g., `moderator`, `salesRep`), add them to `read_all`. Never add custom roles to `create_all` / `update_all` / `delete_all` — those are administrator-only operations.
+- If the plan includes custom roles that should see the project (e.g., `moderator`, `salesRep`), add them to `read_all`. Never add custom roles to `create_all` / `update_all` / `delete_all` **in this project-level `access` array** — those are project-administration operations (creating forms, editing the project). The rule is scoped to this array and says nothing about per-resource `submissionAccess`, where end-user roles routinely hold `create_own` (and must, for any resource the app's own users create).
 - `access` MUST be the LAST key in the emitted template.json, after `resources`. That ordering is what makes the project's data model (resources/forms/actions) readable before the access footer.
 
 ## Resources & Forms — shared shape
@@ -159,7 +159,7 @@ Common combinations:
 ]
 ```
 
-Group-based access (row-level, driven by a Group Assignment action on a join resource) is enforced at runtime by the action — you don't encode it in `submissionAccess` on the child resources. See "Group Assignment action" below.
+Group-based access is enforced at runtime from the field-based block on the group-reference `select` — including **create**. On a write the server rebuilds the row's own `access` array from that block (`{ type, resources: [<groupSubmissionId>] }` per entry), and on a request it resolves the caller's group memberships against it. You therefore do NOT add `create_own` / `read_all` / etc. to a group-scoped child resource for the group's sake; the block is the whole mechanism. Two things the block does NOT cover, both real and both easy to miss: the **group resource itself** (nothing stamps a group row's own `access`, so the group needs a real `read_all` for the end-user role — see "The group resource needs its own read grant" below), and a create whose payload does not carry the group reference (see "What group-based create actually requires").
 
 ## Component shapes
 
@@ -321,10 +321,11 @@ When this select points at a resource that acts as the **group** for a Group Ass
   "input": true,
   "tableView": true,
 
-  // Field-based resource access — copy verbatim.
-  // Roles are intentionally empty arrays: permissions are resolved
-  // at runtime from the Group Assignment action's stored ACLs on the
-  // referenced submission, not from static role lists.
+  // Field-based resource access. Empty `roles` is deliberate: on each write the
+  // server stamps the saved row's own `access` with these types, keyed to the
+  // referenced group submission, and resolves the caller's memberships against
+  // it per request. Pick the types from the menu below — the four-entry form
+  // shown here is the most permissive one.
   "submissionAccess": [
     { "type": "read", "roles": [] },
     { "type": "create", "roles": [] },
@@ -333,6 +334,21 @@ When this select points at a resource that acts as the **group** for a Group Ass
   ],
 }
 ```
+
+**Choosing the types — this is a real access decision, not boilerplate.** Each entry names one permission the server stamps onto the saved row. The row-level vocabulary is wider than the four CRUD names, and two of the values are shorthands:
+
+| Entry type | What a group member may do to the row          | Appears in list results?  |
+| ---------- | ---------------------------------------------- | ------------------------- |
+| `read`     | read                                           | yes                       |
+| `create`   | create rows referencing this group             | n/a (authorizes the POST) |
+| `update`   | update                                         | no, on its own            |
+| `delete`   | **permanently delete**                         | no, on its own            |
+| `write`    | read + create + update — explicitly NOT delete | yes                       |
+| `admin`    | read + create + update + delete                | yes                       |
+
+`{ "type": "write", "roles": [] }` is exactly equivalent to `read` + `create` + `update` as three entries, and the four-entry CRUD block is exactly equivalent to `admin`. A row is only visible to an index/list request through `read`, `write`, or `admin`, so a block of `update` alone yields rows the member may modify but never see listed. The legacy single-value spelling of the same thing is `"defaultPermission": "<type>"` on the component; prefer the array.
+
+Decide `delete` deliberately. The four-entry block lets **any** member of the group permanently delete **any** of that group's rows, not merely the ones they created. That is right for a kanban card or a personal task list and usually wrong for a customer record with an audit obligation — in which case use `write` and leave deletion to an administrator working through the portal. Whatever you choose, the Access Matrix's `delete` column must say the same thing: `group` when the block confers delete, `—` when it does not.
 
 When to include this block: on **every** child-resource `select` component that references a resource acting as a group. Examples:
 
@@ -423,7 +439,7 @@ Used inside a `type: "form"` entry to link the form to a Resource record that wa
 
 The pre-selection (binding the select to the logged-in user's Applicant record) is wired in the UI layer by the framework skill, not in the template — the template's job is to declare the reference select, mark it `disabled`, and require it. When the relationship is strictly 1:1 with the authenticated user, you can omit this select entirely and rely on the submission **`owner`** instead (owner-based `submissionAccess`).
 
-> **Anti-pattern — never create the Resource from the bespoke Form.** Do NOT add a nested `form` component that creates the Resource inline, and do NOT give the Form a Save action whose `settings.resource` writes a new record into the referenced Resource. Creating the data-model record and collecting the bespoke response are two separate flow steps: the record is established first by its own flow; the Form only references it. See `formio-application` → "Using Resources within Forms — the right flow (and the anti-pattern to avoid)".
+> **Anti-pattern — never create the Resource from the bespoke Form.** Do NOT add a nested `form` component that creates the Resource inline, and do NOT give the Form a Save action whose `settings.resource` writes a new record into the referenced Resource. Creating the data-model record and collecting the bespoke response are two separate flow steps: the record is established first by its own flow; the Form only references it. See `formio-application/references/resource-vs-form-anti-pattern.md` → "Using Resources within Forms — the right flow (and the anti-pattern to avoid)".
 
 ### Form referencing an established Resource — full shape
 
@@ -685,9 +701,9 @@ Rules:
 - Emit one conditional `user:role<Persona>` action for EVERY assignable role in the plan, including the self-register persona — the register form's own unconditional Role Assignment still covers self-registration, and the conditional set covers users created or edited on the resource directly (portal or API).
 - Never plan a step that writes `submission.roles` directly (POST body, PUT, PATCH) — the API silently strips it, and a PUT that includes a `roles` key can wipe the existing roles.
 
-### Group Assignment (Group Permissions) — has two halves
+### Group Assignment (Group Permissions) — has three parts
 
-Group-based access is configured in **two places** that must be in sync. Missing either half leaves the group permissions broken:
+Group-based access is configured in **three places** that must be in sync. The first two are the mechanism; the third is the one every reader forgets, because it is a grant on the group resource rather than on the children:
 
 **Half 1 — the action on the join resource.**
 
@@ -699,14 +715,19 @@ Attach Group Assignment to the join resource (e.g., `ProjectUser`, `CompanyUser`
   "name": "group",
   "form": "projectUser",
   "priority": 5,
-  "method": ["create"],
+  "method": ["create", "update", "delete"],
   "handler": ["after"],
   "settings": {
     "group": "project",   // field key on the join resource that identifies the group
     "user":  "user"        // field key on the join resource that identifies the user
+                           // omit entirely when the form IS the user (join-less shape);
+                           // never set it to "_id" — it is resolved as data.<key>
+    // optional: "role": "<field key>" — stores memberships as "<groupId>:<role>"
   }
 }
 ```
+
+All three methods are required, not a stylistic choice. The action computes membership by diffing the submitted row against the previous one, so `update` is what moves a membership and `delete` is what revokes it; with `method: ["create"]` a membership can be granted and then never moved or withdrawn. Two constraints the JSON cannot express, both silent when violated: the requester must hold **update access on the group record** for an assignment to verify (so self-serve joining does not work while the group is administrator-only — see `formio-auth/references/group-permissions.md` → "The assigner must have update access on the group"), and group-scoped **list** filtering requires a `team` / `commercial` / `trial` project plan.
 
 Do not attach Group Assignment to non-join resources.
 
@@ -716,11 +737,25 @@ Every child resource that should inherit the group's access (e.g., `Task` inheri
 
 Without Half 2, a logged-in user with a ProjectUser membership can see the Project row but **cannot** see the Tasks attached to it — the child's access does not automatically propagate.
 
+**What group-based create actually requires.**
+
+Create is authorized by the block, not by a form-level grant: on a POST the server reads the group reference out of the **submitted payload** and grants `create_all` for that group id. Three preconditions, and a failure of any one produces `Unauthorized` on every create while reads keep working — the exact shape of a silent group-permissions bug:
+
+1. **The block carries a create-conferring type** — `create`, `write`, or `admin`. A `read`-only block authorizes no creates.
+2. **The payload carries the group reference as an object with an `_id`.** A bare-string value is skipped, which is one more reason a group-reference select must be `"reference": true` with no `valueProperty: "_id"`.
+3. **The group field is actually populated in the submitted payload.** An empty value contributes nothing. This is the sharp edge for the transitive mirror, and it is sharper than it looks: the access check reads the mirrored key out of the request body, and `calculateValue` has NOT run at that point — server-side calculation happens later in submission processing. Sending the parent reference is not enough, even with the parent's nested group data included; only the mirrored field's own value counts. In a rendered form this works because Form.io evaluates `calculateValue` client-side and ships the result, so a browser submit carries it. Any other client — a script, an integration, a mobile app posting a bare parent reference — is refused with `Unauthorized` on create. Verified against a live deployment: bare parent reference → `401`; same request with the mirrored value present → `201`, correctly stamped.
+
+Precondition 2 has a corollary that bites first in practice: populating that select requires read access on the group resource (next section). No read on the group means an empty select, which means no group reference in the payload, which means every create fails.
+
+**The group resource needs its own read grant.**
+
+Nothing stamps a group row's own `access` — the server builds a row's `access` from that row's components, and a group resource carries no reference to itself. Group membership does not help either: reference population and read checks consult `read_all` roles and ownership, never group ids. So the group resource needs `read_all` including the end-user role, both to render the group's name and to populate the `dataSrc: "resource"` select whose value authorizes group-based create. Note the trade-off explicitly in the plan: this makes every group row readable by every end user. There is no membership-scoped read of a group's own record.
+
 **Transitive access — 2+ levels below the group.**
 
-When a resource is not a direct child of the group but a grandchild (or deeper) — e.g., `Contact` under `Account`, with `Team` as the group on `Account` — half 2 cannot point at the group directly because the sub-resource has no relationship with the group. Instead, add **both** a parent reference and a hidden, calculated mirror of the group field to the sub-resource. The mirror is invisible, auto-populated from the parent, uses `reference: false`, and carries the same four-entry `submissionAccess` block.
+When a resource is not a direct child of the group but a grandchild (or deeper) — e.g., `Contact` under `Account`, with `Team` as the group on `Account` — Half 2 cannot point at the group directly because the sub-resource has no relationship with the group. Instead, add **both** a parent reference and a hidden, calculated mirror of the group field to the sub-resource. The mirror is invisible, auto-populated from the parent, uses `reference: true` like the parent select, and carries the same field-based `submissionAccess` block. What matters mechanically is that the calculated value is the referenced submission OBJECT: the stamping step skips any value without an `_id`.
 
-See "`select` — transitive group-access mirror" in Component shapes for the exact shape and the `calculateValue` pattern. Every level of the hierarchy below the direct child repeats this mirror so access flows all the way down.
+See "`select` — transitive group-access mirror" in Component shapes for the exact shape and the `calculateValue` pattern. Every level of the hierarchy below the direct child repeats this mirror so access flows all the way down. Note the mirror is **client-supplied at create time**: the permission check reads the mirrored key from the request body before `calculateValue` is evaluated server-side, so a client that posts only the parent reference is refused. A rendered form satisfies this automatically (Form.io calculates client-side and submits the value); a non-browser client must send the mirrored value explicitly.
 
 ## Assembly checklist
 
@@ -739,6 +774,8 @@ Before emitting the Phase B JSON, walk through this list:
 - [ ] **When `roles` declares 2+ assignable personas, the `user` resource has the `role` selectboxes component and one conditional `user:role<Persona>` action per persona** (see "Multi-role user systems"). Direct `roles` writes are stripped by the API, so without these actions the non-self-register personas cannot be assigned at all.
 - [ ] Every Group Assignment action's `settings.group` and `settings.user` match field keys on the join resource it's attached to.
 - [ ] **Every child resource whose access flows from a group has a four-entry `submissionAccess` (`read`, `create`, `update`, `delete`, roles: `[]`) on the `select` component that references the group.** Missing this block silently breaks group permissions on the child.
+- [ ] **If end users create groups at runtime, the plan says who writes the creator's membership row.** Creating a group confers no membership in it, so without that write the creator holds no group role and every child operation under their own group is refused. The group resource also needs `create_all` + `read_own` + `update_own` for that role, since the assignment is verified against the requester's update access on the group being assigned into.
+- [ ] **Every resource an end user creates at runtime can actually be created by that user.** For an owner-scoped resource that means `create_own` for their role in its own `submissionAccess`. For a group-scoped child it means the field-based block carries `create`, `write`, or `admin` AND the group reference is populated in the payload at submit time — do not also add `create_own`, which would authorize creating rows outside the group. Walk the app's primary flow and confirm every POST the user makes is covered by one of the two.
 - [ ] **Every resource 2+ levels below the group has a hidden, calculated mirror of the group select** (`hidden: true`, `calculateValue: "value = data.<parent>.data.<group>;"`, `refreshOn: "<parent>"`, `reference: true`) carrying the same four-entry `submissionAccess` block. Without the mirror, group access stops at the direct child and grandchildren are invisible to group members.
 - [ ] The `user` resource is present if the plan has any authentication.
 - [ ] **No login form has a `save` action that sets `settings.resource`.** A login-form `save` pointing to any underlying resource is always wrong (it tries to create a new record in that resource on every login — e.g. a new user). A login form emits ONLY `<name>:login` by default; a plain `save` (empty `settings`, no `resource`) is allowed ONLY when the user asked for a login audit trail.
@@ -747,4 +784,4 @@ Before emitting the Phase B JSON, walk through this list:
 
 ## Verification
 
-After writing, mentally trace one flow end-to-end: a user signs up on `userRegister` → Save action writes to `user` → Role Assignment adds `authenticated` → Login action issues a JWT → the user can now load `project` (via `access.read_all`) but only sees rows where a `ProjectUser` membership exists (via the Group Assignment ACL). If any link in that chain is missing, fix before emitting.
+After writing, mentally trace one flow end-to-end: a user signs up on `userRegister` → Save action writes to `user` → Role Assignment adds `authenticated` → Login action issues a JWT → the user can now load `project` (via `access.read_all`) but only sees rows where a `ProjectUser` membership exists (via the Group Assignment ACL) → the user creates a Task, which succeeds because the field-based block on `task.project` carries a create-conferring type AND the payload names a project they belong to; the same block stamps the new row so their teammates can read it. If any link in that chain is missing, fix before emitting — and note that the create link is the one that fails without failing the import.

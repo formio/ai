@@ -31,7 +31,7 @@ Every new Form.io project is seeded with these roles, each with a unique MongoDB
 - **Administrator** — preconfigured with full CRUD across the project.
 - **Authenticated** — preconfigured for logged-in workflows; assigned by the Role Assignment Action at signup.
 
-In a planner-produced `template.json` the default roles are emitted as objects with `title`, `description`, `admin`, and `default` fields — see `plugin/skills/formio-resource-planner/references/template-json.md` lines 34–59 for the canonical shape.
+In a planner-produced `template.json` the default roles are emitted as objects with `title`, `description`, `admin`, and `default` fields — see `plugin/skills/formio-resource-planner/references/template-json.md` → "Roles" for the canonical shape.
 
 ### Custom roles
 
@@ -75,7 +75,7 @@ Key rules:
 | Form Definition | `access[]` on each Form/Resource | Who can read/update/delete the form's JSON definition. `read_all` is required for users to load the form's renderer. |
 | Submission Data | `submissionAccess[]` on each Form/Resource | Who can create/read/update/delete actual submission rows. This is "the real access-control story". |
 
-The planner reference at `plugin/skills/formio-resource-planner/references/template-json.md` lines 61–158 carries the canonical `access` and `submissionAccess` JSON shapes; common patterns (admin-only, owner-level, public-submit, group-based) are documented there.
+The planner reference at `plugin/skills/formio-resource-planner/references/template-json.md` → "Top-level `access`" and "`access` vs `submissionAccess` — keep these straight" carries the canonical `access` and `submissionAccess` JSON shapes; common patterns (admin-only, owner-level, public-submit, group-based) are documented there.
 
 ### Layered access models
 
@@ -136,7 +136,7 @@ Use the Form.io project portal for direct Role and Permission edits when you are
 
 ## See also
 
-- `formio-resource-planner` — owns the canonical role objects, `access` arrays, and `submissionAccess` arrays for `template.json`. Start there when designing a new project's permission matrix. See `plugin/skills/formio-resource-planner/references/template-json.md` lines 34–158.
+- `formio-resource-planner` — owns the canonical role objects, `access` arrays, and `submissionAccess` arrays for `template.json`. Start there when designing a new project's permission matrix. See `plugin/skills/formio-resource-planner/references/template-json.md` → "Roles", "Top-level `access`", and "`access` vs `submissionAccess` — keep these straight".
 - [`resource-auth.md`](./resource-auth.md) — how roles get attached to a user at login and signup.
 - [`group-permissions.md`](./group-permissions.md) — group-based access overlay.
 - [`sso-oidc.md`](./sso-oidc.md), [`sso-saml.md`](./sso-saml.md), [`sso-ldap.md`](./sso-ldap.md) — provider role mapping into Form.io roles.

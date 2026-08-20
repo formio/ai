@@ -38,7 +38,7 @@ Four shapes, all driven from the planner's Resource Map — every one of them en
 
 1. **Simple new resource** — one browsable resource, one module, one route.
 2. **Parent → child hierarchy** (e.g., `Event → Participant`) — the child module mounts as a child route under the parent's `:id/` view, filtered by the parent id.
-3. **Bidirectional many-to-many join** around a join resource (e.g., `Team ↔ User` via a `TeamUser` join) — two sibling modules, each mounted under the opposite side's `:id/` view.
+3. **Bidirectional many-to-many join** around a join resource (e.g., `Team ↔ User` via a `TeamUser` join) — two sibling modules, each mounted under the opposite side's `:id/` view. When the join carries a Group Assignment action AND end users create the group side at runtime, the group-creation flow must also write the creator's membership row in the same code path — creating a group confers no membership in it, so a creator without that row is locked out of their own group: the list renders empty and the first child create returns `Unauthorized`. A members view that only reads is not sufficient.
 4. **Transitive group-access hierarchy** — a resource whose access is inherited through a parent's group reference; the narrowing stays server-side in field-based `submissionAccess`, and the module only carries the authentication guard.
 
 Two-phase cadence, with a hard approval gate between the phases:

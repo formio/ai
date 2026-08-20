@@ -72,7 +72,7 @@ Include this section ONLY when the app has bespoke, purpose-specific data-collec
 
 Auth forms (login / register) are NOT listed here — they belong under `## Users & Auth`. This section is only for application-level bespoke forms.
 
-One block per form. Call out which Resource (if any) the form **references** (a record established earlier in the flow) and how. A bespoke form references an existing record — it never creates that record on submit; see `SKILL.md` → "Resources vs. Forms" and `formio-application` → "Using Resources within Forms" for the anti-pattern.
+One block per form. Call out which Resource (if any) the form **references** (a record established earlier in the flow) and how. A bespoke form references an existing record — it never creates that record on submit; see `SKILL.md` → "Resources vs. Forms" and `formio-application/references/resource-vs-form-anti-pattern.md` → "Using Resources within Forms" for the anti-pattern.
 
 ```markdown
 - <FormName> (type: form) Purpose: <1 sentence — the specific interaction this form captures> References: <ResourceName via disabled pre-selected Select | owner (1:1 with the user) | none> Fields:
@@ -90,10 +90,14 @@ Bulleted facts only. Keep it parseable.
 ```markdown
 - User resource: <default `user` | custom `<name>`>
 - Login form: <form machineName> (Login action)
+- Login resources: <the Login action's `settings.resources` — `user` by default; `admin`, or `user` + `admin`, only when the app itself must authenticate administrators>
+- Admin operations: <each admin-only workflow in one line — e.g. "Seed initial Project rows; create ProjectUser membership rows; assign `administrator` to specific users." — noting they run through the Form.io project portal, not the app. `None.` when the app has none.>
 - Registration: <self-register via <form> with Role Assignment → <role> | admin-invite only | none>
 - SSO: <none | OIDC | SAML | LDAP>
 - Custom JWT: <yes | no>
 ```
+
+The `Admin operations` line is what `phase-b-emission.md` → "Admin-only work goes through the Form.io portal, not the app login form" and `planning-rules.md` → "Login" both point at: admin-only responsibilities are captured here rather than designed into the app's login surface.
 
 When `SSO` is anything other than `none`, or `Custom JWT` is `yes`, downstream auth configuration (OAuth/SAML/LDAP Role Mapping, Token Swap, `JWT_SECRET`-signed Custom JWT, email-token auth, 2FA, reCAPTCHA) is owned by the `formio-auth` skill — hand off there after this Resource Map is approved.
 
@@ -112,26 +116,45 @@ One bullet per role. Include the three Form.io defaults (`administrator`, `authe
 
 A truth table of CRUD capability per resource × actor. Actors are roles and groups (where a group-based rule is in play). Cell values use this vocabulary — keep it small and consistent so consumers can match on exact strings:
 
-| Token        | Meaning                                                                        |
-| ------------ | ------------------------------------------------------------------------------ |
-| `all`        | Unrestricted across every submission of this resource.                         |
-| `own`        | Only submissions the actor owns (Form.io Owner rule).                          |
-| `group`      | Only submissions whose group the actor belongs to (group-via-join).            |
+| Token | Meaning |
+| --- | --- |
+| `all` | Unrestricted across every submission of this resource. |
+| `own` | Only submissions the actor owns (Form.io Owner rule). |
+| `group` | Only submissions whose group the actor belongs to (group-via-join). |
 | `group(<j>)` | Group access specifically through join `<j>` — use when multiple groups apply. |
-| `role(<r>)`  | Gated by role `<r>` layered on top of another rule.                            |
-| `—`          | No access.                                                                     |
+| `role(<r>)` | Gated by role `<r>` layered on top of another rule. |
+| `—` | No access. |
+
+### Token → `template.json` mapping
+
+Every non-`—` cell must land in the emitted `template.json`. This is the mapping Phase B realizes; `<actor>` is the row's actor role, `<op>` is the column.
+
+| Cell | What Phase B emits |
+| --- | --- |
+| `create` / `all` | `{ "type": "create_all", "roles": ["<actor>"] }` in the resource's `submissionAccess` |
+| `create` / `own` | `{ "type": "create_own", "roles": ["<actor>"] }` |
+| `create` / `group` | Nothing in `submissionAccess`. A create-conferring type (`create`, `write`, or `admin`) in the field-based block on the group-reference `select` — the server authorizes the POST from the group reference in the payload. Adding `create_own` here would wrongly permit creating rows outside the group. |
+| `read`/`update`/`delete` `all` | `{ "type": "<op>_all", "roles": ["<actor>"] }` |
+| `read`/`update`/`delete` `own` | `{ "type": "<op>_own", "roles": ["<actor>"] }` |
+| `read`/`update`/`delete` `group` | Nothing in `submissionAccess`. The field-based block must carry a type conferring that operation: `read`/`write`/`admin` for read, `update`/`write`/`admin` for update, `delete`/`admin` for delete. |
+| `role(<r>)` | The underlying rule's entry, with `<r>` in its `roles` array |
+| `—` | Nothing. |
+
+**Two asymmetries to get right.** First, `delete | group` and `delete | —` are a real fork: the four-entry CRUD block (equivalently `admin`) lets any group member permanently delete any of the group's rows, while `write` gives read + create + update and withholds delete. The matrix column and the block must agree, and when they disagree the block wins at runtime. Second, a **group resource** can never carry `group` in its own row: nothing stamps a group record's own `access`, and membership does not confer read of it. The group needs `read_all` for the end-user role — which is also what lets the `dataSrc: "resource"` select populate, without which no group reference reaches the payload and every group-scoped create fails. Record that as `all`, and note the trade-off that every end user can then read every group row.
+
+Phase B verifies each matrix row against the arrays it emitted before handing off: for every row, for every column, confirm the mapping above actually appears. `packages/skill-tests/src/formio-resource-planner/example-access-consistency.test.ts` enforces this mapping over the checked-in examples.
 
 Layout:
 
 ```markdown
-| Resource    | Actor         | create | read  | update | delete | Notes                           |
-| ----------- | ------------- | ------ | ----- | ------ | ------ | ------------------------------- |
-| Project     | administrator | all    | all   | all    | all    | full admin                      |
-| Project     | authenticated | —      | group | group  | —      | group-via-ProjectUser           |
-| Task        | administrator | all    | all   | all    | all    |                                 |
-| Task        | authenticated | group  | group | group  | —      | inherits via Task.project       |
-| ProjectUser | administrator | all    | all   | all    | all    | admin-managed membership        |
-| ProjectUser | authenticated | —      | own   | —      | —      | user sees their own memberships |
+| Resource | Actor | create | read | update | delete | Notes |
+| --- | --- | --- | --- | --- | --- | --- |
+| Project | administrator | all | all | all | all | full admin |
+| Project | authenticated | — | group | group | — | group-via-ProjectUser |
+| Task | administrator | all | all | all | all |  |
+| Task | authenticated | group | group | group | — | inherits via Task.project |
+| ProjectUser | administrator | all | all | all | all | admin-managed membership |
+| ProjectUser | authenticated | — | own | — | — | user sees their own memberships |
 ```
 
 One row per (resource, actor) pair with a non-trivial rule. Do not enumerate irrelevant actors — if a resource is admin-only, two rows (administrator + `authenticated: — / — / — / —`) are sufficient.

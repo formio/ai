@@ -165,7 +165,7 @@
       "name": "group",
       "form": "projectUser",
       "priority": 5,
-      "method": ["create"],
+      "method": ["create", "update", "delete"],
       "handler": ["after"],
       "settings": {
         "group": "project",
@@ -347,7 +347,7 @@
         },
         {
           "type": "read_all",
-          "roles": ["administrator"]
+          "roles": ["administrator", "authenticated"]
         },
         {
           "type": "update_all",
@@ -445,10 +445,6 @@
         {
           "type": "delete_all",
           "roles": ["administrator"]
-        },
-        {
-          "type": "create_own",
-          "roles": ["authenticated"]
         }
       ]
     },
@@ -461,6 +457,12 @@
       "components": [
         {
           "type": "select",
+          "submissionAccess": [
+            {
+              "type": "read",
+              "roles": []
+            }
+          ],
           "key": "project",
           "label": "Project",
           "widget": "choicesjs",
@@ -529,10 +531,6 @@
         {
           "type": "delete_all",
           "roles": ["administrator"]
-        },
-        {
-          "type": "read_own",
-          "roles": ["authenticated"]
         }
       ]
     }

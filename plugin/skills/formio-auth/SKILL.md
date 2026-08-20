@@ -59,7 +59,7 @@ Each reference doc is self-contained and follows the section layout `Overview` �
 - [`references/resource-auth.md`](./references/resource-auth.md) — Resource-backed login with the Login Action + Role Assignment Action, the six-step Form.io auth flow, and the `x-jwt-token` response header.
 - [`references/login-forms.md`](./references/login-forms.md) — Login and registration form patterns: `access`, `submissionAccess`, anonymous self-register, brute-force protection settings.
 - [`references/roles-and-permissions.md`](./references/roles-and-permissions.md) — Default roles, custom roles, the eight permission types (`create_own`, `create_all`, `read_own`, `read_all`, `update_own`, `update_all`, `delete_own`, `delete_all`) across project, form-definition, and submission-data scopes.
-- [`references/group-permissions.md`](./references/group-permissions.md) — Group Assignment Action and field-based `submissionAccess`: the two-halves model for single-level group access, and the hidden calculated mirror for transitive group access.
+- [`references/group-permissions.md`](./references/group-permissions.md) — Group Assignment Action and field-based `submissionAccess`: the three parts of single-level group access (action, field-based block, and the group resource's own read grant), the entry-type menu including the delete decision, the assigner's update-access requirement, and the hidden calculated mirror for transitive group access.
 - [`references/sso-oidc.md`](./references/sso-oidc.md) — OAuth / OpenID Connect provider setup plus OAuth Role Mapping.
 - [`references/sso-saml.md`](./references/sso-saml.md) — SAML provider setup plus SAML Role Mapping.
 - [`references/sso-ldap.md`](./references/sso-ldap.md) — LDAP directory setup plus LDAP Role Mapping.

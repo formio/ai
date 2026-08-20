@@ -73,18 +73,20 @@ This app exercises **transitive group access**: the group (`Team`) sits two leve
 
 | Resource | Actor | create | read | update | delete | Notes |
 | --- | --- | --- | --- | --- | --- | --- |
+| User | administrator | all | all | all | all |  |
+| User | authenticated | — | own | own | — | owner-level access to own record |
 | Team | administrator | all | all | all | all | admin creates teams |
-| Team | salesRep | — | all | — | — | read-only; needed to render team names |
+| Team | salesRep | — | all | — | — | `read_all` is required, not a convenience: nothing stamps a group row's own `access`, and it must be readable to populate the `team` select whose value authorizes group-based create. Trade-off: every rep can read every Team row |
 | TeamUser | administrator | all | all | all | all | admin manages memberships |
-| TeamUser | salesRep | — | own | — | — | rep sees their own membership rows |
+| TeamUser | salesRep | — | group | — | — | sees their own teams' membership rows (read-only field-based block on TeamUser.team); `read_own` would be inert — admin creates and therefore owns these rows |
 | Account | administrator | all | all | all | all |  |
-| Account | salesRep | group | group | group | — | group-via-TeamUser (field-based on Account.team) |
+| Account | salesRep | group | group | group | group | group-via-TeamUser (field-based on Account.team); all four ops come from the block — create included |
 | Contact | administrator | all | all | all | all |  |
-| Contact | salesRep | group | group | group | — | transitive via hidden `team` mirror |
+| Contact | salesRep | group | group | group | group | transitive via hidden `team` mirror |
 | Deal | administrator | all | all | all | all |  |
-| Deal | salesRep | group | group | group | — | transitive via hidden `team` mirror |
+| Deal | salesRep | group | group | group | group | transitive via hidden `team` mirror |
 | Activity | administrator | all | all | all | all |  |
-| Activity | salesRep | group | group | group | — | transitive via hidden `team` mirror |
+| Activity | salesRep | group | group | group | group | transitive via hidden `team` mirror |
 
 ## ER Diagram
 

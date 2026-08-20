@@ -54,7 +54,7 @@ Work through six rounds — compress or expand as the user's description warrant
 Two planning references cover the primitives; open them while building the map:
 
 - [`references/planning-rules.md`](references/planning-rules.md) — the relationship → construct mapping (foreign-key `select`s, N:N join resources, user-to-resource group joins), the component cheat sheet, and the action cheat sheet.
-- [`references/access-patterns.md`](references/access-patterns.md) — the owner/group/role/tenant pattern table; the two-halves rule for group-based access (a Group Assignment action on the join AND a four-entry field-based `submissionAccess` block on every child's group-reference select — missing half 2 is a silent bug: the user sees the Project but not its Tasks); the transitive hidden-calculated-mirror pattern for resources 2+ levels below the group; and the `access` vs `submissionAccess` distinction (users describing access almost always mean `submissionAccess`). Read it whenever the plan has any owner-, group-, or role-based access.
+- [`references/access-patterns.md`](references/access-patterns.md) — the owner/group/role/tenant pattern table; the three-part rule for group-based access (a Group Assignment action on the join, a field-based `submissionAccess` block on every child's group-reference select with the entry types chosen deliberately, AND `read_all` for the end-user role on the group resource itself — both omissions are silent bugs: without part 2 the user sees the Project but not its Tasks; without part 3 the group select cannot populate, so no group reference reaches the payload and every create returns `Unauthorized` while reads keep working); the transitive hidden-calculated-mirror pattern for resources 2+ levels below the group; and the `access` vs `submissionAccess` distinction (users describing access almost always mean `submissionAccess`). Read it whenever the plan has any owner-, group-, or role-based access.
 
 ## Phase A — Resource Map for review
 
@@ -135,7 +135,7 @@ Consult these when the user's requirements touch an edge case this skill doesn't
 All one hop from here — open the one matching the phase you are in:
 
 - [`references/planning-rules.md`](references/planning-rules.md) — Resources vs. Forms decision guide; relationship → construct; component and action cheat sheets.
-- [`references/access-patterns.md`](references/access-patterns.md) — owner/group/role/tenant patterns; the group-access two-halves rule; transitive mirrors; `access` vs `submissionAccess`.
+- [`references/access-patterns.md`](references/access-patterns.md) — owner/group/role/tenant patterns; the group-access three-part rule (including the group resource's own read grant); the entry-type menu and the delete decision; transitive mirrors; `access` vs `submissionAccess`.
 - [`references/interview-guide.md`](references/interview-guide.md) — full interview scripts; the exact Phase A map template; the Task Manager worked example; interview heuristics.
 - [`references/phase-b-emission.md`](references/phase-b-emission.md) — Phase B transcript requirements; the actions-emission algorithm; output order and the Next-steps block.
 - [`references/template-md.md`](references/template-md.md) — full `template.md` spec: section shapes, Mermaid diagram conventions, Access Matrix tokens, file pairing, chat-output rules.
