@@ -1,6 +1,6 @@
 # CONFIG — `FormioAppConfig` and `AppModule` wiring
 
-> **`FormioAppConfig` renames both URLs.** `appUrl` is the **Project URL** — the project this application reads and writes, and the one value anyone supplies. `apiUrl` is the **Base URL** — the deployment hosting it, which is normally derived from the Project URL rather than supplied. Take both from `npx -y @formio/mcp@0.10.0 project get --cwd "<workspace root>"`; never compose, derive, or hand-type either one yourself.
+> **`FormioAppConfig` renames both URLs.** `appUrl` is the **Project URL** — the project this application reads and writes, and the one value anyone supplies. `apiUrl` is the **Base URL** — the deployment hosting it, which is normally derived from the Project URL rather than supplied. Take both from `npx -y @formio/mcp@0.11.0 project get --cwd "<workspace root>"`; never compose, derive, or hand-type either one yourself.
 
 This document is loaded by the parent `formio-angular` skill during Phase 3. It is **not** a standalone skill — no frontmatter, no independent trigger. The parent reads it after BOOTSTRAP has left the workspace in place and before AUTH.
 
@@ -42,7 +42,7 @@ Notes on why this shape:
 `config.ts` tells the running application which project to talk to. It does not tell the tooling — a clone on another machine resolves whatever that machine happens to have mapped, which is how a generated app and the tools that maintain it end up pointed at different projects. Offer to record it alongside the code, in one line, and run it if the user agrees:
 
 ```bash
-npx -y @formio/mcp@0.10.0 project set --project-url "<the Project URL you just wrote>" --scope repo --cwd "<workspace root>"
+npx -y @formio/mcp@0.11.0 project set --project-url "<the Project URL you just wrote>" --scope repo --cwd "<workspace root>"
 ```
 
 That writes a committed `formio.json` holding the same Project URL, tracked with the application's own source, so every clone and every later skill invocation in that workspace resolves the project this `config.ts` was written for. Pass the **workspace root** as `--cwd` and never an ancestor of it: discovery walks upward, so a file placed above the workspace governs every unrelated project beside it too. Add `--base-url` only if `project get` reported one it could not derive. Skip it silently outside a git repository — nothing would be tracking the file.

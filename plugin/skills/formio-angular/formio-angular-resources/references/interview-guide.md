@@ -1,6 +1,6 @@
 # Interview guide — rounds 2–4, guard decisions, heuristics
 
-> **`FormioAppConfig` renames both URLs.** `appUrl` is the **Project URL** — the project this application reads and writes, and the one value anyone supplies. `apiUrl` is the **Base URL** — the deployment hosting it, which is normally derived from the Project URL rather than supplied. Take both from `npx -y @formio/mcp@0.10.0 project get --cwd "<workspace root>"`; never compose, derive, or hand-type either one yourself.
+> **`FormioAppConfig` renames both URLs.** `appUrl` is the **Project URL** — the project this application reads and writes, and the one value anyone supplies. `apiUrl` is the **Base URL** — the deployment hosting it, which is normally derived from the Project URL rather than supplied. Take both from `npx -y @formio/mcp@0.11.0 project get --cwd "<workspace root>"`; never compose, derive, or hand-type either one yourself.
 
 Companion to `../SKILL.md`'s "The interview": the full question wording for round 1, the checklists for rounds 2–4, the template-pair reading guide, the Access Matrix guard-decision rules, and the heuristics for compressing or skipping rounds.
 
@@ -9,7 +9,7 @@ Companion to `../SKILL.md`'s "The interview": the full question wording for roun
 Ask in ONE question round, using the client's structured question mechanism (in Claude Code, `AskUserQuestion`):
 
 1. **New or existing Angular workspace?** If existing: path to the workspace root (should contain `angular.json`). If new: the desired app name (kebab-case).
-2. **Form.io project URL** (`projectUrl`) — the value that goes into `FormioAppConfig.appUrl`. Not a question to ask: resolve it with `npx -y @formio/mcp@0.10.0 project get --cwd "<workspace root>"` and reconcile against `src/app/config.ts`, asking only for whichever value that command reports missing.
+2. **Form.io project URL** (`projectUrl`) — the value that goes into `FormioAppConfig.appUrl`. Not a question to ask: resolve it with `npx -y @formio/mcp@0.11.0 project get --cwd "<workspace root>"` and reconcile against `src/app/config.ts`, asking only for whichever value that command reports missing.
 3. **Design language** — what the ViewComponent templates should lean on: **Bootstrap 5** (matches angular-demo, default), **Tailwind**, **Material** (`@angular/material`), **the workspace's existing design system** (for existing workspaces, read their styles and match), or **unstyled HTML** (minimum viable, user will restyle). The routing shape is the same regardless; only the template classes and markup change. The answer also picks the vocabulary for the shell's page-layout wrapper (see the parent skill's `AUTH.md` → "Page layout contract") — the wrapper itself is required in every language. **If the workspace already carries a shell in a different language** (the AUTH phase wrote it in whatever BOOTSTRAP installed, normally Bootstrap 5) and the answer here differs, re-express that wrapper and the navbar container in the newly-selected language as part of swapping the stylesheet, and list both edits in the Phase A plan. Leaving Bootstrap classes on the shell after removing Bootstrap's stylesheet returns the app to zero gutters.
 
 ## Reading the template pair
