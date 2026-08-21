@@ -48,7 +48,7 @@ Show the user every file you intend to write, in full, before writing anything:
   "mcpServers": {
     "formio-mcp": {
       "command": "npx",
-      "args": ["-y", "@formio/mcp@0.10.0"]
+      "args": ["-y", "@formio/mcp@0.11.0"]
     }
   }
 }
@@ -61,7 +61,7 @@ Show the user every file you intend to write, in full, before writing anything:
   "mcpServers": {
     "formio-mcp": {
       "command": "npx",
-      "args": ["-y", "@formio/mcp@0.10.0"]
+      "args": ["-y", "@formio/mcp@0.11.0"]
     }
   }
 }
@@ -74,7 +74,7 @@ Show the user every file you intend to write, in full, before writing anything:
   "servers": {
     "formio-mcp": {
       "command": "npx",
-      "args": ["-y", "@formio/mcp@0.10.0"]
+      "args": ["-y", "@formio/mcp@0.11.0"]
     }
   }
 }
@@ -85,7 +85,7 @@ Show the user every file you intend to write, in full, before writing anything:
 ```toml
 [mcp_servers.formio-mcp]
 command = "npx"
-args = ["-y", "@formio/mcp@0.10.0"]
+args = ["-y", "@formio/mcp@0.11.0"]
 ```
 
 ### Why the version is pinned
@@ -115,7 +115,7 @@ The server starts with no project. Left unconfigured, the first Form.io tool cal
 ### First, ask the server what this directory resolves to
 
 ```bash
-npx -y @formio/mcp@0.10.0 project get --cwd "$(pwd)"
+npx -y @formio/mcp@0.11.0 project get --cwd "$(pwd)"
 ```
 
 On a zero exit it prints the Project URL, the Base URL, and which source supplied each. The work is already done: report both URLs in one line and go to Step 5. Do not interview for something already on record.
@@ -129,13 +129,13 @@ Read the `Source:` line for what it is: this command runs in your shell, and the
 On exit `1` — nothing is recorded for this directory — the command explains what is missing and names the command that fixes it. Relay that instruction to the user, ask for the **single value it names**, and persist it with the command it named:
 
 ```bash
-npx -y @formio/mcp@0.10.0 project set --project-url "<project url>" --cwd "$(pwd)"
+npx -y @formio/mcp@0.11.0 project set --project-url "<project url>" --cwd "$(pwd)"
 ```
 
 **When the working directory is inside a git repository, offer the choice of where to record it, in the same round you ask for the URL.** Adding `--scope repo` writes a committed `formio.json` instead of the machine-local mapping — tracked with the code, so it is shared with everyone who clones the repository and it survives a fresh checkout. The default records it for this machine only. Say that consequence in one line and let the user pick; do not explain how the two are ranked, because `project get` reports which one supplied a value. Outside a git repository, do not offer `--scope repo` — nothing would be tracking the file.
 
 ```bash
-npx -y @formio/mcp@0.10.0 project set --project-url "<project url>" --scope repo --cwd "$(pwd)"
+npx -y @formio/mcp@0.11.0 project set --project-url "<project url>" --scope repo --cwd "$(pwd)"
 ```
 
 Then re-run `project get`. Most of the time that is the end of it: the Base URL is derived from the Project URL — `https://api.form.io` for a project on a `form.io` host, the parent path for a project addressed as a sub-directory — so there is no second value to collect.
@@ -143,7 +143,7 @@ Then re-run `project get`. Most of the time that is the end of it: the Base URL 
 The exception is a Project URL that is a plain sub-domain of the user's own domain, e.g. `https://myproject.mysite.com`, whose deployment is a sibling sub-domain that nothing in the Project URL names. There, and only there, the re-run exits `3` and asks for a Base URL. That is its own exit code because it is its own answer: the project is on record and one named value is missing. Ask for it then, with the flag that message names — never before, and never by assuming a default:
 
 ```bash
-npx -y @formio/mcp@0.10.0 project set --base-url "<base url>" --cwd "$(pwd)"
+npx -y @formio/mcp@0.11.0 project set --base-url "<base url>" --cwd "$(pwd)"
 ```
 
 Either flag alone is a valid update once a project is on record — in the working-directory mapping or in a committed `formio.json` — so the second round does not re-ask for the first value.
@@ -194,10 +194,10 @@ Some environments block the public npm registry — an air-gapped network, a loc
 1. **Global install from an internal registry or a cached tarball**, then point the configuration at the binary instead of `npx`:
 
    ```bash
-   npm install -g @formio/mcp@0.10.0
+   npm install -g @formio/mcp@0.11.0
    ```
 
-   Replace `"command": "npx", "args": ["-y", "@formio/mcp@0.10.0"]` with `"command": "formio-mcp", "args": []` in each file (and the TOML equivalent).
+   Replace `"command": "npx", "args": ["-y", "@formio/mcp@0.11.0"]` with `"command": "formio-mcp", "args": []` in each file (and the TOML equivalent).
 
 2. **The desktop bundle.** For Claude Desktop and other hosts that accept one, the `.mcpb` bundle attached to each GitHub release carries the server with no registry access required.
 

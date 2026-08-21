@@ -44,7 +44,7 @@ Every step has an approval gate before any file is written or any MCP call hits 
 
 - **MCP server** (`@formio/mcp`) — first-party Form.io operations as MCP tools (`form_*`, `role_*`, `action_*`, `project_*`).
 - **Skills library** — eleven activatable skills (app orchestration, form building, form embedding, planner, framework implementor, schema, actions, auth, SDK, API router, MCP setup) plus a reference library under `formio-api/references/` covering every endpoint in the Form.io API Postman collection.
-- **Per-directory project routing** — `project_set` maps a working directory to a Form.io project in `~/.formio/projects.json`, so each directory can target a different project. The server resolves that mapping on every tool call; `npx -y @formio/mcp@0.10.0 project get --cwd .` prints what it resolves and why.
+- **Per-directory project routing** — `project_set` maps a working directory to a Form.io project in `~/.formio/projects.json`, so each directory can target a different project. The server resolves that mapping on every tool call; `npx -y @formio/mcp@0.11.0 project get --cwd .` prints what it resolves and why.
 
 | Skill | Purpose |
 | --- | --- |
@@ -75,7 +75,7 @@ No client prompts for anything at install time. Both URLs are resolved per direc
 | `FORMIO_FORCE_BROWSER` | no | `0` | Set to `1` to attempt the browser login even where the server detects no browser (CI, a container, SSH with no display). |
 | `FORMIO_INSECURE_TLS` | no | `false` | When `true`, skips TLS certificate verification — for self-hosted deployments behind self-signed certs. Do not use against production. |
 
-\* Per-directory mappings are persisted to `~/.formio/projects.json` by the `project_set` tool, or by `npx -y @formio/mcp@0.10.0 project set --project-url <url> --base-url <url> --cwd <path>` before any client has connected. Both record the project URL **and** the base URL, and the server resolves both from that file per directory, falling back to the global environment values only when an entry omits them.
+\* Per-directory mappings are persisted to `~/.formio/projects.json` by the `project_set` tool, or by `npx -y @formio/mcp@0.11.0 project set --project-url <url> --base-url <url> --cwd <path>` before any client has connected. Both record the project URL **and** the base URL, and the server resolves both from that file per directory, falling back to the global environment values only when an entry omits them.
 
 ### Authentication modes
 

@@ -1,6 +1,6 @@
 # App integration — AppModule, routing, config, auth, styling
 
-> **`FormioAppConfig` renames both URLs.** `appUrl` is the **Project URL** — the project this application reads and writes, and the one value anyone supplies. `apiUrl` is the **Base URL** — the deployment hosting it, which is normally derived from the Project URL rather than supplied. Take both from `npx -y @formio/mcp@0.10.0 project get --cwd "<workspace root>"`; never compose, derive, or hand-type either one yourself.
+> **`FormioAppConfig` renames both URLs.** `appUrl` is the **Project URL** — the project this application reads and writes, and the one value anyone supplies. `apiUrl` is the **Base URL** — the deployment hosting it, which is normally derived from the Project URL rather than supplied. Take both from `npx -y @formio/mcp@0.11.0 project get --cwd "<workspace root>"`; never compose, derive, or hand-type either one yourself.
 
 Every resource module you generate plugs into a shared foundation. This file is the canonical shape of that foundation, matching the angular-demo's AppModule but trimmed to only what this skill's output needs.
 

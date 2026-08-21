@@ -1,6 +1,6 @@
 # AUTH — `AuthModule` and `FormioAuthConfig` wiring
 
-> **`FormioAppConfig` renames both URLs.** `appUrl` is the **Project URL** — the project this application reads and writes, and the one value anyone supplies. `apiUrl` is the **Base URL** — the deployment hosting it, which is normally derived from the Project URL rather than supplied. Take both from `npx -y @formio/mcp@0.10.0 project get --cwd "<workspace root>"`; never compose, derive, or hand-type either one yourself.
+> **`FormioAppConfig` renames both URLs.** `appUrl` is the **Project URL** — the project this application reads and writes, and the one value anyone supplies. `apiUrl` is the **Base URL** — the deployment hosting it, which is normally derived from the Project URL rather than supplied. Take both from `npx -y @formio/mcp@0.11.0 project get --cwd "<workspace root>"`; never compose, derive, or hand-type either one yourself.
 
 This document is loaded by the parent `formio-angular` skill during Phase 4. It is **not** a standalone skill — no frontmatter, no independent trigger. The parent reads it after CONFIG has been approved and before delegating to the resource sub-skill.
 

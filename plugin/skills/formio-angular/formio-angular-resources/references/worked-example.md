@@ -1,6 +1,6 @@
 # Worked example — Task Manager
 
-> **`FormioAppConfig` renames both URLs.** `appUrl` is the **Project URL** — the project this application reads and writes, and the one value anyone supplies. `apiUrl` is the **Base URL** — the deployment hosting it, which is normally derived from the Project URL rather than supplied. Take both from `npx -y @formio/mcp@0.10.0 project get --cwd "<workspace root>"`; never compose, derive, or hand-type either one yourself.
+> **`FormioAppConfig` renames both URLs.** `appUrl` is the **Project URL** — the project this application reads and writes, and the one value anyone supplies. `apiUrl` is the **Base URL** — the deployment hosting it, which is normally derived from the Project URL rather than supplied. Take both from `npx -y @formio/mcp@0.11.0 project get --cwd "<workspace root>"`; never compose, derive, or hand-type either one yourself.
 
 End-to-end walk-through of `../SKILL.md`'s flow: the planner's input, the Phase A Scaffolding Plan emitted for approval, and representative Phase B files.
 

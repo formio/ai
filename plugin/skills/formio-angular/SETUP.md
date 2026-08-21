@@ -18,7 +18,7 @@ The `Project URL` is the full URL of the Form.io project this application reads 
 These two URLs are scoped to the working directory, not to the client install: a Form.io project is one-to-one with the application built against it. The MCP server already keeps that scope and is the only thing that knows it, so this phase reads that mapping rather than competing with it:
 
 ```bash
-npx -y @formio/mcp@0.10.0 project get --cwd "<workspace cwd>"
+npx -y @formio/mcp@0.11.0 project get --cwd "<workspace cwd>"
 ```
 
 On a zero exit, the two URLs it prints ARE the configuration. Confirm them in one line and go to the approval gate:
