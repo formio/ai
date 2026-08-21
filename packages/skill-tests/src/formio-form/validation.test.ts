@@ -3,28 +3,13 @@
 // the canonical `validate.json` contract: JSON Logic evaluating to `true`
 // means valid, evaluating to a string makes that string the error message.
 
-import { afterEach, describe, expect, it } from 'vitest';
-import { Formio } from '@formio/js';
+import { describe, expect, it } from 'vitest';
 import { validationFormDefinition } from './fixtures/logic';
-
-const containers: HTMLElement[] = [];
-
-function container(): HTMLElement {
-  const el = document.createElement('div');
-  document.body.appendChild(el);
-  containers.push(el);
-  return el;
-}
-
-afterEach(() => {
-  for (const el of containers.splice(0)) {
-    el.remove();
-  }
-});
+import { createForm } from './renderer-harness';
 
 describe('validation.md — validate.json', () => {
   it('surfaces the JSON Logic error string for an invalid value', async () => {
-    const form = await Formio.createForm(container(), validationFormDefinition);
+    const form = await createForm(validationFormDefinition);
     await form.setSubmission({ data: { name: 'Alice' } });
     await expect(form.submit()).rejects.toBeTruthy();
     const messages = form.errors.map((error) => error.message ?? String(error));
@@ -32,7 +17,7 @@ describe('validation.md — validate.json', () => {
   });
 
   it('accepts the valid value and clears the error', async () => {
-    const form = await Formio.createForm(container(), validationFormDefinition);
+    const form = await createForm(validationFormDefinition);
     const nameComponent = form.getComponent('name');
     expect(nameComponent).toBeTruthy();
     await form.setSubmission({ data: { name: 'Bob' } });

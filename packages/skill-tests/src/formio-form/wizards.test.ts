@@ -2,28 +2,13 @@
 // Behavior tests for plugin/skills/formio-form/references/wizards.md —
 // wizard display mode, programmatic page navigation, conditional pages.
 
-import { afterEach, describe, expect, it, vi } from 'vitest';
-import { Formio } from '@formio/js';
+import { describe, expect, it, vi } from 'vitest';
 import { conditionalWizardDefinition } from './fixtures/wizard-external';
-
-const containers: HTMLElement[] = [];
-
-function container(): HTMLElement {
-  const el = document.createElement('div');
-  document.body.appendChild(el);
-  containers.push(el);
-  return el;
-}
-
-afterEach(() => {
-  for (const el of containers.splice(0)) {
-    el.remove();
-  }
-});
+import { createForm } from './renderer-harness';
 
 describe('wizards.md — page navigation', () => {
   it('exposes programmatic next/previous page navigation', async () => {
-    const wizard = await Formio.createForm(container(), conditionalWizardDefinition);
+    const wizard = await createForm(conditionalWizardDefinition);
     expect(wizard.pages.length).toBe(3);
     expect(wizard.page).toBe(0);
 
@@ -37,7 +22,7 @@ describe('wizards.md — page navigation', () => {
 
 describe('wizards.md — conditional pages', () => {
   it('drops a page whose condition is false', async () => {
-    const wizard = await Formio.createForm(container(), conditionalWizardDefinition);
+    const wizard = await createForm(conditionalWizardDefinition);
     expect(wizard.pages.length).toBe(3);
 
     wizard.getComponent('wantsExtras').setValue('no');

@@ -108,9 +108,9 @@ Pause for acknowledgement, then proceed.
 
 ## Phase 4 — AUTH
 
-**Goal:** generate `src/app/auth/auth.module.ts` configuring `FormioAuthConfig` from the `template.json` auth resources (user resource name, login form, register form) and roles, then import `AuthModule` into `AppModule`.
+**Goal:** generate `src/app/auth/auth.module.ts` configuring `FormioAuthConfig` from the `template.json` auth resources (user resource name, login form, register form) and roles, import `AuthModule` into `AppModule`, and write the app shell — the REQUIRED page-layout wrapper around `<router-outlet>` (the only layout boundary that reaches the library-rendered create / edit / delete / index / login / register routes) plus recommended auth-aware nav chrome.
 
-**How:** read [`AUTH.md`](./AUTH.md) for the `template.json` extraction rules, the `auth.module.ts` code template, the `AppModule` / routing / `app.component` edits, the auth guard, the "no `template.json`" fallback (run the planner, or skip AUTH with a TODO), and the skip-if-already-wired detection logic.
+**How:** read [`AUTH.md`](./AUTH.md) for the `template.json` extraction rules, the `auth.module.ts` code template, the `AppModule` / routing / root-component edits, the shell's page layout contract, the auth guard, the "no `template.json`" fallback (run the planner, or skip AUTH with a TODO), and the skip-if-already-wired detection logic.
 
 **Gate:** print a preview of `auth.module.ts` citing the exact `template.json` values used (per `AUTH.md`'s gate template), then wait for approval. If the user declines, stop.
 

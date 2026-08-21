@@ -14,16 +14,18 @@ Emit the plan as a single fenced markdown block. Use this exact template — ter
 ### Target workspace
 - Mode: <new workspace `ng new <app-name>` | existing workspace at `<path>`>
 - FormioAppConfig.appUrl: <URL or placeholder>
-- UI framework: <Bootstrap 5 | none>
+- UI framework: <Bootstrap 5 | Tailwind | Angular Material | existing design system | unstyled>
+- Page shell: <VERIFIED — `src/app/app.html` wraps `<router-outlet>` in `<page-layout element + classes>` | MISSING — will add per AUTH.md's page layout contract>  (resource templates add NO page-level wrapper; the shell is the only thing that pads the library-rendered create / edit / delete / index / login / register routes)
 
 ### Files to create / modify
 <tree grouped by folder — mark "NEW" or "MODIFY". Every browsable resource gets a custom ResourceComponent + ViewComponent pair, no exceptions.>
 
   src/app/
+    app.html (or app.component.html)                    MODIFY  (nav link per resource; verify the shell page-layout wrapper)
     app-module.ts                                       MODIFY  (adds imports)
     app-routing-module.ts                               NEW
     config.ts                                           NEW or MODIFY  (FormioAppConfig + FormioAuthConfig — same file the parent CONFIG phase writes)
-    home/home.component.{ts,html,scss}                  NEW
+    home/home.{ts,html,scss}                            NEW     (legacy naming: home/home.component.*)
     auth/auth.module.ts                                 NEW
     <resource>/<resource>.module.ts                     NEW     (one per browsable resource)
     <resource>/resource.component.{ts,html,scss}        NEW     (designed nav — tabs / breadcrumb / sidebar)

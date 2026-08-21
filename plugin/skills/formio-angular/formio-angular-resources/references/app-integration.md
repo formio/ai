@@ -9,9 +9,9 @@ Every resource module you generate plugs into a shared foundation. This file is 
 1. `AppModule`
 2. `AppRoutingModule`
 3. `AppConfig` (FormioAppConfig + FormioAuthConfig)
-4. `AppComponent` and `HomeComponent`
+4. Root component (`App`) and `Home`
 5. `AuthModule` and `authGuard`
-6. `angular.json` — Bootstrap 5 + FontAwesome
+6. `angular.json` — Bootstrap 5 + Bootstrap Icons
 7. Logout route
 8. SSO (OIDC / SAML)
 9. Minimum `package.json` dependencies
@@ -34,14 +34,18 @@ import { FormioAuthService, FormioAuthConfig } from '@formio/angular/auth';
 import { FormioResources } from '@formio/angular/resource';
 
 import { AppConfig, AuthConfig } from './config';
-import { AppRoutingModule } from './app-routing.module';
-import { AppComponent } from './app.component';
-import { HomeComponent } from './home/home.component';
+import { AppRoutingModule } from './app-routing-module';
+import { App } from './app'; // legacy naming: `import { AppComponent } from './app.component';`
+import { Home } from './home/home'; // legacy naming: `import { HomeComponent } from './home/home.component';`
 
-(Formio as any).icons = 'fontawesome';
+// 'bi' selects Bootstrap Icons — the icon set BOOTSTRAP installs and loads via
+// angular.json. Use 'fontawesome' ONLY in a workspace that actually loads a
+// FontAwesome stylesheet; the renderer emits fa-* classes for it either way, so a
+// mismatch renders every renderer icon as blank space.
+(Formio as any).icons = 'bi';
 
 @NgModule({
-  declarations: [AppComponent, HomeComponent],
+  declarations: [App, Home],
   imports: [BrowserModule, CommonModule, FormioModule, FormioGrid, AppRoutingModule],
   providers: [
     // provideZonelessChangeDetection() is added by BOOTSTRAP (see BOOTSTRAP.md Step 6).
@@ -50,7 +54,7 @@ import { HomeComponent } from './home/home.component';
     { provide: FormioAppConfig, useValue: AppConfig },
     { provide: FormioAuthConfig, useValue: AuthConfig },
   ],
-  bootstrap: [AppComponent],
+  bootstrap: [App],
 })
 export class AppModule {}
 ```
@@ -66,11 +70,11 @@ If the user has an existing AppModule, **merge** these declarations/imports/prov
 ```typescript
 import { NgModule } from '@angular/core';
 import { RouterModule, Routes } from '@angular/router';
-import { HomeComponent } from './home/home.component';
+import { Home } from './home/home'; // legacy naming: `import { HomeComponent } from './home/home.component';`
 import { authGuard } from './auth/auth.guard';
 
 const routes: Routes = [
-  { path: '', component: HomeComponent },
+  { path: '', component: Home },
   {
     path: 'auth',
     // NO guard — login / register must be reachable while anonymous.
@@ -117,21 +121,21 @@ export const AppConfig: FormioAppConfig = {
 };
 
 export const AuthConfig: FormioAuthConfig = {
-  login: { form: 'userLogin' },
-  register: { form: 'userRegister' },
+  login: { form: 'user/login' }, // === template.json login form's `path`
+  register: { form: 'user/register' }, // === template.json register form's `path`
 };
 ```
 
-Swap `userLogin` / `userRegister` for whatever the Resource Map called them. If the map said `admin` or a custom form, use that name here.
+These two values are **URL path segments**, not form machine names: `@formio/angular/auth` appends `'/' + login.form` to `appUrl` to load the form, so each must equal the `path` property of the corresponding form in `template.json` byte-for-byte. Default projects use `user/login` and `user/register`. A machine name (`userLogin`, `userRegister`) 404s on sign-in. See the parent `AUTH.md` → "`FormioAuthConfig.login.form` / `.register.form` MUST equal `template.json.<form>.path`".
 
 **`appUrl` vs `apiUrl`:**
 
 - `appUrl` = the **Project URL** that `project get` reported. This is what `FormioResourceService` calls to load forms and submissions. It is the value every `form_*` MCP tool uses and every `formio-api/references/project-*` / `formio-api/references/runtime-*` skill means by "project URL."
 - `apiUrl` = the **Base URL** that `project get` reported. Used for cross-project concerns (team / project / tenant management). Take it from that command and nowhere else — do not fill in `https://api.form.io` because the app has one project, since that value is correct only for a project on a `form.io` host and points a self-hosted app's login at a deployment it does not use.
 
-## 4. `AppComponent` and `HomeComponent`
+## 4. Root component (`App`) and `Home`
 
-`src/app/app.component.ts`:
+`src/app/app.ts` (legacy naming: `src/app/app.component.ts`, class `AppComponent`):
 
 ```typescript
 import { Component } from '@angular/core';
@@ -139,61 +143,48 @@ import { FormioAuthService } from '@formio/angular/auth';
 
 @Component({
   selector: 'app-root',
-  templateUrl: './app.component.html',
-  styleUrls: ['./app.component.scss'],
+  templateUrl: './app.html', // legacy naming: './app.component.html'
+  styleUrl: './app.scss', // match the workspace's stylesheet extension — './app.css' on a CSS workspace; legacy naming: styleUrls: ['./app.component.scss']
   standalone: false,
 })
-export class AppComponent {
+export class App {
   constructor(public auth: FormioAuthService) {}
 }
 ```
 
-`src/app/app.component.html`:
+Match whatever `ng new` actually emitted in this workspace — Angular 20+ generates `app.ts` / `app.html` plus a component stylesheet with class `App` and singular `styleUrl`; older workspaces use the `app.component.*` / `AppComponent` / `styleUrls` set. The stylesheet extension is NOT fixed: the CLI emits `app.css` unless the workspace was scaffolded with `--style=scss` (BOOTSTRAP leaves that choice to `angular-new-app`'s interview), so read the extension off the file on disk rather than copying `.scss` from this snippet — pointing `styleUrl` at a file that does not exist fails the build. Do not rename existing files to match this doc.
 
-```html
-<nav class="navbar navbar-expand-lg navbar-light bg-light">
-  <div class="container-fluid">
-    <a class="navbar-brand" routerLink="/">{{ appTitle }}</a>
-    <ul class="navbar-nav me-auto">
-      <!-- one <li> per browsable resource: -->
-      <li class="nav-item"><a class="nav-link" routerLink="/<kebab>"><Resource></a></li>
-    </ul>
-    <ul class="navbar-nav">
-      <li class="nav-item" *ngIf="!auth.authenticated">
-        <a class="nav-link" routerLink="/auth/login">Login</a>
-      </li>
-      <li class="nav-item" *ngIf="!auth.authenticated">
-        <a class="nav-link" routerLink="/auth/register">Register</a>
-      </li>
-      <li class="nav-item" *ngIf="auth.authenticated">
-        <a class="nav-link" (click)="auth.logout()" style="cursor: pointer;">Logout</a>
-      </li>
-    </ul>
-  </div>
-</nav>
-<div class="container" style="margin-top: 20px;">
-  <router-outlet></router-outlet>
-</div>
-```
+### The app shell template — owned by AUTH, not by this file
 
-`src/app/home/home.component.ts`:
+The shell template (`src/app/app.html`, legacy `src/app/app.component.html`) is specified in ONE place: the parent skill's `AUTH.md`, in its shell-template section and its "Page layout contract" subsection. Read it there. It carries the navbar skeleton, the auth-state conditionals, and — load-bearing — the **page layout contract**: the shell wraps `<router-outlet>` in a single page-layout element that owns the app's horizontal gutters, max content width, and top spacing, because most routed surfaces are library components (`FormioResourceCreate/Edit/Delete/Index`, `FormioAuthLogin/Register`) that generated code cannot wrap.
+
+By the time this file is consulted the shell already exists. Two edits belong here, and nothing else:
+
+- Add one `<li class="nav-item"><a class="nav-link" routerLink="/<kebab>"><Resource></a></li>` per browsable resource to the navbar's left-hand `<ul class="navbar-nav me-auto">` — the empty insertion point AUTH.md's shell skeleton leaves for exactly this. If the shell has no left-hand `<ul>` (a hand-written navbar, or one from a different design language), add one before the auth-state list rather than appending resource links into it.
+- Verify the page-layout wrapper around `<router-outlet>` is present. If it is missing, add it per AUTH.md's contract — do not compensate with per-page wrappers inside the resource templates.
+
+`src/app/home/home.ts` (legacy naming: `src/app/home/home.component.ts`, class `HomeComponent`):
 
 ```typescript
 import { Component } from '@angular/core';
 
 @Component({
   selector: 'app-home',
-  templateUrl: './home.component.html',
-  styleUrls: ['./home.component.scss'],
+  templateUrl: './home.html', // legacy naming: './home.component.html'
+  styleUrl: './home.css', // match the workspace's stylesheet extension; legacy naming: styleUrls: ['./home.component.scss']
   standalone: false,
 })
-export class HomeComponent {}
+export class Home {
+  // Interpolated by the template below. Under `strictTemplates` (the `ng new` default)
+  // every property a template reads must be declared, or the build fails with NG9.
+  appName = '<application name>';
+}
 ```
 
-`src/app/home/home.component.html` — keep it terse; one card per browsable resource:
+`src/app/home/home.html` (legacy `home.component.html`) — keep it terse; one card per browsable resource:
 
 ```html
-<h1>{{ appTitle }}</h1>
+<h1>{{ appName }}</h1>
 <div class="row">
   <!-- one <div class="col-md-4"> per browsable resource -->
   <div class="col-md-4">
@@ -281,7 +272,7 @@ export class LogoutComponent implements OnInit {
 }
 ```
 
-## 6. `angular.json` — Bootstrap 5 + FontAwesome
+## 6. `angular.json` — Bootstrap 5 + Bootstrap Icons
 
 For a new workspace or when the user opts in to Bootstrap 5:
 
@@ -289,8 +280,8 @@ For a new workspace or when the user opts in to Bootstrap 5:
 // angular.json → projects.<app>.architect.build.options
 "styles": [
   "node_modules/bootstrap/dist/css/bootstrap.min.css",
-  "node_modules/font-awesome/css/font-awesome.min.css",
-  "src/styles.scss"
+  "node_modules/bootstrap-icons/font/bootstrap-icons.css",
+  "src/styles.css"
 ],
 "scripts": []
 ```
@@ -298,10 +289,12 @@ For a new workspace or when the user opts in to Bootstrap 5:
 Required `npm install`:
 
 ```bash
-npm install @formio/angular @formio/js bootstrap font-awesome
+npm install @formio/angular @formio/js bootstrap bootstrap-icons
 ```
 
-If the user picked "none" for UI framework, omit the bootstrap/font-awesome lines and generate plain HTML (no `nav-tabs` in `resource.component.html`, no card markup in `home.component.html`).
+On an orchestrated run BOOTSTRAP already wrote these entries (see `BOOTSTRAP.md` Step 5) — verify them rather than re-adding, and match `src/styles.css` to whatever extension the workspace actually uses.
+
+If the user picked **unstyled HTML** for the design language, omit the bootstrap/bootstrap-icons lines, drop the `(Formio as any).icons` assignment from section 1, and generate plain HTML (no `nav-tabs` in the resource template, no card markup in the home template). If they picked Tailwind, Angular Material, or the workspace's existing design system, install that language's packages instead of bootstrap/bootstrap-icons and use its vocabulary in the templates. Two things survive every one of those choices: the shell's page-layout wrapper, and re-expressing that wrapper plus the navbar container in the newly-selected language when the answer differs from what BOOTSTRAP installed — swapping the stylesheet out from under Bootstrap classes leaves the app with no gutters at all.
 
 ## 7. Logout route
 
@@ -311,7 +304,7 @@ Already covered in section 5. Do not duplicate `FormioAuthService.logout()` logi
 
 When the Resource Map says `SSO: OIDC` or `SSO: SAML`, skip the native-form login and link `/auth/login` to the project's SSO redirect URL instead. The Form.io project configures the IdP; the Angular app just points the user at it.
 
-Replace the Login button in `app.component.html`:
+Replace the Login button in the shell template (`src/app/app.html`, legacy `src/app/app.component.html`):
 
 ```html
 <li class="nav-item" *ngIf="!auth.authenticated">
@@ -335,7 +328,7 @@ Ensure these four are in `dependencies`:
 "@formio/angular": "^<latest-5.x>",
 "@formio/js":      "^<compatible>",
 "bootstrap":       "^5.3.0",
-"font-awesome":    "^4.7.0"
+"bootstrap-icons": "^1.11.0"
 ```
 
 Do not pin versions inside the skill — the user's Angular version dictates the compatible `@formio/angular` major. Look up latest at <https://www.npmjs.com/package/@formio/angular> or rely on `npm install` to resolve.
@@ -348,5 +341,6 @@ When mode is "existing workspace," before writing `app-module.ts` / `app-routing
 2. Merge: add new `import` lines, add new entries to `imports: [...]`, `declarations: [...]`, `providers: [...]`, `routes: [...]`. Leave untouched everything you didn't add.
 3. If the file declares `FormioAppConfig` / `FormioResources` / `FormioAuthService` already, do NOT re-declare. Verify the existing `appUrl` matches what the user gave — if not, flag a conflict and ask.
 4. Same for `angular.json` styles — append, don't replace.
+5. Read the shell template (`src/app/app.html`, legacy `app.component.html`). If `<router-outlet>` is not inside a page-layout element that supplies horizontal gutters and a max content width, add one per the parent skill's `AUTH.md` → "Page layout contract" — it is the only thing that pads the library-rendered routes. Report it in the Phase A plan as a shell modification.
 
 In the Phase A plan, be explicit about which existing files will be modified and what will be added to each. The user should be able to read the plan and know exactly what the diff will look like before you touch their code.

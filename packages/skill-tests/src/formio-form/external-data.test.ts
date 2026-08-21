@@ -4,22 +4,10 @@
 // fetch is stubbed; no live server involved.
 
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { Formio } from '@formio/js';
 import { externalDataFormDefinition } from './fixtures/wizard-external';
-
-const containers: HTMLElement[] = [];
-
-function container(): HTMLElement {
-  const el = document.createElement('div');
-  document.body.appendChild(el);
-  containers.push(el);
-  return el;
-}
+import { createForm } from './renderer-harness';
 
 afterEach(() => {
-  for (const el of containers.splice(0)) {
-    el.remove();
-  }
   vi.unstubAllGlobals();
 });
 
@@ -35,7 +23,7 @@ describe('external-data.md — load external data into the submission', () => {
       )
     );
 
-    const form = await Formio.createForm(container(), externalDataFormDefinition);
+    const form = await createForm(externalDataFormDefinition);
 
     // The doc example: fetch the profile, then set it as the submission.
     const response = await fetch('https://api.example.com/profile/42');

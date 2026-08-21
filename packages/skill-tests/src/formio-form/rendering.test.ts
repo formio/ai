@@ -5,28 +5,13 @@
 // plugin/skills/formio-form/references/rendering.md, javascript-api.md, and
 // options.md — run against the real @formio/js renderer in jsdom.
 
-import { afterEach, describe, expect, it } from 'vitest';
-import { Formio } from '@formio/js';
+import { describe, expect, it } from 'vitest';
 import { contactFormDefinition, prefillSubmission } from './fixtures/rendering';
-
-const containers: HTMLElement[] = [];
-
-function container(): HTMLElement {
-  const el = document.createElement('div');
-  document.body.appendChild(el);
-  containers.push(el);
-  return el;
-}
-
-afterEach(() => {
-  for (const el of containers.splice(0)) {
-    el.remove();
-  }
-});
+import { createForm } from './renderer-harness';
 
 describe('rendering.md — Formio.createForm with inline JSON', () => {
   it('resolves to a form instance exposing the documented components', async () => {
-    const form = await Formio.createForm(container(), contactFormDefinition);
+    const form = await createForm(contactFormDefinition);
     expect(form).toBeTruthy();
     expect(form.getComponent('firstName')).toBeTruthy();
     expect(form.getComponent('lastName')).toBeTruthy();
@@ -35,7 +20,7 @@ describe('rendering.md — Formio.createForm with inline JSON', () => {
 
 describe('rendering.md — submission pre-fill', () => {
   it('round-trips pre-filled data through form.submission', async () => {
-    const form = await Formio.createForm(container(), contactFormDefinition);
+    const form = await createForm(contactFormDefinition);
     await form.setSubmission(prefillSubmission);
     expect(form.submission.data.firstName).toBe('Jane');
     const firstName = form.getComponent('firstName');
@@ -46,7 +31,7 @@ describe('rendering.md — submission pre-fill', () => {
 
 describe('javascript-api.md — events', () => {
   it('emits change when a component value is set', async () => {
-    const form = await Formio.createForm(container(), contactFormDefinition);
+    const form = await createForm(contactFormDefinition);
     const changed = new Promise((resolve) => {
       form.on('change', resolve);
     });
@@ -58,7 +43,7 @@ describe('javascript-api.md — events', () => {
   });
 
   it('delivers the submission to the submit handler', async () => {
-    const form = await Formio.createForm(container(), contactFormDefinition);
+    const form = await createForm(contactFormDefinition);
     await form.setSubmission(prefillSubmission);
     const submitted = new Promise((resolve) => {
       form.on('submit', resolve);
@@ -71,7 +56,7 @@ describe('javascript-api.md — events', () => {
 
 describe('options.md — renderer options', () => {
   it('readOnly: true renders a non-editable form', async () => {
-    const form = await Formio.createForm(container(), contactFormDefinition, {
+    const form = await createForm(contactFormDefinition, {
       readOnly: true,
     });
     expect(form.options.readOnly).toBe(true);

@@ -3,28 +3,13 @@
 // plugin/skills/formio-form/references/calculated-values.md — a JSON Logic
 // `calculateValue` deriving a total from quantity × price.
 
-import { afterEach, describe, expect, it, vi } from 'vitest';
-import { Formio } from '@formio/js';
+import { describe, expect, it, vi } from 'vitest';
 import { calculatedFormDefinition } from './fixtures/logic';
-
-const containers: HTMLElement[] = [];
-
-function container(): HTMLElement {
-  const el = document.createElement('div');
-  document.body.appendChild(el);
-  containers.push(el);
-  return el;
-}
-
-afterEach(() => {
-  for (const el of containers.splice(0)) {
-    el.remove();
-  }
-});
+import { createForm } from './renderer-harness';
 
 describe('calculated-values.md — calculateValue with JSON Logic', () => {
   it('computes the total from quantity and price as inputs change', async () => {
-    const form = await Formio.createForm(container(), calculatedFormDefinition);
+    const form = await createForm(calculatedFormDefinition);
     expect(form.getComponent('total')).toBeTruthy();
 
     form.getComponent('quantity').setValue(3);
