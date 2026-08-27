@@ -36,12 +36,22 @@ const SLOT_SHAPES =
 const BARE_NAME = /FORMIO_(?:PROJECT|BASE)_URL/;
 
 // What makes a paragraph's subject the environment. Deliberately narrow: naming a
-// client `env` block, an environment VARIABLE, or the resolution order in which the
-// environment is the weakest source. The bare word "environment" is not enough — "a
-// typo or the wrong environment is the usual cause" is a sentence about a
-// deployment, and accepting it let a handoff value keep a variable's name.
+// client `env` block, an environment VARIABLE, the environment a value is read FROM,
+// or the resolution order in which the environment is the weakest source.
+//
+// The bare word "environment" is not enough — "a typo or the wrong environment is the
+// usual cause" is a sentence about a deployment, and accepting it let a handoff value
+// keep a variable's name. "in the environment" IS enough: it names the place a value
+// is read from, which is the whole subject of the rule, and the install documents
+// that describe the resolution order say it that way.
+//
+// A bare "shell" is NOT enough either, for the same reason, and it was briefly
+// accepted here: these documents mention a shell constantly — every runnable command
+// sits in one — so it exempted most paragraphs in the library from the check. The
+// case it was added for, "in this shell's environment", is already covered by the
+// alternative below it.
 const ENVIRONMENT_SUBJECT =
-  /environment variable|`env`|env block|weakest|resolution order|process\.env/i;
+  /environment variable|`env`|env block|environment block|in (the|this) (server's own |shell's )?environment|weakest|resolution order|process\.env/i;
 
 // Postman's own placeholder. Legitimate inside a code span or fence when a document
 // is explaining the Postman mapping; unresolved in prose it is an endpoint root the
@@ -52,7 +62,13 @@ const POSTMAN_PLACEHOLDER = /\{\{(?:baseUrl|projectName)\}\}/;
 // the validation spec describes. The FORMIO_* rules deliberately still apply inside
 // code: a slot in a template or a shell line is the case that does real damage.
 function stripCode(text: string): string {
-  return text.replace(/```[\s\S]*?```/g, '').replace(/`[^`\n]*`/g, '');
+  return withoutFences(text).replace(/`[^`\n]*`/g, '');
+}
+
+// Fenced blocks only, with their line structure preserved so a reported line number
+// still points at the line it was read from.
+function withoutFences(text: string): string {
+  return text.replace(/```[\s\S]*?```/g, (block) => '\n'.repeat(block.split('\n').length - 1));
 }
 
 function paragraphsOf(body: string): { text: string; startLine: number }[] {
@@ -100,10 +116,17 @@ export function urlTerminologyIssues(docs: readonly TerminologyDocument[]): Term
       }
     });
 
-    // A bare mention is judged per PARAGRAPH: the rule is about what the
+    // A bare mention is judged per PARAGRAPH of PROSE: the rule is about what the
     // surrounding text is talking about, and a table row or a bullet is its own
     // subject.
-    for (const paragraph of paragraphsOf(doc.body)) {
+    //
+    // Fenced blocks are excluded, and only from this rule. A fence that names one of
+    // these variables is an environment block by construction — a client `env` map,
+    // an `export` line, a Docker `-e` flag — and it carries no prose to state a
+    // subject, so judged as prose it flagged every install document's own
+    // configuration snippet. The SLOT rules above still reach inside code, which is
+    // where a slot does its damage.
+    for (const paragraph of paragraphsOf(withoutFences(doc.body))) {
       const withoutSlots = paragraph.text.replace(SLOT_SHAPES, '');
       if (BARE_NAME.test(withoutSlots) && !ENVIRONMENT_SUBJECT.test(withoutSlots)) {
         issues.push({

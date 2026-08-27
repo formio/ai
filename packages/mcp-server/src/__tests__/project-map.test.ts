@@ -16,11 +16,11 @@ describe('project-map', () => {
   });
 
   it('writeProjectEntry writes env block keyed by cwd', () => {
-    writeProjectEntry(
-      '/workspace/packages/a',
-      { FORMIO_PROJECT_URL: 'https://project-a.form.io' },
-      tmpDir
-    );
+    writeProjectEntry({
+      cwd: '/workspace/packages/a',
+      env: { FORMIO_PROJECT_URL: 'https://project-a.form.io' },
+      cacheDir: tmpDir,
+    });
 
     const contents = JSON.parse(fs.readFileSync(path.join(tmpDir, 'projects.json'), 'utf-8'));
     expect(contents).toEqual({
@@ -31,11 +31,11 @@ describe('project-map', () => {
   });
 
   it('readProjectEntry returns the entry for a cwd', () => {
-    writeProjectEntry(
-      '/workspace/packages/a',
-      { FORMIO_PROJECT_URL: 'https://project-a.form.io' },
-      tmpDir
-    );
+    writeProjectEntry({
+      cwd: '/workspace/packages/a',
+      env: { FORMIO_PROJECT_URL: 'https://project-a.form.io' },
+      cacheDir: tmpDir,
+    });
 
     const entry = readProjectEntry('/workspace/packages/a', tmpDir);
     expect(entry).toEqual({
@@ -49,17 +49,25 @@ describe('project-map', () => {
   });
 
   it('readProjectEntry returns null when cwd is not mapped', () => {
-    writeProjectEntry(
-      '/workspace/packages/a',
-      { FORMIO_PROJECT_URL: 'https://project-a.form.io' },
-      tmpDir
-    );
+    writeProjectEntry({
+      cwd: '/workspace/packages/a',
+      env: { FORMIO_PROJECT_URL: 'https://project-a.form.io' },
+      cacheDir: tmpDir,
+    });
     expect(readProjectEntry('/workspace/packages/b', tmpDir)).toBeNull();
   });
 
   it('writeProjectEntry preserves entries for other cwds', () => {
-    writeProjectEntry('/workspace/packages/a', { FORMIO_PROJECT_URL: 'https://a.form.io' }, tmpDir);
-    writeProjectEntry('/workspace/packages/b', { FORMIO_PROJECT_URL: 'https://b.form.io' }, tmpDir);
+    writeProjectEntry({
+      cwd: '/workspace/packages/a',
+      env: { FORMIO_PROJECT_URL: 'https://a.form.io' },
+      cacheDir: tmpDir,
+    });
+    writeProjectEntry({
+      cwd: '/workspace/packages/b',
+      env: { FORMIO_PROJECT_URL: 'https://b.form.io' },
+      cacheDir: tmpDir,
+    });
 
     expect(readProjectEntry('/workspace/packages/a', tmpDir)).toEqual({
       env: { FORMIO_PROJECT_URL: 'https://a.form.io' },
@@ -70,16 +78,16 @@ describe('project-map', () => {
   });
 
   it('writeProjectEntry overwrites the env block for the same cwd', () => {
-    writeProjectEntry(
-      '/workspace/packages/a',
-      { FORMIO_PROJECT_URL: 'https://old-project.form.io' },
-      tmpDir
-    );
-    writeProjectEntry(
-      '/workspace/packages/a',
-      { FORMIO_PROJECT_URL: 'https://new-project.form.io' },
-      tmpDir
-    );
+    writeProjectEntry({
+      cwd: '/workspace/packages/a',
+      env: { FORMIO_PROJECT_URL: 'https://old-project.form.io' },
+      cacheDir: tmpDir,
+    });
+    writeProjectEntry({
+      cwd: '/workspace/packages/a',
+      env: { FORMIO_PROJECT_URL: 'https://new-project.form.io' },
+      cacheDir: tmpDir,
+    });
 
     expect(readProjectEntry('/workspace/packages/a', tmpDir)).toEqual({
       env: { FORMIO_PROJECT_URL: 'https://new-project.form.io' },
@@ -105,7 +113,11 @@ describe('project-map', () => {
 
     it('refuses to overwrite it from writeProjectEntry', () => {
       expect(() =>
-        writeProjectEntry('/workspace', { FORMIO_PROJECT_URL: 'https://x.form.io' }, tmpDir)
+        writeProjectEntry({
+          cwd: '/workspace',
+          env: { FORMIO_PROJECT_URL: 'https://x.form.io' },
+          cacheDir: tmpDir,
+        })
       ).toThrow(ProjectMapUnreadableError);
       expect(fs.readFileSync(path.join(tmpDir, 'projects.json'), 'utf-8')).toBe(
         '{"/workspace": {"env"'
@@ -134,7 +146,11 @@ describe('project-map', () => {
 
     it('refuses to overwrite it from writeProjectEntry', () => {
       expect(() =>
-        writeProjectEntry('/workspace', { FORMIO_PROJECT_URL: 'https://x.form.io' }, tmpDir)
+        writeProjectEntry({
+          cwd: '/workspace',
+          env: { FORMIO_PROJECT_URL: 'https://x.form.io' },
+          cacheDir: tmpDir,
+        })
       ).toThrow(ProjectMapUnreadableError);
       expect(fs.readFileSync(path.join(tmpDir, 'projects.json'), 'utf-8')).toBe(contents);
     });
@@ -162,13 +178,39 @@ describe('project-map', () => {
       expect(() => readProjectEntry('/workspace', tmpDir)).toThrow(/\/workspace/);
     });
 
-    // A malformed entry is still a mapping someone may want back, and the write
-    // path is the one that used to destroy the file.
-    it('refuses to overwrite it from writeProjectEntry', () => {
+    // Replaced, not refused. This entry is what the write is FOR: the error the reader
+    // raises names re-mapping the directory as the repair, and a writer that refuses to
+    // overwrite it makes that repair impossible — while telling the reader to delete a
+    // file that holds every other directory's mapping. Nothing in a malformed entry is
+    // worth preserving against the user's explicit re-map.
+    it('replaces it from writeProjectEntry', () => {
       expect(() =>
-        writeProjectEntry('/workspace', { FORMIO_PROJECT_URL: 'https://x.form.io' }, tmpDir)
-      ).toThrow(ProjectMapUnreadableError);
-      expect(fs.readFileSync(path.join(tmpDir, 'projects.json'), 'utf-8')).toBe(contents);
+        writeProjectEntry({
+          cwd: '/workspace',
+          env: { FORMIO_PROJECT_URL: 'https://x.form.io' },
+          cacheDir: tmpDir,
+        })
+      ).not.toThrow();
+      expect(readProjectEntry('/workspace', tmpDir)).toEqual({
+        env: { FORMIO_PROJECT_URL: 'https://x.form.io' },
+      });
+    });
+
+    // The rest of the file is not this write's business, malformed or not.
+    it('leaves another directory untouched while doing so', () => {
+      const preserved = JSON.parse(contents) as Record<string, unknown>;
+      preserved['/other'] = { env: { FORMIO_PROJECT_URL: 'https://other.form.io' } };
+      fs.writeFileSync(path.join(tmpDir, 'projects.json'), JSON.stringify(preserved));
+
+      writeProjectEntry({
+        cwd: '/workspace',
+        env: { FORMIO_PROJECT_URL: 'https://x.form.io' },
+        cacheDir: tmpDir,
+      });
+
+      expect(readProjectEntry('/other', tmpDir)).toEqual({
+        env: { FORMIO_PROJECT_URL: 'https://other.form.io' },
+      });
     });
   });
 
@@ -190,7 +232,11 @@ describe('project-map', () => {
   it('maps another directory without disturbing a malformed sibling entry', () => {
     fs.writeFileSync(path.join(tmpDir, 'projects.json'), '{"/broken": "nope"}');
 
-    writeProjectEntry('/good', { FORMIO_PROJECT_URL: 'https://good.form.io' }, tmpDir);
+    writeProjectEntry({
+      cwd: '/good',
+      env: { FORMIO_PROJECT_URL: 'https://good.form.io' },
+      cacheDir: tmpDir,
+    });
 
     const raw = JSON.parse(fs.readFileSync(path.join(tmpDir, 'projects.json'), 'utf-8')) as Record<
       string,
@@ -201,7 +247,11 @@ describe('project-map', () => {
   });
 
   it('file is created with 0600 permissions', () => {
-    writeProjectEntry('/workspace/packages/a', { FORMIO_PROJECT_URL: 'https://a.form.io' }, tmpDir);
+    writeProjectEntry({
+      cwd: '/workspace/packages/a',
+      env: { FORMIO_PROJECT_URL: 'https://a.form.io' },
+      cacheDir: tmpDir,
+    });
     const stats = fs.statSync(path.join(tmpDir, 'projects.json'));
     expect((stats.mode & 0o777).toString(8)).toBe('600');
   });

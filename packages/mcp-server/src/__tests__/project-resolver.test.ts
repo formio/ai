@@ -40,8 +40,11 @@ describe('resolveProjectConfig', () => {
   // direction, so one pair resolved in two.
   describe('the project map wins over the environment', () => {
     it('resolves the mapped project URL despite an environment project URL', () => {
-      writeProjectEntry('/workspace/pkg-a', {
-        FORMIO_PROJECT_URL: 'https://mapped.form.io',
+      writeProjectEntry({
+        cwd: '/workspace/pkg-a',
+        env: {
+          FORMIO_PROJECT_URL: 'https://mapped.form.io',
+        },
       });
 
       const cfg = resolveProjectConfig('/workspace/pkg-a', configWithEnvProject);
@@ -52,9 +55,12 @@ describe('resolveProjectConfig', () => {
     // The mapped deployment outranks the environment's for the same reason its
     // project does: it is the more specific statement about this directory.
     it('prefers the mapped base URL over the configured one', () => {
-      writeProjectEntry('/workspace/pkg-a', {
-        FORMIO_PROJECT_URL: 'https://mysite.com/mapped',
-        FORMIO_BASE_URL: 'https://mysite.com',
+      writeProjectEntry({
+        cwd: '/workspace/pkg-a',
+        env: {
+          FORMIO_PROJECT_URL: 'https://mysite.com/mapped',
+          FORMIO_BASE_URL: 'https://mysite.com',
+        },
       });
 
       const cfg = resolveProjectConfig('/workspace/pkg-a', configWithEnvProject);
@@ -68,9 +74,12 @@ describe('resolveProjectConfig', () => {
     // from the api.form.io default — the wrong-deployment login the mapping
     // exists to prevent, and silent because nothing reports which host was used.
     it('uses the mapped base URL when the pin names the mapped project and supplies no base URL', () => {
-      writeProjectEntry('/workspace/pkg-pinned', {
-        FORMIO_PROJECT_URL: 'https://myproject.mysite.com',
-        FORMIO_BASE_URL: 'https://forms.mysite.com',
+      writeProjectEntry({
+        cwd: '/workspace/pkg-pinned',
+        env: {
+          FORMIO_PROJECT_URL: 'https://myproject.mysite.com',
+          FORMIO_BASE_URL: 'https://forms.mysite.com',
+        },
       });
 
       const cfg = resolveProjectConfig('/workspace/pkg-pinned', {
@@ -104,8 +113,11 @@ describe('resolveProjectConfig', () => {
 
     it('is unaffected by a stale FORMIO_PLUGIN_CONTEXT', () => {
       process.env.FORMIO_PLUGIN_CONTEXT = '1';
-      writeProjectEntry('/workspace/pkg-a', {
-        FORMIO_PROJECT_URL: 'https://mapped.form.io',
+      writeProjectEntry({
+        cwd: '/workspace/pkg-a',
+        env: {
+          FORMIO_PROJECT_URL: 'https://mapped.form.io',
+        },
       });
 
       const cfg = resolveProjectConfig('/workspace/pkg-a', configWithEnvProject);
@@ -116,8 +128,11 @@ describe('resolveProjectConfig', () => {
 
   describe('project map is used when the environment has no project', () => {
     it('resolves the mapped project URL for the cwd', () => {
-      writeProjectEntry('/workspace/pkg-a', {
-        FORMIO_PROJECT_URL: 'https://mapped.form.io',
+      writeProjectEntry({
+        cwd: '/workspace/pkg-a',
+        env: {
+          FORMIO_PROJECT_URL: 'https://mapped.form.io',
+        },
       });
 
       const cfg = resolveProjectConfig('/workspace/pkg-a', baseConfig);
@@ -131,9 +146,12 @@ describe('resolveProjectConfig', () => {
     // an empty string, not an absent variable. Read as a pin, it locks the server
     // out of every mapping project_set can write.
     it('falls back to the map when the environment project URL is empty', () => {
-      writeProjectEntry('/workspace/pkg-empty-env', {
-        FORMIO_PROJECT_URL: 'https://mysite.com/mapped',
-        FORMIO_BASE_URL: 'https://mysite.com',
+      writeProjectEntry({
+        cwd: '/workspace/pkg-empty-env',
+        env: {
+          FORMIO_PROJECT_URL: 'https://mysite.com/mapped',
+          FORMIO_BASE_URL: 'https://mysite.com',
+        },
       });
 
       const cfg = resolveProjectConfig('/workspace/pkg-empty-env', {
@@ -151,21 +169,30 @@ describe('resolveProjectConfig', () => {
     // be read back: the next tool call said "no project configured", whose remedy
     // is project_set, which writes the same unreadable entry again.
     it('reads the mapping keyed on the process cwd when no cwd is supplied', () => {
-      writeProjectEntry(process.cwd(), {
-        FORMIO_PROJECT_URL: 'https://server-cwd.form.io',
-        FORMIO_BASE_URL: 'https://server-cwd-deployment.example.com',
+      // Customer-hosted, so the recorded deployment is the record's own answer: a
+      // form.io project is served by https://api.form.io and by nothing else, so a
+      // recorded deployment there is set aside rather than read.
+      writeProjectEntry({
+        cwd: process.cwd(),
+        env: {
+          FORMIO_PROJECT_URL: 'https://server-cwd.example.com',
+          FORMIO_BASE_URL: 'https://server-cwd-deployment.example.com',
+        },
       });
 
       const cfg = resolveProjectConfig(undefined, baseConfig);
 
-      expect(cfg.projectUrl).toBe('https://server-cwd.form.io');
+      expect(cfg.projectUrl).toBe('https://server-cwd.example.com');
       expect(cfg.baseUrl).toBe('https://server-cwd-deployment.example.com');
     });
 
     it('prefers the mapped base URL over the configured base URL', () => {
-      writeProjectEntry('/workspace/pkg-a', {
-        FORMIO_PROJECT_URL: 'https://mysite.com/mapped',
-        FORMIO_BASE_URL: 'https://mysite.com',
+      writeProjectEntry({
+        cwd: '/workspace/pkg-a',
+        env: {
+          FORMIO_PROJECT_URL: 'https://mysite.com/mapped',
+          FORMIO_BASE_URL: 'https://mysite.com',
+        },
       });
 
       const cfg = resolveProjectConfig('/workspace/pkg-a', baseConfig);
@@ -179,9 +206,12 @@ describe('resolveProjectConfig', () => {
     // host. Resolution must carry both through untouched — nothing here may
     // reconstruct one URL from the other.
     it('resolves a sub-domain-routed customer project against its own deployment host', () => {
-      writeProjectEntry('/workspace/pkg-subdomain', {
-        FORMIO_PROJECT_URL: 'https://myproject.mysite.com',
-        FORMIO_BASE_URL: 'https://forms.mysite.com',
+      writeProjectEntry({
+        cwd: '/workspace/pkg-subdomain',
+        env: {
+          FORMIO_PROJECT_URL: 'https://myproject.mysite.com',
+          FORMIO_BASE_URL: 'https://forms.mysite.com',
+        },
       });
 
       const cfg = resolveProjectConfig('/workspace/pkg-subdomain', baseConfig);
@@ -191,8 +221,11 @@ describe('resolveProjectConfig', () => {
     });
 
     it('falls back to the configured base URL when the mapped entry has none', () => {
-      writeProjectEntry('/workspace/pkg-a', {
-        FORMIO_PROJECT_URL: 'https://mapped.form.io',
+      writeProjectEntry({
+        cwd: '/workspace/pkg-a',
+        env: {
+          FORMIO_PROJECT_URL: 'https://mapped.form.io',
+        },
       });
 
       const cfg = resolveProjectConfig('/workspace/pkg-a', baseConfig);
@@ -204,8 +237,11 @@ describe('resolveProjectConfig', () => {
     // the hosted-cloud default is applied here — after the mapping has had its
     // say, which is the whole reason it moved.
     it('defaults to the hosted cloud when neither the mapping nor the config has a base URL', () => {
-      writeProjectEntry('/workspace/pkg-no-base', {
-        FORMIO_PROJECT_URL: 'https://mapped.form.io',
+      writeProjectEntry({
+        cwd: '/workspace/pkg-no-base',
+        env: {
+          FORMIO_PROJECT_URL: 'https://mapped.form.io',
+        },
       });
 
       const cfg = resolveProjectConfig('/workspace/pkg-no-base', { apiKey: 'abc' });
@@ -214,8 +250,11 @@ describe('resolveProjectConfig', () => {
     });
 
     it('strips a trailing slash from the mapped project URL', () => {
-      writeProjectEntry('/workspace/pkg-a', {
-        FORMIO_PROJECT_URL: 'https://mapped.form.io/',
+      writeProjectEntry({
+        cwd: '/workspace/pkg-a',
+        env: {
+          FORMIO_PROJECT_URL: 'https://mapped.form.io/',
+        },
       });
 
       const cfg = resolveProjectConfig('/workspace/pkg-a', baseConfig);
@@ -224,8 +263,11 @@ describe('resolveProjectConfig', () => {
     });
 
     it('reads the map without a FORMIO_PLUGIN_CONTEXT being set', () => {
-      writeProjectEntry('/workspace/pkg-a', {
-        FORMIO_PROJECT_URL: 'https://mapped.form.io',
+      writeProjectEntry({
+        cwd: '/workspace/pkg-a',
+        env: {
+          FORMIO_PROJECT_URL: 'https://mapped.form.io',
+        },
       });
 
       expect(resolveProjectConfig('/workspace/pkg-a', baseConfig).projectUrl).toBe(
@@ -234,8 +276,11 @@ describe('resolveProjectConfig', () => {
     });
 
     it('does not mutate baseConfig when resolving', () => {
-      writeProjectEntry('/workspace/pkg-a', {
-        FORMIO_PROJECT_URL: 'https://mapped.form.io',
+      writeProjectEntry({
+        cwd: '/workspace/pkg-a',
+        env: {
+          FORMIO_PROJECT_URL: 'https://mapped.form.io',
+        },
       });
       const snapshot = { ...baseConfig };
 
@@ -357,9 +402,12 @@ describe('resolveProjectConfig', () => {
   // URL from forms.mysite.com/current" — far from the file that caused it.
   describe('a mapped URL that is not a URL', () => {
     it('fails resolution rather than handing an unparseable base URL to fetch', () => {
-      writeProjectEntry('/workspace/pkg-bad-base', {
-        FORMIO_PROJECT_URL: 'https://mapped.form.io',
-        FORMIO_BASE_URL: 'forms.mysite.com',
+      writeProjectEntry({
+        cwd: '/workspace/pkg-bad-base',
+        env: {
+          FORMIO_PROJECT_URL: 'https://mapped.form.io',
+          FORMIO_BASE_URL: 'forms.mysite.com',
+        },
       });
 
       expect(() => resolveProjectConfig('/workspace/pkg-bad-base', { apiKey: 'abc' })).toThrow(
@@ -368,9 +416,12 @@ describe('resolveProjectConfig', () => {
     });
 
     it('names the variable, the directory and the map file', () => {
-      writeProjectEntry('/workspace/pkg-bad-base-named', {
-        FORMIO_PROJECT_URL: 'https://mapped.form.io',
-        FORMIO_BASE_URL: 'forms.mysite.com',
+      writeProjectEntry({
+        cwd: '/workspace/pkg-bad-base-named',
+        env: {
+          FORMIO_PROJECT_URL: 'https://mapped.form.io',
+          FORMIO_BASE_URL: 'forms.mysite.com',
+        },
       });
       const resolve = () =>
         resolveProjectConfig('/workspace/pkg-bad-base-named', { apiKey: 'abc' });
@@ -381,8 +432,11 @@ describe('resolveProjectConfig', () => {
     });
 
     it('fails on an unusable mapped project URL', () => {
-      writeProjectEntry('/workspace/pkg-bad-project', {
-        FORMIO_PROJECT_URL: 'forms.mysite.com/myproject',
+      writeProjectEntry({
+        cwd: '/workspace/pkg-bad-project',
+        env: {
+          FORMIO_PROJECT_URL: 'forms.mysite.com/myproject',
+        },
       });
 
       expect(() => resolveProjectConfig('/workspace/pkg-bad-project', { apiKey: 'abc' })).toThrow(
@@ -391,8 +445,11 @@ describe('resolveProjectConfig', () => {
     });
 
     it('rejects a mapped URL whose protocol is not http or https', () => {
-      writeProjectEntry('/workspace/pkg-ftp', {
-        FORMIO_PROJECT_URL: 'ftp://mapped.form.io',
+      writeProjectEntry({
+        cwd: '/workspace/pkg-ftp',
+        env: {
+          FORMIO_PROJECT_URL: 'ftp://mapped.form.io',
+        },
       });
 
       expect(() => resolveProjectConfig('/workspace/pkg-ftp', { apiKey: 'abc' })).toThrow(
@@ -405,8 +462,11 @@ describe('resolveProjectConfig', () => {
     // token cache against its key — so surrounding whitespace and host case have
     // to be gone before then.
     it('normalizes a usable mapped URL the way an environment value is normalized', () => {
-      writeProjectEntry('/workspace/pkg-untidy', {
-        FORMIO_PROJECT_URL: '  https://Mapped.form.io/  ',
+      writeProjectEntry({
+        cwd: '/workspace/pkg-untidy',
+        env: {
+          FORMIO_PROJECT_URL: '  https://Mapped.form.io/  ',
+        },
       });
 
       expect(resolveProjectConfig('/workspace/pkg-untidy', { apiKey: 'abc' }).projectUrl).toBe(
@@ -423,9 +483,12 @@ describe('resolveProjectConfig', () => {
     // could be hiding the value that should have won — and degrading silently to
     // api.form.io is exactly the wrong-deployment failure to avoid.
     it('fails rather than degrading an unusable mapped base URL to the default', () => {
-      writeProjectEntry('/workspace/pkg-pin-bad-base', {
-        FORMIO_PROJECT_URL: 'https://examples.form.io',
-        FORMIO_BASE_URL: 'forms.mysite.com',
+      writeProjectEntry({
+        cwd: '/workspace/pkg-pin-bad-base',
+        env: {
+          FORMIO_PROJECT_URL: 'https://examples.form.io',
+          FORMIO_BASE_URL: 'forms.mysite.com',
+        },
       });
 
       expect(() =>
@@ -443,8 +506,11 @@ describe('resolveProjectConfig', () => {
   // else in this flow can surface.
   describe('resolving with no cwd argument', () => {
     it('says which directory supplied the mapping', () => {
-      writeProjectEntry(process.cwd(), {
-        FORMIO_PROJECT_URL: 'https://server-cwd.form.io',
+      writeProjectEntry({
+        cwd: process.cwd(),
+        env: {
+          FORMIO_PROJECT_URL: 'https://server-cwd.form.io',
+        },
       });
       const notes: string[] = [];
 
@@ -455,8 +521,11 @@ describe('resolveProjectConfig', () => {
     });
 
     it('says nothing when the caller passed a cwd', () => {
-      writeProjectEntry('/workspace/pkg-a', {
-        FORMIO_PROJECT_URL: 'https://mapped.form.io',
+      writeProjectEntry({
+        cwd: '/workspace/pkg-a',
+        env: {
+          FORMIO_PROJECT_URL: 'https://mapped.form.io',
+        },
       });
       const notes: string[] = [];
 

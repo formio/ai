@@ -14,11 +14,13 @@ The server SHALL resolve the target Form.io project for each tool call in this o
 
 No other variable participates. In particular there SHALL be no variable that OFFERS a project without applying one: the environment is already the weakest source, so a project set there is overridden by both stronger sources and therefore suggests without pinning.
 
-The base URL SHALL resolve through the SAME order, reading `baseUrl` from the committed file, then `env.FORMIO_BASE_URL` from the matched map entry, then `FORMIO_BASE_URL` from the environment. Trailing slashes SHALL be stripped from both resolved URLs.
+A project and its deployment SHALL travel together. Precedence selects ONE record, and BOTH resolved values come from it: the base URL is that record's own — `baseUrl` in the committed file, `env.FORMIO_BASE_URL` in the matched map entry, `FORMIO_BASE_URL` in the environment — or, when that record names none, it is derived from that record's project URL. Halves SHALL NOT be combined across records: a base URL recorded in one record SHALL NOT pair with a project URL resolved from another, because nothing in a record that holds only half a configuration says which project the other half belongs to. Trailing slashes SHALL be stripped from both resolved URLs.
+
+Mixing halves is what makes "which project is this deployment for?" a question at read time, and answering it requires a stored pairing that every writer must maintain and every reader must police. Keeping each record whole removes the question rather than answering it.
 
 `FORMIO_PROJECT_URL` is not a pin. It is the weakest source, so a committed file or a personal mapping overrides it, and `project_set` CAN redirect a directory whose environment names a different project. A deployment that must target one project deterministically SHALL supply only the source it wants used.
 
-When no source supplies a base URL, the server SHALL derive it from the shape of the resolved project URL. There is no defaulting step: every base URL is either **derived** from the project URL or **absent and asked for**, which is what makes the Project URL the single configuration a user has to think about.
+When the winning record supplies no base URL, the server SHALL derive it from the shape of that record's project URL. There is no defaulting step: every base URL is either **derived** from the project URL or **absent and asked for**, which is what makes the Project URL the single configuration a user has to think about.
 
 1. **Project URL on a `form.io` host** (the hosted cloud — `https://examples.form.io`) → the base URL is `https://api.form.io`, reported with source `derived`. The hosted cloud is the one deployment whose base URL is a constant, so this is a derivation from the host rather than a fallback.
 2. **Project URL carrying a non-empty path** (sub-directory routing) → the base URL is that project URL **with its final path segment removed**, reported with source `derived`. The final segment is the project's name; everything preceding it is the deployment, which MAY itself be mounted at a sub-path. `https://forms.mysite.com/myproject` derives `https://forms.mysite.com`, and `https://forms.mysite.com/one/two` derives `https://forms.mysite.com/one`. The derived value SHALL NOT be reduced to the bare origin.
@@ -139,41 +141,63 @@ A project URL that resolves while its base URL does not SHALL fail at the point 
 - **THEN** `~/.formio/projects.json` contains an entry keyed `/work/app` whose `env.FORMIO_PROJECT_URL` is `https://my-project.form.io`
 - **AND** a subsequent project-scoped tool call with `cwd` of `/work/app` resolves to that project when `FORMIO_PROJECT_URL` is unset
 
-### Requirement: A written base URL falls back to the mapping before the environment
+### Requirement: A write stores the deployment its own record names, and never a global one
 
-When `project_set` (and the equivalent `formio-mcp project set` command) is called without an explicit base URL, the value written SHALL be the base URL already mapped for that working directory when one exists, and only otherwise `FORMIO_BASE_URL` from the environment. Every value in the chain SHALL be tested for truthiness rather than nullishness, so an empty string — a host prompt the user cleared — falls through instead of erasing the mapping.
+`project_set` (and the equivalent `formio-mcp project set` command) SHALL take the deployment it stores from three sources in this order, and from no other: the `baseUrl` the caller supplied, the deployment already recorded for this directory when the call does NOT change its project, and the value derived from the project URL being recorded. A write that changes the project keeps nothing — that deployment belonged to the project being replaced.
 
-This mirrors the resolution order above, where a mapped base URL outranks the configured one. Preferring the environment here would make the mapped-value fallback unreachable wherever a host exports a `FORMIO_BASE_URL` of its own (the `.mcpb` desktop bundle sets one from its prompt): re-pointing a self-hosted directory at a sibling project would silently move it to whatever that global names, sending its portal login to the wrong deployment and re-keying its token cache. Changing a directory's deployment therefore requires passing the base URL explicitly.
+A global `FORMIO_BASE_URL` SHALL NOT be read by either writer. It is one value answering a per-project question, and the environment is a record of its own: copied into the mapping beside another record's project, it becomes a stale per-directory answer that then outranks derivation forever, which is the silent substitution the derivation rules exist to prevent. Every value SHALL be tested for truthiness rather than nullishness, so an empty string — a host prompt the user cleared — falls through instead of erasing the record.
 
-The environment link SHALL be reached ONLY for a project URL that derives no base URL of its own — the path-less shape on a customer domain. A global `FORMIO_BASE_URL` is one value answering a per-project question: written into the mapping for a project whose shape derives its own deployment, it replaces a per-project-correct answer with a stale copy that then outranks derivation for that directory forever. `https://api.form.io` is the value most likely to be exported, so the failure this prevents is the same silent substitution the derivation rules exist to prevent — a hosted-cloud base URL persisted for a self-hosted project. Whether a project URL derives its own base URL SHALL be decided by the derivation rules above rather than by a separate test, so the two cannot drift.
+Where none of the three sources yields a deployment — the path-less shape on a customer domain, recorded for the first time — the write SHALL fail naming the Base URL it needs, rather than store half a record. When a deployment IS recorded for the directory but could not be adopted, because the project URL stored beside it is unusable and therefore cannot vouch for it, the refusal SHALL name that value and say why it was not adopted: the user is otherwise asked to supply a value sitting on disk in the very entry they are repairing.
 
-#### Scenario: Re-pointing a directory keeps its deployment
+#### Scenario: Re-pointing a directory replaces its deployment
 
 - **WHEN** `/work/crm` is mapped to `https://forms.example.com/old` with `FORMIO_BASE_URL` of `https://forms.example.com`
-- **AND** `FORMIO_BASE_URL` in the environment is `https://api.form.io`
 - **AND** `project_set` is called with that `cwd`, a `projectUrl` of `https://forms.example.com/new`, and no `baseUrl`
-- **THEN** the entry's `env.FORMIO_BASE_URL` is still `https://forms.example.com`
+- **THEN** the entry's `env.FORMIO_BASE_URL` is the value derived for the new project, `https://forms.example.com`
+- **AND** nothing is carried from the previous project's record
 
-#### Scenario: An explicit base URL replaces the mapped one
+#### Scenario: An explicit base URL replaces the recorded one
 
-- **WHEN** a directory is mapped with `FORMIO_BASE_URL` of `https://forms.example.com`
-- **AND** `project_set` is called with a `baseUrl` of `https://api.form.io`
-- **THEN** the entry's `env.FORMIO_BASE_URL` becomes `https://api.form.io`
+- **WHEN** a directory is mapped to `https://myproject.mysite.com` with `FORMIO_BASE_URL` of `https://forms.mysite.com`
+- **AND** `project_set` is called with a `baseUrl` of `https://api.mysite.com`
+- **THEN** the entry's `env.FORMIO_BASE_URL` becomes `https://api.mysite.com`
 
-#### Scenario: The environment supplies the base URL for a project that derives none
+#### Scenario: A global FORMIO_BASE_URL is never written into a record
 
-- **WHEN** no entry exists for the caller's `cwd`
-- **AND** `FORMIO_BASE_URL` in the environment is `https://forms.mysite.com`
+- **WHEN** `FORMIO_BASE_URL` in the environment is `https://forms.mysite.com`
 - **AND** `project_set` is called with a `projectUrl` of `https://myproject.mysite.com` and no `baseUrl`
-- **THEN** the new entry's `env.FORMIO_BASE_URL` is `https://forms.mysite.com`
+- **THEN** the call fails naming the Base URL it needs, rather than adopting the environment's value
 
-#### Scenario: The environment does not override a derivable base URL
+#### Scenario: A derivable project records its derived deployment
 
-- **WHEN** no entry exists for the caller's `cwd`
+- **WHEN** `project_set` is called with a `projectUrl` of `https://forms.mysite.com/myproject` and no `baseUrl`
 - **AND** `FORMIO_BASE_URL` in the environment is `https://api.form.io`
-- **AND** `project_set` is called with a `projectUrl` of `https://forms.mysite.com/myproject` and no `baseUrl`
-- **THEN** the new entry records the project URL alone, with no `env.FORMIO_BASE_URL`
-- **AND** resolution derives `https://forms.mysite.com` for that directory rather than reading `https://api.form.io`
+- **THEN** the new entry's `env.FORMIO_BASE_URL` is `https://forms.mysite.com`, derived from the project URL
+- **AND** the environment's value is not read
+
+#### Scenario: A stranded deployment is named rather than demanded again
+
+- **WHEN** an entry holds an unusable `FORMIO_PROJECT_URL` beside a usable `FORMIO_BASE_URL`
+- **AND** `project_set` is called with a valid path-less `projectUrl` and no `baseUrl`
+- **THEN** the refusal names the recorded deployment and says it was not adopted because the project URL stored beside it is unusable
+
+### Requirement: A hosted-cloud project's deployment is derived, never taken from a record
+
+A project on a `form.io` host is served by `https://api.form.io` and by nothing else — that is what makes the Project URL the whole configuration for a hosted project — and a `*.form.io` host is never a Base URL. A recorded deployment naming anything else is therefore not a second opinion but a value that cannot be right, and left in place it becomes the portal-login URL and the token-cache key for a deployment the user does not use.
+
+A WRITE SHALL refuse that pair, naming the deployment that does serve the project: the value is the caller's live answer, and a refusal is what corrects it before it reaches disk. A READ SHALL ignore the recorded value, resolve the derived deployment, and say which value it set aside and in which record — the right answer is knowable for this shape, so failing every tool call over a value the server can supply itself would be gratuitous, while silence would leave a stale variable invisible.
+
+#### Scenario: A write pairing a hosted project with another deployment is refused
+
+- **WHEN** `project_set` is called with a `projectUrl` of `https://examples.form.io` and a `baseUrl` of `https://forms.oldcorp.com`
+- **THEN** the call fails naming `https://api.form.io` as the deployment that serves it
+- **AND** nothing is recorded for that directory
+
+#### Scenario: A recorded foreign deployment is ignored at read, in every record
+
+- **WHEN** a committed `formio.json`, a mapping entry, or the environment pairs `https://examples.form.io` with `https://forms.oldcorp.com`
+- **THEN** resolution reports `https://examples.form.io` on `https://api.form.io`
+- **AND** a note names the ignored value and the record it came from
 
 ### Requirement: An unreadable project map fails loudly instead of reading as empty
 
@@ -248,3 +272,144 @@ The schema SHALL NOT vary by host mode, and the server SHALL NOT build a differe
 - **AND** a tool is called with no `cwd`
 - **THEN** the call proceeds against the environment-supplied project
 
+
+### Requirement: A record holds a project and its deployment as a pair
+
+Every write SHALL leave a record holding a complete configuration. `project_set` and `project set` SHALL derive the base URL from the project URL at save time and store BOTH in the record they write, so that a record naming a project always names the deployment that serves it.
+
+Where the project URL names no deployment — a path-less project URL on a customer domain, the one shape derivation cannot answer — the write SHALL FAIL rather than record half a configuration, naming the base URL as the value it needs in the same call. The caller answering a `base-url-unresolved` report already holds the project URL, so supplying both costs the user nothing: the user is still asked for one value.
+
+Writing a project URL SHALL replace that record's pair, discarding any base URL it held for the previous project. A base URL supplied alone SHALL amend the record that currently supplies the project, and where that record cannot hold it — the project is in a committed file or the environment while the call targets the mapping — the write SHALL FAIL naming the call that records the pair in the right place.
+
+No record SHALL hold a base URL without the project URL it belongs to, and no stored pairing metadata SHALL be required to interpret one: the pair is the interpretation.
+
+#### Scenario: Saving a project stores its derived deployment
+
+- **WHEN** `project_set` records `https://examples.form.io` for a directory
+- **THEN** the entry holds that project URL AND `https://api.form.io`
+- **AND** a later resolution reports both from that one record
+
+#### Scenario: Saving a project that names no deployment is refused
+
+- **WHEN** `project_set` is asked to record `https://myproject.mysite.com` with no base URL
+- **THEN** the call fails naming the base URL it needs
+- **AND** nothing is written for that directory
+
+#### Scenario: Re-pointing a directory replaces the whole pair
+
+- **WHEN** a directory mapped to one project and its deployment is recorded with a different project URL
+- **THEN** the entry holds the new project URL and the deployment derived for it
+- **AND** the previous deployment is gone rather than carried
+
+#### Scenario: A base URL alone amends the record that holds the project
+
+- **WHEN** the mapping holds the project and `project_set` is called with a base URL alone
+- **THEN** that entry's pair is updated in place
+- **AND** when the project comes from a committed file, the call fails naming that file's path and the `baseUrl` key to add to it
+- **AND** when the project comes only from the environment, the call fails naming the mapping write that records the pair
+
+### Requirement: A write reports the pair the next read resolves
+
+A write SHALL report the pair its own directory resolves to AFTER the write, obtained from the resolver rather than recomputed. Both entry points SHALL report it: `project_set` in `projectUrl` and `baseUrl`, and `project set` on its `Project URL:` and `Base URL:` lines. Where the write does not take effect — a committed `formio.json` governs the directory, so the mapping is only the fallback if that file goes away — the reported pair SHALL be the governing record's, the record just written SHALL be named in prose, and the wording SHALL NOT claim in the active voice that a value was set.
+
+A write that lands on disk and leaves the directory resolving no deployment SHALL NOT report success. `project_set` SHALL report `ok` false while still carrying the resolved pair and `changed`, and `project set` SHALL exit `3`; both SHALL carry the reader's own report, naming the file and the key to edit. The record SHALL still be written: it is a legitimate fallback, and the failure being reported is the state of the directory, not of the write.
+
+Resolution notes emitted while answering that question — a `formio.json` passed over, a recorded base URL set aside — SHALL reach the caller, deduplicated against the notes the write itself collected, and SHALL survive a throw from any stage of the command.
+
+#### Scenario: A mapping written under a committed file reports the governing pair
+
+- **WHEN** `project_set` records a project for a directory a committed `formio.json` governs
+- **THEN** the reported pair is the one that committed file resolves
+- **AND** the message names the record just written and says it does not take effect
+
+#### Scenario: A write that leaves no deployment is not a success
+
+- **WHEN** a base URL is recorded for a directory whose committed `formio.json` names the same project and supplies no deployment
+- **THEN** the record is written
+- **AND** `project_set` reports `ok` false, and `project set` exits `3`
+- **AND** the message names that file and the `baseUrl` key to add to it
+
+#### Scenario: A committed file the pair rule refuses fails the write that follows it
+
+- **WHEN** a committed `formio.json` holds a URL that parses but the pair rule refuses
+- **THEN** the write does not report success
+- **AND** the failure names that file rather than describing the record just written
+
+#### Scenario: A resolution note reaches the caller once
+
+- **WHEN** a write resolves through a `formio.json` holding a base URL that is set aside
+- **THEN** the note explaining it is reported by both entry points
+- **AND** it appears once, not once per walk of the tree
+
+### Requirement: A present-but-unusable record still governs its directory
+
+A mapping entry that exists and cannot be honoured SHALL be treated by every writer as the record that governs that directory, not as an absent one. This SHALL hold for an entry that is structurally malformed and for one whose `FORMIO_PROJECT_URL` is not an http(s) URL, which is validated only where the record wins and therefore reaches a writer looking well-formed.
+
+A write carrying no project URL SHALL be refused against such an entry, naming that entry as the reason and quoting the recorded value back, because that entry is the only place the value exists and the repair replaces it. The refusal SHALL NOT attribute the project to any other record.
+
+This SHALL apply only where the mapping is the record that would govern. A committed `formio.json` outranks it, so a broken entry beneath one decides nothing, and the refusal there SHALL name that file and the key to add to it rather than the mapping.
+
+A mapping SHALL be keyed by the resolved directory, so that one directory has one record however the caller spelled the path.
+
+#### Scenario: A broken entry is not reported as the environment holding the project
+
+- **WHEN** a directory's mapping entry holds a value that is not an http(s) URL and `FORMIO_PROJECT_URL` names a project
+- **THEN** a write carrying only a base URL is refused
+- **AND** the refusal names the entry and quotes the recorded value
+- **AND** it does not name the environment's project
+
+#### Scenario: A structurally malformed entry reaches the same answer
+
+- **WHEN** a directory's mapping entry is not an object holding an `env` of strings
+- **THEN** a write carrying only a base URL is refused without attributing the project elsewhere
+
+#### Scenario: A trailing slash is the same record
+
+- **WHEN** a project is recorded for `<dir>/` and read back for `<dir>`
+- **THEN** the same pair resolves
+- **AND** the map holds one entry for that directory, not two
+
+### Requirement: An invalid pair is refused wherever it is formed, by one rule
+
+Two pairs are not configurations at all, and ONE classification SHALL decide both for every writer and for the resolver — the rule written once for writes and again for reads is how a case escaped the read-side copy.
+
+The first is the hosted cloud's own API root offered as a project URL. It IS a `form.io` host, so it derives itself as its own deployment; diagnosing it as an Open Source install would be wrong, and it is the likeliest mistake on this surface — the deployment URL pasted where the project URL goes. The refusal SHALL say it is the Base URL every hosted project shares, not a project URL, and ask which project. It SHALL be recognised by HOST rather than by an exact string, so `http://api.form.io` and `https://api.form.io/<name>` — the same mistake, and the second is a shape the server's own guidance already calls out — are refused with it; the host SHALL be compared whole, never as a suffix, so a lookalike host is a different deployment.
+
+The second is a Base URL identical to the Project URL, which names a server with no project layer: the Form.io Open Source server serves one set of forms at its own root, so the two URLs collapse onto each other. The refusal SHALL name the value, state that the Form.io Agentic Coding tools are built for the Form.io Enterprise Server, and say why the two URLs cannot be the same: every tool here addresses a project UNDER a deployment, and project roles, actions, stages, imports and exports have no counterpart on that server. It SHALL name what to do instead — a project on an Enterprise deployment, or a hosted-cloud project served by `https://api.form.io`.
+
+The classification SHALL judge the EFFECTIVE pair — the recorded deployment, or the derived one where the record holds none — because the collapse is about what the tools would target, not what happens to be written down: `https://api.form.io` derives itself, so a record holding it as the project with no deployment beside it collapses exactly as a recorded pair does.
+
+Every write that forms a pair SHALL refuse it before anything reaches disk, so the user is not left to diagnose a string of unexplained 404s from a later tool call. And the resolver SHALL refuse it at the point of use, because a hand-written `formio.json`, a hand-edited mapping entry, and the environment never pass through a writer. The read-time refusal is per record, in that record's own repair vocabulary: a committed file fails naming the file, like every other unusable committed value; a mapping entry fails naming the entry and the `project_set` rewrite that replaces it; the environment — a suggestion, read tolerantly everywhere else — is ignored with a note naming the cause, and resolution falls through to the interview.
+
+#### Scenario: The Base URL answers with the Project URL
+
+- **WHEN** a write is asked to pair `https://forms.mysite.com` with itself
+- **THEN** it fails naming that URL and the Enterprise Server requirement
+- **AND** nothing is recorded for that directory
+
+#### Scenario: The API root is offered as a project URL
+
+- **WHEN** a write is asked to record `https://api.form.io` as the Project URL
+- **THEN** it fails saying that is the hosted cloud's shared Base URL, not a project URL, and asks which project
+- **AND** nothing is recorded for that directory
+
+#### Scenario: A hand-written committed pair that collapses is refused at read, naming the file
+
+- **WHEN** a committed `formio.json` holds `https://api.form.io` as `projectUrl`, or the same URL as both keys
+- **THEN** resolution fails as an unusable committed file, naming its path and the cause
+
+#### Scenario: A hand-edited mapping pair that collapses is refused at read, naming the entry
+
+- **WHEN** a mapping entry holds `https://api.form.io` as `FORMIO_PROJECT_URL`, or the same URL as both values
+- **THEN** resolution fails as an unusable entry, naming the directory and the `project_set` rewrite that replaces it
+
+#### Scenario: An environment pair that collapses is ignored with a note
+
+- **WHEN** `FORMIO_PROJECT_URL` is `https://api.form.io`, or names the same URL as `FORMIO_BASE_URL`
+- **THEN** the environment record is set aside with a note naming the cause
+- **AND** resolution continues to the not-configured interview rather than failing
+
+#### Scenario: A real deployment is unaffected
+
+- **WHEN** a write pairs `https://myproject.mysite.com` with `https://api.mysite.com`
+- **THEN** it succeeds

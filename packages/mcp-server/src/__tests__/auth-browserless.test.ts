@@ -6,8 +6,8 @@ import { ResolvedFormioConfig } from '../config.js';
 vi.mock('child_process', () => ({ exec: vi.fn() }));
 
 const CONFIG: ResolvedFormioConfig = {
-  baseUrl: 'https://formio.invalid',
-  projectUrl: 'https://formio.invalid/example',
+  baseUrl: 'https://formio.invalid/sub',
+  projectUrl: 'https://formio.invalid/sub/example',
 };
 
 // A host with no browser must be told so immediately. Waiting out the login

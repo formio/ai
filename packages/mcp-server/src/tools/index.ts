@@ -15,6 +15,7 @@ import { registerFormRevisionsListTool } from './form_revisions_list.js';
 import { registerFormUpdateTool } from './form_update.js';
 import { registerHelloTool } from './hello.js';
 import { registerProjectExportTool } from './project_export.js';
+import { registerProjectGetTool } from './project_get.js';
 import { registerProjectImportTool } from './project_import.js';
 import { registerProjectSetTool } from './project_set.js';
 import { registerRoleCreateTool } from './role_create.js';
@@ -38,11 +39,21 @@ export function registerAllTools(
   registerFormRevisionsListTool(server, config);
   registerFormUpdateTool(server, config);
   registerProjectExportTool(server, config);
+  // Reports what the tools around it will resolve, so it takes the same config
+  // and the same cwd fallback project_set writes under.
+  registerProjectGetTool(server, config, { cwd: options.cwd });
   registerProjectImportTool(server, config);
-  // The already-validated base URL, not a second read of the environment: one
-  // unusable FORMIO_BASE_URL has to be dropped once, in getConfig, or the tool
-  // that repairs a directory's mapping is the one it breaks.
-  registerProjectSetTool(server, { cwd: options.cwd, baseUrl: () => config.baseUrl });
+  // The environment project comes from the already-validated config, not from a
+  // second read of the environment: an unusable FORMIO_PROJECT_URL has to be
+  // dropped once, in getConfig, or the tool that repairs a directory's mapping is
+  // the one it breaks — and a tool reading process.env itself re-emits the
+  // warning getConfig already made on every call, while its view of what is
+  // configured drifts from the view the resolver uses on the next one.
+  registerProjectSetTool(server, {
+    cwd: options.cwd,
+    projectUrl: () => config.projectUrl,
+    baseUrl: () => config.baseUrl,
+  });
   registerRoleCreateTool(server, config);
   registerRoleListTool(server, config);
   registerRoleUpdateTool(server, config);

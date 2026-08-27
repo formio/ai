@@ -59,8 +59,49 @@ describe('formio-mcp-setup skill', () => {
     expect(description).toContain('Not for');
   });
 
+  // The too-old branch tells the agent to edit the pin in "the file your client
+  // reads" — which does not exist for a plugin install, where the pin belongs to
+  // the plugin. The missing-server branch already handles that case; without the
+  // same answer here an agent hunts for an `mcpServers` entry nothing wrote, and
+  // writing one leaves two servers configured.
+  it('answers the too-old case for a plugin install as well as a file', () => {
+    const text = body(setupSkillMd);
+    const branch = text.slice(
+      text.indexOf('### Already connected, but too old'),
+      text.indexOf('## Step 2')
+    );
+
+    expect(branch.length).toBeGreaterThan(0);
+    expect(branch).toMatch(/marketplace/i);
+    expect(branch).toMatch(/update the plugin/i);
+  });
+
+  // The remedy "change the pin to the one the Step 2 blocks carry" is circular in
+  // the window this branch was written for. `sync:pins` restamps those blocks only
+  // at release, and skills install straight off the default branch, so between
+  // merging a tool and publishing it the blocks name the very release that lacks
+  // it — and the user is told to upgrade to what they already run, forever. The
+  // branch has to compare the two and say what to do when they match.
+  it('does not send a matching pin round the upgrade loop', () => {
+    const text = body(setupSkillMd);
+    const branch = text.slice(
+      text.indexOf('### Already connected, but too old'),
+      text.indexOf('## Step 2')
+    );
+
+    expect(branch.length).toBeGreaterThan(0);
+    // Compare before editing.
+    expect(branch).toMatch(/already (?:names|carries)|same version|matches the (?:pin|version)/i);
+    // And name the state the comparison can find: the release is not out yet.
+    expect(branch).toMatch(
+      /not (?:yet )?(?:been )?published|no published release|not published yet/i
+    );
+    // Editing a pin to itself is the outcome this branch must forbid.
+    expect(branch).toMatch(/do not edit|nothing to edit|no edit/i);
+  });
+
   // Every client reads a different file, and two do not use `mcpServers` at all.
-  // Writing all four sidesteps having to detect the host.
+  // All four stay documented, because the fallback still writes them all.
   it('documents all four client configurations with the right shape', () => {
     const text = body(setupSkillMd);
 
@@ -71,6 +112,22 @@ describe('formio-mcp-setup skill', () => {
     expect(text).toContain('mcpServers');
     expect(text).toMatch(/"servers"/);
     expect(text).toMatch(/\[mcp_servers\.formio-mcp\]/);
+  });
+
+  // Writing four files for three clients the user does not run is noise the
+  // agent can avoid: it knows which product it is. Detection is by self-
+  // identity, then one question, and only then the write-everything fallback.
+  it("writes the running client's file first, with all four as the fallback", () => {
+    const text = body(setupSkillMd);
+
+    expect(text).toMatch(/client you are running|running client|which client you are/i);
+    // The fallback is explicit, and it is the last resort rather than the default.
+    expect(text).toMatch(/cannot determine|cannot tell|not sure|unclear/i);
+    expect(text).toMatch(/inert/);
+    // Stale directories are not evidence of the running host.
+    expect(text).toMatch(/\.vscode\/|\.cursor\//);
+    // The old rule must be gone: it forbade the detection this step now requires.
+    expect(text).not.toMatch(/Do not try to work out which client/i);
   });
 
   it('launches the published server and hard-codes no configuration', () => {
@@ -158,7 +215,10 @@ describe('preflight contract', () => {
   //
   // formio-mcp-setup was ADDED to the fixture by that same change. It postdated
   // the original snapshot, so nothing was pinning the one description most likely
-  // to drift as the setup flow changed.
+  // to drift as the setup flow changed. It has since moved again: the skill writes
+  // the configuration for the client it is running in rather than all four in one
+  // pass, and the description says so, because the write-everything path is now a
+  // fallback rather than the promise.
   it('left every existing description byte-identical', () => {
     const before = JSON.parse(readFileSync(descriptionSnapshot, 'utf8')) as Record<string, string>;
     const now = Object.fromEntries(

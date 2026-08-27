@@ -179,10 +179,97 @@ export const acknowledgementShape = {
 
 export const projectMappingShape = {
   ...acknowledgementShape,
+  // Overridden: for a writer, "it worked" is not "the write reached disk" — a record
+  // can land and leave the directory no more usable than before, which is the answer
+  // the caller has to act on.
+  ok: z
+    .boolean()
+    .describe(
+      'True when the directory is ready for a deployment call. False means the record WAS written and the directory still resolves no Base URL, because a committed formio.json governs it and supplies none — `message` then carries the report naming the file and the key to add. Do not retry this call; make that edit'
+    ),
   cwd: z.string().describe('Working directory the mapping is keyed against'),
-  projectUrl: z.string().describe('Project URL now active for that directory'),
-  baseUrl: z.string().optional().describe('Deployment URL persisted alongside the project URL'),
+  projectUrl: z
+    .string()
+    .describe(
+      'Project URL now ACTIVE for that directory — what the next tool call will target. Usually the project this call just recorded; where a committed formio.json governs the directory, it is the project THAT file names, because the mapping written here takes effect only if that file goes away. The message says so when the two differ'
+    ),
+  baseUrl: z
+    .string()
+    .optional()
+    .describe(
+      "The deployment that serves `projectUrl`, from the same record — never one record's project beside another record's deployment"
+    ),
   changed: z
     .boolean()
-    .describe('False when the requested mapping was already in place and nothing was written'),
+    .describe(
+      'False when the requested mapping was already in place and nothing was written. True means the RECORD changed, which is not necessarily the same as the ACTIVE project changing — a committed formio.json still outranks it'
+    ),
+};
+
+/**
+ * What `project_get` reports: the resolved configuration, where each half came
+ * from, and which of the three answers this is.
+ *
+ * `status` carries what the CLI's exit codes carry, and for the same reason —
+ * callers branch on the outcome, and a substring of the message is not a
+ * contract. `ok` is the only status with both URLs; `base-url-unresolved` has a
+ * project and no deployment; `not-configured` has neither.
+ */
+export const projectResolutionShape = {
+  status: z
+    .enum(['ok', 'not-configured', 'base-url-unresolved'])
+    .describe(
+      'Which of the three answers this is: "ok" — both URLs resolved; "not-configured" — nothing is mapped for this directory, so ask the user for a Project URL and record it with project_set; "base-url-unresolved" — the project is recorded and its deployment could not be derived, so ask for the Base URL alone and record it with project_set. Treat anything other than "ok" as blocking.'
+    ),
+  cwd: z.string().describe('Working directory the resolution was performed for'),
+  projectUrl: z
+    .string()
+    .optional()
+    .describe('Project URL that resolves for that directory; absent when status is not-configured'),
+  baseUrl: z
+    .string()
+    .optional()
+    .describe('Deployment hosting that project; absent unless status is ok'),
+  projectUrlSource: z
+    .string()
+    .optional()
+    .describe(
+      'Which layer supplied the project URL: committed (a formio.json found by walking up), mapping (the per-directory record project_set writes), or environment (FORMIO_PROJECT_URL, the weakest source)'
+    ),
+  baseUrlSource: z
+    .string()
+    .optional()
+    .describe(
+      'Which layer supplied the base URL: committed, mapping, environment, derived (read off the project URL), or unresolved'
+    ),
+  shadowed: z
+    .array(z.string())
+    .describe('Layers that could have supplied a URL and were overridden, in precedence order'),
+  unpaired: z
+    .array(z.string())
+    .describe(
+      'Values that were overridden by nothing: a deployment recorded with no project beside it, so nothing says which project it serves and it cannot be read. Separate from `shadowed` because the fix differs — a shadowed value is in the wrong record, an unpaired one is in an incomplete record'
+    ),
+  message: z.string().describe('The full human-readable report, including what to do next'),
+  remedy: z
+    .object({
+      tool: z.string().describe('The tool to call — always project_set'),
+      arguments: z
+        .record(z.string(), z.string())
+        .describe(
+          'Arguments this report already knows: the cwd, and the project where one applies'
+        ),
+      supply: z
+        .array(z.string())
+        .describe('The arguments to ask the USER for — one value, added to the arguments above'),
+    })
+    .optional()
+    .describe(
+      'The same remedy the message states, as a call: ask the user for the argument named in `supply`, add it to `arguments`, and call the tool. Absent when the status is "ok" — and absent when no call fixes the state: a deployment missing from a committed formio.json is recorded by editing that file, whose path and key the message names, because this server never writes a committed file. Acting on this rather than parsing the message is what keeps a caller from composing a call the server would refuse — which write reaches the record holding the project depends on that record'
+    ),
+  notes: z
+    .array(z.string())
+    .describe(
+      'Anything set aside while resolving — an unreadable mapping a committed formio.json made irrelevant, a stored value that is not a URL, or the directory this answer is about when no cwd was passed. A URL the server dropped as unusable at startup is on its stderr rather than here, because it was never a candidate for this resolution'
+    ),
 };

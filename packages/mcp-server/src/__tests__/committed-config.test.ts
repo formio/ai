@@ -6,7 +6,6 @@ import {
   CommittedConfigUnusableError,
   COMMITTED_CONFIG_FILE,
   findCommittedConfig,
-  planCommittedConfigWrite,
 } from '../committed-config.js';
 
 // The mapping in ~/.formio/projects.json is keyed by absolute path and lives in a
@@ -215,88 +214,10 @@ describe('the committed formio.json', () => {
     });
   });
 
-  // Where `project set --scope repo` writes. A broken file is the file to repair —
-  // CommittedConfigUnusableError says so in as many words — so the write path has
-  // to land ON it. Falling back to <cwd>/formio.json created a second file in a
-  // subdirectory and left the unusable ancestor governing every sibling of it,
-  // with the reported cause untouched.
-  //
-  // A write recording a DIFFERENT project is the opposite case: rewriting the
-  // ancestor there re-points every sibling folder under it, which made the
-  // per-folder targeting the walk advertises impossible to create.
-  describe('where a repo-scoped write lands', () => {
-    it('amends the nearest existing file when the project is unchanged', () => {
-      repo(root);
-      write(root, { projectUrl: 'https://inside.form.io' });
-      const nested = path.join(root, 'packages', 'thing');
-      fs.mkdirSync(nested, { recursive: true });
-
-      expect(
-        planCommittedConfigWrite({ startDir: nested, projectUrl: 'https://inside.form.io' })
-      ).toEqual({ filePath: path.join(root, COMMITTED_CONFIG_FILE) });
-    });
-
-    it('amends the nearest existing file when no project is being recorded', () => {
-      repo(root);
-      write(root, { projectUrl: 'https://inside.form.io' });
-      const nested = path.join(root, 'packages', 'thing');
-      fs.mkdirSync(nested, { recursive: true });
-
-      expect(planCommittedConfigWrite({ startDir: nested }).filePath).toBe(
-        path.join(root, COMMITTED_CONFIG_FILE)
-      );
-    });
-
-    it('lands in the caller’s own directory when the project differs', () => {
-      repo(root);
-      write(root, { projectUrl: 'https://inside.form.io' });
-      const nested = path.join(root, 'packages', 'thing');
-      fs.mkdirSync(nested, { recursive: true });
-
-      const plan = planCommittedConfigWrite({
-        startDir: nested,
-        projectUrl: 'https://other.form.io',
-      });
-
-      expect(plan.filePath).toBe(path.join(nested, COMMITTED_CONFIG_FILE));
-      expect(plan.shadows?.filePath).toBe(path.join(root, COMMITTED_CONFIG_FILE));
-      expect(plan.shadows?.projectUrl).toBe('https://inside.form.io');
-    });
-
-    it('rewrites the file in the caller’s own directory rather than shadowing it', () => {
-      repo(root);
-      write(root, { projectUrl: 'https://inside.form.io' });
-
-      const plan = planCommittedConfigWrite({
-        startDir: root,
-        projectUrl: 'https://other.form.io',
-      });
-
-      expect(plan.filePath).toBe(path.join(root, COMMITTED_CONFIG_FILE));
-      expect(plan.shadows).toBeUndefined();
-    });
-
-    it('creates one in the caller’s own directory when the walk finds none', () => {
-      repo(root);
-      const nested = path.join(root, 'packages', 'thing');
-      fs.mkdirSync(nested, { recursive: true });
-
-      expect(planCommittedConfigWrite({ startDir: nested }).filePath).toBe(
-        path.join(nested, COMMITTED_CONFIG_FILE)
-      );
-    });
-
-    it('targets an unusable ancestor rather than creating a second file below it', () => {
-      repo(root);
-      write(root, '{ not json');
-      const nested = path.join(root, 'packages', 'thing');
-      fs.mkdirSync(nested, { recursive: true });
-
-      expect(
-        planCommittedConfigWrite({ startDir: nested, projectUrl: 'https://x.form.io' }).filePath
-      ).toBe(path.join(root, COMMITTED_CONFIG_FILE));
-    });
-
+  // The file is hand-authored — this server reads it and never writes it — so its
+  // unusable-file error must instruct the edit rather than name a write this server
+  // no longer has.
+  describe('the repair for an unusable file', () => {
     it('names the offending file on the error itself', () => {
       repo(root);
       write(root, '{ not json');
@@ -309,6 +230,21 @@ describe('the committed formio.json', () => {
           path.join(root, COMMITTED_CONFIG_FILE)
         );
       }
+    });
+
+    it('instructs an edit and says what a usable file holds, naming no writer', () => {
+      repo(root);
+      write(root, '{ not json');
+
+      let message = '';
+      try {
+        findCommittedConfig(root);
+      } catch (error) {
+        message = error instanceof Error ? error.message : String(error);
+      }
+
+      expect(message).toContain('"projectUrl"');
+      expect(message).not.toMatch(/--scope|scope "repo"|scope: "repo"/);
     });
   });
 });

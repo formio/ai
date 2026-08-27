@@ -50,6 +50,27 @@ describe('guidance for a stand-alone server', () => {
     await client.close();
   });
 
+  // The read half of the same surface. These instructions are the ONLY
+  // configuration guidance a stand-alone agent gets, so naming only the writer
+  // left it with no way to learn it can ask what a directory already resolves to —
+  // and an agent that cannot ask interviews the user for a project the server
+  // already has.
+  it('names project_get as the way to read what a directory resolves to', async () => {
+    const server = createServer();
+    const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
+    await server.connect(serverTransport);
+    const client = new Client({ name: 'test-client', version: '0.0.0' });
+    await client.connect(clientTransport);
+
+    const instructions = client.getInstructions() ?? '';
+
+    expect(instructions).toContain('project_get');
+    // Reading is what comes BEFORE the interview, so the instruction has to say
+    // when to call it, not merely that it exists.
+    expect(instructions).toMatch(/before/i);
+    await client.close();
+  });
+
   it('names no client, skill, or plugin in its instructions', async () => {
     const server = createServer();
     const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();

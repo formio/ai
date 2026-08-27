@@ -54,12 +54,12 @@ After both blocks, tell the user the filenames that were written to disk (using 
 Wrote ./template.md and ./template.json.
 ```
 
-Then finish with a short "Next steps" section. This is a **menu you print**, not work you do: this skill writes the artifact pair and hands it back, and it does not run any of the calls below. Whoever does — `formio-application` on its own flow, or you in a later turn once the user asks — owns the project gate for them, which means running `npx -y @formio/mcp@0.11.0 project get --cwd "$(pwd)"` and naming the resolved Project URL before the first write. Never present the import as something already done.
+Then finish with a short "Next steps" section. This is a **menu you print**, not work you do: this skill writes the artifact pair and hands it back, and it does not run any of the calls below. Whoever does — `formio-application` on its own flow, or you in a later turn once the user asks — owns the project gate for them, which means calling `project_get` with `cwd` set to the user's current working directory and naming the resolved Project URL before the first write. Never present the import as something already done.
 
 ```
 ### Next steps
 
-- **Import directly**: `project_import` (MCP tool) with the contents of `template.json`; fall back to `curl -X POST -H "x-jwt-token: $JWT" -H "Content-Type: application/json" -d "{\"template\": $(cat template.json)}" {projectUrl}/import` only when the MCP server is unavailable, substituting the Project URL that `project get` reported
+- **Import directly**: `project_import` (MCP tool) with the contents of `template.json`; fall back to `curl -X POST -H "x-jwt-token: $JWT" -H "Content-Type: application/json" -d "{\"template\": $(cat template.json)}" {projectUrl}/import` only when the MCP server is unavailable, substituting the Project URL the user gave you — `project_get` is a tool on the server this fallback exists for, so there is nothing to ask
 - **Or pass the pair to another skill / tool**:
   - `form_create` (MCP tool) for each entry under `resources` and `forms` in `template.json`
   - `action_create` (MCP tool) for each entry under `actions`; the REST shapes live in `formio-api/references/project-actions` if the MCP server is unavailable

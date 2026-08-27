@@ -29,11 +29,11 @@ describe('project get reports how the base URL was resolved', () => {
   }
 
   it('names a derived base URL as derived, not as mapped or defaulted', () => {
-    writeProjectEntry(
-      '/w/subdir',
-      { FORMIO_PROJECT_URL: 'https://forms.mysite.com/myproject' },
-      cacheDir
-    );
+    writeProjectEntry({
+      cwd: '/w/subdir',
+      env: { FORMIO_PROJECT_URL: 'https://forms.mysite.com/myproject' },
+      cacheDir: cacheDir,
+    });
 
     const result = get('/w/subdir');
 
@@ -44,11 +44,11 @@ describe('project get reports how the base URL was resolved', () => {
   });
 
   it('derives a sub-path deployment without flattening it to the origin', () => {
-    writeProjectEntry(
-      '/w/subpath',
-      { FORMIO_PROJECT_URL: 'https://forms.mysite.com/one/two' },
-      cacheDir
-    );
+    writeProjectEntry({
+      cwd: '/w/subpath',
+      env: { FORMIO_PROJECT_URL: 'https://forms.mysite.com/one/two' },
+      cacheDir: cacheDir,
+    });
 
     const result = get('/w/subpath');
 
@@ -58,11 +58,11 @@ describe('project get reports how the base URL was resolved', () => {
 
   describe('when the base URL cannot be determined', () => {
     beforeEach(() => {
-      writeProjectEntry(
-        '/w/subdomain',
-        { FORMIO_PROJECT_URL: 'https://myproject.mysite.com' },
-        cacheDir
-      );
+      writeProjectEntry({
+        cwd: '/w/subdomain',
+        env: { FORMIO_PROJECT_URL: 'https://myproject.mysite.com' },
+        cacheDir: cacheDir,
+      });
     });
 
     // Exit 1 means "nothing is mapped", whose documented remedy is supplying a

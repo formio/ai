@@ -10,8 +10,8 @@ vi.mock('child_process', () => ({ exec: vi.fn() }));
 // runs on CI, which is exactly what browserless detection refuses to launch a
 // browser in. See auth-browserless.test.ts for the detection behaviour.
 const DEFAULT_CONFIG: ResolvedFormioConfig = {
-  baseUrl: 'https://formio.invalid',
-  projectUrl: 'https://formio.invalid/example',
+  baseUrl: 'https://formio.invalid/sub',
+  projectUrl: 'https://formio.invalid/sub/example',
   forceBrowser: true,
 };
 

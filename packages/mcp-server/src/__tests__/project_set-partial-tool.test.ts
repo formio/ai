@@ -13,7 +13,6 @@ describe('project_set accepts one URL at a time', () => {
     const server = new McpServer({ name: 'test', version: '0.0.0' });
     registerProjectSetTool(server, {
       cwd: () => '/w/server-cwd',
-      baseUrl: () => undefined,
     });
     const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
     await server.connect(serverTransport);
@@ -28,7 +27,10 @@ describe('project_set accepts one URL at a time', () => {
   }
 
   it('updates only the base URL for a directory that already has a project', async () => {
-    writeProjectEntry('/w/tool-mapped', { FORMIO_PROJECT_URL: 'https://myproject.mysite.com' });
+    writeProjectEntry({
+      cwd: '/w/tool-mapped',
+      env: { FORMIO_PROJECT_URL: 'https://myproject.mysite.com' },
+    });
 
     const result = await call({ baseUrl: 'https://forms.mysite.com', cwd: '/w/tool-mapped' });
 
@@ -39,7 +41,7 @@ describe('project_set accepts one URL at a time', () => {
   });
 
   it('rejects a call supplying neither URL, naming both', async () => {
-    writeProjectEntry('/w/tool-mapped2', { FORMIO_PROJECT_URL: 'https://x.form.io' });
+    writeProjectEntry({ cwd: '/w/tool-mapped2', env: { FORMIO_PROJECT_URL: 'https://x.form.io' } });
 
     const result = await call({ cwd: '/w/tool-mapped2' });
 

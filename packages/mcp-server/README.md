@@ -82,7 +82,7 @@ Wired into a client — the same entry as [Connect a client](#connect-a-client),
 
 `FORMIO_API_KEY` is the recommended path — no browser, nothing interactive. Browser login also works if you publish the auth port; see [Headless environments](#headless-environments) for both.
 
-Two container-specific notes regardless of auth mode. Prefer `FORMIO_PROJECT_URL` over the `project_set` tool: `project_set` persists its per-directory mapping to `~/.formio/projects.json`, which lives inside the container and is discarded when it exits. And the `cwd` argument every tool takes refers to a path *inside* the container, not on your host.
+Two container-specific notes regardless of auth mode. Prefer the `FORMIO_PROJECT_URL` environment variable over the `project_set` tool: `project_set` persists its per-directory mapping to `~/.formio/projects.json`, which lives inside the container and is discarded when it exits. And the `cwd` argument every tool takes refers to a path *inside* the container, not on your host.
 
 To reuse a token across container runs, mount the cache directory — it must be writable, since the server rewrites the file when a token is refreshed or cleared:
 
@@ -161,7 +161,7 @@ The same run, step by step:
 
 ![Server card for formio-mcp showing Connected and the docker command it runs](https://raw.githubusercontent.com/formio/ai/main/packages/mcp-server/docs/images/inspector-4-connected.jpg)
 
-**5. Open the Tools tab** for the tools this server exposes. Every server lists all 20 — including `project_set`, which is registered for every client.
+**5. Open the Tools tab** for the tools this server exposes. Every server lists all 21 — including `project_set` and `project_get`, which are registered for every client.
 
 ![Tools tab listing hello, form_create, form_get, form_list and the rest](https://raw.githubusercontent.com/formio/ai/main/packages/mcp-server/docs/images/inspector-5-tools.jpg)
 
@@ -214,7 +214,8 @@ The bundled `@formio/mcp` server exposes these tools. Skills prefer these over r
 | --- | --- |
 | `project_export` | Export the project's complete template (roles, resources, forms, actions) as a portable JSON document. Use before `project_import` to snapshot. |
 | `project_import` | Import a template JSON — additively merges roles, resources, forms, and actions in one call. **Same-machine-name items are overwritten in place; everything else is preserved.** |
-| `project_set` | Persist a Project URL for a directory — in `~/.formio/projects.json` by default, or in a committed `formio.json` with `scope: "repo"`, so the target travels with the code. One server can serve several workspaces. Registered in every client. A mapping written here overrides `FORMIO_PROJECT_URL` in the server environment, which is the weakest source. |
+| `project_get` | Report which project a directory resolves to, which deployment hosts it, and which layer supplied each. The preflight to run before the first call that reads or writes — it answers from inside the server, with the same resolver every other tool uses, so no shell command is needed to ask it. Returns a `status` of `ok`, `not-configured`, or `base-url-unresolved`. |
+| `project_set` | Persist a Project URL for a directory, in `~/.formio/projects.json`. To record the target with the code instead, write a committed `formio.json` in the application's own folder — the server reads that file and never writes it. One server can serve several workspaces. Registered in every client. A mapping written here overrides `FORMIO_PROJECT_URL` in the server environment, which is the weakest source. |
 
 ### Diagnostic
 
@@ -231,7 +232,7 @@ The MCP server supports two authentication modes:
 - **JWT mode (default).** A short-lived local Express server renders the Form.io portal login form; the user signs in once, the JWT comes back via a `/callback` endpoint, and `formioFetch` attaches `x-jwt-token` on every subsequent request. The flow is implicit — the **first authenticated tool call** triggers it on a cache miss. No explicit `authenticate` tool exists.
 - **API-key mode.** Set `FORMIO_API_KEY`. All requests attach `x-token`; the browser flow is skipped entirely.
 
-The JWT is cached in `~/.formio/mcp-tokens.json` (mode `0600`), keyed by `FORMIO_BASE_URL` — one token covers every project on the same deployment. Tokens are valid for roughly seven days; on a cache hit the server checks expiry locally, then revalidates against the server, and falls back to a fresh login if either check fails.
+The JWT is cached in `~/.formio/mcp-tokens.json` (mode `0600`), keyed by the resolved Base URL — one token covers every project on the same deployment. Tokens are valid for roughly seven days; on a cache hit the server checks expiry locally, then revalidates against the server, and falls back to a fresh login if either check fails.
 
 > **What the agent is granted.** JWT mode hands the agent **the JWT of whoever logs in**, so the agent acts with that person's permissions for the token's lifetime — sign in as an administrator and the agent inherits administrator access to the deployment. An API key is scoped to its project instead. Prefer API-key mode for unattended or shared environments, and sign in as a least-privileged user when using JWT mode.
 
@@ -286,7 +287,7 @@ The probe runs lazily — only when the local auth page is actually served.
 | `FORMIO_INSECURE_TLS` | no | `undefined` | Set to `1` to skip TLS verification. Local development only — never against production. |  |  |
 | `FORMIO_FORCE_BROWSER` | no | `0` | Set to `1` to attempt the browser login even where the server detects no browser (CI, a container, SSH with no display). |  |  |
 
-<sub>\* Not at startup — the server starts, lists every tool, and answers `hello` without it; only the tools that read or write Form.io data error, naming `project_set` and this variable. The alternative is the `project_set` tool, which maps a working directory to a project in `~/.formio/projects.json`. Resolution runs by scope, narrowest first: a committed `formio.json` found by walking up from the caller's `cwd`, then the mapping for that `cwd`, then `FORMIO_PROJECT_URL` in the environment as the weakest source, then the error. Map a directory before any client connects with `npx -y @formio/mcp@0.11.0 project set --project-url <url> --cwd <path>` — the deployment is derived from the project URL wherever it can be, so add `--base-url <url>` only when the server says it cannot be determined. `project get --cwd <path>` prints what resolves and which source won. It exits `0` when it resolved, `1` when nothing is mapped for that directory, `2` when the command could not answer (a usage error, a malformed URL, an unreadable `~/.formio/projects.json`), and `3` when a project resolved but its Base URL could not be determined — so a caller can tell "nothing here yet" from "this failed" from "half configured, and here is the one value missing".</sub>
+<sub>\* Not at startup — the server starts, lists every tool, and answers `hello` without it; only the tools that read or write Form.io data error, naming `project_set` and this variable. The alternative is the `project_set` tool, which maps a working directory to a project in `~/.formio/projects.json`. Resolution runs by scope, narrowest first: a committed `formio.json` found by walking up from the caller's `cwd`, then the mapping for that `cwd`, then `FORMIO_PROJECT_URL` in the environment as the weakest source, then the error. Map a directory before any client connects with `npx -y @formio/mcp@0.11.0 project set --project-url <url> --cwd <path>` — the deployment is derived from the project URL wherever it can be, so add `--base-url <url>` only when the server says it cannot be determined. `project get --cwd <path>` prints what resolves and which source won. It exits `0` when it resolved, `1` when nothing is mapped for that directory, `2` when the command could not answer (a usage error, a malformed URL, an unreadable `~/.formio/projects.json`), and `3` when a project resolved but its Base URL could not be determined — so a caller can tell "nothing here yet" from "this failed" from "half configured, and here is the one value missing". `project set --cwd <path>` exits `0` when the directory is ready to serve a call, `1` when a named value is still missing, `2` when the command could not answer, and `3` when the record WAS written and the directory still resolves no Base URL — a committed `formio.json` governs it and supplies none, so the remedy is an edit to that file rather than another write.</sub>
 
 ---
 
@@ -296,13 +297,13 @@ Form.io's privacy policy covers the Form.io Services this server talks to: **htt
 
 What the server itself does with data, which is the part the policy above cannot describe:
 
-**Where your data goes.** Only to the Form.io deployment you configure. Every request targets `FORMIO_BASE_URL` / `FORMIO_PROJECT_URL` — your own SaaS project or your self-hosted server. The server sends nothing to Form.io when you are self-hosted, and there is no telemetry, analytics, or usage reporting of any kind.
+**Where your data goes.** Only to the Form.io deployment you configure. Every request targets the Project URL and Base URL that resolve for your working directory — your own SaaS project or your self-hosted server. The server sends nothing to Form.io when you are self-hosted, and there is no telemetry, analytics, or usage reporting of any kind.
 
 **What is stored on your machine.** Two files under `~/.formio/`, both written with mode `0600`:
 
 | File | Contents | Written when |
 | --- | --- | --- |
-| `mcp-tokens.json` | The JWT from the browser login, keyed by `FORMIO_BASE_URL` | You sign in through the browser |
+| `mcp-tokens.json` | The JWT from the browser login, keyed by the resolved Base URL | You sign in through the browser |
 | `projects.json` | A per-directory map of project and base URLs | `project_set` runs |
 
 Form data and submissions are never written to disk — they pass through in memory to answer a tool call.

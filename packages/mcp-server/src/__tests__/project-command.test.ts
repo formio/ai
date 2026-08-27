@@ -70,7 +70,11 @@ describe('project command', () => {
     });
 
     it('preserves mappings for other working directories', () => {
-      writeProjectEntry('/other/path', { FORMIO_PROJECT_URL: 'https://other.form.io' }, cacheDir);
+      writeProjectEntry({
+        cwd: '/other/path',
+        env: { FORMIO_PROJECT_URL: 'https://other.form.io' },
+        cacheDir: cacheDir,
+      });
 
       runProjectCommand(
         ['project', 'set', '--project-url', 'https://x.form.io', '--cwd', '/abs/path'],
@@ -94,77 +98,19 @@ describe('project command', () => {
       );
     });
 
-    // The global applies to the one shape that derives nothing: a path-less
-    // project URL on a customer domain, whose deployment is a sibling sub-domain.
-    it('falls back to FORMIO_BASE_URL from the environment when the shape derives none', () => {
-      runProjectCommand(
-        ['project', 'set', '--project-url', 'https://myproject.mysite.com', '--cwd', '/abs/path'],
-        { cacheDir, env: { FORMIO_BASE_URL: 'https://forms.mysite.com' } }
-      );
-
-      expect(readProjectEntry('/abs/path', cacheDir)?.env.FORMIO_BASE_URL).toBe(
-        'https://forms.mysite.com'
-      );
-    });
-
-    // One global answering a per-project question. Where the project URL derives
-    // its own deployment, persisting the global replaces a correct per-project
-    // answer with a stale one that then outranks derivation for this directory
-    // forever.
-    it('does not persist the env global over a base URL the project URL derives', () => {
-      runProjectCommand(
-        ['project', 'set', '--project-url', 'https://forms.mysite.com/app', '--cwd', '/abs/path'],
-        { cacheDir, env: { FORMIO_BASE_URL: 'https://api.form.io' } }
-      );
-
-      expect(readProjectEntry('/abs/path', cacheDir)).toEqual({
-        env: { FORMIO_PROJECT_URL: 'https://forms.mysite.com/app' },
-      });
-    });
-
-    // The terminal running the CLI is not the process the MCP server was
-    // launched in, so FORMIO_BASE_URL is usually absent there. Dropping the
-    // mapped base URL on a re-set would silently point a self-hosted directory
-    // back at api.form.io — the wrong-deployment login this whole mapping exists
-    // to prevent.
-    it('keeps the mapped base URL when --base-url and the environment supply none', () => {
-      writeProjectEntry(
-        '/abs/path',
-        {
-          FORMIO_PROJECT_URL: 'https://old.acme.com',
-          FORMIO_BASE_URL: 'https://forms.acme.com',
-        },
-        cacheDir
-      );
-
-      const result = runProjectCommand(
-        ['project', 'set', '--project-url', 'https://new.acme.com', '--cwd', '/abs/path'],
-        { cacheDir, env: {} }
-      );
-
-      expect(result.exitCode).toBe(0);
-      expect(readProjectEntry('/abs/path', cacheDir)).toEqual({
-        env: {
-          FORMIO_PROJECT_URL: 'https://new.acme.com',
-          FORMIO_BASE_URL: 'https://forms.acme.com',
-        },
-      });
-      expect(result.stdout).toContain('https://forms.acme.com');
-    });
-
     // An empty environment value is how a host passes a prompt the user cleared,
     // and it is falsy on the very next line — so a nullish fallback hands the
     // rewrite an empty string and the mapped base URL disappears anyway. Same
     // deployment-revert as above, reached by the empty-value route.
     it('keeps the mapped base URL when FORMIO_BASE_URL is set but empty', () => {
-      writeProjectEntry(
-        '/abs/path',
-        {
+      writeProjectEntry({
+        cwd: '/abs/path',
+        env: {
           FORMIO_PROJECT_URL: 'https://old.acme.com',
           FORMIO_BASE_URL: 'https://forms.acme.com',
         },
-        cacheDir
-      );
+        cacheDir: cacheDir,
+      });
 
       runProjectCommand(
         ['project', 'set', '--project-url', 'https://new.acme.com', '--cwd', '/abs/path'],
@@ -180,14 +126,14 @@ describe('project command', () => {
     // the mapping, then the environment. A shell that does export FORMIO_BASE_URL
     // must not re-point a mapped self-hosted directory at the global value.
     it('prefers the mapped base URL over FORMIO_BASE_URL from the environment', () => {
-      writeProjectEntry(
-        '/abs/path',
-        {
+      writeProjectEntry({
+        cwd: '/abs/path',
+        env: {
           FORMIO_PROJECT_URL: 'https://old.acme.com',
           FORMIO_BASE_URL: 'https://forms.acme.com',
         },
-        cacheDir
-      );
+        cacheDir: cacheDir,
+      });
 
       runProjectCommand(
         ['project', 'set', '--project-url', 'https://new.acme.com', '--cwd', '/abs/path'],
@@ -200,14 +146,14 @@ describe('project command', () => {
     });
 
     it('lets an explicit --base-url replace the mapped one', () => {
-      writeProjectEntry(
-        '/abs/path',
-        {
+      writeProjectEntry({
+        cwd: '/abs/path',
+        env: {
           FORMIO_PROJECT_URL: 'https://old.forms.acme.com/old',
           FORMIO_BASE_URL: 'https://forms.acme.com',
         },
-        cacheDir
-      );
+        cacheDir: cacheDir,
+      });
 
       runProjectCommand(
         [
@@ -248,23 +194,6 @@ describe('project command', () => {
           FORMIO_PROJECT_URL: 'https://x.form.io',
           FORMIO_BASE_URL: 'https://api.form.io',
         },
-      });
-    });
-
-    // The shell this runs in is whatever the agent inherited, and a client that
-    // exports FORMIO_BASE_URL from an unexpanded manifest variable exports the
-    // literal. Failing the command on it makes `project set --project-url …` —
-    // the exact line formio-mcp-setup runs — unusable for a user who supplied no
-    // base URL of their own.
-    it('ignores an unusable FORMIO_BASE_URL from the environment instead of failing', () => {
-      const result = runProjectCommand(
-        ['project', 'set', '--project-url', 'https://x.form.io', '--cwd', '/abs/path'],
-        { cacheDir, env: { FORMIO_BASE_URL: '${FORMIO_BASE_URL}' } }
-      );
-
-      expect(result.exitCode).toBe(0);
-      expect(readProjectEntry('/abs/path', cacheDir)).toEqual({
-        env: { FORMIO_PROJECT_URL: 'https://x.form.io' },
       });
     });
 
@@ -355,14 +284,14 @@ describe('project command', () => {
     // repair reporting the very error it was run to clear, with nothing saying the
     // value came from the map rather than from the command line.
     it('repairs a directory whose mapped base URL is not a URL', () => {
-      writeProjectEntry(
-        '/abs/path',
-        {
+      writeProjectEntry({
+        cwd: '/abs/path',
+        env: {
           FORMIO_PROJECT_URL: 'https://old.form.io',
           FORMIO_BASE_URL: 'forms.mysite.com',
         },
-        cacheDir
-      );
+        cacheDir: cacheDir,
+      });
 
       const result = runProjectCommand(
         ['project', 'set', '--project-url', 'https://new.form.io', '--cwd', '/abs/path'],
@@ -371,20 +300,19 @@ describe('project command', () => {
 
       expect(result.exitCode).toBe(0);
       expect(readProjectEntry('/abs/path', cacheDir)).toEqual({
-        env: { FORMIO_PROJECT_URL: 'https://new.form.io' },
+        env: { FORMIO_PROJECT_URL: 'https://new.form.io', FORMIO_BASE_URL: 'https://api.form.io' },
       });
-      expect(result.stderr).toContain('FORMIO_BASE_URL');
     });
 
     it('lets --base-url replace an unusable mapped base URL', () => {
-      writeProjectEntry(
-        '/abs/path',
-        {
+      writeProjectEntry({
+        cwd: '/abs/path',
+        env: {
           FORMIO_PROJECT_URL: 'https://old.form.io',
           FORMIO_BASE_URL: 'forms.mysite.com',
         },
-        cacheDir
-      );
+        cacheDir: cacheDir,
+      });
 
       const result = runProjectCommand(
         [
@@ -409,11 +337,14 @@ describe('project command', () => {
 
   describe('project get', () => {
     it('reports the mapping as the winning source', () => {
-      writeProjectEntry(
-        '/abs/path',
-        { FORMIO_PROJECT_URL: 'https://mapped.form.io', FORMIO_BASE_URL: 'https://api.form.io' },
-        cacheDir
-      );
+      writeProjectEntry({
+        cwd: '/abs/path',
+        env: {
+          FORMIO_PROJECT_URL: 'https://mapped.form.io',
+          FORMIO_BASE_URL: 'https://api.form.io',
+        },
+        cacheDir: cacheDir,
+      });
 
       const result = runProjectCommand(['project', 'get', '--cwd', '/abs/path'], {
         cacheDir,
@@ -430,7 +361,11 @@ describe('project command', () => {
     // is REPORTED rather than dropped — otherwise "my FORMIO_PROJECT_URL is being
     // ignored" has no answer in this output.
     it('reports the mapping as the winner and the environment as shadowed', () => {
-      writeProjectEntry('/abs/path', { FORMIO_PROJECT_URL: 'https://mapped.form.io' }, cacheDir);
+      writeProjectEntry({
+        cwd: '/abs/path',
+        env: { FORMIO_PROJECT_URL: 'https://mapped.form.io' },
+        cacheDir: cacheDir,
+      });
 
       const result = runProjectCommand(['project', 'get', '--cwd', '/abs/path'], {
         cacheDir,
@@ -452,14 +387,14 @@ describe('project command', () => {
     // answer, not an answer of "nothing here", so it must not land on the
     // interview path either.
     it('exits 2 rather than reporting a malformed mapped URL as the answer', () => {
-      writeProjectEntry(
-        '/abs/path',
-        {
+      writeProjectEntry({
+        cwd: '/abs/path',
+        env: {
           FORMIO_PROJECT_URL: 'https://mapped.form.io',
           FORMIO_BASE_URL: 'forms.mysite.com',
         },
-        cacheDir
-      );
+        cacheDir: cacheDir,
+      });
 
       const result = runProjectCommand(['project', 'get', '--cwd', '/abs/path'], {
         cacheDir,
@@ -467,7 +402,6 @@ describe('project command', () => {
       });
 
       expect(result.exitCode).toBe(2);
-      expect(result.stderr).toContain('FORMIO_BASE_URL');
       expect(result.stderr).toContain('/abs/path');
     });
 
@@ -534,8 +468,10 @@ describe('project command', () => {
     it('names both variables when the environment supplied the project and the base URL', () => {
       const result = runProjectCommand(['project', 'get', '--cwd', '/abs/path'], {
         cacheDir,
+        // Customer-hosted: a form.io project is served by https://api.form.io alone,
+        // so its deployment is derived and never credited to a variable.
         env: {
-          FORMIO_PROJECT_URL: 'https://pinned.form.io',
+          FORMIO_PROJECT_URL: 'https://pinned.acme.com',
           FORMIO_BASE_URL: 'https://forms.acme.com',
         },
       });
@@ -545,11 +481,14 @@ describe('project command', () => {
     });
 
     it('still collapses to one clause when a single source supplied both', () => {
-      writeProjectEntry(
-        '/abs/path',
-        { FORMIO_PROJECT_URL: 'https://mapped.form.io', FORMIO_BASE_URL: 'https://api.form.io' },
-        cacheDir
-      );
+      writeProjectEntry({
+        cwd: '/abs/path',
+        env: {
+          FORMIO_PROJECT_URL: 'https://mapped.form.io',
+          FORMIO_BASE_URL: 'https://api.form.io',
+        },
+        cacheDir: cacheDir,
+      });
 
       const result = runProjectCommand(['project', 'get', '--cwd', '/abs/path'], {
         cacheDir,
@@ -574,7 +513,11 @@ describe('project command', () => {
     // A plugin-launched server carries its own env block, so reporting the
     // mapping as the resolved truth would be a claim this command cannot make.
     it('says the server environment is not visible when the mapping won', () => {
-      writeProjectEntry('/abs/path', { FORMIO_PROJECT_URL: 'https://mapped.form.io' }, cacheDir);
+      writeProjectEntry({
+        cwd: '/abs/path',
+        env: { FORMIO_PROJECT_URL: 'https://mapped.form.io' },
+        cacheDir: cacheDir,
+      });
 
       const result = runProjectCommand(['project', 'get', '--cwd', '/abs/path'], {
         cacheDir,
@@ -592,7 +535,11 @@ describe('project command', () => {
     // cannot change this answer. Reading that line, an agent abandons the
     // project_set repair that would have worked.
     it('does not claim an invisible environment outranks the mapping', () => {
-      writeProjectEntry('/abs/path', { FORMIO_PROJECT_URL: 'https://mapped.form.io' }, cacheDir);
+      writeProjectEntry({
+        cwd: '/abs/path',
+        env: { FORMIO_PROJECT_URL: 'https://mapped.form.io' },
+        cacheDir: cacheDir,
+      });
 
       const result = runProjectCommand(['project', 'get', '--cwd', '/abs/path'], {
         cacheDir,
@@ -617,7 +564,11 @@ describe('project command', () => {
           baseUrl: 'https://committed.mysite.com',
         })
       );
-      writeProjectEntry(repo, { FORMIO_BASE_URL: 'https://mapped.mysite.com' }, cacheDir);
+      writeProjectEntry({
+        cwd: repo,
+        env: { FORMIO_BASE_URL: 'https://mapped.mysite.com' },
+        cacheDir: cacheDir,
+      });
 
       const result = runProjectCommand(['project', 'get', '--cwd', repo], {
         cacheDir,
@@ -662,11 +613,14 @@ describe('project command', () => {
     // the literal here and calling it the winning source describes a server that
     // does not exist.
     it('drops an unusable FORMIO_PROJECT_URL and reports the mapping, as the server does', () => {
-      writeProjectEntry(
-        '/abs/path',
-        { FORMIO_PROJECT_URL: 'https://mapped.form.io', FORMIO_BASE_URL: 'https://api.form.io' },
-        cacheDir
-      );
+      writeProjectEntry({
+        cwd: '/abs/path',
+        env: {
+          FORMIO_PROJECT_URL: 'https://mapped.form.io',
+          FORMIO_BASE_URL: 'https://api.form.io',
+        },
+        cacheDir: cacheDir,
+      });
 
       const result = runProjectCommand(['project', 'get', '--cwd', '/abs/path'], {
         cacheDir,
@@ -683,7 +637,11 @@ describe('project command', () => {
     // env, cwd and cacheDir are injected. A note written straight to
     // process.stderr would be the one part no caller can see.
     it('returns the dropped-value note in stderr rather than writing it out of band', () => {
-      writeProjectEntry('/abs/path', { FORMIO_PROJECT_URL: 'https://mapped.form.io' }, cacheDir);
+      writeProjectEntry({
+        cwd: '/abs/path',
+        env: { FORMIO_PROJECT_URL: 'https://mapped.form.io' },
+        cacheDir: cacheDir,
+      });
 
       const result = runProjectCommand(['project', 'get', '--cwd', '/abs/path'], {
         cacheDir,
@@ -702,14 +660,14 @@ describe('project command', () => {
     // split-clause case was an artifact of the two halves resolving in opposite
     // directions.
     it('collapses to one clause when both halves come from the mapping', () => {
-      writeProjectEntry(
-        '/abs/path',
-        {
+      writeProjectEntry({
+        cwd: '/abs/path',
+        env: {
           FORMIO_PROJECT_URL: 'https://myproject.mysite.com',
           FORMIO_BASE_URL: 'https://forms.mysite.com',
         },
-        cacheDir
-      );
+        cacheDir: cacheDir,
+      });
 
       const result = runProjectCommand(['project', 'get', '--cwd', '/abs/path'], {
         cacheDir,
@@ -727,23 +685,28 @@ describe('project command', () => {
     // the string the mapping holds, so a value comparison credits the mapping for
     // a value it never supplied, and keeps a caveat about a mapping nothing read.
     it('does not credit the mapping for a default that merely matches it', () => {
-      writeProjectEntry(
-        '/abs/path',
-        {
+      // A deployment that legitimately serves this project, and that also happens
+      // to be the string the environment holds — so a value comparison would credit
+      // the wrong record. (api.form.io cannot stand in here any more: the hosted
+      // cloud serves only form.io projects, so pairing it with a customer project is
+      // refused.)
+      writeProjectEntry({
+        cwd: '/abs/path',
+        env: {
           FORMIO_PROJECT_URL: 'https://proj-a.mysite.com',
-          FORMIO_BASE_URL: 'https://api.form.io',
+          FORMIO_BASE_URL: 'https://forms.mysite.com',
         },
-        cacheDir
-      );
+        cacheDir: cacheDir,
+      });
 
       const result = runProjectCommand(['project', 'get', '--cwd', '/abs/path'], {
         cacheDir,
         env: { FORMIO_PROJECT_URL: 'https://examples.form.io' },
       });
 
-      // The mapping supplies both halves now, so its own api.form.io IS the
-      // answer rather than a default that happens to match.
-      expect(result.stdout).toContain('Base URL:    https://api.form.io');
+      // The mapping supplies both halves now, so its own value IS the answer rather
+      // than a default that happens to match.
+      expect(result.stdout).toContain('Base URL:    https://forms.mysite.com');
       expect(result.stdout).toMatch(/Source:.*working-directory mapping/);
       expect(result.stdout).toMatch(/not visible/);
     });
@@ -763,14 +726,14 @@ describe('project command', () => {
     });
 
     it('drops an unusable FORMIO_BASE_URL and reports the mapped deployment', () => {
-      writeProjectEntry(
-        '/abs/path',
-        {
+      writeProjectEntry({
+        cwd: '/abs/path',
+        env: {
           FORMIO_PROJECT_URL: 'https://forms.acme.com/app',
           FORMIO_BASE_URL: 'https://forms.acme.com',
         },
-        cacheDir
-      );
+        cacheDir: cacheDir,
+      });
 
       const result = runProjectCommand(['project', 'get', '--cwd', '/abs/path'], {
         cacheDir,

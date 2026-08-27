@@ -208,7 +208,7 @@ Email addresses in `emails`, `cc`, `bcc` also support template variables, allowi
 
 ### config tokens — require project public configuration
 
-Any `{{ config.<key> }}` token (e.g. `{{ config.appUrl }}` for a link back to the app) reads from the **project's public configuration**. This `appUrl` is a key the project owner chose and is NOT `FormioAppConfig.appUrl` from the Angular skills — it is not the Project URL, has no relationship to it, and is not resolved by `project get`. If that key is not present in the project config, the token renders as an empty string and the email ships with a blank link. Whenever a template or subject references `{{ config.<something> }}`, that `<something>` MUST be added to the project's public config first.
+Any `{{ config.<key> }}` token (e.g. `{{ config.appUrl }}` for a link back to the app) reads from the **project's public configuration**. This `appUrl` is a key the project owner chose and is NOT `FormioAppConfig.appUrl` from the Angular skills — it is not the Project URL, has no relationship to it, and is not resolved by `project_get`. If that key is not present in the project config, the token renders as an empty string and the email ships with a blank link. Whenever a template or subject references `{{ config.<something> }}`, that `<something>` MUST be added to the project's public config first.
 
 Set it with a `PUT` to the project endpoint, passing a `config` object:
 

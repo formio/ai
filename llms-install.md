@@ -17,8 +17,8 @@ The server starts with no configuration at all, lists its tools, and raises an a
 
 Two values exist if the user volunteers them or asks to pin a project:
 
-- **`FORMIO_PROJECT_URL`** — the full URL of the Form.io project, e.g. `https://myproject.form.io`, or `https://your-host/project-name` when self-hosted.
-- **`FORMIO_BASE_URL`** — the parent of the project URL. Defaults to `https://api.form.io`. Set it only when self-hosting or using Form.io Enterprise.
+- **`FORMIO_PROJECT_URL`** — the full URL of the Form.io project, e.g. `https://myproject.form.io`, or `https://your-host/project-name` when self-hosted. The weakest of the three project sources: a committed `formio.json` and the per-directory mapping `project_set` writes both override it, so it pins nothing.
+- **`FORMIO_BASE_URL`** — the deployment hosting that project. There is **no default**: it is derived from the project URL — `https://api.form.io` for a project on a `form.io` host, and the parent path for a project addressed as a sub-directory — so leave it unset. The one shape it cannot be derived from is a project URL carrying no path on a customer domain, whose deployment is a sibling sub-domain; set it only if the user names that value, and never guess `https://api.form.io` for a project that is not on a `form.io` host. A value that cannot be this project's deployment is discarded with a note rather than used.
 
 Do **not** set `FORMIO_API_KEY` unless the user explicitly provides one. Authentication defaults to a browser-based portal-login flow triggered on the first authenticated tool call, which is the intended path and requires no stored secret. Never invent an API key value or commit one to a file.
 
@@ -104,4 +104,4 @@ npx -y @formio/mcp@0.11.0 project get --cwd <absolute path>
 
 Call the `hello` tool — it needs no authentication and confirms the server is reachable. Then call `form_list`, which triggers the login flow on first use.
 
-If `form_list` fails with a missing-configuration error, `FORMIO_PROJECT_URL` is unset or wrong. Requires Node.js 20 or newer.
+If `form_list` fails with a missing-configuration error, nothing is recorded for that working directory yet — the error names the value to ask for and the `project_set` call that records it, so relay it rather than reaching for an environment variable, which any mapping overrides anyway. Requires Node.js 20 or newer.

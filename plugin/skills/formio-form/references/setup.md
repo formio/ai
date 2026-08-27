@@ -58,15 +58,15 @@ These are the only two supported inclusion modes. Never import from `@formio/cor
 
 ## URL configuration
 
-**Where these two values come from.** The hosts below are illustrations. When you write these calls into a real application, take both URLs from the MCP server rather than typing them — run `npx -y @formio/mcp@0.11.0 project get --cwd "$(pwd)"` and use exactly what it prints: its `Project URL` for `setProjectUrl`, its `Base URL` for `setBaseUrl`. Do not hardcode an example host, do not derive either URL from the other, and do not carry a value over from another project or an earlier session — the mapping the server reports is what every build-time Form.io tool call resolves, so a different value here ships an application pointed at a deployment the tooling is not managing. If the command reports a value missing, relay its instruction, persist the answer with the `project set` command it names, and re-run it.
+**Where these two values come from.** The hosts below are illustrations — never ship one. Take both URLs from whichever of the two paths applies, per [`project-urls.md`](../../formio-mcp-setup/references/project-urls.md). **If the Form.io MCP tools are callable by you**, call `project_get` with `cwd` set to the user's current working directory and use exactly what it reports: its `projectUrl` for `setProjectUrl`, its `baseUrl` for `setBaseUrl`; if it reports a value missing, relay its instruction, persist the answer with `project_set`, and call it again. **If they are not, ask the user** — for the Project URL first and alone, deriving the Base URL from it, and asking for the Base URL only in the one shape where it cannot be derived. Do not install the MCP server to obtain these two values: writing them into an application reaches no deployment. Either way, do not hardcode an example host, do not derive either URL from the other, and do not carry a value over from another project or an earlier session — a wrong value here ships an application pointed at a deployment nobody is managing.
 
-Every deployment shape is handled by that one command, so there is nothing to work out here: whichever routing the deployment uses, `project get` reports the pair that matches it.
+Every deployment shape is handled by that one tool, so there is nothing to work out here: whichever routing the deployment uses, `project_get` reports the pair that matches it.
 
 ```js
 import { Formio } from '@formio/js';
 
-Formio.setBaseUrl('https://forms.mysite.com'); // the Base URL from `project get`
-Formio.setProjectUrl('https://forms.mysite.com/myproject'); // the Project URL from `project get`
+Formio.setBaseUrl('https://forms.mysite.com'); // the Base URL from `project_get`
+Formio.setProjectUrl('https://forms.mysite.com/myproject'); // the Project URL from `project_get`
 ```
 
 Form URLs passed to `Formio.createForm` are `{projectUrl}/{formPath}`.

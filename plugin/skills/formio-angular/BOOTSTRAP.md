@@ -12,11 +12,13 @@ BOOTSTRAP also installs the Form.io SDKs (`@formio/angular`, `@formio/js`) and t
 
 ## When to skip this phase
 
-Skip BOOTSTRAP if any of the following hold in the target working directory:
+Everything in this phase happens at `workspaceRoot`, the absolute path Pre-flight captured and SETUP stashed. Read it from there rather than from the shell: give every command below an absolute path or run it as `cd "<workspaceRoot>" && <command>`, and never let a `cd` from earlier in the session decide where a scaffold lands.
 
-1. `angular.json` exists at the workspace root — an Angular workspace is already present. The user invoked `formio-angular` against an existing app; honor that and go straight to CONFIG.
+Skip BOOTSTRAP if any of the following hold at `workspaceRoot`:
+
+1. `angular.json` exists at `workspaceRoot` — an Angular workspace is already present. The user invoked `formio-angular` against an existing app; honor that and go straight to CONFIG.
 2. `package.json` exists and lists `@angular/core` as a dependency — same as above, slightly different detection signal (monorepos sometimes relocate `angular.json`).
-3. `formio-application` invoked you in handoff mode and its handoff context carries a `workspacePath` that already contains `angular.json` — trust the orchestrator's detection.
+3. `formio-application` invoked you in handoff mode and the `workspacePath` it passed — which is `workspaceRoot` — already contains `angular.json`; trust the orchestrator's detection.
 
 If any of those hit, tell the user in one sentence: "Angular workspace already present at `<path>` — skipping BOOTSTRAP, continuing to CONFIG." Do not re-run `npx skills add` on a workspace that already exists; it is not destructive but it is noise.
 
@@ -104,15 +106,17 @@ State three things with the offer: the source is the Angular team's official rep
 
 **If the user agrees**, run it exactly once per session, before invoking `angular-new-app`, and report what it installed.
 
-- `-a <agent>` is the client you are actually running in — substitute it (`claude-code`, `cursor`, `codex`, `copilot`, …) so the skills register where this session will look for them. If you cannot determine the running client, omit the flag entirely: the default target is the universal `.agents/skills/` directory, which Cursor, Codex, and Copilot all read, and which Claude Code reads through a symlink. Never hardcode one client.
+- `-a <agent>` is the client you are actually running in — substitute it (`claude-code`, `cursor`, `codex`, `copilot`, …) so the skills register where this session will look for them. If you cannot determine the running client, omit the flag entirely: the default target is the universal `.agents/skills/` directory, which Cursor, Codex, and Copilot all read, and which Claude Code reads through a symlink. Never hardcode one client. Run the command from `workspaceRoot` and stay there — those directories are where the CLI writes, not somewhere to move the shell to, and a session that walks into one scaffolds the user's application inside their agent configuration.
 - `-y` accepts the default install location and any prompts the `skills` CLI emits. It does not stand in for the user's approval above — that approval is what allows the command to run at all.
 - If the command fails, never retry it against a different source. No other repository, fork, or mirror stands in for `angular/skills`, and no hand-assembled copy of those skills stands in for the CLI that installs them.
 
 **If the user declines — or the install fails and they do not want to retry — scaffold the workspace locally instead.** Run the Angular CLI directly, pinned to the major resolved in Step 1, in the target directory:
 
 ```bash
-npx -y @angular/cli@<FORMIO_ANGULAR_SUPPORTED_MAJOR> new <project-name> --directory . --routing --style=scss
+cd "<workspaceRoot>" && npx -y @angular/cli@<FORMIO_ANGULAR_SUPPORTED_MAJOR> new <project-name> --directory . --routing --style=scss
 ```
+
+`--directory .` is relative, so the `cd` in front of it is what decides where the workspace lands. Substitute the absolute `workspaceRoot` there; do not run the command bare and trust the shell to already be in the right place.
 
 Show the command and get approval for it too, then continue at Step 4 — Step 3 does not apply, because there is no `angular-new-app` to delegate to. The delegated path stays the default because the Angular team's skill encodes current `ng new` practice and keeps up with it; this fallback exists so declining a third-party skill install never leaves the user stuck, not because the two are equivalent.
 
@@ -122,7 +126,7 @@ Skip this step entirely when Step 2 took the local `@angular/cli` fallback — t
 
 What to pass to `angular-new-app`:
 
-- **Working directory:** the absolute path where the workspace should be created. Usually the cwd, or the `workspacePath` from `formio-application`'s handoff context.
+- **Working directory:** `workspaceRoot`, the absolute path Pre-flight captured and SETUP stashed. Pass that string. Do not pass `.`, do not pass a path relative to anything, and do not re-read the shell's current directory to fill this in — that is the value a stray `cd` corrupts.
 - **Project name (if asked):** offer a name derived from the Form.io `Project URL`'s subdomain if the user gave one (e.g., `https://foo.form.io` → `foo`). Otherwise let `angular-new-app` default to the directory name.
 - **Angular version (critical):** pass the `FORMIO_ANGULAR_TARGET_VERSION` resolved in Step 1 — the latest patch of the highest Angular major `@formio/angular` supports, or, on the offline path, a bare major the user named. Either form is valid here: `@angular/cli@<major>` resolves the newest CLI in that major, so pass a bare major through unchanged rather than padding it to `<major>.0.0`. If `angular-new-app` exposes a version / CLI-version option, use it; if it shells out to `@angular/cli` and takes CLI flags, pass `@angular/cli@<FORMIO_ANGULAR_SUPPORTED_MAJOR>` so `npx` resolves the matching CLI major before running `ng new`. Always target the newest Angular `@formio/angular` supports; the only thing to avoid is an even-newer Angular major that `@formio/angular` has not yet declared, which would break `npm install` at Step 4.
 - **Intent note:** "This workspace will be wired against `@formio/angular@<version>`, which supports Angular `<major>`. The Form.io integration (config, auth, resource NgModules) is generated in subsequent phases by `formio-angular` and its nested Resources sub-skill at `./formio-angular-resources/SKILL.md`." The Angular skill does not need this for correctness, but surfacing it keeps the flow transparent to the user watching the transcript.
@@ -133,10 +137,12 @@ Do not override `angular-new-app`'s approval gates — it runs its own, and laye
 
 Before advancing, verify all of the following exist:
 
-- `<workspace>/angular.json`
-- `<workspace>/src/app/app-module.ts`
-- `<workspace>/package.json` with `@angular/core` present at the major resolved in Step 1
-- `<workspace>/package.json` with `@formio/angular` pinned as `"^<FORMIO_ANGULAR_VERSION>"` and `@formio/js` pinned as `"^<FORMIO_JS_VERSION>"`
+- `<workspaceRoot>/angular.json`
+- `<workspaceRoot>/src/app/app-module.ts`
+- `<workspaceRoot>/package.json` with `@angular/core` present at the major resolved in Step 1
+- `<workspaceRoot>/package.json` with `@formio/angular` pinned as `"^<FORMIO_ANGULAR_VERSION>"` and `@formio/js` pinned as `"^<FORMIO_JS_VERSION>"`
+
+Check them at that absolute path, spelled out. A check written against "the workspace" and run wherever the shell sits passes in the wrong tree and reports a scaffold that is not where anyone will look for it. If `angular.json` is absent at `workspaceRoot`, stop this phase and find where it actually landed — a tree written to the wrong directory is a scaffold to move or delete with the user's say-so, not one to patch around or re-run on top of.
 
 If any are missing, something went wrong inside the scaffolding step (`angular-new-app`, or the `@angular/cli` fallback) or the follow-up install. Do not patch around it; stop BOOTSTRAP and ask the user whether they want to retry, switch to an existing workspace, or abort. If `@angular/core` in the generated `package.json` is a different major than `FORMIO_ANGULAR_SUPPORTED_MAJOR`, the `angular-new-app` invocation did not honor the version pin — stop and surface the mismatch before continuing. If the Form.io entries landed as exact pins or `~` ranges, rewrite them to `^` as described above and re-run `npm install`.
 
@@ -157,7 +163,7 @@ e.g., `npm install --save @formio/angular@^10.0.1 @formio/js@^5.3.3`. The result
 }
 ```
 
-Run this from inside the workspace directory created by `angular-new-app`. The caret prefix matters — npm's default save-prefix writes `^` already, but do NOT override the user's `.npmrc` if they have configured `save-prefix=~` or `save-exact=true`; in that case, invoke `npm install --save --save-prefix='^' @formio/angular@^<FORMIO_ANGULAR_VERSION> @formio/js@^<FORMIO_JS_VERSION>` to force the `^` regardless. After the install, open the workspace's `package.json` and verify both entries read `"^<version>"` — if either one came out as an exact pin or a `~`, rewrite the line to the `^` form and re-run `npm install` so the lockfile matches.
+Run this from `workspaceRoot` — the directory `angular-new-app` created the workspace in — either by giving `npm` that path or by prefixing `cd "<workspaceRoot>" && `. The caret prefix matters — npm's default save-prefix writes `^` already, but do NOT override the user's `.npmrc` if they have configured `save-prefix=~` or `save-exact=true`; in that case, invoke `npm install --save --save-prefix='^' @formio/angular@^<FORMIO_ANGULAR_VERSION> @formio/js@^<FORMIO_JS_VERSION>` to force the `^` regardless. After the install, open the workspace's `package.json` and verify both entries read `"^<version>"` — if either one came out as an exact pin or a `~`, rewrite the line to the `^` form and re-run `npm install` so the lockfile matches.
 
 ## Step 5 — add Bootstrap 5 and Bootstrap Icons
 
@@ -180,7 +186,7 @@ e.g., `npm install --save bootstrap@^5.3.3 bootstrap-icons@^1.11.3`. The resulti
 }
 ```
 
-Then wire the stylesheets into `angular.json` so the Angular build pipeline bundles them. Open `<workspace>/angular.json`, find the first `projects.<projectName>.architect.build.options.styles` array (and repeat for the matching `test` target's `styles` array — usually immediately below `build`), and ensure these three entries appear **before** the workspace's own `src/styles.css` / `src/styles.scss` so application styles can override Bootstrap defaults:
+Then wire the stylesheets into `angular.json` so the Angular build pipeline bundles them. Open `<workspaceRoot>/angular.json`, find the first `projects.<projectName>.architect.build.options.styles` array (and repeat for the matching `test` target's `styles` array — usually immediately below `build`), and ensure these three entries appear **before** the workspace's own `src/styles.css` / `src/styles.scss` so application styles can override Bootstrap defaults:
 
 ```json
 "styles": [

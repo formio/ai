@@ -24,6 +24,71 @@ describe('the revisions license gate with an unresolved base URL', () => {
     apiKey: 'secret-key',
   };
 
+  // The remedy has to reach the record that holds THIS project, exactly as
+  // requireBaseUrl's does. Hardcoded to the mapping's own `--base-url` call, it named
+  // a command the writer refuses for a committed or environment project — the one
+  // message on this surface that did not use the shared writer.
+  it.each([
+    [
+      'a committed project: the file edit, by path',
+      {
+        projectUrl: 'https://myproject.mysite.com',
+        cwd: '/w/app',
+        projectUrlSource: 'committed' as const,
+        committedFilePath: '/w/app/formio.json',
+      },
+      /\/w\/app\/formio\.json/,
+    ],
+    [
+      'an environment project: a call carrying BOTH halves',
+      {
+        projectUrl: 'https://myproject.mysite.com',
+        cwd: '/w/app',
+        projectUrlSource: 'environment' as const,
+      },
+      /--project-url https:\/\/myproject\.mysite\.com --base-url/,
+    ],
+    [
+      'a mapped project: the mapping’s own update',
+      {
+        projectUrl: 'https://myproject.mysite.com',
+        cwd: '/w/app',
+        projectUrlSource: 'mapping' as const,
+      },
+      /set --base-url <base_url> --cwd \/w\/app/,
+    ],
+  ])('names the write that reaches the record — %s', async (_label, config, expected) => {
+    await expect(
+      gateRevisionsLicense(
+        server,
+        { ...config, apiKey: 'secret-key' },
+        {
+          actionLabel: 'publish',
+          requiresRevisions: true,
+          form: { title: 'Contact' },
+        }
+      )
+    ).rejects.toThrow(expected);
+  });
+
+  // And never the mapping's command for a project held elsewhere, which is the shape
+  // that was wrong.
+  it('does not name the mapping-only command for a committed project', async () => {
+    await expect(
+      gateRevisionsLicense(
+        server,
+        {
+          projectUrl: 'https://myproject.mysite.com',
+          cwd: '/w/app',
+          projectUrlSource: 'committed',
+          committedFilePath: '/w/app/formio.json',
+          apiKey: 'secret-key',
+        },
+        { actionLabel: 'publish', requiresRevisions: true, form: { title: 'Contact' } }
+      )
+    ).rejects.toThrow(/^(?!.*set --base-url <base_url>)/s);
+  });
+
   it('demands the base URL when revisions are explicitly required', async () => {
     await expect(
       gateRevisionsLicense(server, unresolved, {

@@ -11,7 +11,7 @@ The skills library SHALL contain a new skill at `skills/formio-application/SKILL
 - `IMPORT.md` — the `project_import` invocation and error handling.
 - `FRAMEWORK.md` — the framework registry + routing logic.
 
-There SHALL be no `DEPLOYMENT.md`: the Project URL and Base URL are read from the MCP server via `project get` in the skill's preflight, and the guidance for choosing them belongs to the server's own `instructions` and error messages. There SHALL be no `MCP_CONFIG.md` either — the step that wrote MCP configuration was removed, and this list continued to require the file it left behind.
+There SHALL be no `DEPLOYMENT.md`: the Project URL and Base URL are read from the MCP server via the `project_get` tool at the skill's first deployment-touching step, and the guidance for choosing them belongs to the server's own `instructions` and tool messages. There SHALL be no `MCP_CONFIG.md` either — the step that wrote MCP configuration was removed, and this list continued to require the file it left behind.
 
 A symlink `.claude/skills/formio-application` SHALL exist and resolve to `skills/formio-application/`.
 
@@ -27,7 +27,7 @@ A symlink `.claude/skills/formio-application` SHALL exist and resolve to `skills
 
 - **WHEN** every file under `skills/formio-application/` is searched
 - **THEN** none enumerates the three valid URL shapes
-- **AND** none contains a Base-URL derivation table, URL validation rules, or a `project get` exit-code table
+- **AND** none contains a Base-URL derivation table, URL validation rules, or a table of the `project_get` statuses
 
 ### Requirement: formio-application description claims plain-language triggers and names the framework skills
 
@@ -232,12 +232,12 @@ When, during or at the start of an orchestration, the user's request turns out t
 
 `skills/formio-application/INTENT.md` SHALL instruct the skill to present Step 1 as a single question round with exactly two explicit options — "Build a new app" and "Modify / extend an existing app" — using the client's structured question mechanism, which it MAY name as a parenthetical example only. Where the client's mechanism offers a free-text answer alongside fixed options, `INTENT.md` SHALL describe that affordance in portable terms rather than by naming it.
 
-`INTENT.md` MUST define the downstream consequence of each answer, against the four-step flow whose project configuration the preflight already resolved:
+`INTENT.md` MUST define the downstream consequence of each answer, against the four-step flow whose project configuration the preflight resolves at Step 3:
 
 - Build-new → run the planner in full-project mode (Step 2), import the full template (Step 3), route to the framework's entry skill (Step 4).
 - Modify-existing → run the planner in delta mode (Step 2), additively import the delta (Step 3), route to the framework's extend sub-skill (Step 4 with the detection path).
 
-Neither branch SHALL describe a Deployment step or a URL interview: the configuration is resolved in the preflight before Step 1 is asked, on both branches.
+Neither branch SHALL describe a Deployment step or a URL interview: the configuration is resolved by the preflight at Step 3, on both branches, and is not a step of `INTENT.md`'s own.
 
 #### Scenario: INTENT.md defines the two-option question and routing
 
@@ -257,49 +257,65 @@ Neither branch SHALL describe a Deployment step or a URL interview: the configur
 - **WHEN** `INTENT.md` is read
 - **THEN** any client tool name appears only as a parenthetical example attached to a portable instruction
 
-### Requirement: formio-application resolves its project configuration in the preflight
+### Requirement: formio-application resolves its project configuration at its first deployment-touching step
 
-The `formio-application` `SKILL.md` preflight SHALL resolve the target project before any step runs, in this order:
+The `formio-application` `SKILL.md` preflight SHALL gate the first step that reads from or writes to a deployment — Step 3 (Import) — rather than the turn. Steps 1 (Intent) and 2 (Plan) touch no deployment, so the preflight SHALL NOT block them, and the skill SHALL say where its first tool call is. When Step 3 is reached the preflight SHALL resolve the target project in this order:
 
-1. Confirm the Form.io tools are available. When they are not, route to `formio-mcp-setup` and stop — there is no server to ask for configuration, so the probe below cannot run.
-2. Run `npx -y @formio/mcp@<pinned> project get --cwd <the user's working directory>`. On success, confirm the resolved Project URL and Base URL in one line and continue. On failure, ask for the single value the message names, persist it by running the `project set` command the message names, and re-run — repeating if the next run names the second value.
-3. Stash the resolved values as `FORMIO_PROJECT_URL` and `FORMIO_BASE_URL` for the Import step and the framework handoff.
+1. Confirm the Form.io tools are callable, `project_get` among them. When they are not, route to `formio-mcp-setup` and stop — there is no server to ask for configuration, so the probe below cannot run.
+2. Call the `project_get` MCP tool with `cwd` set to the user's current working directory, and branch on the `status` it returns. On `ok`, confirm the resolved Project URL and Base URL in one line and continue. On `not-configured`, ask for the single value the message names, record it with the `project_set` tool, and call again. On `base-url-unresolved`, ask for the Base URL alone and record it with `project_set` passing `baseUrl` and leaving `projectUrl` out — the project is already on record and SHALL NOT be re-asked.
+3. Stash the resolved values as `projectUrl` and `baseUrl` for the Import step and the framework handoff. These are values in the skill's working context, not environment variables: nothing reads them from the environment and nothing writes them there.
+
+The skill SHALL NOT shell out to `npx -y @formio/mcp@<pinned> project get` for this. The connected server answers it over the open transport with the same resolver every other tool uses, so a subprocess adds an npm download and the chance of one server version reporting a resolution a different connected version will not honor.
+
+A `project_get` call that fails outright instead of returning a status SHALL be relayed rather than interviewed around: it could not answer at all, so a `project_set` would fail for the same unreported reason.
 
 This SHALL run on BOTH branches. On modify-existing the workspace's own `FormioAppConfig` is not the server's mapping, and `project_import` resolves against the mapping — so a cloned workspace with URLs in its source and nothing on record is resolved here rather than failing at import.
 
-The skill SHALL NOT carry its own URL interview: it asks only for what the server's message names, and SHALL NOT restate the valid URL shapes, plain-language URL descriptions, example values, validation rules, or Base-URL derivation. It SHALL NOT edit `~/.formio/projects.json` by any means other than the server's own command or tool.
+The skill SHALL NOT carry its own URL interview: it asks only for what the server's message names, and SHALL NOT restate the valid URL shapes, plain-language URL descriptions, example values, validation rules, or Base-URL derivation. It SHALL NOT edit `~/.formio/projects.json` by any means other than the server's own tool.
 
 #### Scenario: An existing mapping is confirmed rather than interviewed
 
-- **WHEN** the preflight's `project get` resolves a project for the working directory
+- **WHEN** `project_get` returns `ok` for the working directory
 - **THEN** the skill confirms the resolved project and base URL in one line
 - **AND** it does not ask for either URL
-- **AND** Step 1 (Intent) proceeds immediately
+- **AND** the Import step proceeds immediately
 
 #### Scenario: The preflight asks only for the value the server names
 
-- **WHEN** the preflight's `project get` fails because no project URL resolves
-- **THEN** the skill asks for the project URL and persists it with the `project set` command the message named
-- **AND** when the re-run then reports an unresolved base URL, the skill asks only for the base URL
+- **WHEN** `project_get` returns `not-configured`
+- **THEN** the skill asks for the project URL and records it with the `project_set` tool
+- **AND** when the next call returns `base-url-unresolved`, the skill asks only for the base URL and calls `project_set` without a `projectUrl`
 - **AND** the skill does not present its own list of valid URL shapes or validation rules
+
+#### Scenario: Planning runs before any server is required
+
+- **WHEN** the user asks for an app and no Form.io tools are callable
+- **THEN** the skill runs Intent and Plan in full and writes `template.md` + `template.json`
+- **AND** it raises the missing server at Step 3 rather than opening the turn with it
 
 #### Scenario: Missing tools route to setup before the probe runs
 
-- **WHEN** the preflight finds no Form.io tools available under any name
+- **WHEN** Step 3 is reached and no Form.io tools are available under any name
 - **THEN** the skill routes to `formio-mcp-setup`
-- **AND** it does not attempt `project get` or any import
+- **AND** it does not attempt `project_get` or any import
 - **AND** it does not write any MCP configuration file
 - **AND** it does not claim the user's original request is finished
+
+#### Scenario: A server too old to expose project_get is repaired, not interviewed around
+
+- **WHEN** the other Form.io tools are callable and `project_get` is not
+- **THEN** the skill hands off to `formio-mcp-setup` to re-pin the configured version
+- **AND** it does not decide that case from a version number written in prose
 
 #### Scenario: Modify-existing resolves the mapping too
 
 - **WHEN** the user says "also track attendees in each event" in an existing Angular workspace
-- **THEN** the preflight runs `project get` and completes the configuration if it fails
+- **THEN** the preflight calls `project_get` at Step 3 and completes the configuration from the status it returns
 - **AND** it does not read the URLs out of the workspace and assume the mapping exists
 
 ### Requirement: formio-application runs a four-step orchestration
 
-The `formio-application` `SKILL.md` body SHALL describe four ordered steps, with the project configuration already resolved by the preflight and with approval gates between destructive operations:
+The `formio-application` `SKILL.md` body SHALL describe four ordered steps, with the project configuration resolved by the preflight at Step 3 and with approval gates between destructive operations:
 
 1. **Intent** — ask whether this is a new app or an existing app being extended. Documented in `INTENT.md`.
 2. **Plan** — invoke `formio-resource-planner`, which emits the paired `template.md` (Resource Map) and `template.json` to the working directory. Full-project plan on build-new; delta plan (new resources only) on modify-existing.
@@ -308,7 +324,7 @@ The `formio-application` `SKILL.md` body SHALL describe four ordered steps, with
 
 The body MUST reference the three sibling docs (`INTENT.md`, `IMPORT.md`, `FRAMEWORK.md`) by relative link.
 
-There SHALL be no MCP-configuration step and no restart boundary on either branch. The mapping the server reads at tool-call time is written by `project set` / `project_set` during the preflight, so no configuration file and no session reload stands between resolution and import.
+There SHALL be no MCP-configuration step and no restart boundary on either branch. The mapping the server reads at tool-call time is written by the `project_set` tool during the preflight, and every tool resolves its project on each call, so no configuration file and no session reload stands between resolution and import.
 
 #### Scenario: Build-new branch runs end to end in one invocation
 

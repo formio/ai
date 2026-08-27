@@ -10,6 +10,10 @@ Defines `formio.json`: the committed counterpart to the machine-local project ma
 
 The server SHALL support a committed configuration file named `formio.json` that records the Form.io project a directory targets. Its purpose is to be tracked in version control: unlike `~/.formio/projects.json`, which is keyed by absolute path and lives in the user's home directory, this file travels with the code, survives a clone, and is reviewable in a pull request.
 
+The file is HAND-AUTHORED: the server SHALL read it and SHALL NOT write it, and no tool or subcommand SHALL offer to. The file lives in the user's repository and is designed for review — two keys, visible in a diff — and the server cannot assume every file by that name is its own: no Form.io artifact of this toolset uses the name for anything else (exports live in `template.json`), but a stray `formio.json` from some other origin can still exist, and the reader tolerates one (below) while a writer cannot write a file it disowns without claiming it. Every message that directs a caller to record something in this file SHALL name the exact file path and key to edit.
+
+A `formio.json` that names NEITHER `projectUrl` nor `baseUrl` is not this server's file: the reader SHALL pass it over with a note and keep walking, so a stray file by that name neither configures nor breaks the directory it sits in. A file naming either key IS addressed to this server and is held to the format.
+
 The file SHALL be a JSON object with:
 
 - `projectUrl` (required) — the full URL of the Form.io project this directory targets.
@@ -45,8 +49,14 @@ The file SHALL NOT be a place for credentials. A project URL and a base URL name
 
 #### Scenario: A missing projectUrl is actionable
 
-- **WHEN** `formio.json` exists but has no `projectUrl`
+- **WHEN** `formio.json` exists, names `baseUrl`, but has no `projectUrl`
 - **THEN** resolution fails with an error naming the file's path and the missing key
+
+#### Scenario: A file that is not this server's is passed over
+
+- **WHEN** the walk meets a `formio.json` naming neither `projectUrl` nor `baseUrl` — a file this server did not define
+- **THEN** the file is passed over with a note and the walk continues, so an ancestor configuration still governs
+- **AND** nothing ever writes configuration keys into that file
 
 ### Requirement: Discovery walks up from the caller's directory and stops at the repository boundary
 
@@ -85,9 +95,9 @@ When the caller supplies no `cwd`, discovery SHALL start from the MCP server's o
 
 ### Requirement: The file belongs to the application being built, not to unrelated directories
 
-`formio.json` SHALL be created in the workspace of the application it configures — the folder that application lives in — by the skills that scaffold or extend that application. It records what that application targets, which is why it travels with that application's source.
+`formio.json` SHALL be created in the workspace of the application it configures — the folder that application lives in — by the user or the skills that scaffold or extend that application, writing the file directly. It records what that application targets, which is why it travels with that application's source.
 
-Because discovery walks upward, a `formio.json` governs every directory beneath it. Creating one at the root of a working tree that holds unrelated projects therefore points all of them at one Form.io project, which is a misconfiguration rather than a shortcut. `project set --scope repo` SHALL write to the `--cwd` directory when the upward walk finds no existing file, so the default placement is the directory the caller named rather than an ancestor.
+Because discovery walks upward, a `formio.json` governs every directory beneath it. Creating one at the root of a working tree that holds unrelated projects therefore points all of them at one Form.io project, which is a misconfiguration rather than a shortcut — every instruction about authoring the file SHALL direct it into the application's own folder rather than an ancestor.
 
 This library's own repository SHALL NOT contain a `formio.json`. One committed here would be discovered by every `project get` run anywhere in the tree — every skill invocation, every eval run, every test that resolves a project — and would silently govern all of them. A guard test SHALL assert its absence, because the footgun is created by the same upward walk that makes the feature work and is invisible until something resolves the wrong project.
 
@@ -97,11 +107,10 @@ This library's own repository SHALL NOT contain a `formio.json`. One committed h
 - **THEN** any `formio.json` it writes is created at `<workspace>`, alongside that application's own source
 - **AND** it is not written to an ancestor of `<workspace>`
 
-#### Scenario: repo scope writes the named directory when no file exists
+#### Scenario: No writer exists for the file
 
-- **WHEN** `project set --scope repo --cwd /repo/apps/web` runs and the upward walk finds no existing file within the repository
-- **THEN** the file is created at `/repo/apps/web/formio.json`
-- **AND** no file is created at `/repo`
+- **WHEN** `project set` runs with any arguments, or any `project_set` tool call is made
+- **THEN** no `formio.json` is created or modified anywhere
 
 #### Scenario: This repository carries no committed configuration of its own
 

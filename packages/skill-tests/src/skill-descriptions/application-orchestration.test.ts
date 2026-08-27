@@ -86,8 +86,8 @@ describe('formio-application orchestration', () => {
     const { body } = skillDocument(SKILL_MD);
     const preflight = body.slice(body.indexOf('## Preflight'), body.indexOf('## Stance'));
 
-    expect(preflight).toMatch(/project get/);
-    expect(preflight).toMatch(/--cwd/);
+    expect(preflight).toMatch(/project_get/);
+    expect(preflight).toMatch(/`cwd`/);
     expect(body).not.toMatch(/### Step \d[\w.]* — Deployment/);
   });
 

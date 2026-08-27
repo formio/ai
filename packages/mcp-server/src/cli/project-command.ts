@@ -1,20 +1,31 @@
-import fs from 'fs';
 import path from 'path';
-import { FormioConfig, PROJECT_URL_GUIDANCE, normalizeHttpUrl, readHttpUrlEnv } from '../config.js';
+import { InvalidRequestedUrlError, readHttpUrlEnv } from '../config.js';
+import { COMMITTED_CONFIG_FILE, findCommittedConfig } from '../committed-config.js';
 import {
-  COMMITTED_CONFIG_FILE,
-  CommittedConfigUnusableError,
-  findCommittedConfig,
-  planCommittedConfigWrite,
-} from '../committed-config.js';
-import { ProjectMapUnreadableError, readProjectEntry, writeProjectEntry } from '../project-map.js';
+  readProjectEntryForWrite,
+  unusableRecordProjectUrl,
+  writeProjectEntry,
+} from '../project-map.js';
+import { planProjectEntry } from '../project-entry-plan.js';
 import {
-  BaseUrlSource,
-  ProjectResolution,
-  derivesOwnBaseUrl,
-  resolveProject,
-  usableEnvironmentBaseUrl,
-} from '../project-resolver.js';
+  API_ROOT_IS_NOT_YOUR_DEPLOYMENT,
+  DEPLOYMENT_IS_DERIVED,
+  NOT_A_HOSTED_PROJECT,
+  API_ROOT_NOT_A_PROJECT,
+  ENTERPRISE_ONLY,
+  HOSTED_CLOUD_DEPLOYMENT,
+} from '../pair-rule.js';
+import {
+  BASE_URL_UNDERIVABLE,
+  COMMITTED_IS_HAND_AUTHORED,
+  strandedBaseUrlClause,
+} from '../write-refusals.js';
+import {
+  BASE_URL_NOT_DETERMINED,
+  ProjectRemedies,
+  environmentRecordName,
+  reportProject,
+} from '../project-report.js';
 import { PROJECT_CLI, projectCommand } from '../cli-launch.js';
 
 export interface ProjectCommandOptions {
@@ -53,12 +64,14 @@ export const EXIT_BASE_URL_UNRESOLVED = 3;
 // command that answers `command not found`.
 const USAGE = [
   'Usage:',
-  `  ${PROJECT_CLI} set [--project-url <url>] [--base-url <url>] [--cwd <absolute path>] [--scope user|repo]`,
+  `  ${PROJECT_CLI} set [--project-url <url>] [--base-url <url>] [--cwd <absolute path>]`,
   `  ${PROJECT_CLI} get [--cwd <absolute path>]`,
   '',
-  'Scopes:',
-  '  user  (default)  the machine-local mapping in ~/.formio/projects.json',
-  `  repo             a committed ${COMMITTED_CONFIG_FILE}, versioned with the code and shared with everyone who clones it`,
+  `set writes the machine-local mapping in ~/.formio/projects.json. To record the project`,
+  `with the code instead — versioned, and shared with everyone who clones it — write a`,
+  `committed ${COMMITTED_CONFIG_FILE} in the application's own folder: a JSON object holding`,
+  `{"projectUrl": "..."}, plus "baseUrl" only when it cannot be derived. This command`,
+  `reads that file and never writes it.`,
 ].join('\n');
 
 // The environment, the working directory, and the cache directory are all
@@ -68,22 +81,38 @@ interface CommandContext {
   env: NodeJS.ProcessEnv;
   cwd: string;
   cacheDir?: string;
+  /**
+   * Owned by runProjectCommand rather than by the subcommand, so a note survives a
+   * THROW.
+   *
+   * A note is usually the CAUSE of the failure printed beside it — a formio.json passed
+   * over unread, a FORMIO_PROJECT_URL discarded — and collected inside the subcommand it
+   * reached the caller only on that subcommand's own return paths. Every throw printed
+   * the failure alone, which is the run where the explanation matters most.
+   */
+  notes: string[];
 }
 
 export function isProjectCommand(args: string[]): boolean {
   return args[0] === 'project';
 }
 
-// Only `--flag value` pairs are recognized; anything else is a usage error
-// rather than a silently ignored token.
-function parseFlags(args: string[]): Record<string, string> {
+// Only KNOWN `--flag value` pairs are recognized; anything else is a usage error
+// rather than a silently ignored token. An unknown flag must fail, not fall away:
+// a caller passing a flag this command no longer takes — `--scope repo`, from a
+// release that had a committed-file writer — would otherwise have its write land
+// in a record it did not choose, and be told it succeeded.
+function parseFlags(args: string[], known: ReadonlyArray<string>): Record<string, string> {
   return args.reduce<Record<string, string>>((flags, token, index) => {
     if (!token.startsWith('--')) {
       const flagBefore = args[index - 1];
-      if (flagBefore?.startsWith('--')) {
+      if (flagBefore?.startsWith('--') && known.includes(flagBefore.slice(2))) {
         return flags;
       }
       throw new Error(`Unexpected argument: ${token}`);
+    }
+    if (!known.includes(token.slice(2))) {
+      throw new Error(`Unknown flag: ${token}\n\n${USAGE}`);
     }
     const value = args[index + 1];
     if (value === undefined || value.startsWith('--')) {
@@ -143,8 +172,18 @@ function baseUrlUnresolved(stderr: string, notes: readonly string[]): ProjectCom
 // The command could not answer: a usage error, a malformed URL, a relative
 // --cwd, an unreadable map. Interviewing on this hides the cause and repeats the
 // failure through project_set.
-function fail(stderr: string): ProjectCommandResult {
-  return { exitCode: EXIT_FAILED, stdout: '', stderr };
+//
+// Notes travel with it for the same reason the other two outcomes keep them: an
+// "Ignoring FORMIO_PROJECT_URL: ..." note is the CAUSE of the required-project
+// failure below — a host that never expanded its manifest variable — so dropping
+// it here printed "no project mapped yet" about a directory whose project had
+// just been discarded unread.
+function fail(stderr: string, notes: readonly string[] = []): ProjectCommandResult {
+  return {
+    exitCode: EXIT_FAILED,
+    stdout: '',
+    stderr: [...notes, stderr].filter(Boolean).join('\n'),
+  };
 }
 
 function runSet(flags: Record<string, string>, context: CommandContext): ProjectCommandResult {
@@ -152,142 +191,262 @@ function runSet(flags: Record<string, string>, context: CommandContext): Project
     return fail(`Pass at least one of --project-url or --base-url.\n\n${USAGE}`);
   }
 
-  const scope = flags.scope ?? 'user';
-  if (scope !== 'user' && scope !== 'repo') {
-    return fail(`--scope must be one of: user, repo. Received: ${scope}\n\n${USAGE}`);
-  }
-
   const cwd = resolveCwd(flags.cwd, context.cwd);
 
-  if (scope === 'repo') {
-    return writeCommittedScope(flags, cwd);
-  }
-  const mappedProjectUrl = readProjectEntry(cwd, context.cacheDir)?.env.FORMIO_PROJECT_URL;
-  // A committed formio.json configures the project exactly as the mapping does,
-  // and the base-URL error does not say which one supplied it — it asks for the
-  // deployment alone, by design. So "this directory has a project" is a question
-  // about every source, not about the map: consulting only the map made the
-  // remedy the server prints for a repo-scoped project answer "no project mapped
-  // yet" for a directory whose project it had just printed. A file too broken to
-  // read throws out of here into runProjectCommand's catch, which is right — that
-  // is a command that could not answer, not a directory with no project.
-  const committedProjectUrl = findCommittedConfig(cwd)?.projectUrl;
+  const notes = context.notes;
+  const onIgnored = (message: string) => notes.push(message);
+  const mapped = readProjectEntryForWrite(cwd, context.cacheDir);
+  // See project_set: an entry that EXISTS and cannot be honoured is not an absent one,
+  // and treating it as absent made this command diagnose the environment as holding a
+  // project this directory's own record governs.
+  const unusableEntry = unusableRecordProjectUrl(mapped, cwd);
+  // Walked ONCE, for both the plan and the note below. A file too broken to read
+  // throws out of here into runProjectCommand's catch, which is right: that is a
+  // command that could not answer, not a directory with no project.
+  const committed = findCommittedConfig(cwd, { onNote: onIgnored });
+  const plan = planProjectEntry({
+    cwd,
+    requested: { projectUrl: flags['project-url'], baseUrl: flags['base-url'] },
+    record: {
+      projectUrl: mapped.status === 'usable' ? mapped.entry.env.FORMIO_PROJECT_URL : undefined,
+      baseUrl: mapped.status === 'usable' ? mapped.entry.env.FORMIO_BASE_URL : undefined,
+    },
+    elsewhere: {
+      // Where the project lives when this mapping has none. A file too broken to read
+      // throws out of here into runProjectCommand's catch, which is right: that is a
+      // command that could not answer, not a directory with no project.
+      committed,
+      // Read tolerantly — an unusable value is not a project, and failing here would
+      // block the call that records a usable one.
+      environment: readHttpUrlEnv({
+        raw: context.env.FORMIO_PROJECT_URL,
+        name: 'FORMIO_PROJECT_URL',
+        onIgnored,
+      }),
+    },
+  });
 
-  // --project-url is required only where NOTHING configures a project. Wherever
-  // one is on record, either flag alone is a valid partial update, which is what
-  // makes the base-URL error's own remedy — `project set --base-url <url>` — a
-  // command the user can actually run.
-  if (!flags['project-url'] && !mappedProjectUrl && !committedProjectUrl) {
-    return fail(
-      `--project-url is required for ${cwd}, which has no project mapped yet.\n\n${USAGE}`
+  // Only where the mapping is the record that WOULD govern. A committed formio.json
+  // outranks it, so a broken entry beneath one decides nothing — and naming the
+  // mapping as "the record that governs this directory" there is the same
+  // wrong-record diagnosis this guard exists to stop, one layer up. The plan's own
+  // wrong-record branch answers that case, in the committed file's vocabulary.
+  if (unusableEntry !== undefined && !flags['project-url'] && !committed?.projectUrl) {
+    return notConfigured(
+      `The mapping for ${cwd} holds an unusable value, so it is the record that governs this directory and it cannot answer with a project: ${unusableEntry} Nothing else supplies the project while that entry is on record. Run: ${projectCommand(`set --project-url <project_url> --cwd ${cwd}`)}\n\n${USAGE}`,
+      notes
     );
   }
 
-  const normalizedMapped = mappedProjectUrl
-    ? // Re-normalized rather than passed through: the stored value is
-      // hand-editable and predates this validation, and it is about to be
-      // rewritten as though freshly supplied.
-      normalizeHttpUrl(mappedProjectUrl, `FORMIO_PROJECT_URL mapped for ${cwd}`)
-    : undefined;
-  // Undefined when only a committed file names the project. Nothing is written to
-  // the mapping in that case: copying the committed value in would make a second
-  // record of the project that goes stale the moment the tracked file changes,
-  // and this call was asked for a deployment, not for a project.
-  const projectUrl = flags['project-url']
-    ? normalizeHttpUrl(flags['project-url'], 'projectUrl')
-    : normalizedMapped;
-  // What this directory will resolve to once the write lands — the value the
-  // derivation questions below are about, whichever record holds it. Committed
-  // first, matching the order resolveProjectConfig reads them in: a committed
-  // formio.json outranks the mapping, so where both name a project the mapping is
-  // not what governs this directory.
-  const effectiveProjectUrl = (committedProjectUrl ?? projectUrl) as string;
-  const repointed = Boolean(normalizedMapped) && projectUrl !== normalizedMapped;
-  // Falsy, not nullish, at every link: an empty FORMIO_BASE_URL is a prompt the
-  // user cleared, not a deployment. A nullish chain would stop there, hand the
-  // rewrite an empty string, and drop the mapped base URL just the same.
-  //
-  // The environment link is read through readHttpUrlEnv, which drops an
-  // unusable value instead of throwing: this command runs in whatever shell the
-  // agent inherited, and a FORMIO_BASE_URL exported from an unexpanded manifest
-  // variable would otherwise fail the very invocation formio-mcp-setup runs —
-  // for a user who supplied no base URL of their own and cannot see why. The
-  // flag stays strict, because that one is the user's own typing.
-  //
-  // The mapped link is read the same tolerant way, and for a sharper reason: this
-  // rewrite is the documented repair for a directory whose mapping the resolver
-  // now refuses, so failing on the stored value made the repair report the very
-  // error it was run to clear — and named it "baseUrl", as though the caller had
-  // typed it.
-  const notes: string[] = [];
-  const onIgnored = (message: string) => notes.push(message);
-  const mappedBaseUrl = readHttpUrlEnv({
-    raw: readProjectEntry(cwd, context.cacheDir)?.env.FORMIO_BASE_URL,
-    name: `FORMIO_BASE_URL mapped for ${cwd}`,
-    onIgnored,
-  });
-  // A mapped base URL belongs to the project it was mapped WITH. Re-pointing the
-  // directory at a project that names its own deployment must drop it, or one
-  // deployment answers for another — and, because the mapping outranks
-  // derivation, answers for this directory forever. The same one-value-answering-
-  // a-per-project-question failure the environment link below is gated against,
-  // reached through the mapping instead. A re-set that leaves the project alone
-  // keeps it: there it is this project's own explicitly recorded deployment.
-  const carriedBaseUrl =
-    repointed && derivesOwnBaseUrl(effectiveProjectUrl) ? undefined : mappedBaseUrl;
-  //
-  // The environment link is reached only for a project URL that derives no
-  // deployment of its own. One global answering a per-project question, written
-  // into this mapping, would replace the derivation and then outrank it for this
-  // directory forever.
-  const declaredBaseUrl =
-    flags['base-url'] ||
-    carriedBaseUrl ||
-    usableEnvironmentBaseUrl({
-      projectUrl: effectiveProjectUrl,
-      read: () =>
-        readHttpUrlEnv({
-          raw: context.env.FORMIO_BASE_URL,
-          name: 'FORMIO_BASE_URL',
-          onIgnored,
-        }),
-      onNote: onIgnored,
-    });
-  const baseUrl = declaredBaseUrl ? normalizeHttpUrl(declaredBaseUrl, 'baseUrl') : undefined;
+  if (plan.outcome === 'no-values') {
+    return fail(`Pass at least one of --project-url or --base-url.\n\n${USAGE}`, notes);
+  }
+  // Exit 1, not 2. A named value is missing and the message says which — the same
+  // answer `project get` gives for an unconfigured directory, and callers branch on the
+  // code: 1 means act on this message, 2 means relay it and stop. Reporting a missing
+  // value as 2 told every skill to abandon the step it was in the middle of.
+  if (plan.outcome === 'project-required') {
+    return notConfigured(
+      `--project-url is required for ${cwd}, which has no project mapped yet.\n\n${USAGE}`,
+      notes
+    );
+  }
+  // A record holds a project and its deployment together, so the one project URL that
+  // names no deployment cannot be recorded alone.
+  if (plan.outcome === 'base-url-required') {
+    return notConfigured(
+      `--base-url is required alongside ${plan.projectUrl}: ${BASE_URL_UNDERIVABLE}.${strandedBaseUrlClause(plan)} Ask the user for it and run: ${projectCommand(`set --project-url ${plan.projectUrl} --base-url <base_url> --cwd ${cwd}`)}\n\n${USAGE}`,
+      notes
+    );
+  }
+  // The deployment goes where the project is. Writing it into the mapping while the
+  // project lives elsewhere would split one configuration across two records. The
+  // committed file is a record this command reads and never writes, so the remedy
+  // there is the edit, named file and key.
+  if (plan.outcome === 'wrong-record') {
+    return notConfigured(
+      plan.record === 'committed'
+        ? `${plan.projectUrl} is recorded in the committed ${COMMITTED_CONFIG_FILE} at ${plan.filePath}, not in this directory's mapping, so a base URL alone has no project to be recorded beside. Add "baseUrl": "${flags['base-url']}" beside "projectUrl" in that file — ${COMMITTED_IS_HAND_AUTHORED}.\n\n${USAGE}`
+        : `${plan.projectUrl} is recorded in FORMIO_PROJECT_URL in the environment, not in this directory's mapping, so a base URL alone has no project to be recorded beside. Record the pair where the project is: ${projectCommand(
+            `set --project-url ${plan.projectUrl} --base-url ${flags['base-url']} --cwd ${cwd}`
+          )}\n\n${USAGE}`,
+      notes
+    );
+  }
 
-  writeProjectEntry(
+  // Not a shape this toolset serves. Refused before anything is written, because the
+  // failure it prevents is a string of unexplained 404s much later. Exit 1, like every
+  // refusal that names the value it needs: the caller is mid-interview, and the remedy
+  // is to ask the user which project and run this command again.
+  if (plan.outcome === 'not-a-hosted-project') {
+    return notConfigured(
+      `${plan.url} is not a Form.io project URL. ${NOT_A_HOSTED_PROJECT}`,
+      notes
+    );
+  }
+  if (plan.outcome === 'not-a-project-url') {
+    return notConfigured(`${plan.url} is ${API_ROOT_NOT_A_PROJECT}`, notes);
+  }
+  // Refused at the point a user typed it. The reader, meeting the same pair already on
+  // disk, uses the derived deployment instead and says which value it set aside.
+  if (plan.outcome === 'underivable-mismatch') {
+    return notConfigured(
+      `${plan.baseUrl} is not the deployment for ${plan.projectUrl}. ${DEPLOYMENT_IS_DERIVED} Run: ${projectCommand(`set --project-url ${plan.projectUrl} --cwd ${cwd}`)}\n\n${USAGE}`,
+      notes
+    );
+  }
+  if (plan.outcome === 'api-root-deployment') {
+    return notConfigured(
+      `${plan.baseUrl} is not the deployment for ${plan.projectUrl}. ${API_ROOT_IS_NOT_YOUR_DEPLOYMENT}\n\n${USAGE}`,
+      notes
+    );
+  }
+  if (plan.outcome === 'hosted-project-foreign-deployment') {
+    return notConfigured(
+      `${plan.baseUrl} is not the deployment for ${plan.projectUrl}. ${HOSTED_CLOUD_DEPLOYMENT} Run: ${projectCommand(`set --project-url ${plan.projectUrl} --cwd ${cwd}`)}\n\n${USAGE}`,
+      notes
+    );
+  }
+  // Exit 1 for the same reason: this is the user typing the wrong URL back, and the
+  // remedy is to re-ask — reporting it as 2 told every caller to relay and stop, which
+  // abandoned the very interview the refusal exists to redirect.
+  if (plan.outcome === 'open-source-deployment') {
+    return notConfigured(
+      `${plan.url} is both the Project URL and the Base URL. ${ENTERPRISE_ONLY}`,
+      notes
+    );
+  }
+
+  if (plan.outcome === 'write') {
+    writeProjectEntry({ cwd, env: plan.entry.env, cacheDir: context.cacheDir });
+  }
+
+  // A committed file GOVERNS this directory, whether or not it names the same project:
+  // it supplies the pair that resolves, so a mapping written under one is the fallback
+  // if it goes away and not what takes effect now. Silence here reads as "your project
+  // is now X".
+  const shadowedByCommitted = committed?.projectUrl;
+
+  // What resolves is ASKED OF THE READER — the same reportProject that answers
+  // `project get`, over the state this write just produced. Printed from the plan
+  // instead, this command exited 0 naming a Base URL that the very next `project get`
+  // reported as "could not be determined": the two halves of one tool disagreeing about
+  // one directory, in the channel a user reads.
+  const settled = reportProject({
     cwd,
-    {
-      ...(projectUrl && { FORMIO_PROJECT_URL: projectUrl }),
-      ...(baseUrl && { FORMIO_BASE_URL: baseUrl }),
+    baseConfig: {
+      projectUrl: readHttpUrlEnv({
+        raw: context.env.FORMIO_PROJECT_URL,
+        name: 'FORMIO_PROJECT_URL',
+      }),
     },
-    context.cacheDir
-  );
+    cacheDir: context.cacheDir,
+    remedies: CLI_REMEDIES,
+    notes,
+  });
+  // Emitted twice — once on this command's own walk and once on the report's — and a
+  // user told twice that the same file was passed over reads it as two files.
+  const deduped = notes.filter((note, index) => notes.indexOf(note) === index);
+  notes.length = 0;
+  notes.push(...deduped);
 
-  return ok(
-    [
-      projectUrl ? `Project set for ${cwd}` : `Base URL set for ${cwd}`,
-      `Project URL: ${effectiveProjectUrl}`,
-      // A mapping write under a committed file naming a different project still
-      // belongs on disk — it is the fallback if that file goes away — but it does
-      // not take effect now, and silence here reads as "your project is now X".
-      ...(committedProjectUrl && projectUrl && committedProjectUrl !== projectUrl
-        ? [
-            ``,
-            `Note: the committed ${COMMITTED_CONFIG_FILE} names ${committedProjectUrl}, which outranks the mapping just written (${projectUrl}). ${committedProjectUrl} stays the active project for this directory until that file changes.`,
-          ]
-        : []),
-      ...(baseUrl ? [`Base URL:    ${baseUrl}`] : []),
-      ...(projectUrl
-        ? []
-        : [
-            ``,
-            `The project stays where it is recorded — the committed ${COMMITTED_CONFIG_FILE} — and only the deployment was added to this directory's mapping.`,
-          ]),
-    ].join('\n'),
-    notes
-  );
+  const block = [
+    plan.outcome === 'unchanged'
+      ? `No change for ${cwd}`
+      : // A record that does not take effect is described as RECORDED, never as set.
+        shadowedByCommitted
+        ? `Recorded for ${cwd}`
+        : plan.setAProject
+          ? `Project set for ${cwd}`
+          : `Base URL set for ${cwd}`,
+    // The stale value is gone, and silence about it would leave the user thinking
+    // their recorded deployment survived this write.
+    ...(plan.droppedBaseUrl
+      ? [
+          `Replaced ${plan.droppedBaseUrl}, which was recorded as this project's deployment and cannot serve it.`,
+        ]
+      : []),
+    `Project URL: ${settled.projectUrl}`,
+    `Base URL:    ${settled.baseUrl ?? BASE_URL_NOT_DETERMINED}`,
+    // A committed file governs this directory whether or not it names the same project,
+    // so a mapping write under one does not take effect — the pair the resolver
+    // reports comes from that file, not from what was just written. Said for every
+    // such write, because a caller cannot be left to discover it from a later report,
+    // and said whether or not this call changed anything.
+    ...(shadowedByCommitted
+      ? [
+          ``,
+          shadowedByCommitted !== plan.projectUrl
+            ? `Note: the committed ${COMMITTED_CONFIG_FILE} names ${shadowedByCommitted}, which outranks this directory's mapping (${plan.projectUrl}). ${shadowedByCommitted} is the active project until that file changes; what was recorded here is the fallback if it goes away.`
+            : `Note: the committed ${COMMITTED_CONFIG_FILE} governs this directory, so it supplies the pair that resolves — this mapping does not take effect while that file is there, and is the fallback if it goes away. To change what resolves, edit that file directly; this command reads a committed file and never writes one.`,
+        ]
+      : []),
+  ].join('\n');
+
+  // The write landed and the directory still cannot serve a call: the committed file
+  // that governs it supplies no deployment, and nothing this command can write will.
+  // Exit 0 sent the caller onward, so `project set` succeeded and the very next
+  // `project get` reported the same directory as unserviceable. 3 is the code that
+  // already means exactly this — the project resolved and its deployment did not — and
+  // it is the only non-ok status reachable here, since the write itself put a project
+  // on record. The block above still prints: the record is half the answer, and the
+  // reader's message, which names the file and the key to edit, is the other half.
+  if (settled.status !== 'ok') {
+    return {
+      exitCode: EXIT_BASE_URL_UNRESOLVED,
+      stdout: block,
+      stderr: [...notes, settled.message].filter(Boolean).join('\n'),
+    };
+  }
+
+  return ok(block, notes);
 }
+
+// Named once, for the same reason the tool names its own: the remedies read it
+// as prose and hand it to environmentRecordName.
+const ENVIRONMENT_LOCATION = 'this shell’s environment';
+
+// The CLI vocabulary for every remedy this report can carry: runnable commands,
+// because the reader is a shell. The tool that answers the same question from
+// inside the server names `project_set` instead — see tools/project_get.ts.
+const CLI_REMEDIES: ProjectRemedies = {
+  setProject: (cwd) => [
+    `Run: ${projectCommand(`set --project-url <url> --cwd ${cwd}`)}`,
+    `Or record it with the code, versioned and shared with everyone who clones the repository: write a committed ${COMMITTED_CONFIG_FILE} in the application's own folder holding {"projectUrl": "<url>"} — this command reads that file and never writes it.`,
+  ],
+  setBaseUrl: ({ cwd, projectUrlSource, projectUrl, committedFilePath }) => {
+    // The deployment goes in the record that holds the project, so which remedy this
+    // is depends on where that project is. Printing the mapping's command for a
+    // project held elsewhere named a call that fails — and a committed file is a
+    // record this command reads and never writes, so its remedy is the edit, named
+    // file and key.
+    if (projectUrlSource === 'mapping') {
+      return [
+        `Run: ${projectCommand(`set --base-url <base_url> --cwd ${cwd}`)}`,
+        `That updates this directory's own record, which already holds ${projectUrl}.`,
+      ];
+    }
+    if (projectUrlSource === 'committed') {
+      return [
+        `Add "baseUrl": "<base_url>" beside "projectUrl" in ${committedFilePath ?? `the committed ${COMMITTED_CONFIG_FILE}`} — the committed file that holds this project, versioned with the code, so everyone who clones the repository resolves the same pair. Edit it directly: this command reads a committed file and never writes one, and a mapping written under it does not take effect.`,
+      ];
+    }
+    return [
+      `Run: ${projectCommand(`set --project-url ${projectUrl} --base-url <base_url> --cwd ${cwd}`)}`,
+      `${projectUrl} comes from ${environmentRecordName(ENVIRONMENT_LOCATION)}, which this command cannot write, so the pair is recorded in this directory's mapping — which then governs it.`,
+    ];
+  },
+  // This command runs in the caller's shell, not in the MCP server's process. A
+  // plugin- or bundle-launched server carries its own env block, so what it
+  // resolves can differ from what is printed here — and the difference is
+  // invisible from this side. Say so rather than let the output be read as the
+  // server's answer.
+  environmentCaveat: () => [
+    `Note:        the MCP server’s own environment is not visible from this shell, so a FORMIO_PROJECT_URL or FORMIO_BASE_URL set there is not listed above. Neither can override this mapping — the environment is the weakest source — so what resolves here is what the server resolves.`,
+  ],
+  // This reader's own variables, which is why it can be told to look at them.
+  environmentLocation: ENVIRONMENT_LOCATION,
+};
 
 function runGet(flags: Record<string, string>, context: CommandContext): ProjectCommandResult {
   const cwd = resolveCwd(flags.cwd, context.cwd);
@@ -297,7 +456,7 @@ function runGet(flags: Record<string, string>, context: CommandContext): Project
   // environment as the winning source contradicts what the next tool call does.
   // The whole point of `project get` is to report what resolves and which source
   // won, so the two readings must not diverge.
-  const notes: string[] = [];
+  const notes = context.notes;
   const onIgnored = (message: string) => notes.push(message);
   const envProjectUrl = readHttpUrlEnv({
     raw: context.env.FORMIO_PROJECT_URL,
@@ -309,290 +468,70 @@ function runGet(flags: Record<string, string>, context: CommandContext): Project
     name: 'FORMIO_BASE_URL',
     onIgnored,
   });
-  const resolution = resolveOrNull(cwd, context, {
-    baseConfig: { baseUrl: envBaseUrl, projectUrl: envProjectUrl },
-    onNote: (message) => notes.push(message),
-  });
 
-  if (!resolution) {
-    return notConfigured(
-      [
-        `No Form.io project is configured for ${cwd}, and no ${COMMITTED_CONFIG_FILE} was found by walking up from it.`,
-        `Run: ${projectCommand(`set --project-url <url> --cwd ${cwd}`)}`,
-        `Or record it with the code, versioned and shared with everyone who clones the repository:`,
-        `     ${projectCommand(`set --project-url <url> --scope repo --cwd ${cwd}`)}`,
-        ``,
-        PROJECT_URL_GUIDANCE,
-      ]
-        .filter(Boolean)
-        .join('\n'),
-      notes
-    );
-  }
-
-  const { config: resolved, sources } = resolution;
-  const committedPath = resolution.committedFilePath;
-
-  // Every layer that COULD have supplied the project, in precedence order, so a
-  // losing one can be reported rather than silently omitted. "My project_set did
-  // nothing" is otherwise unanswerable from this output.
-  const shadowed: string[] = [];
-  if (sources.projectUrl !== 'committed' && resolution.candidates.committed) {
-    shadowed.push(`a committed ${COMMITTED_CONFIG_FILE} naming ${resolution.candidates.committed}`);
-  }
-  if (sources.projectUrl !== 'mapping' && resolution.candidates.mapping) {
-    shadowed.push(`the working-directory mapping naming ${resolution.candidates.mapping}`);
-  }
-  if (sources.projectUrl !== 'environment' && resolution.candidates.environment) {
-    shadowed.push(`FORMIO_PROJECT_URL in this shell naming ${resolution.candidates.environment}`);
-  }
-  // The base URL needs the same report, for the same reason. A mapped deployment
-  // silently overriding a committed one is otherwise invisible in this output,
-  // and "my formio.json baseUrl did nothing" then has no answer here.
-  if (sources.baseUrl !== 'committed' && resolution.baseUrlCandidates.committed) {
-    shadowed.push(
-      `the baseUrl in the committed ${COMMITTED_CONFIG_FILE} naming ${resolution.baseUrlCandidates.committed}`
-    );
-  }
-  if (sources.baseUrl !== 'mapping' && resolution.baseUrlCandidates.mapping) {
-    shadowed.push(`the mapped base URL naming ${resolution.baseUrlCandidates.mapping}`);
-  }
-  if (sources.baseUrl !== 'environment' && resolution.baseUrlCandidates.environment) {
-    shadowed.push(
-      `FORMIO_BASE_URL in this shell naming ${resolution.baseUrlCandidates.environment}`
-    );
-  }
-
-  // Half-configured is its own answer, and its own exit code. The project URL
-  // resolved and its deployment did not — a path-less customer project names no
-  // host to derive one from — so printing the api.form.io default here would
-  // present a guess as configuration. Not a `1`: the remedy is the base URL
-  // alone, not the project interview a `1` sends the caller into. And not a `2`
-  // either, which is what it used to return: a `2` means the command could not
-  // answer, and every skill's preflight responds to one by relaying and stopping.
-  if (sources.baseUrl === 'unresolved') {
-    return baseUrlUnresolved(
-      [
-        `Project URL: ${resolved.projectUrl}`,
-        `Base URL:    could not be determined.`,
-        ``,
-        `The project is configured — only its Base URL is missing. A project URL with no path names its deployment nowhere: the deployment is a sibling sub-domain of the same parent domain, so it must be supplied rather than derived.`,
-        `Run: ${projectCommand(`set --base-url <base_url> --cwd ${cwd}`)}`,
-        `Or add a "baseUrl" key beside "projectUrl" in the committed ${COMMITTED_CONFIG_FILE}, which records it with the code.`,
-        ``,
-        `This blocks JWT authentication, which builds the portal-login URL from the Base URL and keys the cached token by it. An API key needs no Base URL and is unaffected.`,
-      ].join('\n'),
-      notes
-    );
-  }
-
-  // Reports which side of the resolver's precedence supplied each URL. Without
-  // it, an environment value silently overriding a mapping that looks correct on
-  // disk is undiagnosable.
-  //
-  // Two answers, not one: the base URL resolves on its own terms — a pinned
-  // project can be paired with a base URL that came from the mapping — so a
-  // single "Source:" naming only where the project came from misattributes the
-  // other line. The provenance is reported by the resolver rather than inferred
-  // by comparing values here: an inferred answer credits the mapping whenever it
-  // happens to hold the same string that won, and https://api.form.io is the
-  // value most likely to be on both sides.
-  const describe = (source: BaseUrlSource, variable: string) => {
-    if (source === 'environment') {
-      return `this shell’s environment (${variable}), the weakest source — a committed ${COMMITTED_CONFIG_FILE} or the working-directory mapping overrides it`;
-    }
-    if (source === 'mapping') {
-      return `the working-directory mapping for ${cwd}`;
-    }
-    if (source === 'committed') {
-      // Named by path, not by layer: the upward walk means the governing file is
-      // usually not in the directory the caller is standing in, so "a committed
-      // file" leaves "why this project?" unanswered.
-      return `the committed ${COMMITTED_CONFIG_FILE} at ${committedPath ?? '(unknown path)'}`;
-    }
-    // One wording for every derivation: a form.io host implies api.form.io, and a
-    // sub-directory project implies its parent. Both are read off the project URL,
-    // which is what makes the project URL the single configuration.
-    return `the project URL it was derived from — the base URL is not configured separately unless it cannot be derived`;
-  };
-  const projectSource = describe(sources.projectUrl, 'FORMIO_PROJECT_URL');
-  const baseSource = describe(sources.baseUrl, 'FORMIO_BASE_URL');
-  // Collapsed on the rendered clauses, not on the source enums: two values can
-  // both come from `environment` and still come from *different variables*, and
-  // printing the project's clause alone then credits the base URL to
-  // FORMIO_PROJECT_URL — the attribution a reader of this output branches on.
-  // Identical strings are the only case where one clause says everything.
-  const source =
-    projectSource === baseSource
-      ? projectSource
-      : `project URL from ${projectSource}; base URL from ${baseSource}`;
-
-  // This command runs in the caller's shell, not in the MCP server's process. A
-  // plugin- or bundle-launched server carries its own env block, so what it
-  // resolves can differ from what is printed here — and the difference is
-  // invisible from this side. Say so rather than let the output be read as the
-  // server's answer. Kept whenever the mapping supplied any part of the answer,
-  // including a base URL under a pinned project.
-  const caveat = [sources.projectUrl, sources.baseUrl].includes('mapping')
-    ? [
-        `Note:        the MCP server’s own environment is not visible from this shell, so a FORMIO_PROJECT_URL or FORMIO_BASE_URL set there is not listed above. Neither can override this mapping — the environment is the weakest source — so what resolves here is what the server resolves.`,
-      ]
-    : [];
-
-  return ok(
-    [
-      `Project URL: ${resolved.projectUrl}`,
-      `Base URL:    ${resolved.baseUrl}`,
-      `Source:      ${source}`,
-      ...(shadowed.length
-        ? [`Shadowed:    ${shadowed.join('; ')} — overridden by the source above.`]
-        : []),
-      ...caveat,
-    ].join('\n'),
-    notes
-  );
-}
-
-interface ResolveRequest {
-  baseConfig: FormioConfig;
-  onNote: (message: string) => void;
-}
-
-// The resolver signals "nothing configured" by throwing, which is the right
-// shape for a tool handler and the wrong one for a reporting command. An
-// unreadable map is a different answer than an unmapped directory, though:
-// reporting it as "nothing configured" sends the caller to `project set`, whose
-// rewrite is what destroys the other mappings. It travels to the caller instead,
-// where runProjectCommand's catch turns it into EXIT_FAILED — a code the caller
-// can act on, rather than the EXIT_NOT_CONFIGURED an unmapped directory returns.
-function resolveOrNull(
-  cwd: string,
-  context: CommandContext,
-  { baseConfig, onNote }: ResolveRequest
-): ProjectResolution | null {
+  // Caught here rather than in runProjectCommand's catch, which cannot see the notes
+  // this function collected. A could-not-answer failure keeps them for the same
+  // reason the other three outcomes do: an "Ignoring FORMIO_PROJECT_URL: ..." note is
+  // often the CAUSE, and a launch whose host never expanded that variable is exactly
+  // the one likely to also have an unreadable map — reported alone, the second
+  // problem hid the first.
+  let report;
   try {
-    return resolveProject(cwd, baseConfig, { cacheDir: context.cacheDir, onNote });
+    report = reportProject({
+      cwd,
+      baseConfig: { baseUrl: envBaseUrl, projectUrl: envProjectUrl },
+      cacheDir: context.cacheDir,
+      remedies: CLI_REMEDIES,
+      notes,
+    });
   } catch (error) {
-    // Both "a record exists and cannot be used" errors travel to the caller,
-    // where runProjectCommand turns them into EXIT_FAILED. Reporting either as
-    // "nothing configured" would send the caller to `project set`, which writes a
-    // record the broken one then shadows — the symptom clears and the cause does
-    // not, which the precedence order then hides.
-    if (
-      error instanceof ProjectMapUnreadableError ||
-      error instanceof CommittedConfigUnusableError
-    ) {
-      throw error;
-    }
-    return null;
+    return fail(error instanceof Error ? error.message : String(error), notes);
   }
+
+  if (report.status === 'not-configured') {
+    return notConfigured(report.message, report.notes);
+  }
+  if (report.status === 'base-url-unresolved') {
+    return baseUrlUnresolved(report.message, report.notes);
+  }
+  return ok(report.message, report.notes);
 }
 
 export function runProjectCommand(
   args: string[],
   options: ProjectCommandOptions = {}
 ): ProjectCommandResult {
+  const notes: string[] = [];
   const context: CommandContext = {
     env: options.env ?? process.env,
     cwd: options.cwd ?? process.cwd(),
     cacheDir: options.cacheDir,
+    notes,
   };
   const subcommand = args[1];
 
   try {
-    const flags = parseFlags(args.slice(2));
     if (subcommand === 'set') {
-      return runSet(flags, context);
+      return runSet(parseFlags(args.slice(2), ['project-url', 'base-url', 'cwd']), context);
     }
     if (subcommand === 'get') {
-      return runGet(flags, context);
+      return runGet(parseFlags(args.slice(2), ['cwd']), context);
     }
     return fail(`Unknown project subcommand: ${subcommand ?? '(none)'}\n\n${USAGE}`);
   } catch (error) {
-    // Everything that throws is a failure to answer, never an answer of
+    // A URL the caller typed wrong is an answer to act on: ask the user again. It is
+    // the same situation as the API-root and Open Source refusals, which are exit 1
+    // for exactly this reason — reporting it as 2 tells every caller to relay and
+    // stop, abandoning the round that was about to supply the right value.
+    if (error instanceof InvalidRequestedUrlError) {
+      return notConfigured(
+        `${error.message}. Ask the user for the URL again and run the command with the corrected value.\n\n${USAGE}`,
+        notes
+      );
+    }
+    // Everything else that throws is a failure to answer, never an answer of
     // "nothing is mapped": an unreadable map, a relative --cwd, a malformed
     // stored URL. EXIT_FAILED keeps them out of the interview path.
-    return fail(error instanceof Error ? error.message : String(error));
+    return fail(error instanceof Error ? error.message : String(error), notes);
   }
-}
-
-// `--scope repo` writes the committed file rather than the machine-local mapping.
-//
-// Where it writes is the whole subtlety, and planCommittedConfigWrite owns the
-// rule: an amendment lands on the governing file wherever the walk found it, and
-// a write recording a DIFFERENT project lands in the directory the caller named,
-// because rewriting an ancestor would re-point every sibling folder beside it.
-function writeCommittedScope(flags: Record<string, string>, cwd: string): ProjectCommandResult {
-  // Normalized before the placement question is asked: "is this the same project
-  // the governing file already names?" is a comparison between normalized URLs,
-  // and an unusable value has to fail as a usage error rather than decide a path.
-  const requestedProjectUrl = flags['project-url']
-    ? normalizeHttpUrl(flags['project-url'], 'projectUrl')
-    : undefined;
-  const { filePath: target, shadows } = planCommittedConfigWrite({
-    startDir: cwd,
-    projectUrl: requestedProjectUrl,
-  });
-
-  // Read-modify-write, preserving unknown keys: the file is hand-edited and may
-  // carry a $schema or a convention key that this command has no business
-  // discarding.
-  let existing: Record<string, unknown> = {};
-  if (fs.existsSync(target)) {
-    try {
-      const parsed: unknown = JSON.parse(fs.readFileSync(target, 'utf8'));
-      if (typeof parsed === 'object' && parsed !== null && !Array.isArray(parsed)) {
-        existing = parsed as Record<string, unknown>;
-      }
-    } catch {
-      // A file too broken to parse is still the file to replace; the values below
-      // are what the caller asked to record, and refusing here would leave them
-      // with no way to repair it through this command.
-      existing = {};
-    }
-  }
-
-  const projectUrl =
-    requestedProjectUrl ??
-    (typeof existing.projectUrl === 'string'
-      ? normalizeHttpUrl(existing.projectUrl, `projectUrl in ${target}`)
-      : undefined);
-  if (!projectUrl) {
-    return fail(
-      `--project-url is required for ${target}, which records no project yet.\n\n${USAGE}`
-    );
-  }
-
-  const baseUrl = flags['base-url']
-    ? normalizeHttpUrl(flags['base-url'], 'baseUrl')
-    : typeof existing.baseUrl === 'string'
-      ? normalizeHttpUrl(existing.baseUrl, `baseUrl in ${target}`)
-      : undefined;
-
-  const next = {
-    ...existing,
-    projectUrl,
-    ...(baseUrl ? { baseUrl } : {}),
-  };
-  fs.mkdirSync(path.dirname(target), { recursive: true });
-  fs.writeFileSync(target, `${JSON.stringify(next, null, 2)}\n`);
-
-  return ok(
-    [
-      `Wrote ${target}`,
-      `Project URL: ${projectUrl}`,
-      ...(baseUrl ? [`Base URL:    ${baseUrl}`] : []),
-      ``,
-      `This file is committed with the code and takes precedence over the machine-local mapping, so everyone who clones this repository resolves the same project.`,
-      // Said out loud because the caller asked to record a project and got a file
-      // in a directory they may not have expected: the ancestor was left alone on
-      // purpose, so the folders beside this one keep the project it names.
-      ...(shadows
-        ? [
-            ``,
-            `${shadows.filePath} still names ${shadows.projectUrl} and was left unchanged, so it keeps governing every other directory under it. The new file takes precedence for ${cwd} and everything beneath it. To re-point the whole tree instead, run the same command with --cwd ${path.dirname(shadows.filePath)}.`,
-          ]
-        : []),
-    ].join('\n')
-  );
 }

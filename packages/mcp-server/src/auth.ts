@@ -155,7 +155,12 @@ async function checkLoginForm(
   return (loginForm as { _id?: string } | null)?._id ? true : false;
 }
 
-async function resolveDefaultLoginFormUrl(config: ResolvedFormioConfig): Promise<string> {
+// Exported for the same reason `resetLoginFormCache` is: the URL this returns is the
+// page a user types credentials into, and which host it names is the difference
+// between logging in to their deployment and logging in to one they do not use.
+// Reaching it through `authenticate` means standing up a local server and a browser
+// launch, so the one behaviour worth pinning would go untested.
+export async function resolveDefaultLoginFormUrl(config: ResolvedFormioConfig): Promise<string> {
   const cacheKey = loginFormCacheKey(config);
   const cached = resolvedLoginFormCache.get(cacheKey);
   if (cached) {

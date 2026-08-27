@@ -103,12 +103,30 @@ describe('the setup skill captures the project configuration', () => {
     expect(askIndex).toBeGreaterThan(probeIndex);
   });
 
-  it('asks for one value at a time, with either flag alone a valid update', () => {
+  // One value at a time is the rule for the USER. A record holds a project and its
+  // deployment together, so the command can carry both — it already has the project the
+  // report named — and "either flag alone is a valid update" is only true of the record
+  // that already holds the project.
+  it('asks the user for one value at a time', () => {
     const body = setupBody();
 
     expect(body).toMatch(/single value it names/i);
     expect(body).toContain('--base-url');
-    expect(body).toMatch(/[Ee]ither flag alone/);
+    expect(body).toMatch(/asked for one value/i);
+  });
+
+  it('says a deployment alone updates only the record that holds the project', () => {
+    const body = setupBody();
+
+    expect(body).toMatch(/only for the record that already holds the project/i);
+  });
+
+  // 1 and 2 mean different things to a caller: act on this, versus relay it and stop.
+  it('distinguishes the code that names a missing value from the one that cannot answer', () => {
+    const body = setupBody();
+
+    expect(body).toMatch(/Exit `1`[^\n]*answer, not a failure/i);
+    expect(body).toMatch(/Exit `2`[^\n]*could not answer/i);
   });
 });
 
@@ -313,7 +331,7 @@ describe('the skills delegate project resolution to the server', () => {
 
   it('every tool-calling skill names the read surface', () => {
     const offenders = probing()
-      .filter((doc) => !doc.body.includes('project get'))
+      .filter((doc) => !doc.body.includes('project_get'))
       .map((doc) => doc.path);
 
     expect(offenders).toEqual([]);
@@ -355,7 +373,7 @@ describe('both orchestrator branches resolve the mapping', () => {
     const body = orchestrator();
 
     expect(body).toMatch(/## Preflight/);
-    expect(body).toContain('project get');
+    expect(body).toContain('project_get');
     expect(body).not.toMatch(/### Step \d[\w.]* — Deployment/);
   });
 
@@ -366,6 +384,6 @@ describe('both orchestrator branches resolve the mapping', () => {
       .filter((line) => line.includes('FormioAppConfig'))
       .join('\n');
 
-    expect(modifyLines).toMatch(/project get|mapping/i);
+    expect(modifyLines).toMatch(/project_get|mapping/i);
   });
 });

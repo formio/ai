@@ -47,9 +47,13 @@ describe('capability quality', () => {
     const tools = await listToolsUnconfigured();
     // The whole surface, project_set included: every client can map a working
     // directory to a project, so nothing is withheld by launch mode.
-    expect(tools.length).toBe(20);
+    expect(tools.length).toBe(21);
     expect(tools.map((t) => t.name)).toContain('form_list');
     expect(tools.map((t) => t.name)).toContain('project_set');
+    // The read half of the same surface. Withholding it is what sent every
+    // skill's preflight to `npx @formio/mcp project get` — spawning a second
+    // server to ask this one a question it can answer over the open transport.
+    expect(tools.map((t) => t.name)).toContain('project_get');
   });
 
   it('still reports a missing project URL clearly when a tool is called', async () => {

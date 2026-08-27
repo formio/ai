@@ -23,15 +23,23 @@ export interface CommittedProjectConfig {
 // symptom clears, the cause persists, and the precedence order hides it. Same
 // reasoning as ProjectMapUnreadableError, one layer up.
 export class CommittedConfigUnusableError extends Error {
-  // Carried as a field, not only inside the message. `project set --scope repo` is
-  // the documented repair for this file, so the writer has to be able to land on
-  // the exact path the walk rejected rather than parse it back out of prose.
+  // Carried as a field, not only inside the message, so a caller that acts on the
+  // exact path the walk rejected does not have to parse it back out of prose.
   readonly filePath: string;
 
   constructor(filePath: string, reason: string) {
+    // The repair is an edit to the file itself, and the message says exactly what a
+    // usable one holds. This server never writes a committed file: the file lives in
+    // the user's repository and is designed for hand authorship and review, and the
+    // reader below tolerates a formio.json this server did not define — a writer
+    // landing on such a file either claims it or refuses with nothing runnable to
+    // offer. An edit is an instruction both a human with an editor and an agent with
+    // file tools can carry out.
     super(
       `The committed Form.io configuration at ${filePath} cannot be used: ${reason}. ` +
-        `Fix that file — it takes precedence over the working-directory mapping, so writing a mapping will not override it.`
+        `Fix that file — it takes precedence over the working-directory mapping, so writing a mapping will not override it. ` +
+        `A usable one is a JSON object holding {"projectUrl": "<the project's full URL>"}, plus "baseUrl" only when the deployment cannot be derived from the project URL. ` +
+        `Edit it directly (ask the user first — this server does not own a committed file), or remove it to let the working-directory mapping govern.`
     );
     this.name = 'CommittedConfigUnusableError';
     this.filePath = filePath;
@@ -44,11 +52,12 @@ export interface FindCommittedConfigOptions {
   onNote?: (message: string) => void;
 }
 
-// `formio.json` is a name a Form.io user is likely to already be using for
-// something else — an exported form, a project template, a CLI config — and none
-// of those documents configure this server. Treating one as a broken
-// configuration failed EVERY tool call for that directory, with no source able to
-// override it and no repair short of overwriting a file this server does not own.
+// No Form.io artifact of this toolset uses the name `formio.json` for anything
+// else (exports live in template.json), but the file sits in the user's own
+// repository, where a file by that name from some other origin can still exist —
+// and treating one as a broken configuration failed EVERY tool call for that
+// directory, with no source able to override it and no repair short of
+// overwriting a file this server does not own.
 //
 // So the question asked first is "is this file addressed to us?", answered by the
 // only two keys this format has. A file naming neither is somebody else's; a file
@@ -149,9 +158,9 @@ export function findCommittedConfig(
     const candidate = path.join(dir, COMMITTED_CONFIG_FILE);
     if (fs.existsSync(candidate)) {
       const found = readOne(candidate, onNote);
-      // Only a file addressed to this server ends the walk. One that is not — an
-      // exported form that happens to be called formio.json — is passed over, so
-      // a configuration above it still governs.
+      // Only a file addressed to this server ends the walk. One that is not — a
+      // stray formio.json this server did not define — is passed over, so a
+      // configuration above it still governs.
       if (found) {
         return found;
       }
@@ -166,63 +175,4 @@ export function findCommittedConfig(
     }
     dir = parent;
   }
-}
-
-export interface CommittedWriteRequest {
-  startDir: string;
-  // The project the write will record, already normalized, when the caller is
-  // recording one. Omitted when the write only amends a base URL, which is an
-  // edit to whichever file already holds the project.
-  projectUrl?: string;
-}
-
-export interface CommittedWritePlan {
-  filePath: string;
-  // The ancestor configuration this write will take precedence over, when the
-  // write deliberately lands below one. Reported so the writer can say so: a
-  // caller who asked to record a project for one folder has to be told that a
-  // different file still governs the folders beside it.
-  shadows?: CommittedProjectConfig;
-}
-
-// Where `project set --scope repo` writes.
-//
-// Two rules, and the second is what makes per-folder targeting possible at all.
-// A write that AMENDS what a file already says — a base URL for the project it
-// already names, or the same project again — lands on that file wherever the walk
-// found it, so a second `project set` updates the first one's file rather than
-// shadowing it from a deeper directory. A write that records a DIFFERENT project
-// lands in the directory the caller named: rewriting an ancestor there would
-// silently re-point every sibling folder beneath it, which is the opposite of
-// what "set the project for this folder" asks for, and it made the per-folder
-// targeting the read side advertises impossible to create.
-export function planCommittedConfigWrite({
-  startDir,
-  projectUrl,
-}: CommittedWriteRequest): CommittedWritePlan {
-  const dir = path.resolve(startDir);
-  const here = path.join(dir, COMMITTED_CONFIG_FILE);
-
-  let found: CommittedProjectConfig | undefined;
-  try {
-    found = findCommittedConfig(dir);
-  } catch (error) {
-    // A broken file is still the file to rewrite; repairing it is the point — and
-    // the file to repair is the one the walk found, which the error names. Falling
-    // back to <startDir>/formio.json instead created a SECOND file below an
-    // unusable ancestor and left that ancestor governing every sibling directory,
-    // after CommittedConfigUnusableError had told the user it was the thing to fix.
-    if (error instanceof CommittedConfigUnusableError) {
-      return { filePath: error.filePath };
-    }
-    throw error;
-  }
-
-  if (!found || found.filePath === here) {
-    return { filePath: here };
-  }
-  if (!projectUrl || projectUrl === found.projectUrl) {
-    return { filePath: found.filePath };
-  }
-  return { filePath: here, shadows: found };
 }

@@ -9,8 +9,8 @@ vi.mock('child_process', () => ({ exec: vi.fn() }));
 // forceBrowser because these tests exercise the browser login path itself, and
 // the suite runs on CI — where browserless detection refuses to launch one.
 const DEFAULT_CONFIG: ResolvedFormioConfig = {
-  baseUrl: 'https://formio.invalid',
-  projectUrl: 'https://formio.invalid/example',
+  baseUrl: 'https://formio.invalid/sub',
+  projectUrl: 'https://formio.invalid/sub/example',
   forceBrowser: true,
 };
 
@@ -82,13 +82,13 @@ describe('authenticate', () => {
       expect(link).toMatch(/integrity="sha384-[A-Za-z0-9+/=]+" crossorigin="anonymous"/);
     }
     expect(html).toContain('Formio.createForm');
-    expect(html).toContain('https://formio.invalid/formio/user/login');
+    expect(html).toContain('https://formio.invalid/sub/formio/user/login');
   });
 
   it('uses custom loginFormUrl when set instead of the default', async () => {
     const config: ResolvedFormioConfig = {
-      baseUrl: 'https://formio.invalid',
-      projectUrl: 'https://formio.invalid/example',
+      baseUrl: 'https://formio.invalid/sub',
+      projectUrl: 'https://formio.invalid/sub/example',
       loginFormUrl: 'https://custom.form.io/mylogin',
       forceBrowser: true,
     };
@@ -105,7 +105,7 @@ describe('authenticate', () => {
     await authPromise;
 
     expect(html).toContain('https://custom.form.io/mylogin');
-    expect(html).not.toContain('https://formio.invalid/formio/user/login');
+    expect(html).not.toContain('https://formio.invalid/sub/formio/user/login');
   });
 });
 

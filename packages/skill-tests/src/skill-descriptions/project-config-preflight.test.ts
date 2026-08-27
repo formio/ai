@@ -66,10 +66,19 @@ describe('every tool-calling skill probes the project configuration', () => {
     expect(probingSkillMd()).toHaveLength(10);
   });
 
-  it('instructs running project get with the working directory', () => {
+  // The probe is a TOOL CALL, not a shell command. It used to be
+  // `npx -y @formio/mcp@<version> project get --cwd "$(pwd)"` in all ten skills —
+  // an agent holding an open connection to the server spawning an npm download to
+  // ask that same server a question it answers over the transport. The answer has
+  // to come from the process that will serve the calls after it.
+  it('instructs calling project_get with the working directory', () => {
     expect(
-      offenders(probingSkillMd(), (text) => !/project get/.test(text) || !/--cwd/.test(text))
+      offenders(probingSkillMd(), (text) => !/project_get/.test(text) || !/`cwd`/.test(text))
     ).toEqual([]);
+  });
+
+  it('sends no probing skill to a shell command for the answer', () => {
+    expect(offenders(probingSkillMd(), (text) => /project get/.test(text))).toEqual([]);
   });
 
   it('pins the server version on every project get invocation', () => {
@@ -84,7 +93,7 @@ describe('every tool-calling skill probes the project configuration', () => {
 
   it('relays the error rather than composing its own interview', () => {
     expect(
-      offenders(probingSkillMd(), (text) => !/project set/.test(text) || !/relay/i.test(text))
+      offenders(probingSkillMd(), (text) => !/project_set/.test(text) || !/relay/i.test(text))
     ).toEqual([]);
   });
 
@@ -109,30 +118,35 @@ describe('every tool-calling skill probes the project configuration', () => {
     );
   });
 
-  // Four exit codes exist so a caller can tell "nothing is recorded here yet"
-  // (interview) from "this command could not answer" (do not interview — an
-  // unreadable map, a broken formio.json, a malformed URL). Every gate branched on
-  // "non-zero" alone, which collapses them and sends the agent into the interview
-  // whose `project set` then fails for the same unreported reason.
-  it('distinguishes exit 1 from exit 2 rather than branching on non-zero alone', () => {
+  // The statuses carry what the CLI exit codes carried, and for the same reason: a
+  // caller has to tell "nothing is recorded here yet" (interview) from "this could
+  // not answer at all" (do NOT interview — an unreadable map, a broken formio.json,
+  // a malformed URL), whose `project_set` would fail for the same unreported reason.
+  it('distinguishes "nothing is mapped" from "could not answer at all"', () => {
     expect(
-      offenders(probingSkillMd(), (text) => !/exit(s)? `?2`?|exit code 2/i.test(text))
+      offenders(
+        probingSkillMd(),
+        (text) => !/`not-configured`/.test(text) || !/fails outright/i.test(text)
+      )
     ).toEqual([]);
   });
 
-  // Exit 3 is the half-configured answer: the project is on record and its
-  // deployment could not be derived. It reported as a 2 before, which every gate
-  // answers by relaying and STOPPING — so the one deployment shape this surface
-  // exists to serve, a path-less project URL on a customer domain, dead-ended on
-  // guidance written for a broken file.
+  // The half-configured answer: the project is on record and its deployment could
+  // not be derived. Collapsing it into either other status dead-ends the one
+  // deployment shape this whole surface exists to serve — a path-less project URL
+  // on a customer domain.
   it('gives the missing-base-URL answer its own branch', () => {
-    expect(
-      offenders(probingSkillMd(), (text) => !/exit(s)? `?3`?|exit code 3/i.test(text))
-    ).toEqual([]);
+    expect(offenders(probingSkillMd(), (text) => !/`base-url-unresolved`/.test(text))).toEqual([]);
   });
 
-  it('sends the exit 3 branch to --base-url rather than back to the project interview', () => {
-    expect(offenders(probingSkillMd(), (text) => !/--base-url/.test(text))).toEqual([]);
+  // Asserted on the intent rather than on one token: the branch asks the user for the
+  // Base URL and does not send them back through the project interview. Which call
+  // records it is the report's to name, since that depends on the record holding the
+  // project.
+  it('sends that branch to the Base URL rather than back to the project interview', () => {
+    expect(
+      offenders(probingSkillMd(), (text) => !/Base URL/.test(text) || !/not re-ask/i.test(text))
+    ).toEqual([]);
   });
 
   it('tells formio-mcp-setup that exit 3 is the base-URL round', () => {
@@ -147,7 +161,7 @@ describe('every tool-calling skill probes the project configuration', () => {
 
     expect(planner).toContain('project_set');
     expect(planner).toMatch(/HTTP/);
-    expect(planner).not.toMatch(/project get/);
+    expect(planner).not.toMatch(/project get|project_get/);
   });
 
   // The planner's exemption rests on one claim: it calls no MCP tool. Its own
@@ -162,7 +176,7 @@ describe('every tool-calling skill probes the project configuration', () => {
     );
 
     expect(emission).toMatch(/does not (run|make|call)|hand(s|ed)? (it|them|the pair) (back|to)/i);
-    expect(emission).toMatch(/project get/);
+    expect(emission).toMatch(/project_get/);
   });
 
   it('keeps the planner from reading an environment variable to build a URL', () => {
@@ -172,9 +186,17 @@ describe('every tool-calling skill probes the project configuration', () => {
   });
 });
 
+// One document is allowed to carry the URL rules: the canonical
+// formio-mcp-setup/references/project-urls.md, which is what an agent with NO
+// server reads in order to ask for the two values by the same rules the server
+// applies. Everywhere else the ban stands — a second copy is what drifts.
+const CANONICAL_URL_RULES = 'formio-mcp-setup/references/project-urls.md';
+
 describe('no skill restates the build-time URL guidance the server owns', () => {
-  it('enumerates the three shapes nowhere', () => {
-    expect(offenders(allMarkdown(), (text) => /three valid shapes/i.test(text))).toEqual([]);
+  const nonCanonical = () => allMarkdown().filter((path) => !path.endsWith(CANONICAL_URL_RULES));
+
+  it('enumerates the three shapes nowhere else', () => {
+    expect(offenders(nonCanonical(), (text) => /three valid shapes/i.test(text))).toEqual([]);
   });
 
   // Matched on the deleted table's own rows rather than on "a table containing a
@@ -191,13 +213,13 @@ describe('no skill restates the build-time URL guidance the server owns', () => 
     ).toEqual([]);
   });
 
-  it('carries no Base-URL derivation table', () => {
-    expect(offenders(allMarkdown(), (text) => /not derivable/i.test(text))).toEqual([]);
+  it('carries no Base-URL derivation table of its own', () => {
+    expect(offenders(nonCanonical(), (text) => /not derivable/i.test(text))).toEqual([]);
   });
 
   it('carries no URL validation rules of its own', () => {
     expect(
-      offenders(allMarkdown(), (text) => /Trailing slash\.|Strip trailing/i.test(text))
+      offenders(nonCanonical(), (text) => /Trailing slash\.|Strip trailing/i.test(text))
     ).toEqual([]);
   });
 
@@ -271,7 +293,7 @@ describe('no document describes a URL interview that no longer exists', () => {
   it('the angular parent points at SETUP as a resolver, not an interviewer', () => {
     const text = read(join(skillsRoot, 'formio-angular/SKILL.md'));
 
-    expect(text).toContain('project get');
+    expect(text).toContain('project_get');
     expect(text).not.toMatch(/the URL interview/i);
   });
 });
@@ -286,7 +308,7 @@ describe('no document describes a URL interview that no longer exists', () => {
 // The predicate separates the two cases precisely: a call with an opening quote
 // is a value being authored, while prose that merely names the methods (Angular's
 // `FormioModule` calls them internally) has no parenthesis and needs no gate.
-describe('authoring the SDK URL calls is gated on project get', () => {
+describe('authoring the SDK URL calls is gated on project_get', () => {
   const AUTHORS_A_VALUE = /set(Base|Project)Url\('/;
 
   const authoringDocs = () => allMarkdown().filter((path) => AUTHORS_A_VALUE.test(read(path)));
@@ -295,8 +317,8 @@ describe('authoring the SDK URL calls is gated on project get', () => {
     expect(authoringDocs().length).toBeGreaterThan(0);
   });
 
-  it('every document that writes a URL value names project get', () => {
-    expect(offenders(authoringDocs(), (text) => !/project get/.test(text))).toEqual([]);
+  it('every document that writes a URL value names project_get', () => {
+    expect(offenders(authoringDocs(), (text) => !/project_get/.test(text))).toEqual([]);
   });
 
   it('every one of them says not to hardcode the example', () => {
@@ -324,6 +346,8 @@ describe('authoring the SDK URL calls is gated on project get', () => {
 // paraphrase walked straight through it — the embed setup guide enumerated the
 // same routings in its own words.
 describe('no document paraphrases the deployment routing shapes', () => {
+  const nonCanonical = () => allMarkdown().filter((path) => !path.endsWith(CANONICAL_URL_RULES));
+
   it('does not explain sub-directory versus sub-domain project routing', () => {
     expect(
       offenders(
@@ -332,6 +356,24 @@ describe('no document paraphrases the deployment routing shapes', () => {
           /sub-?director(y|ies)[ ,-]+projects?/i.test(text) &&
           /sub-?domain[ ,-]+projects?/i.test(text)
       )
+    ).toEqual([]);
+  });
+
+  // The pattern above reads "sub-directory projects"; the paraphrase that walked
+  // through it put the noun first — "routes projects to sub-domains or
+  // sub-directories" — and then gave a template URL for each. Same catalogue, same
+  // drift risk, one sentence away from the canonical copy that owns it.
+  it('does not enumerate the routings in the other word order either', () => {
+    expect(
+      offenders(nonCanonical(), (text) =>
+        /projects? to sub-?domains? (or|and) sub-?director(y|ies)/i.test(text)
+      )
+    ).toEqual([]);
+  });
+
+  it('does not offer a template project URL per routing', () => {
+    expect(
+      offenders(nonCanonical(), (text) => /https:\/\/<project>\.<your-domain>/i.test(text))
     ).toEqual([]);
   });
 });
@@ -388,13 +430,13 @@ describe('the FormioAppConfig aliases are documented and gated', () => {
     ).toEqual([]);
   });
 
-  it('every document that supplies values for them names project get', () => {
+  it('every document that supplies values for them names project_get', () => {
     const SUPPLIES_A_VALUE = /(appUrl|apiUrl):\s*['"`]|YOUR_FORMIO_(PROJECT|BASE)_URL/;
 
     expect(
       offenders(
         formioAppConfigDocs().filter((path) => SUPPLIES_A_VALUE.test(read(path))),
-        (text) => !/project get/.test(text)
+        (text) => !/project_get/.test(text)
       )
     ).toEqual([]);
   });
@@ -410,14 +452,14 @@ describe('the FormioAppConfig aliases are documented and gated', () => {
 // workspace's own config.ts. That file is a record, not the authority: a clone on
 // a fresh machine, a re-pointed project, or a hand edit leaves it disagreeing with
 // the mapping every build-time tool call resolves.
-describe('the Angular sub-skill treats project get as the authority', () => {
+describe('the Angular sub-skill treats project_get as the authority', () => {
   const subSkill = () => read(join(skillsRoot, 'formio-angular/formio-angular-resources/SKILL.md'));
   const interviewGuide = () =>
     read(join(skillsRoot, 'formio-angular/formio-angular-resources/references/interview-guide.md'));
 
-  it('names project get in both the flow and its interview guide', () => {
-    expect(subSkill()).toContain('project get');
-    expect(interviewGuide()).toContain('project get');
+  it('names project_get in both the flow and its interview guide', () => {
+    expect(subSkill()).toContain('project_get');
+    expect(interviewGuide()).toContain('project_get');
   });
 
   it('does not present config.ts as the source to read URLs from first', () => {
@@ -447,6 +489,22 @@ describe('the skills know about the committed configuration', () => {
     expect(offenders(probing(), (text) => !/formio\.json/.test(text))).toEqual([]);
   });
 
+  // The preflight opened by telling the agent that a tool "resolves which project
+  // it targets from a mapping keyed on a working directory" — the machine-local
+  // mapping, alone, as though the committed file the next paragraph names were not a
+  // source at all. An agent that believes it then reports the mapping as the cause
+  // when a committed file is what governs, and offers to re-map a directory the
+  // mapping does not decide.
+  it('does not present the machine-local mapping as the only source', () => {
+    expect(offenders(allMarkdown(), (text) => /from a mapping keyed on/i.test(text))).toEqual([]);
+  });
+
+  it('still says resolution is per working directory, which is why cwd travels', () => {
+    expect(
+      offenders(probing(), (text) => !/per working directory|working directory/i.test(text))
+    ).toEqual([]);
+  });
+
   it('no skill document restates the precedence order or the .git boundary', () => {
     expect(
       offenders(
@@ -459,10 +517,14 @@ describe('the skills know about the committed configuration', () => {
     ).toEqual([]);
   });
 
-  it('formio-mcp-setup offers the repo scope only inside a git repository', () => {
+  // The committed file is hand-authored — the server reads it and never writes it —
+  // so the offer is to write the file, not to pass a scope flag the command no
+  // longer takes.
+  it('formio-mcp-setup offers the committed file only inside a git repository', () => {
     const text = read(join(skillsRoot, 'formio-mcp-setup/SKILL.md'));
 
-    expect(text).toContain('--scope repo');
+    expect(text).not.toContain('--scope');
+    expect(text).toMatch(/never writes it/);
     expect(text).toMatch(/git repositor/i);
     expect(text).toMatch(/shared with everyone who clones|everyone who clones/i);
   });
@@ -478,7 +540,10 @@ describe('the scaffolding skills record the target with the application', () => 
     const config = read(join(skillsRoot, 'formio-angular/CONFIG.md'));
 
     expect(config).toContain('formio.json');
-    expect(config).toContain('--scope repo');
+    // Written directly by the skill: the server reads a committed file and never
+    // writes one. The claim under test is unchanged: CONFIG commits the target.
+    expect(config).toMatch(/never writes it/);
+    expect(config).not.toMatch(/scope[^\n]*"repo"/);
     expect(config).toMatch(/workspace root|workspace directory/i);
   });
 
@@ -583,5 +648,64 @@ describe('endpoint roots are renamed, not removed', () => {
       .filter((name) => /\{\{baseUrl\}\}/.test(stripCode(read(join(REFERENCE_DIR, name)))));
 
     expect(offending).toEqual([]);
+  });
+});
+
+// The repo-scope write exists so a clone resolves the project this application was
+// built against. That fails for the one shape the whole surface exists to serve — a
+// path-less customer project, whose Base URL was RECORDED rather than derived — if the
+// write carries `projectUrl` alone: the clone has no mapping, so it resolves
+// `base-url-unresolved`. CONFIG gated the second value on "project_get reported one it
+// could not derive", which never happens: once the value is recorded the report says
+// `ok`, and only `baseUrlSource` says where it came from.
+describe('CONFIG records the deployment when it was not derived', () => {
+  it('keys the decision on baseUrlSource rather than on a failure to derive', () => {
+    const config = read(join(skillsRoot, 'formio-angular/CONFIG.md'));
+
+    expect(config).toMatch(/baseUrlSource/);
+    expect(config).not.toMatch(/only if `?project_get`? reported one it could not derive/i);
+  });
+
+  it('says what happens to a clone without it', () => {
+    const config = read(join(skillsRoot, 'formio-angular/CONFIG.md'));
+
+    expect(config).toMatch(/clone/i);
+    expect(config).toMatch(/base-url-unresolved/);
+  });
+});
+
+// A record holds a project and its deployment together, so where a deployment is
+// recorded depends on where the project already is. The preflights prescribed one
+// call — "pass baseUrl, leave projectUrl out" — which is right only when the mapping
+// holds the project, and is refused for a project held by a committed formio.json or
+// the environment. The report knows which record governs and names the write; the
+// skills relay it rather than composing their own.
+describe('the half-configured branch relays the write rather than prescribing one', () => {
+  const relaying = () => [...probingSkillMd(), join(skillsRoot, 'formio-angular/SETUP.md')];
+
+  it('no skill tells the agent to leave projectUrl out', () => {
+    expect(
+      offenders(
+        [...relaying(), join(skillsRoot, 'formio-mcp-setup/references/project-urls.md')],
+        (text) => /leav(e|ing) `?projectUrl`? out/i.test(text)
+      )
+    ).toEqual([]);
+  });
+
+  it('every one still branches on the status and records what the message names', () => {
+    expect(
+      offenders(
+        relaying(),
+        (text) => !/`base-url-unresolved`/.test(text) || !/project_set/.test(text)
+      )
+    ).toEqual([]);
+  });
+
+  // The canonical copy is what an agent with no server reads, so it carries the rule
+  // rather than a single call: the deployment goes in the record that holds the project.
+  it('the canonical reference states where a deployment is recorded', () => {
+    const text = read(join(skillsRoot, 'formio-mcp-setup/references/project-urls.md'));
+
+    expect(text).toMatch(/record that holds the project|beside the project|same record/i);
   });
 });
