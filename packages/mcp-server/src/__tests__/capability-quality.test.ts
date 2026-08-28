@@ -66,7 +66,15 @@ describe('capability quality', () => {
     const result = await client.callTool({ name: 'form_list', arguments: {} });
     expect(result.isError).toBe(true);
     const text = (result.content as { text: string }[])[0].text;
-    expect(text).toMatch(/FORMIO_PROJECT_URL/);
+    // "Clear" is: it names what is missing, what a Project URL is, and the call that
+    // records one. It used to be asserted by looking for FORMIO_PROJECT_URL, which was
+    // a proxy — and a misleading one, since this message is relayed verbatim to the
+    // USER, for whom the name of an environment variable they need not have is not the
+    // clear part. Precedence between the three records is the agent's business and it
+    // gets that from the server's instructions.
+    expect(text).toMatch(/no Form\.io project is configured/i);
+    expect(text).toMatch(/project_set/);
+    expect(text).toMatch(/A Project URL is the full URL of one Form\.io project/);
   });
 
   it('describes what every tool does', async () => {

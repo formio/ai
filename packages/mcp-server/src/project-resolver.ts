@@ -4,7 +4,7 @@ import {
   BASE_URL_UNRESOLVED_GUIDANCE,
   FormioConfig,
   ResolvedFormioConfig,
-  PROJECT_URL_GUIDANCE,
+  PROJECT_URL_FOR_A_USER,
   normalizeHttpUrl,
   stripTrailingSlashes,
 } from './config.js';
@@ -115,7 +115,12 @@ function missingProjectError({ cwd, mapCwd, unpaired }: MissingProject): Project
       stranded +
       `Ask the user for their Project URL, then call ${how}, or run: ${projectCommand(`set --project-url <project_url> --cwd ${cwd ?? mapCwd}`)}. ` +
       `To record the target with the code instead — versioned, and shared with everyone who clones it — add a ${COMMITTED_CONFIG_FILE} holding {"projectUrl": "..."} in the application's own folder. ` +
-      `${PROJECT_URL_GUIDANCE} FORMIO_PROJECT_URL in the server environment supplies one too, but it is the weakest source: a ${COMMITTED_CONFIG_FILE} or a mapping overrides it.`,
+      // Which record wins is not this message's business. It is asked of a person for
+      // ONE value, and precedence — that the environment supplies a project too and is the
+      // weakest of the three — is a rule the agent already has from the server's own
+      // instructions at connect time. Carried here it lengthened, by a third, the message
+      // every skill relays verbatim to the user.
+      PROJECT_URL_FOR_A_USER,
     // Carried structurally as well as in the prose: the reporting caller renders its
     // own message and would otherwise have to parse this one back out.
     unpaired

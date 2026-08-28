@@ -8,6 +8,32 @@ export const DEFAULT_BASE_URL = 'https://api.form.io';
 // whichever project URL the user is about to supply, so guidance about it cannot be
 // acted on before that answer exists — and carrying it here made a message asking
 // for one value read as asking for two.
+/**
+ * The Project URL, for the PERSON being asked for one.
+ *
+ * Every skill instructs the agent to relay the unconfigured report verbatim and ask for
+ * the one value it names, so this text is read by a human — who is going to paste the URL
+ * they already have. What they need is the definition and the shapes; what they were
+ * getting was PROJECT_URL_GUIDANCE entire, a third of which is prohibitions written to
+ * stop an AGENT constructing a URL it should have asked for. Relayed under a one-line
+ * question, those read as guardrails for somebody else, and they made a three-line ask
+ * eight lines long.
+ *
+ * The prohibitions are not lost: they stay in PROJECT_URL_GUIDANCE, which the server's
+ * own instructions carry, so an agent with no skills installed still meets them at
+ * connect time — the surface they were written for.
+ */
+export const PROJECT_URL_FOR_A_USER = [
+  'A Project URL is the full URL of one Form.io project.',
+  `On Form.io's hosted cloud that is the project's name as a sub-domain of form.io: a project named examples is https://examples.form.io.`,
+  'On a deployment you host it is either a sub-directory of that deployment (https://forms.mysite.com/myproject) or a sibling sub-domain of the same parent domain (https://myproject.mysite.com), depending on how that deployment routes projects.',
+].join(' ');
+
+/**
+ * The same thing for an AGENT, with the rules that stop it building a URL rather than
+ * asking for one. Carried by the server's instructions and by the surfaces only a model
+ * reads — never by a report a user is shown; see PROJECT_URL_FOR_A_USER.
+ */
 export const PROJECT_URL_GUIDANCE = [
   'A Project URL is the full URL of one Form.io project — the project an application reads and writes.',
   `On Form.io's hosted cloud it is the project's name as a sub-domain of form.io: a project named examples is https://examples.form.io.`,

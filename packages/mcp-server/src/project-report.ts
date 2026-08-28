@@ -2,7 +2,7 @@ import { COMMITTED_CONFIG_FILE } from './committed-config.js';
 import {
   BASE_URL_UNDERIVABLE,
   FormioConfig,
-  PROJECT_URL_GUIDANCE,
+  PROJECT_URL_FOR_A_USER,
   normalizeHttpUrl,
 } from './config.js';
 import {
@@ -298,7 +298,7 @@ export function reportProject({
           : []),
         ...(cwdWasNamed ? remedies.setProject(cwd) : []),
         ``,
-        PROJECT_URL_GUIDANCE,
+        PROJECT_URL_FOR_A_USER,
       ]
         .filter(Boolean)
         .join('\n'),
