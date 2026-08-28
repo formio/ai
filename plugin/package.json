@@ -1,6 +1,6 @@
 {
   "name": "@formio/ai",
-  "version": "0.11.0",
+  "version": "0.12.0",
   "description": "Form.io agentic toolset — the Form.io MCP server plus a skill library for building applications on the Form.io platform, usable from any coding agent that reads Agent Skills or speaks MCP.",
   "type": "module",
   "license": "MIT",
