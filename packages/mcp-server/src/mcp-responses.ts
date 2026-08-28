@@ -23,10 +23,14 @@ export function toMcpStructuredResult(structured: Record<string, unknown>, text?
   };
 }
 
-export function toMcpError(error: unknown) {
+// `notes` lead the message for the same reason a successful answer's do: a note is
+// often the CAUSE of the failure being reported — an ignored formio.json on the walk,
+// an environment variable a host never expanded — and a failure rendered alone hides
+// the first half of the story.
+export function toMcpError(error: unknown, notes: readonly string[] = []) {
   const message = error instanceof Error ? error.message : String(error);
   return {
-    content: [{ type: 'text' as const, text: message }],
+    content: [{ type: 'text' as const, text: [...notes, message].filter(Boolean).join('\n') }],
     isError: true,
   };
 }

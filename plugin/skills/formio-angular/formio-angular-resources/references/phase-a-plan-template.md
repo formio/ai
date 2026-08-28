@@ -1,6 +1,6 @@
 # Phase A plan template, pattern → file mapping, and the design-skill rule
 
-> **`FormioAppConfig` renames both URLs.** `appUrl` is the **Project URL** — the project this application reads and writes, and the one value anyone supplies. `apiUrl` is the **Base URL** — the deployment hosting it, which is normally derived from the Project URL rather than supplied. Take both from `npx -y @formio/mcp@0.11.0 project get --cwd "<workspace root>"`; never compose, derive, or hand-type either one yourself.
+> **`FormioAppConfig` renames both URLs.** `appUrl` is the **Project URL** — the project this application reads and writes, and the one value anyone supplies. `apiUrl` is the **Base URL** — the deployment hosting it, which is normally derived from the Project URL rather than supplied. Take both from `project_get` (called with `cwd` set to the workspace root) when the Form.io MCP tools are callable by you, and otherwise ask the user for them — see [`project-urls.md`](../../../formio-mcp-setup/references/project-urls.md). Never compose, derive, or hand-type either one yourself.
 
 Companion to `../SKILL.md`'s "Phase A" and "The approval gate". Contains the exact Scaffolding Plan template, the pattern → file mapping table that populates it, and the full `frontend-design` consultation rule with its disclosure-line format. The gate exists because regenerating is cheap in the plan (~50 lines) and expensive in the files (~15–40 files × 40–80 lines each).
 

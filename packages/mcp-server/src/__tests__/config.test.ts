@@ -155,6 +155,27 @@ describe('getConfig', () => {
 // The normalized value is what gets persisted, cached against, and concatenated
 // into request URLs, so it has to be the string new URL() accepted — not the
 // caller's raw input, which may differ from it by whitespace.
+// One spelling of a host, decided where URLs enter. `api.form.io.` and `api.form.io`
+// are the same host — legal, identically resolved, invisible to a user — and treating
+// them as two defeated the pair rule, would key two token-cache entries, and would
+// make two records holding "the same" URL compare unequal. Normalized in each rule
+// instead, it fixed those rules and left every other comparison seeing two hosts.
+describe('a host written in its fully-qualified form', () => {
+  it.each([
+    ['a bare host', 'https://api.form.io.', 'https://api.form.io'],
+    ['a host with a path', 'https://api.form.io./myproject', 'https://api.form.io/myproject'],
+    ['a customer host', 'https://forms.mysite.com./one', 'https://forms.mysite.com/one'],
+  ])('collapses to one spelling: %s', (_label, input, expected) => {
+    expect(normalizeHttpUrl(input, 'projectUrl')).toBe(expected);
+  });
+
+  // The SCHEME is not normalized: http and https to one host are different endpoints,
+  // and one of them carries credentials in plaintext.
+  it('leaves the scheme alone', () => {
+    expect(normalizeHttpUrl('http://forms.mysite.com', 'baseUrl')).toBe('http://forms.mysite.com');
+  });
+});
+
 describe('normalizeHttpUrl', () => {
   it('trims surrounding whitespace', () => {
     expect(normalizeHttpUrl(' https://api.form.io ', 'baseUrl')).toBe('https://api.form.io');

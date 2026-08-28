@@ -35,7 +35,11 @@ describe('resolution precedence by scope', () => {
 
   it('prefers the committed file over a personal mapping', () => {
     commit({ projectUrl: 'https://committed.form.io' });
-    writeProjectEntry(root, { FORMIO_PROJECT_URL: 'https://mapped.form.io' }, cacheDir);
+    writeProjectEntry({
+      cwd: root,
+      env: { FORMIO_PROJECT_URL: 'https://mapped.form.io' },
+      cacheDir: cacheDir,
+    });
 
     const { config, sources } = resolve();
 
@@ -45,7 +49,11 @@ describe('resolution precedence by scope', () => {
 
   // The reversal of the old rule, so the environment value must be provably unused.
   it('prefers a personal mapping over the environment', () => {
-    writeProjectEntry(root, { FORMIO_PROJECT_URL: 'https://mapped.form.io' }, cacheDir);
+    writeProjectEntry({
+      cwd: root,
+      env: { FORMIO_PROJECT_URL: 'https://mapped.form.io' },
+      cacheDir: cacheDir,
+    });
 
     const { config, sources } = resolve({ projectUrl: 'https://env-project.form.io' });
 
@@ -70,36 +78,19 @@ describe('resolution precedence by scope', () => {
 
   it('resolves the base URL through the same order', () => {
     commit({ projectUrl: 'https://a.mysite.com', baseUrl: 'https://committed-base.mysite.com' });
-    writeProjectEntry(
-      root,
-      {
+    writeProjectEntry({
+      cwd: root,
+      env: {
         FORMIO_PROJECT_URL: 'https://b.mysite.com',
         FORMIO_BASE_URL: 'https://mapped-base.mysite.com',
       },
-      cacheDir
-    );
+      cacheDir: cacheDir,
+    });
 
     const { config, sources } = resolve({ baseUrl: 'https://env-base.mysite.com' });
 
     expect(config.baseUrl).toBe('https://committed-base.mysite.com');
     expect(sources.baseUrl).toBe('committed');
-  });
-
-  it('uses a mapped base URL when the committed file names none', () => {
-    commit({ projectUrl: 'https://a.mysite.com' });
-    writeProjectEntry(
-      root,
-      {
-        FORMIO_PROJECT_URL: 'https://b.mysite.com',
-        FORMIO_BASE_URL: 'https://mapped-base.mysite.com',
-      },
-      cacheDir
-    );
-
-    const { config, sources } = resolve({ baseUrl: 'https://env-base.mysite.com' });
-
-    expect(config.baseUrl).toBe('https://mapped-base.mysite.com');
-    expect(sources.baseUrl).toBe('mapping');
   });
 
   it('still derives the base URL by shape when no source supplies one', () => {
@@ -114,7 +105,11 @@ describe('resolution precedence by scope', () => {
   // Today's spec forbids this: an environment project URL pinned the server and
   // project_set could not redirect it.
   it('lets a mapping redirect a directory whose environment names another project', () => {
-    writeProjectEntry(root, { FORMIO_PROJECT_URL: 'https://redirected.form.io' }, cacheDir);
+    writeProjectEntry({
+      cwd: root,
+      env: { FORMIO_PROJECT_URL: 'https://redirected.form.io' },
+      cacheDir: cacheDir,
+    });
 
     expect(resolve({ projectUrl: 'https://pinned.form.io' }).config.projectUrl).toBe(
       'https://redirected.form.io'
@@ -133,7 +128,11 @@ describe('resolution precedence by scope', () => {
 
   it('fails on a broken committed file rather than reporting nothing configured', () => {
     fs.writeFileSync(path.join(root, COMMITTED_CONFIG_FILE), '{ not json');
-    writeProjectEntry(root, { FORMIO_PROJECT_URL: 'https://mapped.form.io' }, cacheDir);
+    writeProjectEntry({
+      cwd: root,
+      env: { FORMIO_PROJECT_URL: 'https://mapped.form.io' },
+      cacheDir: cacheDir,
+    });
 
     let message = '';
     try {

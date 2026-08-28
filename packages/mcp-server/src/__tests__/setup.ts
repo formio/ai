@@ -14,6 +14,13 @@ const tmpHome = fs.mkdtempSync(
 process.env.HOME = tmpHome;
 process.env.USERPROFILE = tmpHome;
 
+// And no project from the shell that started vitest. FORMIO_PROJECT_URL is a
+// project configured for EVERY directory, which inverts every "nothing is
+// configured here" assertion in the suite — silently, and only on the machines
+// where it happens to be exported. A case that wants one sets it itself.
+delete process.env.FORMIO_PROJECT_URL;
+delete process.env.FORMIO_BASE_URL;
+
 beforeEach(() => {
   fs.rmSync(path.join(tmpHome, '.formio'), { recursive: true, force: true });
 });

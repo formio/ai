@@ -87,3 +87,26 @@ describe('project-scoped tools with no resolvable project', () => {
     expect(result.isError).toBeFalsy();
   });
 });
+
+// reportProject turns "the resolver threw" into `not-configured` for everything
+// except the two broken-record errors — which is right for the missing-project
+// throw and wrong for every other one. A relative cwd is the case that exists:
+// resolveProject rejects it, and reporting that as "nothing is mapped here" sends
+// the caller to interview the user and record a project under a directory the next
+// call cannot key. Both entry points validate the cwd today, so this is the guard
+// that keeps a third one from inheriting the wrong answer.
+describe('reportProject on a cwd it cannot resolve against', () => {
+  it('fails rather than reporting the directory as unconfigured', async () => {
+    const { reportProject } = await import('../project-report.js');
+    const remedies = {
+      setProject: () => [],
+      setBaseUrl: () => [],
+      environmentCaveat: () => [],
+      environmentLocation: 'the test environment',
+    };
+
+    expect(() =>
+      reportProject({ cwd: 'relative/path', baseConfig: {}, remedies, notes: [] })
+    ).toThrow(/absolute/);
+  });
+});

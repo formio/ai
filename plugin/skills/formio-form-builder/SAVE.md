@@ -11,7 +11,7 @@ Saving writes into the user's live project, so it sits behind an approval gate. 
 - **Title** — the form's display title.
 - **Path** — the machine path the form will live at (`formPath`).
 - **Type** — webform, wizard, or PDF form (from INTENT).
-- **Target project** — the Project URL the form will be created in, as `project get` reported it.
+- **Target project** — the Project URL the form will be created in, as `project_get` reported it.
 - A one-line component summary ("12 fields across 3 pages", "6 fields including a signature").
 - **Access grants beyond defaults (mandatory call-out).** If the definition carries any `access` or `submissionAccess` entry that makes the form more permissive than the project's defaults, the gate MUST name each grant in plain language and get an explicit yes on it, not just a yes on the save. This covers EVERY role and permission type, not only Anonymous: Anonymous `create_all`/`create_own` ("Anyone on the internet will be able to submit this form without logging in"), Authenticated `create_own`/`create_all` ("Any logged-in user will be able to submit"), any `read_own`/`read_all` grant ("Submitters will be able to read their own submissions back" / "Any logged-in user will be able to read every submission"), and any `update_*`/`delete_*` grant. Ask in its own question round — using the client's structured question mechanism (in Claude Code, `AskUserQuestion`) — offering the permissive option and a locked-down alternative (omit the arrays and inherit project defaults). Never bury a widened permission inside a general "save it?" approval. A definition with no `access`/`submissionAccess` arrays inherits project defaults and needs no call-out.
 
@@ -50,4 +50,4 @@ The server rejected the definition. Quote the shortest decisive error line, rout
 
 ### Project not found / wrong URL
 
-The target Project URL did not resolve. Re-run `project get` for this directory and relay what it says; a typo or the wrong project recorded for this directory is the usual cause.
+The target Project URL did not resolve. Re-run `project_get` for this directory and relay what it says; a typo or the wrong project recorded for this directory is the usual cause.

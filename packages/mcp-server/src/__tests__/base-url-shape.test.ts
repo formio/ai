@@ -12,7 +12,7 @@ describe('shape-aware base URL resolution', () => {
   const noBaseUrl: FormioConfig = { apiKey: undefined };
 
   function mapProject(cwd: string, projectUrl: string): void {
-    writeProjectEntry(cwd, { FORMIO_PROJECT_URL: projectUrl });
+    writeProjectEntry({ cwd: cwd, env: { FORMIO_PROJECT_URL: projectUrl } });
   }
 
   // The VALUE is unchanged and pinned here; only its reported provenance moved.
@@ -73,26 +73,18 @@ describe('shape-aware base URL resolution', () => {
   });
 
   it('prefers a mapped base URL over the unresolved state', () => {
-    writeProjectEntry('/w/mapped-base', {
-      FORMIO_PROJECT_URL: 'https://myproject.mysite.com',
-      FORMIO_BASE_URL: 'https://forms.mysite.com',
+    writeProjectEntry({
+      cwd: '/w/mapped-base',
+      env: {
+        FORMIO_PROJECT_URL: 'https://myproject.mysite.com',
+        FORMIO_BASE_URL: 'https://forms.mysite.com',
+      },
     });
 
     const { config, sources } = resolveProject('/w/mapped-base', noBaseUrl);
 
     expect(config.baseUrl).toBe('https://forms.mysite.com');
     expect(sources.baseUrl).toBe('mapping');
-  });
-
-  it('prefers an environment base URL over the unresolved state', () => {
-    mapProject('/w/env-base', 'https://myproject.mysite.com');
-
-    const { config, sources } = resolveProject('/w/env-base', {
-      baseUrl: 'https://forms.mysite.com',
-    });
-
-    expect(config.baseUrl).toBe('https://forms.mysite.com');
-    expect(sources.baseUrl).toBe('environment');
   });
 
   // A pin that carries its own base URL never consults the map and never

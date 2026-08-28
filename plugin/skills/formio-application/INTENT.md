@@ -28,7 +28,7 @@ When the user's phrasing is genuinely ambiguous, ask the question.
 2. **Step 3 — Import** — `project_import` of the full template into the (empty) project, against the configuration the Preflight resolved.
 3. **Step 4 — Framework routing** — hand off to the framework's entry skill (`formio-angular` today).
 
-The project configuration is NOT a step on this branch or the other one. The Preflight's `project get` settles it before Step 1 is asked, so neither list starts with a URL interview.
+The project configuration is NOT a step on this branch or the other one. Step 3 settles it with `project_get` when the import needs it, so neither list starts with a URL interview.
 
 Do not ask the user "do you want to plan first?" — the planner is an internal step. The user described an app; you plan it.
 

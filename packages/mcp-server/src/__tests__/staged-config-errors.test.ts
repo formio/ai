@@ -81,7 +81,10 @@ describe('configuration errors are self-sufficient', () => {
     const first = messageFrom(() => resolveProjectConfig('/w/staged', {}));
     expect(first).toContain('project set --project-url');
 
-    writeProjectEntry('/w/staged', { FORMIO_PROJECT_URL: 'https://myproject.mysite.com' });
+    writeProjectEntry({
+      cwd: '/w/staged',
+      env: { FORMIO_PROJECT_URL: 'https://myproject.mysite.com' },
+    });
 
     const resolved = resolveProjectConfig('/w/staged', {});
     expect(resolved.projectUrl).toBe('https://myproject.mysite.com');

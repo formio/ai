@@ -8,8 +8,8 @@ import {
   RevisionsLicenseConsentChoice,
 } from './browser-prompts.js';
 import { stripRevisions } from './helpers.js';
-import { requireBaseUrl } from '../project-resolver.js';
-import { projectCommand } from '../cli-launch.js';
+import { baseUrlWriteCommand, requireBaseUrl } from '../project-resolver.js';
+import { COMMITTED_CONFIG_FILE } from '../committed-config.js';
 
 // ─── License detection ──────────────────────────────────────────────────────
 // Resolves the deployment's Security Module flag (`sac`) from the anonymous
@@ -22,6 +22,18 @@ const SAC_PATTERN = /\bsac\s*=\s*(true|false)\b/i;
 // is a third answer distinct from licensed and unlicensed. The flag is a property
 // of the deployment and is fetched from it, so with no deployment URL there is
 // nothing to ask; reporting `false` would be a claim about a probe that never ran.
+// How to record the deployment, named for the record that holds this project — the
+// same split `requireBaseUrl` makes. A committed file is edited by hand; the mapping
+// and the environment have commands, and they are different commands.
+function baseUrlRemedy(cfg: ResolvedFormioConfig): string {
+  const cwd = cfg.cwd ?? process.cwd();
+  if (cfg.projectUrlSource === 'committed') {
+    return `Add "baseUrl": "<base_url>" beside "projectUrl" in ${cfg.committedFilePath ?? `the committed ${COMMITTED_CONFIG_FILE}`} — edit it directly; this server reads a committed file and never writes one`;
+  }
+  const source = cfg.projectUrlSource ?? 'mapping';
+  return `Set it with project_set (pass baseUrl alongside the cwd${source === 'environment' ? ', with the projectUrl' : ''}), or run: ${baseUrlWriteCommand({ source, cwd, projectUrl: cfg.projectUrl })}`;
+}
+
 export async function checkRevisionsLicensed(
   cfg: ResolvedFormioConfig
 ): Promise<boolean | undefined> {
@@ -194,7 +206,12 @@ export async function gateRevisionsLicense(
         `Cannot ${actionLabel} — the Security Module flag is read from {baseUrl}/config.js, and the Base URL for ${cfg.projectUrl} cannot be determined, so that probe never ran. ` +
           `${BASE_URL_UNRESOLVED_GUIDANCE} ` +
           `This one is needed however you authenticate: the probe is an ANONYMOUS request to the deployment, so an API key does not exempt it. ` +
-          `Set it with project_set (pass baseUrl alongside the cwd), or run: ${projectCommand(`set --base-url <base_url> --cwd ${cfg.cwd ?? process.cwd()}`)}. ` +
+          // The write that reaches the record holding THIS project. The mapping's own
+          // `--base-url` call is refused where the project lives in a committed file
+          // or the environment, so naming it unconditionally named a command the
+          // writer rejects — the failure `baseUrlWriteCommand` exists to prevent, in
+          // the one message that did not use it.
+          `${baseUrlRemedy(cfg)}. ` +
           `The project itself is configured — only its Base URL is missing, so do not ask for the Project URL again.`
       );
     }

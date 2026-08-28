@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { formioFetch } from '../formio-client.js';
 import { ResolvedFormioConfig } from '../config.js';
-import { TEST_CONFIG as config } from './test-helpers.js';
+import { TEST_CONFIG as config, TEST_PROJECT_URL } from './test-helpers.js';
 
 vi.mock('../ensure-auth.js', () => ({
   ensureAuthenticated: vi.fn(),
@@ -43,7 +43,7 @@ describe('formioFetch', () => {
 
     const calledUrl = mockFetch.mock.calls[0][0] as URL;
     const calledOptions = mockFetch.mock.calls[0][1] as RequestInit;
-    expect(calledUrl.href).toContain('https://formio.invalid/example/form');
+    expect(calledUrl.href).toContain(`${TEST_PROJECT_URL}/form`);
     expect(calledOptions.headers).toEqual({ 'x-token': 'abc123' });
     expect(result).toEqual(data);
   });
@@ -116,8 +116,8 @@ describe('formioFetch', () => {
 
   it('sends x-jwt-token header when config.jwt is set', async () => {
     const jwtConfig: ResolvedFormioConfig = {
-      baseUrl: 'https://formio.invalid',
-      projectUrl: 'https://formio.invalid/example',
+      baseUrl: 'https://formio.invalid/sub',
+      projectUrl: 'https://formio.invalid/sub/example',
       jwt: 'my-jwt-token',
     };
     mockFetch.mockResolvedValue({ ok: true, json: () => Promise.resolve({}) });
@@ -130,8 +130,8 @@ describe('formioFetch', () => {
 
   it('prefers x-jwt-token when both jwt and apiKey are present', async () => {
     const bothConfig: ResolvedFormioConfig = {
-      baseUrl: 'https://formio.invalid',
-      projectUrl: 'https://formio.invalid/example',
+      baseUrl: 'https://formio.invalid/sub',
+      projectUrl: 'https://formio.invalid/sub/example',
       apiKey: 'abc123',
       jwt: 'my-jwt-token',
     };
@@ -145,8 +145,8 @@ describe('formioFetch', () => {
 
   it('throws when neither jwt nor apiKey is set', async () => {
     const noAuthConfig: ResolvedFormioConfig = {
-      baseUrl: 'https://formio.invalid',
-      projectUrl: 'https://formio.invalid/example',
+      baseUrl: 'https://formio.invalid/sub',
+      projectUrl: 'https://formio.invalid/sub/example',
     };
 
     await expect(formioFetch('form', {}, noAuthConfig)).rejects.toThrow();
@@ -154,8 +154,8 @@ describe('formioFetch', () => {
 
   it('on 401 retry that also fails throws without infinite loop', async () => {
     const jwtConfig: ResolvedFormioConfig = {
-      baseUrl: 'https://formio.invalid',
-      projectUrl: 'https://formio.invalid/example',
+      baseUrl: 'https://formio.invalid/sub',
+      projectUrl: 'https://formio.invalid/sub/example',
       jwt: 'expired-token',
     };
     mockEnsureAuth.mockImplementation(async () => {
@@ -174,8 +174,8 @@ describe('formioFetch', () => {
 
   it('on 401 in API key mode throws without re-auth', async () => {
     const apiKeyConfig: ResolvedFormioConfig = {
-      baseUrl: 'https://formio.invalid',
-      projectUrl: 'https://formio.invalid/example',
+      baseUrl: 'https://formio.invalid/sub',
+      projectUrl: 'https://formio.invalid/sub/example',
       apiKey: 'bad-key',
     };
 
@@ -205,8 +205,8 @@ describe('formioFetch', () => {
 
   it('on 401 in JWT mode clears the cached token, clears config.jwt, calls the gate, and retries', async () => {
     const jwtConfig: ResolvedFormioConfig = {
-      baseUrl: 'https://formio.invalid',
-      projectUrl: 'https://formio.invalid/example',
+      baseUrl: 'https://formio.invalid/sub',
+      projectUrl: 'https://formio.invalid/sub/example',
       jwt: 'expired-jwt',
     };
     mockEnsureAuth.mockImplementation(async () => {
@@ -221,7 +221,7 @@ describe('formioFetch', () => {
 
     // gate called twice: once before the initial request, once for re-auth
     expect(mockEnsureAuth).toHaveBeenCalledTimes(2);
-    expect(mockClearToken).toHaveBeenCalledWith('https://formio.invalid');
+    expect(mockClearToken).toHaveBeenCalledWith('https://formio.invalid/sub');
     const retryOptions = mockFetch.mock.calls[1][1] as RequestInit;
     expect(retryOptions.headers).toEqual({ 'x-jwt-token': 'fresh-jwt' });
     expect(result).toEqual({ data: 'ok' });
@@ -252,8 +252,8 @@ describe('formioFetch', () => {
 
   it('uses the refreshed config.jwt header on the retry after a successful gate during 401 re-auth', async () => {
     const jwtConfig: ResolvedFormioConfig = {
-      baseUrl: 'https://formio.invalid',
-      projectUrl: 'https://formio.invalid/example',
+      baseUrl: 'https://formio.invalid/sub',
+      projectUrl: 'https://formio.invalid/sub/example',
       jwt: 'old-jwt',
     };
     let gateCallCount = 0;

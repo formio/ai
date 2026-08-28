@@ -86,11 +86,11 @@ The probe requirement binds the **build-time** project mapping only. It SHALL NO
 - **WHEN** `plugin/skills/formio-mcp-setup/SKILL.md` is inspected
 - **THEN** it does not direct the agent to load `formio-mcp-setup`, because it is that skill
 
-### Requirement: A setup skill connects the server without knowing which client it is in
+### Requirement: A setup skill connects the server, configuring the client it runs in
 
 The library SHALL provide `plugin/skills/formio-mcp-setup/`, a spec-conformant skill whose description triggers on a missing Form.io MCP server, on requests to install or connect the Form.io MCP server, and on handoff from another skill's preflight.
 
-The skill SHALL write the MCP configuration for every supported client in one pass rather than detecting the host, because three of the four files are inert in any client that does not read them:
+The skill SHALL document the configuration for every supported client, and SHALL write the one a given session needs:
 
 | File | Shape |
 | --- | --- |
@@ -101,12 +101,21 @@ The skill SHALL write the MCP configuration for every supported client in one pa
 
 Every entry SHALL launch the server as `npx -y @formio/mcp@<MAJOR.MINOR.PATCH>`, pinned to the exact `version` in `packages/mcp-server/package.json` and restamped by `pnpm sync:pins`, and SHALL contain no URL, key, or other configuration value: Phase 0's server starts with no configuration and raises an actionable error naming `project_set` when a tool needs a project. The skill SHALL NOT write `FORMIO_PROJECT_URL` into an entry and SHALL NOT describe adding one as a way to pin a project — the environment is the weakest resolution source, so a value there pins nothing.
 
+The skill SHALL select which of those files to write by establishing the running client, in this order: the agent's own identity, then a single question to the user naming the four clients and a "not sure" choice. Where neither answers — the agent cannot tell, the user does not answer or answers "not sure", or the host is not one of the four — the skill SHALL fall back to writing all four files, stating that it is doing so, because a configuration file for a client that is not present is inert. The skill SHALL NOT treat the presence of a `.vscode/`, `.cursor/`, or `.claude/` directory as evidence of the running client. The skill SHALL write more than one file only where the user says they work in more than one client in that workspace.
+
 All four paths are project-scoped. The skill SHALL NOT write to the user's home directory.
 
 #### Scenario: Setup skill exists and conforms
 
 - **WHEN** the Agent Skills conformance suite runs
 - **THEN** `formio-mcp-setup` passes it — directory name matching `name`, description within budget, frontmatter keys within the specification set
+
+#### Scenario: The running client selects the file
+
+- **WHEN** the skill's write instructions are inspected
+- **THEN** they direct the agent to write the file the client it is running in reads, identified from its own identity and then from one question to the user
+- **AND** writing all four is stated as the fallback for an unestablished host, not the default
+- **AND** the presence of a client's directory in the workspace is ruled out as a detection signal
 
 #### Scenario: All four client configurations are documented
 
@@ -128,7 +137,7 @@ All four paths are project-scoped. The skill SHALL NOT write to the user's home 
 
 ### Requirement: Setup is gated, then tells the user how to reload
 
-The skill SHALL print the full contents of every file it intends to write and obtain explicit user approval before writing. After writing it SHALL state the reload step for each client, because every client reads MCP configuration at session start rather than at tool-call time: Claude Code restarts or runs `/mcp`, Cursor toggles the server in Customize or restarts, VS Code reloads the window, Codex restarts and may prompt to trust the directory.
+The skill SHALL print the full contents of every file it intends to write and obtain explicit user approval before writing, and SHALL write exactly the set it previewed. After writing it SHALL state the reload step for the client it identified, and every client's reload step where it fell back to writing all four, because every client reads MCP configuration at session start rather than at tool-call time: Claude Code restarts or runs `/mcp`, Cursor toggles the server in Customize or restarts, VS Code reloads the window, Codex restarts and may prompt to trust the directory.
 
 The skill SHALL then stop and ask the user to re-issue their original request, rather than continuing as though the tools were available.
 
@@ -192,9 +201,9 @@ The `project` invocations the skill documents SHALL carry the same exact pin as 
 
 ### Requirement: The project-configuration step is skippable and never blocks setup
 
-After writing the client configuration, `formio-mcp-setup` SHALL run `project get` for the user's working directory and SHALL interview only when that command fails. On success it SHALL report the resolved URLs in one line, including which source supplied them, and proceed. On failure it SHALL ask for the one value the message names, persist it with the `project set` command the message names, and re-run the command until it resolves or the user declines.
+After writing the client configuration, `formio-mcp-setup` SHALL run `project get` for the user's working directory and SHALL interview only when that command fails. On success it SHALL report the resolved URLs in one line, including which source supplied them, and proceed. On failure it SHALL ask for the one value the message names and persist it the way the message names — the `project set` command where the record is the mapping or the environment, and an edit to the file where a committed `formio.json` holds the project, since the server never writes one and a `project set` carrying a base URL alone is refused there — and re-run the command until it resolves or the user declines.
 
-When the working directory is inside a git repository, the step SHALL offer the choice of scope in the same round it asks for a URL: `--scope repo` records the target in a committed `formio.json` that travels with the code and is reviewable, and the default `user` scope records it in the machine-local mapping. It SHALL state the consequence in one line rather than explaining the whole precedence order — a committed file is shared with everyone who clones the repository, and it overrides a personal mapping. Outside a git repository the step SHALL NOT offer `repo`, because the file would not be tracked by anything.
+When the working directory is inside a git repository, the step SHALL offer the choice of record in the same round it asks for a URL: writing a committed `formio.json` in the application's own folder — a JSON object holding `{"projectUrl": "..."}`, authored directly, since the server reads that file and never writes it — records a target that travels with the code and is reviewable, while `project set` records it in the machine-local mapping. It SHALL state the consequence in one line rather than explaining the whole precedence order — a committed file is shared with everyone who clones the repository, and it overrides a personal mapping. Outside a git repository the step SHALL NOT offer the committed file, because it would not be tracked by anything.
 
 The step SHALL NOT restate the URL guidance the server owns — the shapes, the plain-language descriptions, the example values — and SHALL NOT reference another skill's document for that wording. It relays what the command says.
 
@@ -208,16 +217,16 @@ When the step is skipped, the skill SHALL say that the first Form.io tool call w
 - **THEN** it runs `project get` with the user's working directory first
 - **AND** it interviews only if that command exits non-zero
 
-#### Scenario: Setup offers the committed scope inside a repository
+#### Scenario: Setup offers the committed file inside a repository
 
 - **WHEN** the working directory is inside a git repository and no project resolves
-- **THEN** the step offers recording the target in a committed `formio.json` alongside the machine-local mapping
+- **THEN** the step offers writing a committed `formio.json` alongside the machine-local mapping
 - **AND** it states in one line that a committed file is shared with everyone who clones the repository
 
-#### Scenario: Setup does not offer the committed scope outside a repository
+#### Scenario: Setup does not offer the committed file outside a repository
 
 - **WHEN** the working directory is not inside a git repository
-- **THEN** the step does not offer `--scope repo`
+- **THEN** the step does not offer writing a `formio.json`
 
 #### Scenario: User has no project yet
 

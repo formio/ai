@@ -35,7 +35,7 @@ describe('browserless failures on the tool surface', () => {
         'This environment has no browser available (CI). Set FORMIO_API_KEY instead, publish a port with FORMIO_AUTH_HOST and FORMIO_AUTH_PORT, or set FORMIO_FORCE_BROWSER=1 to try anyway.'
       )
     );
-    writeProjectEntry(CWD, { FORMIO_PROJECT_URL: 'https://formio.invalid/example' });
+    writeProjectEntry({ cwd: CWD, env: { FORMIO_PROJECT_URL: 'https://formio.invalid/example' } });
     const config: FormioConfig = { baseUrl: 'https://formio.invalid' };
     const server = new McpServer({ name: 'test', version: '0.0.0' });
     registerFormListTool(server, config);
@@ -57,8 +57,8 @@ describe('browserless failures on the tool surface', () => {
 
   it('never starts the login flow in API-key mode, however browserless the host', async () => {
     await ensureAuthenticated({
-      baseUrl: 'https://formio.invalid',
-      projectUrl: 'https://formio.invalid/example',
+      baseUrl: 'https://formio.invalid/sub',
+      projectUrl: 'https://formio.invalid/sub/example',
       apiKey: 'abc123',
     });
 

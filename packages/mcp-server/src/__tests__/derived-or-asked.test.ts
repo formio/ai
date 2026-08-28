@@ -23,7 +23,7 @@ describe('the base URL is derived or asked for, never defaulted', () => {
   });
 
   const resolveFor = (projectUrl: string, cwd = '/w/derived') => {
-    writeProjectEntry(cwd, { FORMIO_PROJECT_URL: projectUrl }, cacheDir);
+    writeProjectEntry({ cwd: cwd, env: { FORMIO_PROJECT_URL: projectUrl }, cacheDir: cacheDir });
     return resolveProject(cwd, {}, { cacheDir, onNote: () => {} });
   };
 
@@ -61,11 +61,11 @@ describe('the base URL is derived or asked for, never defaulted', () => {
   });
 
   it('describes the hosted-cloud base URL as derived in project get output', () => {
-    writeProjectEntry(
-      '/w/get-derived',
-      { FORMIO_PROJECT_URL: 'https://examples.form.io' },
-      cacheDir
-    );
+    writeProjectEntry({
+      cwd: '/w/get-derived',
+      env: { FORMIO_PROJECT_URL: 'https://examples.form.io' },
+      cacheDir: cacheDir,
+    });
 
     const result = runProjectCommand(['project', 'get', '--cwd', '/w/get-derived'], {
       cacheDir,
@@ -116,11 +116,11 @@ describe('configuration guidance is placed where it is actionable', () => {
   });
 
   it('the base-URL message keeps the sub-domain explanation', () => {
-    writeProjectEntry(
-      '/w/subdomain-guidance',
-      { FORMIO_PROJECT_URL: 'https://myproject.mysite.com' },
-      cacheDir
-    );
+    writeProjectEntry({
+      cwd: '/w/subdomain-guidance',
+      env: { FORMIO_PROJECT_URL: 'https://myproject.mysite.com' },
+      cacheDir: cacheDir,
+    });
 
     const result = runProjectCommand(['project', 'get', '--cwd', '/w/subdomain-guidance'], {
       cacheDir,

@@ -1,6 +1,8 @@
 # App integration — AppModule, routing, config, auth, styling
 
-> **`FormioAppConfig` renames both URLs.** `appUrl` is the **Project URL** — the project this application reads and writes, and the one value anyone supplies. `apiUrl` is the **Base URL** — the deployment hosting it, which is normally derived from the Project URL rather than supplied. Take both from `npx -y @formio/mcp@0.11.0 project get --cwd "<workspace root>"`; never compose, derive, or hand-type either one yourself.
+> **`FormioAppConfig` renames both URLs.** `appUrl` is the **Project URL** — the project this application reads and writes, and the one value anyone supplies. `apiUrl` is the **Base URL** — the deployment hosting it, which is normally derived from the Project URL rather than supplied. Take both from `project_get` (called with `cwd` set to the workspace root) when the Form.io MCP tools are callable by you, and otherwise ask the user for them — see [`project-urls.md`](../../../formio-mcp-setup/references/project-urls.md). Never compose, derive, or hand-type either one yourself.
+
+**Every path in this document is relative to `workspaceRoot`** — the absolute path the parent skill's Pre-flight captured and SETUP stashed. Read and write them as `<workspaceRoot>/src/app/app-module.ts`, never against wherever the shell happens to stand. Shell working directories persist between commands in an agent session, so a bare relative path can land in a different tree, report that the file is missing, and write a whole resource module into a tree nobody will look in.
 
 Every resource module you generate plugs into a shared foundation. This file is the canonical shape of that foundation, matching the angular-demo's AppModule but trimmed to only what this skill's output needs.
 
@@ -116,8 +118,8 @@ import { FormioAppConfig } from '@formio/angular';
 import { FormioAuthConfig } from '@formio/angular/auth';
 
 export const AppConfig: FormioAppConfig = {
-  appUrl: '{projectUrl}', // Project URL — from `project get`, never hand-typed
-  apiUrl: '{baseUrl}', // Base URL — the deployment; from `project get`, never hand-typed
+  appUrl: '{projectUrl}', // Project URL — from `project_get`, never hand-typed
+  apiUrl: '{baseUrl}', // Base URL — the deployment; from `project_get`, never hand-typed
 };
 
 export const AuthConfig: FormioAuthConfig = {
@@ -130,8 +132,8 @@ These two values are **URL path segments**, not form machine names: `@formio/ang
 
 **`appUrl` vs `apiUrl`:**
 
-- `appUrl` = the **Project URL** that `project get` reported. This is what `FormioResourceService` calls to load forms and submissions. It is the value every `form_*` MCP tool uses and every `formio-api/references/project-*` / `formio-api/references/runtime-*` skill means by "project URL."
-- `apiUrl` = the **Base URL** that `project get` reported. Used for cross-project concerns (team / project / tenant management). Take it from that command and nowhere else — do not fill in `https://api.form.io` because the app has one project, since that value is correct only for a project on a `form.io` host and points a self-hosted app's login at a deployment it does not use.
+- `appUrl` = the **Project URL** that `project_get` reported. This is what `FormioResourceService` calls to load forms and submissions. It is the value every `form_*` MCP tool uses and every `formio-api/references/project-*` / `formio-api/references/runtime-*` skill means by "project URL."
+- `apiUrl` = the **Base URL** that `project_get` reported. Used for cross-project concerns (team / project / tenant management). Take it from that command and nowhere else — do not fill in `https://api.form.io` because the app has one project, since that value is correct only for a project on a `form.io` host and points a self-hosted app's login at a deployment it does not use.
 
 ## 4. Root component (`App`) and `Home`
 

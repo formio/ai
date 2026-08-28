@@ -47,7 +47,11 @@ describe('project get reports the winning layer and what it shadowed', () => {
 
   it('reports a personal mapping shadowed by a committed file, naming its project', () => {
     commit({ projectUrl: 'https://committed.form.io' });
-    writeProjectEntry(repo, { FORMIO_PROJECT_URL: 'https://mapped.form.io' }, cacheDir);
+    writeProjectEntry({
+      cwd: repo,
+      env: { FORMIO_PROJECT_URL: 'https://mapped.form.io' },
+      cacheDir: cacheDir,
+    });
 
     const result = get();
 
@@ -66,7 +70,11 @@ describe('project get reports the winning layer and what it shadowed', () => {
   });
 
   it('reports an environment value shadowed by a mapping', () => {
-    writeProjectEntry(repo, { FORMIO_PROJECT_URL: 'https://mapped.form.io' }, cacheDir);
+    writeProjectEntry({
+      cwd: repo,
+      env: { FORMIO_PROJECT_URL: 'https://mapped.form.io' },
+      cacheDir: cacheDir,
+    });
 
     const result = get({ FORMIO_PROJECT_URL: 'https://env-project.form.io' });
 
@@ -99,14 +107,14 @@ describe('project get reports the winning layer and what it shadowed', () => {
     expect(result.stderr).not.toMatch(/No Form\.io project is configured/);
   });
 
-  it('names the formio.json baseUrl key when the base URL is unresolved', () => {
+  it('names the committed edit that records the pair when the base URL is unresolved', () => {
     commit({ projectUrl: 'https://myproject.mysite.com' });
 
     const result = get();
 
     expect(result.exitCode).toBe(EXIT_BASE_URL_UNRESOLVED);
-    expect(result.stderr).toContain('--base-url');
-    expect(result.stderr).toContain('baseUrl');
+    expect(result.stderr).toContain(path.join(repo, 'formio.json'));
+    expect(result.stderr).toMatch(/"baseUrl"/);
     expect(result.stderr).toMatch(/JWT/i);
   });
 });

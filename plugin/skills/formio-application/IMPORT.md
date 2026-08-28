@@ -1,6 +1,6 @@
 # IMPORT — Call `project_import`
 
-> **Both URLs come from `project get`, never from you.** The **Project URL** is the project this application reads and writes — the one value anyone supplies. The **Base URL** is the deployment hosting it, normally derived from the Project URL rather than supplied. Take both from `npx -y @formio/mcp@0.11.0 project get --cwd "<workspace root>"`; never compose, derive, or hand-type either one yourself. Whatever the framework skill this hands off to calls them in its own configuration, those are the values that go there.
+> **Both URLs come from `project_get`, never from you.** The **Project URL** is the project this application reads and writes — the one value anyone supplies. The **Base URL** is the deployment hosting it, normally derived from the Project URL rather than supplied. Take both from `project_get` (called with `cwd` set to the workspace root) when the Form.io MCP tools are callable by you, and otherwise ask the user for them — see [`project-urls.md`](../formio-mcp-setup/references/project-urls.md). Never compose, derive, or hand-type either one yourself. Whatever the framework skill this hands off to calls them in its own configuration, those are the values that go there.
 
 This document is loaded by the parent `formio-application` skill during Step 3. It is **not** a standalone skill — no frontmatter.
 
@@ -156,12 +156,12 @@ The server rejected the template. Surface the server's error message verbatim (i
 
 On successful import, Step 4 receives:
 
-- `projectUrl`, `baseUrl` (as reported by the Preflight's `project get`, on both branches).
+- `projectUrl`, `baseUrl` (as reported by Step 3's `project_get`, on both branches).
 - Path to `template.md` on disk (planner wrote it; still there — architectural-intent seed for the framework skill).
 - Path to `template.json` on disk (planner wrote it; still there — structured companion).
 - A flag: "import succeeded".
 - For modify-existing: the list of newly-imported resource names (so the framework's extend sub-skill scaffolds modules for exactly those).
 
-On skipped import (user declined or error branch chose skip), Step 4 receives the same values but with the flag set to "import skipped". Downstream framework SETUP confirms the configuration against `project get` either way — it never interviews for it, so a skipped import changes nothing about how the framework skill resolves the project.
+On skipped import (user declined or error branch chose skip), Step 4 receives the same values but with the flag set to "import skipped". Downstream framework SETUP confirms the configuration against `project_get` either way — it never interviews for it, so a skipped import changes nothing about how the framework skill resolves the project.
 
 On "bail out", the flow stops. Partial state: the planner's `template.md` + `template.json` pair still exists on disk (by design — they are artifacts the user can use later). Nothing has been written to the Form.io project on the server.

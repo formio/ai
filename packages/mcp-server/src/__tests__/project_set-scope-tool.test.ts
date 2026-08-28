@@ -1,6 +1,3 @@
-import { Client } from '@modelcontextprotocol/sdk/client/index.js';
-import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
-import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
@@ -8,46 +5,34 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { readProjectEntry } from '../project-map.js';
 import { COMMITTED_CONFIG_FILE } from '../committed-config.js';
 import { registerProjectSetTool } from '../tools/project_set.js';
+import { connectTools } from './test-helpers.js';
 
-// The tool and the command are one behavior described twice, so the scope has to
-// mean the same thing on both. An agent relaying the resolution error reaches for
-// the tool, not the shell.
-describe('project_set scope', () => {
+// project_set writes ONE record: the machine-local mapping. The committed
+// formio.json is hand-authored — the server reads it and never writes it — so the
+// tool must not accept a scope, must never create that file, and must describe the
+// hand-authored route rather than a writer it no longer has.
+describe('project_set writes only the mapping', () => {
   let repo: string;
 
   beforeEach(() => {
     repo = fs.mkdtempSync(path.join(os.tmpdir(), 'formio-tool-scope-'));
     fs.mkdirSync(path.join(repo, '.git'), { recursive: true });
+    fs.rmSync(path.join(os.homedir(), '.formio'), { recursive: true, force: true });
   });
 
   afterEach(() => {
     fs.rmSync(repo, { recursive: true, force: true });
   });
 
-  async function call(args: Record<string, unknown>) {
-    const server = new McpServer({ name: 'test', version: '0.0.0' });
-    registerProjectSetTool(server, { cwd: () => repo, baseUrl: () => undefined });
-    const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
-    await server.connect(serverTransport);
-    const client = new Client({ name: 'test-client', version: '0.0.0' });
-    await client.connect(clientTransport);
-    return client.callTool({ name: 'project_set', arguments: args });
+  async function client() {
+    return connectTools((server) => registerProjectSetTool(server, { cwd: () => repo }));
   }
 
-  const committed = () =>
-    JSON.parse(fs.readFileSync(path.join(repo, COMMITTED_CONFIG_FILE), 'utf8')) as Record<
-      string,
-      unknown
-    >;
+  async function call(args: Record<string, unknown>) {
+    return (await client()).callTool({ name: 'project_set', arguments: args });
+  }
 
-  it('writes the committed file for scope repo', async () => {
-    const result = await call({ projectUrl: 'https://x.form.io', cwd: repo, scope: 'repo' });
-
-    expect(result.isError ?? false).toBe(false);
-    expect(committed().projectUrl).toBe('https://x.form.io');
-  });
-
-  it('writes the personal mapping when scope is omitted', async () => {
+  it('writes the personal mapping', async () => {
     const result = await call({ projectUrl: 'https://x.form.io', cwd: repo });
 
     expect(result.isError ?? false).toBe(false);
@@ -55,25 +40,34 @@ describe('project_set scope', () => {
     expect(fs.existsSync(path.join(repo, COMMITTED_CONFIG_FILE))).toBe(false);
   });
 
-  it('says which file it wrote for scope repo', async () => {
+  // A caller still passing the removed scope argument — from a release that had a
+  // committed-file writer — must not get a committed file, and the result must say
+  // which record WAS written so the disagreement is visible rather than silent.
+  it('never writes a committed file, whatever arguments arrive', async () => {
     const result = await call({ projectUrl: 'https://x.form.io', cwd: repo, scope: 'repo' });
 
-    expect(JSON.stringify(result.content)).toContain(COMMITTED_CONFIG_FILE);
+    expect(fs.existsSync(path.join(repo, COMMITTED_CONFIG_FILE))).toBe(false);
+    if (!result.isError) {
+      expect(JSON.stringify(result.content)).toMatch(/mapping/);
+    }
   });
 
-  it('describes both scopes in its tool description', async () => {
-    const server = new McpServer({ name: 'test', version: '0.0.0' });
-    registerProjectSetTool(server, { cwd: () => repo, baseUrl: () => undefined });
-    const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
-    await server.connect(serverTransport);
-    const client = new Client({ name: 'test-client', version: '0.0.0' });
-    await client.connect(clientTransport);
+  it('exposes no scope argument in its schema', async () => {
+    const { tools } = await (await client()).listTools();
+    const schema = tools.find((tool) => tool.name === 'project_set')?.inputSchema as {
+      properties?: Record<string, unknown>;
+    };
 
-    const { tools } = await client.listTools();
+    expect(Object.keys(schema.properties ?? {})).not.toContain('scope');
+  });
+
+  it('describes the hand-authored committed file, naming no writer for it', async () => {
+    const { tools } = await (await client()).listTools();
     const description = tools.find((tool) => tool.name === 'project_set')?.description ?? '';
 
     expect(description).toContain(COMMITTED_CONFIG_FILE);
-    expect(description).toMatch(/scope/i);
+    expect(description).toMatch(/never writes it/);
+    expect(description).not.toMatch(/scope: "repo"|--scope|scope argument/);
   });
 
   // The mapping file is ~/.formio/projects.json — plural, at a named path. The
@@ -82,14 +76,7 @@ describe('project_set scope', () => {
   // them to edit the wrong path, and the one real path is the one the CLI's own
   // usage text prints.
   it('names the mapping file by its real path', async () => {
-    const server = new McpServer({ name: 'test', version: '0.0.0' });
-    registerProjectSetTool(server, { cwd: () => repo, baseUrl: () => undefined });
-    const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
-    await server.connect(serverTransport);
-    const client = new Client({ name: 'test-client', version: '0.0.0' });
-    await client.connect(clientTransport);
-
-    const { tools } = await client.listTools();
+    const { tools } = await (await client()).listTools();
     const description = tools.find((tool) => tool.name === 'project_set')?.description ?? '';
 
     expect(description).toContain('~/.formio/projects.json');

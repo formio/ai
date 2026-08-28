@@ -75,11 +75,12 @@ npx -y @formio/mcp@0.11.0 project get --cwd "$(pwd)"
 # Record it for this machine…
 npx -y @formio/mcp@0.11.0 project set --project-url "<project url>" --cwd "$(pwd)"
 
-# …or commit it with the application, tracked in git and shared with everyone who clones it
-npx -y @formio/mcp@0.11.0 project set --project-url "<project url>" --scope repo --cwd "$(pwd)"
+# …or commit it with the application, tracked in git and shared with everyone who clones it:
+# write a formio.json in the application's own folder (the server reads it, never writes it)
+echo '{ "projectUrl": "<project url>" }' > formio.json
 ```
 
-The skills do this for you: each one probes `project get` before its first call and asks only for whichever value the server says is missing. Two values can be involved:
+The skills do this for you: each one calls the `project_get` tool before its first call — over the connection the server already has, not through a shell — and asks only for whichever value the server says is missing. Two values can be involved:
 
 - **Project URL** — the endpoint for your project. On our SaaS environment (https://portal.form.io) that is a sub-domain such as `https://myproject.form.io`. Self-hosted, it depends on how your deployment routes projects: a sub-directory (`https://forms.mysite.com/myproject`) or a sub-domain of your own domain (`https://myproject.mysite.com`).
 - **Base URL** — the endpoint for the deployment. On our SaaS environment it is **always** `https://api.form.io` — never your project's `*.form.io` sub-domain. Self-hosted, it is the deployment host, often a sub-domain of your own domain, e.g. `https://forms.mysite.com`.
@@ -273,7 +274,8 @@ The bundled `@formio/mcp` server exposes these tools. Skills prefer these over r
 | --- | --- |
 | `project_export` | Export the project's complete template (roles, resources, forms, actions) as a portable JSON document. Use before `project_import` to snapshot. |
 | `project_import` | Import a template JSON — additively merges roles, resources, forms, and actions in one call. **Same-machine-name items are overwritten in place; everything else is preserved.** |
-| `project_set` | Persist a Project URL for a directory — in `~/.formio/projects.json` by default, or in a committed `formio.json` with `scope: "repo"`, so the target travels with the code. One server can serve several workspaces. Registered in every client. A mapping written here overrides `FORMIO_PROJECT_URL` in the server environment, which is the weakest source. |
+| `project_get` | Report which project a directory resolves to, which deployment hosts it, and which layer supplied each. The preflight to run before the first call that reads or writes — it answers from inside the server, with the same resolver every other tool uses, so no shell command is needed to ask it. Returns a `status` of `ok`, `not-configured`, or `base-url-unresolved`. |
+| `project_set` | Persist a Project URL for a directory, in `~/.formio/projects.json`. To record the target with the code instead, write a committed `formio.json` in the application's own folder — the server reads that file and never writes it. One server can serve several workspaces. Registered in every client. A mapping written here overrides `FORMIO_PROJECT_URL` in the server environment, which is the weakest source. |
 
 ### Diagnostic
 
@@ -314,7 +316,7 @@ The probe runs lazily — only when the local auth page is actually served.
 | `FORMIO_AUTH_HOST` / `FORMIO_AUTH_PORT` | no | `127.0.0.1` / ephemeral | Bind address and port for the login server. Set both when running in a container so the login page is reachable through a published port. | — | `0.0.0.0` / `43117` |
 | `FORMIO_INSECURE_TLS` | no | `false` | When `true`, skips TLS certificate verification (sets `NODE_TLS_REJECT_UNAUTHORIZED=0`) — for self-hosted deployments behind self-signed certs. Do not use against production. | — | `true` |
 
-<sub>\* Not at startup — the server starts and lists every tool without it, and only errors when a tool actually needs a project. The alternative is the `project_set` tool, which maps a working directory to a project in `~/.formio/projects.json` so one server can serve several workspaces. Resolution runs by scope, narrowest first: a committed `formio.json` found by walking up from the caller's `cwd`, then the mapping for that `cwd`, then `FORMIO_PROJECT_URL` in the environment as the weakest source, then the error. Map a directory before any client connects with `npx -y @formio/mcp@0.11.0 project set --project-url <url> --cwd <path>` — the deployment is derived from the project URL wherever it can be, so add `--base-url <url>` only when the server says it cannot be determined. `project get --cwd <path>` prints what resolves and which source won, exiting `0` when it resolved, `1` when nothing is mapped, `2` when the command itself failed, and `3` when a project resolved but its Base URL could not be determined — the half-configured directory, repaired by supplying that one value.</sub>
+<sub>\* Not at startup — the server starts and lists every tool without it, and only errors when a tool actually needs a project. The alternative is the `project_set` tool, which maps a working directory to a project in `~/.formio/projects.json` so one server can serve several workspaces. Resolution runs by scope, narrowest first: a committed `formio.json` found by walking up from the caller's `cwd`, then the mapping for that `cwd`, then `FORMIO_PROJECT_URL` in the environment as the weakest source, then the error. Map a directory before any client connects with `npx -y @formio/mcp@0.11.0 project set --project-url <url> --cwd <path>` — the deployment is derived from the project URL wherever it can be, so add `--base-url <url>` only when the server says it cannot be determined. `project get --cwd <path>` prints what resolves and which source won, exiting `0` when it resolved, `1` when nothing is mapped, `2` when the command itself failed, and `3` when a project resolved but its Base URL could not be determined — the half-configured directory, repaired by supplying that one value. `project set --cwd <path>` exits `0` when the directory is ready to serve a call, `1` when a named value is still missing, `2` when the command could not answer, and `3` when the record WAS written and the directory still resolves no Base URL — a committed `formio.json` governs it and supplies none, so the remedy is an edit to that file rather than another write.</sub>
 
 ---
 

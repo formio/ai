@@ -78,7 +78,7 @@ What each row's target skill receives when called by Step 4:
 }
 ```
 
-The Entry skill uses this to load the template pair (both files on disk — `template.md` for intent, `template.json` for shape) and move quickly through its own phases. It does NOT skip SETUP: SETUP confirms the project against `project get`, because the handed-in URLs are a copy and the mapping is what the generated `config.ts` has to agree with.
+The Entry skill uses this to load the template pair (both files on disk — `template.md` for intent, `template.json` for shape) and move quickly through its own phases. It does NOT skip SETUP: SETUP confirms the project against `project_get`, because the handed-in URLs are a copy and the mapping is what the generated `config.ts` has to agree with.
 
 ### Modify-existing → Extend sub-skill
 

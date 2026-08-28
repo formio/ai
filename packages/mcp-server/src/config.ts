@@ -15,15 +15,22 @@ export const PROJECT_URL_GUIDANCE = [
   'A *.form.io host is never a Base URL, and https://api.form.io/<project> is not a hosted project URL. Never build a Project URL by appending a project name to a deployment URL — in the sub-domain shape the two hosts differ by design, so neither can be built from the other.',
 ].join(' ');
 
-// Why a base URL sometimes has to be asked for. Carried ONLY by the message raised
-// when it cannot be derived, which is the one place a reader can act on it.
-// Deliberately names no example base URL. A reader who reaches this message has a
-// project URL that is NOT on a form.io host — that is why it could not be
-// derived — so citing api.form.io here would offer the one value that is certainly
-// wrong for them, which is the failure the unresolved state exists to prevent.
+// WHY the one project-URL shape that derives nothing has to be asked about, in one
+// clause. Every message that refuses or reports that shape composes this rather than
+// paraphrasing it: the writers' refusals, the half-configured report, and the
+// authentication error below all said it in slightly different words, which is the
+// same rule expressed in four places.
+export const BASE_URL_UNDERIVABLE =
+  'a project URL that carries no path on a customer domain names its deployment nowhere — there the deployment is a sibling sub-domain of the same parent domain — so it cannot be derived';
+
+// The read path's fuller version. Deliberately names no example base URL: a reader
+// who reaches this message has a project URL that is NOT on a form.io host — that is
+// why it could not be derived — so citing api.form.io here would offer the one value
+// that is certainly wrong for them, which is the failure the unresolved state exists
+// to prevent.
 export const BASE_URL_UNRESOLVED_GUIDANCE = [
   'A Base URL is the deployment hosting a project, and it is normally derived from the project URL rather than supplied — a project addressed as a sub-directory is served by its parent path, so https://forms.mysite.com/one/two is served by https://forms.mysite.com/one.',
-  'It cannot be derived from a project URL that carries no path on a customer domain: there the deployment is a sibling sub-domain of the same parent domain, and nothing in the project URL names it. Ask the user for it.',
+  `But ${BASE_URL_UNDERIVABLE}. Ask the user for it.`,
 ].join(' ');
 
 // Form.io URLs are compared and concatenated in several places, so they are
@@ -43,6 +50,22 @@ export function stripTrailingSlashes(url: string): string {
 // host case is significant to string equality and to no one else, so
 // https://Examples.form.io and https://examples.form.io must not be two
 // deployments, two cache entries, or two projects. The parser normalizes both.
+/**
+ * A URL the CALLER just typed, as opposed to one read from a record.
+ *
+ * The distinction decides the exit code, and the codes are a contract the skills
+ * branch on: a mistyped Project URL is the user typing the wrong thing, so the remedy
+ * is to re-ask — the same reasoning that already puts the API-root and Open Source
+ * refusals on exit 1. A malformed value read from disk is a different thing entirely
+ * and stays "could not answer", because no answer from the user fixes a broken record.
+ */
+export class InvalidRequestedUrlError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'InvalidRequestedUrlError';
+  }
+}
+
 export function normalizeHttpUrl(input: string, label: string): string {
   let parsed: URL;
   try {
@@ -52,6 +75,18 @@ export function normalizeHttpUrl(input: string, label: string): string {
   }
   if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
     throw new Error(`${label} must use http or https, got: ${parsed.protocol}`);
+  }
+  // `api.form.io.` and `api.form.io` are the same host — the trailing root dot is
+  // legal, resolves identically, and is invisible to a user. Removed HERE, at the one
+  // place every URL enters, so every downstream comparison sees one spelling: the
+  // pair rule, the token-cache key, and string equality between records. Handled
+  // instead inside individual rules, it fixed those rules and left the others
+  // treating one deployment as two.
+  //
+  // The scheme is deliberately NOT normalized: http and https to the same host are
+  // different endpoints, and one of them sends credentials in plaintext.
+  if (parsed.hostname.endsWith('.') && parsed.hostname !== '.') {
+    parsed.hostname = parsed.hostname.replace(/\.$/, '');
   }
   return stripTrailingSlashes(parsed.href);
 }
@@ -92,6 +127,14 @@ export interface ResolvedFormioConfig extends FormioConfig {
   // anybody can run. Resolution is the only step that knows which directory the
   // answer belongs to.
   cwd?: string;
+  // Which record supplied the project. Carried for the same reason `cwd` is: the errors
+  // raised downstream name the write that records a deployment beside its project, and
+  // which write that is depends on the record — resolution is the only step that knows.
+  projectUrlSource?: 'committed' | 'mapping' | 'environment';
+  // The committed file that supplied the project, by path, when that is the record.
+  // Carried because the remedy for a committed record is an edit to that exact file,
+  // and the upward walk means it is usually not in the directory the caller named.
+  committedFilePath?: string;
 }
 
 // One behavior for every agent: no environment variable switches the defaults,
@@ -107,10 +150,12 @@ export function getConfig(): FormioConfig {
   // URL" out of fetch.
   //
   // Left undefined when the environment supplies nothing usable, rather than
-  // defaulted here. resolveProjectConfig applies DEFAULT_BASE_URL last, so a
-  // deployment mapped for the directory still outranks silence from the
-  // environment — which a pre-filled default made indistinguishable from an
-  // explicit FORMIO_BASE_URL=https://api.form.io.
+  // defaulted here. There is no default to apply: resolution DERIVES the base URL
+  // from the project URL — DEFAULT_BASE_URL for a form.io host, the parent path for
+  // a sub-directory project — and leaves it unresolved for the one shape that
+  // derives nothing. A value pre-filled here would be indistinguishable from an
+  // explicit FORMIO_BASE_URL=https://api.form.io, which is a candidate the resolver
+  // ranks and gates rather than a fallback it reaches for.
   const baseUrl = readHttpUrlEnv({ raw: process.env.FORMIO_BASE_URL, name: 'FORMIO_BASE_URL' });
   // Deliberately optional. Clients and directory crawlers launch the server with
   // no configuration to read tools/list, so failing at startup made it look like

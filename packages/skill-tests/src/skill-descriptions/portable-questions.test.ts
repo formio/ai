@@ -96,7 +96,7 @@ describe('the option sets each question offers survive', () => {
   it('angular SETUP reads the project from the server instead of interviewing', () => {
     const { body } = skillDocument('plugin/skills/formio-angular/SETUP.md');
 
-    expect(body).toContain('project get');
+    expect(body).toContain('project_get');
     expect(body).toContain('`projectUrl`');
     expect(body).toContain('`baseUrl`');
     expect(body).not.toContain('FORMIO_PROJECT_URL');

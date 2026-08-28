@@ -60,7 +60,7 @@ The server SHALL start successfully, complete the MCP handshake, and answer `too
 
 ### Requirement: A stand-alone server asks for the Project URL alone
 
-The server SHALL be usable with no skills installed, so every piece of guidance an agent needs to configure a project SHALL come from the server itself. It SHALL declare MCP server `instructions` describing the **Project URL as the single configuration**: how to find what a directory resolves to, how to record a project, and that the Base URL is derived from the project URL wherever it can be and asked for only when it cannot. The instructions SHALL NOT instruct an agent to collect both URLs in one round, and SHALL NOT present the Base URL as a second value to persist: a value that is usually derived cannot be asked for before the answer it is derived from exists. They SHALL NOT name a client, skill, or plugin, and SHALL NOT name `FORMIO_DEFAULT_PROJECT_URL`.
+The server SHALL be usable with no skills installed, so every piece of guidance an agent needs to configure a project SHALL come from the server itself. It SHALL declare MCP server `instructions` describing the **Project URL as the single configuration**: how to find what a directory resolves to, how to record a project, and that the Base URL is derived from the project URL wherever it can be and asked for only when it cannot. The instructions SHALL NOT instruct an agent to ask the USER for both URLs in one round: a value that is usually derived cannot be asked for before the answer it is derived from exists. They MAY describe a single call carrying both, because a caller answering a report about a project already holds that project URL and only the user's Base URL is new. They SHALL NOT name a client, skill, or plugin, and SHALL NOT name `FORMIO_DEFAULT_PROJECT_URL`.
 
 The server's configuration **errors** SHALL be self-sufficient, because the skills library no longer restates this guidance and an agent may reach an error without having read the instructions. Each SHALL name the exact remedy command. They SHALL be split by where the guidance is actionable:
 
@@ -150,57 +150,73 @@ The instructions SHALL additionally rule out the three mistakes these shapes inv
 
 The `formio-mcp` bin SHALL accept a `project` command with two subcommands, `set` and `get`, so a project can be configured and inspected before any MCP client has connected. Invoked with no arguments the bin SHALL start the stdio server exactly as before — the command surface is additive and MUST NOT change the transport path.
 
-`project set` SHALL accept `--project-url`, `--base-url`, `--cwd` (optional, defaulting to `process.cwd()`, resolved to an absolute path), and `--scope` (optional, one of `user` or `repo`, defaulting to `user`).
+`project set` SHALL accept `--project-url`, `--base-url`, and `--cwd` (optional, defaulting to `process.cwd()`, resolved to an absolute path). It writes ONE record: the working-directory → project mapping in `~/.formio/projects.json`. The committed `formio.json` is hand-authored — the server reads it and never writes it: the file belongs to the user's repository, the reader tolerates a `formio.json` this server did not define, and a writer that lands on such a file either corrupts it or refuses with nothing runnable to offer. An unknown flag SHALL be refused rather than ignored: a caller passing a flag this command no longer takes — `--scope repo`, from a release that had a committed-file writer — must not have its write land in a record it did not choose while being told it succeeded.
 
-- **`--scope user`** writes the working-directory → project mapping in `~/.formio/projects.json`, exactly as before.
-- **`--scope repo`** writes or updates the nearest committed `formio.json`, found by the same upward walk resolution uses. When the walk finds none, the file SHALL be created in the `--cwd` directory. The command SHALL print the path it wrote, because "the nearest file" is not obvious from the invocation.
+Every write SHALL leave the record it writes holding a project and its deployment together — see the pairing requirement in `project-map-routing`. `--project-url` SHALL be optional where the mapping already holds a project, in which case `--base-url` alone amends that record's pair. Where the project is held by a record this command cannot write, the call SHALL fail rather than record a deployment apart from its project: for a committed `formio.json` it SHALL name that file's resolved path and the `baseUrl` key to add beside `projectUrl`; for the environment it SHALL name the mapping write carrying both URLs. A call supplying neither flag SHALL fail, naming both.
 
-`--project-url` SHALL be required when the targeted scope has no project recorded yet, and optional when it does: either URL flag alone is then a valid partial update, and the omitted flag retains its current value. A call supplying neither flag SHALL fail, naming both. URL validation SHALL be the same normalization in both scopes.
-
-The `project_set` MCP tool SHALL take the same `scope` argument with the same default, so the tool and the command are one behavior described twice.
+The report that asks for a deployment SHALL name that remedy itself, per record: the mapping's own `--base-url` update where the mapping holds the project, the edit — exact file path and key — where a committed file holds it, and a mapping write carrying both URLs where only the environment does. A remedy that names one write for every record names one that fails for two of the three, and a failing remedy is worse than none. The `project_set` tool SHALL name the same remedies in tool vocabulary, with the committed record's remedy stated as the same file edit — there is no call that performs it, so the structured `remedy` is absent there and the message carries the instruction.
 
 `project get` SHALL accept `--cwd` (same default) and print the resolved project URL, the resolved base URL, and **which source won** for each. The sources it SHALL be able to name are the committed `formio.json` (**named by its resolved path**, since which file won is the whole question when several exist), the working-directory mapping, this shell's environment, a derived base URL, and unresolved. There is no `default` source to name — see the derivation rules in `project-map-routing` — because a value reported as a default reads as a guess. Because the command runs in the caller's shell rather than the MCP server's process, it cannot see the server's own `env` block, and it SHALL say so whenever a file or mapping supplied the answer.
 
 `project get` SHALL additionally report any source it SHADOWED — a personal mapping overridden by a committed file, or an environment value overridden by either. A stale lower layer is otherwise invisible, and "my `project_set` did nothing" is the failure that produces. Reporting the shadowing is what makes the new precedence order legible.
 
-Shadowing SHALL be reported for BOTH URLs, from separately tracked candidate lists. The two halves resolve independently — a committed project can be paired with a mapped deployment — so one shared list would attribute a shadowed deployment to whichever layer supplied the project, and a mapped base URL silently overriding a committed one would go unreported entirely.
+Shadowing SHALL be reported for the deployment a losing record holds as well as for its project, since a record loses as a whole and a reader asking "why is my recorded base URL not in effect?" needs the answer. A deployment recorded in a directory whose entry names NO project SHALL be named in the half-configured report: nothing says which project it serves, so it cannot be read, and the write the report names replaces it.
 
 Any note the command collected on the way to a failure SHALL travel with that failure rather than being dropped. An ignored unusable `FORMIO_BASE_URL` is the CAUSE of the unresolved-base-URL outcome, so omitting it there withholds the explanation of the error being reported.
 
 When neither supplies a project URL it SHALL print the same actionable message the tools raise, naming `project set` and `formio.json`. When a committed file is present but unusable it SHALL print that distinct error instead and exit `2`.
 
-When the base URL is unresolved, `project get` SHALL report it as unresolved, naming `project set --base-url` and the `baseUrl` key of a committed file as the fixes, SHALL NOT print `https://api.form.io` as though it were configured, SHALL still print the resolved project URL, and SHALL exit `2` rather than `1`. Because an API-key deployment never reads the base URL, the output SHALL say the missing value blocks JWT authentication rather than that the project is unusable.
+When the base URL is unresolved, `project get` SHALL report it as unresolved, naming the remedy that records the pair in the record holding the project — a command for the mapping and the environment, the file edit for a committed `formio.json` — SHALL NOT print `https://api.form.io` as though it were configured, SHALL still print the resolved project URL, and SHALL exit `3`. That half-configured answer gets its own code: a `1` asks for the project, which this directory already has, and a `2` is "the command could not answer", which every caller responds to by relaying and stopping — so reporting it as either dead-ends the one deployment shape this surface exists to serve. Because an API-key deployment never reads the base URL, the output SHALL say the missing value blocks JWT authentication rather than that the project is unusable.
+
+The four exit codes SHALL be: `0` resolved, `1` nothing configured for that directory, `2` the command could not answer (a usage error, a malformed URL, an unreadable `~/.formio/projects.json`, an unusable committed file), and `3` a project resolved whose base URL could not be determined.
+
+`project set` SHALL use the same vocabulary, because callers branch on the code rather than on the message: a refusal that NAMES the value or the write it needs — a missing project URL, a missing base URL for the one shape that derives none, a deployment offered for a project another record holds, the API root offered as a project URL, a pair collapsed onto one server — SHALL exit `1`, the code that means act on this message. Both wrong-URL refusals are the user typing the wrong URL back mid-interview, and the remedy is to re-ask; reporting either as `2` told every caller to relay and stop, abandoning the round the refusal exists to redirect. `2` SHALL remain "could not answer": a usage error, an unknown flag, a value that is not a URL, a record that cannot be read. Reporting a named missing value as `2` tells every caller to relay and stop in the middle of the round that was about to supply it.
+
+`project set` SHALL also exit `3`, and it SHALL mean for a write what it means for a read: the project resolved and its deployment did not. It is reached where the record was WRITTEN and a committed `formio.json` still governs the directory and supplies no deployment — so nothing this command can write will resolve one, and the remedy is the edit the report names. The record SHALL still be written, because it remains the fallback if that file goes away, and the printed block SHALL still name the pair that resolves. A `0` there told every caller the directory was ready and sent it to an authenticated call that fails for a reason the write already had in hand.
 
 Both subcommands SHALL exit non-zero on failure and SHALL write nothing to stdout that a caller could mistake for MCP protocol traffic.
+
+#### Scenario: The base-URL repair records the pair where the project lives
+
+- **WHEN** a project resolves only from `FORMIO_PROJECT_URL` and its base URL cannot be derived
+- **THEN** `project get` names a write carrying BOTH URLs into this directory's mapping
+- **AND** running exactly that command succeeds and leaves the directory resolving `0`
+- **AND** a `--base-url` call alone fails instead, naming that same write
+
+#### Scenario: Every printed remedy is a command that resolves the directory
+
+- **WHEN** `project get` ANSWERS with a status of `1` or `3`
+- **THEN** the command it prints, with the values it asks the user for, succeeds
+- **AND** the `project get` that follows exits `0` reporting exactly those values
+
+#### Scenario: A could-not-answer failure names the repair before the command
+
+- **WHEN** `project get` exits `2` because a record exists and cannot be read
+- **THEN** it says that record must be repaired or deleted FIRST
+- **AND** any command it prints is stated as the step that follows, since nothing can write a file that cannot be read
 
 #### Scenario: No arguments still starts the stdio server
 
 - **WHEN** the bin is invoked with no arguments
 - **THEN** it connects a stdio transport and serves the full tool list, unchanged from before this change
 
-#### Scenario: project set defaults to the personal scope
+#### Scenario: project set writes the personal mapping and nothing else
 
-- **WHEN** `formio-mcp project set --project-url https://x.form.io --cwd /abs/path` runs with no `--scope`
+- **WHEN** `formio-mcp project set --project-url https://x.form.io --cwd /abs/path` runs
 - **THEN** the mapping is written to `~/.formio/projects.json` for `/abs/path`
 - **AND** no `formio.json` is created
 
-#### Scenario: project set --scope repo writes the committed file
+#### Scenario: A removed flag is refused rather than ignored
 
-- **WHEN** `formio-mcp project set --project-url https://x.form.io --scope repo --cwd /repo/apps/web` runs and no `formio.json` exists at or above that directory within the repository
-- **THEN** `/repo/apps/web/formio.json` is created containing that project URL
-- **AND** the command prints the path it wrote
+- **WHEN** `formio-mcp project set --project-url https://x.form.io --scope repo --cwd /abs/path` runs
+- **THEN** the command exits `2` naming `--scope` as an unknown flag
+- **AND** nothing is written anywhere
 
-#### Scenario: project set --scope repo updates the nearest existing file
+#### Scenario: A deployment for a committed project is an edit, not a call
 
-- **WHEN** `/repo/formio.json` exists and `formio-mcp project set --base-url https://forms.mysite.com --scope repo --cwd /repo/apps/web` runs
-- **THEN** `/repo/formio.json` is updated rather than a new file created in `apps/web`
-- **AND** the command prints `/repo/formio.json`
-
-#### Scenario: The project_set tool matches the command's scope
-
-- **WHEN** the `project_set` tool is called with `scope` of `repo`
-- **THEN** it writes the committed file on the same terms as the command
-- **AND** omitting `scope` writes the personal mapping
+- **WHEN** a committed `formio.json` holds the project and `project set --base-url` runs, or `project get` reports `3` for it
+- **THEN** the message names that file's resolved path and the `"baseUrl"` key to add beside `"projectUrl"`
+- **AND** performing exactly that edit leaves the directory resolving `0`
 
 #### Scenario: project get names the committed file by path
 
@@ -227,7 +243,7 @@ Both subcommands SHALL exit non-zero on failure and SHALL write nothing to stdou
 #### Scenario: An ignored variable is reported alongside the failure it caused
 
 - **WHEN** `FORMIO_PROJECT_URL` resolves a path-less customer project, `FORMIO_BASE_URL` holds an unusable value, and `project get` runs
-- **THEN** it exits `2` reporting that the base URL could not be determined
+- **THEN** it exits `3` reporting that the base URL could not be determined
 - **AND** the same output carries the note that `FORMIO_BASE_URL` was ignored
 
 #### Scenario: project get with nothing configured is actionable
@@ -241,6 +257,59 @@ Both subcommands SHALL exit non-zero on failure and SHALL write nothing to stdou
 - **WHEN** a `formio.json` is found but cannot be parsed
 - **THEN** `project get` exits `2` and names that file's path
 - **AND** it does not report the directory as unconfigured
+
+### Requirement: The read half of the project surface is a tool as well as a command
+
+The server SHALL expose a `project_get` tool reporting which project a working directory resolves to, which deployment hosts it, and which layer supplied each. Without it every skill's preflight shelled out to `npx -y @formio/mcp@<pinned> project get`, so an agent already holding an open connection spawned an npm download to ask that same server a question it could answer over the transport — and a preflight run by one version could report a resolution the connected version would not honor.
+
+`project_get` SHALL take the same optional `cwd` argument every other tool takes, defaulting to the server's own process cwd, and SHALL resolve through the same resolver, in the same precedence, as every other tool.
+
+Its three answers SHALL travel as a machine-readable `status`, not as a substring of the message: `ok` carries both URLs, `not-configured` carries neither and sends the caller to `project_set`, and `base-url-unresolved` carries the project and asks for the deployment alone. These correspond to the CLI's exit codes `0`, `1` and `3`. A failure to answer at all SHALL be a tool error rather than a fourth status, so it can never be mistaken for `not-configured`, whose remedy would overwrite the record that is merely unreadable.
+
+The tool SHALL be registered read-only, and SHALL name no shell command in any remedy it prints: its reader holds an open connection, so every fix is a tool call.
+
+Any note collected on the way to an answer SHALL reach the text the tool returns, not only its structured payload. An "Ignoring `FORMIO_BASE_URL`" note is the CAUSE of a `base-url-unresolved` answer, and a client that surfaces only text would otherwise show a generic "could not be determined" about a value that had just been discarded unread. When the caller passed no `cwd`, the answer SHALL say that it is about the server's own working directory, since a confidently reported project for a directory nobody asked about is the failure that produces. It SHALL say so on a resolved answer as much as on an unresolved one, with ONE exception: a project supplied by the environment resolves identically for every directory, so the fallback directory is not part of that answer and a caution about it hangs a warning on something correct everywhere. That exception does not extend to a half-configured answer, whose remedy records a deployment under one directory — there the directory IS part of the answer, whatever supplied the project.
+
+Both the tool and the `project get` command SHALL derive their report from one shared implementation, differing only in reader-specific vocabulary: how each names a remedy (tool calls for an agent, runnable commands for a shell), the shell-environment caveat, which is true of the command and false of the server answering about itself, and how each NAMES the environment a value came from. The two readers stand in different processes, so a report that credits the tool's answer to "this shell's environment" sends an agent looking for a variable only the server's launch configuration holds. The `project get` / `project set` subcommands SHALL remain, because `formio-mcp-setup` runs before any tool exists to call.
+
+Any note collected on the way to an outcome SHALL travel with that outcome in EVERY shape the command can return, the could-not-answer failure included. An ignored unusable `FORMIO_PROJECT_URL` is the cause of the required-project failure, so a failure shape that discards notes reports "no project mapped yet" about a directory whose project was discarded unread.
+
+The server's declared `instructions` SHALL name `project_get` and what to do with each status, since they are the only configuration guidance an agent receives when the server is used stand-alone with no skills installed.
+
+#### Scenario: A connected agent asks the server rather than npm
+
+- **WHEN** an agent holding an open connection needs to know what a directory resolves to
+- **THEN** `project_get` answers it over the transport
+- **AND** no skill instructs it to run `npx -y @formio/mcp@<pinned> project get` for that
+
+#### Scenario: Nothing configured is a status, not a tool error
+
+- **WHEN** `project_get` is called for a directory nothing configures
+- **THEN** it returns `status: "not-configured"` without `isError`
+- **AND** its message names `project_set` and no shell command
+
+#### Scenario: An unreadable map is a tool error, not a status
+
+- **WHEN** `~/.formio/projects.json` cannot be parsed and `project_get` is called
+- **THEN** the call fails as a tool error
+- **AND** it does not report the directory as unconfigured
+
+#### Scenario: The tool credits the server's environment, not the caller's shell
+
+- **WHEN** `project_get` resolves a project from `FORMIO_PROJECT_URL`
+- **THEN** the source it names is the MCP server's own environment
+- **AND** `project get` in a shell still names that shell's environment for the same resolution
+
+#### Scenario: A fallback directory says so on a resolved answer
+
+- **WHEN** `project_get` is called with no `cwd` and the server's own directory resolves a project from a committed file or its mapping
+- **THEN** the answer says no `cwd` argument was passed and names that directory
+
+#### Scenario: A project the environment answers for everywhere says nothing
+
+- **WHEN** `project_get` is called with no `cwd` and the project comes from `FORMIO_PROJECT_URL`
+- **THEN** a resolved answer carries no caution about the fallback directory
+- **AND** a `base-url-unresolved` answer carries it, because its remedy records a deployment under that directory
 
 #### Scenario: A configured mapping resolves on the first tool call
 
