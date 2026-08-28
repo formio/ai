@@ -10,9 +10,13 @@
 //
 // The same run produced the other half of this file: told the tools were absent,
 // the agent invented a remedy — "run /mcp, pick the Form.io server, authorize" —
-// for a server no step had configured, and reported an "installed but not
-// authenticated" state that does not exist in this design. The setup skill is the
-// only remedy, and authentication is implicit.
+// for a server no step had configured. The setup skill is the only remedy.
+//
+// The rules that spelled out what NOT to report ("installed but not authenticated",
+// no slash command, no authorize-in-the-browser, never pre-announce authentication)
+// were deleted with the prose they guarded. This server lists every tool before it
+// authenticates, so there is no installed-but-unauthenticated state for a skill to
+// describe, and eleven copies of the description cost more attention than they bought.
 
 import { readdirSync, readFileSync } from 'node:fs';
 import { dirname, join, relative, resolve } from 'node:path';
@@ -90,35 +94,17 @@ describe('the preflight offers one remedy and invents none', () => {
     ).toEqual([]);
   });
 
-  // The invented instruction from the failing run was a client slash command plus
-  // "authorize in the browser". Both are banned by name — generically, because
-  // agent-neutral-prose.test.ts forbids these documents from spelling any one
-  // client's command, even inside a prohibition.
-  it('forbids inventing a client-specific setup or authorization step', () => {
+  // The check names ONE CONCRETE TOOL rather than "the Form.io tools". An abstract check
+  // invites an agent to reason about whether the tools are present but not yet usable,
+  // and no such state exists here: measured against the built server over stdio with a
+  // clean HOME, `tools/list` returns all 21 tools, `form_list` among them, before any
+  // authentication and without writing a token cache. Auth moved off startup in
+  // `lazy-auth-on-first-tool-call` and fires at the first API call. So `form_list` is
+  // callable exactly when this server is connected, and the check needs nothing else.
+  it('names form_list as the check', () => {
     expect(
-      offenders(
-        gatedSkillMd(),
-        (text) => !/no slash command/i.test(text) || !/authorize in the browser/i.test(text)
-      )
+      offenders(gatedSkillMd(), (text) => !/`form_list` is callable by you/.test(text))
     ).toEqual([]);
-  });
-
-  it('rules out reporting a server as present but unauthenticated', () => {
-    expect(
-      offenders(gatedSkillMd(), (text) => !/installed but not authenticated/i.test(text))
-    ).toEqual([]);
-  });
-
-  // A Form.io-branded MCP entry that exposes only connection/authentication tools
-  // is what the agent mistook for this server. The check is the named tools.
-  it('states that a Form.io-branded server without these tools is not this server', () => {
-    expect(offenders(gatedSkillMd(), (text) => !/is not this server/i.test(text))).toEqual([]);
-  });
-
-  it('keeps authentication implicit rather than a step to announce', () => {
-    expect(offenders(gatedSkillMd(), (text) => !/pre-announce authentication/i.test(text))).toEqual(
-      []
-    );
   });
 });
 

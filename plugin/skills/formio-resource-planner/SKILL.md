@@ -12,13 +12,9 @@ Turn a natural-language application description into a concrete Form.io resource
 
 **Planning needs no server.** This skill calls no MCP tool: it interviews, decides a resource model, and writes `template.md` + `template.json` to the working directory. Every one of those steps runs with no Form.io server connected, no project configured, and no authentication — so run the whole two-phase flow to completion before the subject of a server comes up at all. Whoever imports the result owns that gate; you do not hold it, and you must not open with it.
 
-**Check this only if you reach a Form.io tool call, not when this skill activates.** The check is whether `form_list`, `form_create`, `project_import`, and `project_set` are callable by you. A Form.io-branded MCP server that does not expose them is not this server — an entry named for Form.io offering only connection or authentication tools does not satisfy this check, and "installed but not authenticated" is not a state this design has or that you may report.
+**Check this when you reach your first Form.io tool call, not when this skill activates.** The check is whether `form_list` is callable by you. If it is, proceed. If it is not, load the `formio-mcp-setup` skill and use it to help the user connect the server; that skill is the only remedy you offer, and this skill writes no MCP configuration itself.
 
-If you reach such a call and the tools are missing, stop there and load the `formio-mcp-setup` skill; it writes the MCP configuration this client reads and tells the user how to reload. **That skill is the only remedy you offer.** Do not invent one: no client menu, no slash command, no "authorize in the browser", no install or reload steps of your own. The setup skill owns every instruction the user receives, and an invented one sends them looking for a server entry that nothing ever wrote. If `formio-mcp-setup` is not installed either, tell the user:
-
-> I have no Form.io tools, so the Form.io MCP server is not connected, and the `formio-mcp-setup` skill that would connect it is not installed either. Both ship in the Form.io skill library at https://github.com/formio/ai — its README carries the install route for every client, including the MCP server entry to add if you would rather configure it directly.
-
-**Never pre-announce authentication.** Authentication is implicit: the first authenticated tool call opens the portal-login flow itself when no cached JWT is present. There is no authenticate-first step to ask the user for, and no unauthenticated state to diagnose before a call has actually failed.
+## Never work around missing tools
 
 Do **not** work around missing tools by making direct HTTP requests against a Form.io deployment, and do not write a throwaway script that makes them for you. This library documents the whole Form.io REST surface, which makes hand-rolling requests tempting and wrong — it bypasses the guardrails the tools enforce and can write to a live deployment unreviewed. Stop and report what is blocking instead.
 

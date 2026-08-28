@@ -73,6 +73,11 @@ describe('no skill but the setup skill carries a Form.io install command', () =>
   });
 });
 
+// The fallback quote this once guarded — what to say when the tools are absent AND
+// `formio-mcp-setup` is not installed either — is gone. `npx skills add formio/ai`
+// installs the library as a unit, so a gated skill that is present never has the setup
+// skill missing beside it, and eleven copies of a message for that state cost more
+// attention than the state was worth.
 describe('the replacement still tells the user what to do', () => {
   const gatedSkillMd = () =>
     allMarkdown().filter(
@@ -81,17 +86,6 @@ describe('the replacement still tells the user what to do', () => {
 
   it('covers the eleven gated skills', () => {
     expect(gatedSkillMd()).toHaveLength(11);
-  });
-
-  // Without the commands, the message has to name the thing to install and where
-  // its instructions live, or "I have no tools" is a dead end.
-  it('each names the skill library and where the install route is documented', () => {
-    expect(
-      offenders(
-        gatedSkillMd(),
-        (text) => !/formio\/ai/.test(text) || !/github\.com\/formio\/ai|README/.test(text)
-      )
-    ).toEqual([]);
   });
 
   it('each still routes to the setup skill first', () => {

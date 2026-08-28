@@ -159,7 +159,7 @@ describe('every tool-calling skill probes the project configuration', () => {
   it('leaves the planner with the tools preflight but no probe', () => {
     const planner = read(join(skillsRoot, 'formio-resource-planner/SKILL.md'));
 
-    expect(planner).toContain('project_set');
+    expect(planner).toContain('form_list');
     expect(planner).toMatch(/HTTP/);
     expect(planner).not.toMatch(/project get|project_get/);
   });
