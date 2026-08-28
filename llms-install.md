@@ -48,7 +48,7 @@ Otherwise write this block into the client's MCP config file, replacing the proj
   "mcpServers": {
     "formio-mcp": {
       "command": "npx",
-      "args": ["-y", "@formio/mcp@0.11.0"],
+      "args": ["-y", "@formio/mcp@0.12.0"],
       "env": {
         "FORMIO_PROJECT_URL": "https://your-project.form.io"
       }
@@ -74,7 +74,7 @@ Merge into the existing object rather than overwriting the file. For VS Code, pu
 ```toml
 [mcp_servers.formio-mcp]
 command = "npx"
-args = ["-y", "@formio/mcp@0.11.0"]
+args = ["-y", "@formio/mcp@0.12.0"]
 ```
 
 There is no universal `.mcp.json`: a root `.mcp.json` is read by Claude Code only. Writing one file per client is the reliable approach when you do not know which client the user runs.
@@ -86,7 +86,7 @@ The skills installer never writes MCP configuration — it handles skills only. 
 Whichever way, the entry is the same command with no environment block required:
 
 ```json
-{ "command": "npx", "args": ["-y", "@formio/mcp@0.11.0"] }
+{ "command": "npx", "args": ["-y", "@formio/mcp@0.12.0"] }
 ```
 
 After writing any MCP configuration, tell the user to reload: MCP servers are read at session start, not at tool-call time.
@@ -94,8 +94,8 @@ After writing any MCP configuration, tell the user to reload: MCP servers are re
 If the user has volunteered a project URL, you can record it before the reload so the first tool call works:
 
 ```sh
-npx -y @formio/mcp@0.11.0 project set --project-url <url> --base-url <url> --cwd <absolute path>
-npx -y @formio/mcp@0.11.0 project get --cwd <absolute path>
+npx -y @formio/mcp@0.12.0 project set --project-url <url> --base-url <url> --cwd <absolute path>
+npx -y @formio/mcp@0.12.0 project get --cwd <absolute path>
 ```
 
 `project get` prints what the server resolves and which source supplied it. Empty output is not an answer: the `project` command shipped in 0.9.0, and an older `@formio/mcp` ignores these arguments, starts its stdio server, reads end-of-input and exits 0 with no output — a silent no-op that reads as success. Do not invent either URL — if the user has not given them, skip this and let the agent ask when a project is first needed.
