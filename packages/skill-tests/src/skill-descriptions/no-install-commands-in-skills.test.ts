@@ -6,8 +6,10 @@
 // Two problems with keeping it. It duplicates, in eleven places, instructions the
 // setup skill owns and keeps current; and it is a runtime remote-code-execution
 // instruction sitting in a document whose own rule is that the setup skill is the
-// only remedy it offers. A skill that cannot reach its tools can say so and name
-// where the install route is documented without carrying the commands itself.
+// only remedy it offers. A skill that cannot reach its tools routes to the setup
+// skill and stops; it names no install route of its own, because `npx skills add
+// formio/ai` installs the library as a unit and the setup skill is therefore always
+// present beside it.
 //
 // `formio-mcp-setup` is exempt: writing that configuration is its entire job.
 // Angular's own scaffolding commands in BOOTSTRAP.md are a different subject —
@@ -58,7 +60,9 @@ describe('no skill but the setup skill carries a Form.io install command', () =>
 
   it('none carries the old fallback quote', () => {
     expect(
-      offenders(nonSetupDocs(), (text) => /so the Form\.io MCP server isn't connected/.test(text))
+      offenders(nonSetupDocs(), (text) =>
+        /`formio-mcp-setup` skill that would connect it is not installed/.test(text)
+      )
     ).toEqual([]);
   });
 
@@ -73,6 +77,11 @@ describe('no skill but the setup skill carries a Form.io install command', () =>
   });
 });
 
+// The fallback quote this once guarded — what to say when the tools are absent AND
+// `formio-mcp-setup` is not installed either — is gone. `npx skills add formio/ai`
+// installs the library as a unit, so a gated skill that is present never has the setup
+// skill missing beside it, and eleven copies of a message for that state cost more
+// attention than the state was worth.
 describe('the replacement still tells the user what to do', () => {
   const gatedSkillMd = () =>
     allMarkdown().filter(
@@ -81,17 +90,6 @@ describe('the replacement still tells the user what to do', () => {
 
   it('covers the eleven gated skills', () => {
     expect(gatedSkillMd()).toHaveLength(11);
-  });
-
-  // Without the commands, the message has to name the thing to install and where
-  // its instructions live, or "I have no tools" is a dead end.
-  it('each names the skill library and where the install route is documented', () => {
-    expect(
-      offenders(
-        gatedSkillMd(),
-        (text) => !/formio\/ai/.test(text) || !/github\.com\/formio\/ai|README/.test(text)
-      )
-    ).toEqual([]);
   });
 
   it('each still routes to the setup skill first', () => {

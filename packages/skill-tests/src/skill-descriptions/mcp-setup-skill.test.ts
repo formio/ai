@@ -176,7 +176,7 @@ describe('preflight contract', () => {
       .filter((path) => {
         const text = body(path);
         return !(
-          text.includes('project_set') &&
+          text.includes('form_list') &&
           text.includes('formio-mcp-setup') &&
           /preflight/i.test(text)
         );

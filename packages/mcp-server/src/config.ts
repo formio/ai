@@ -1,13 +1,5 @@
 export const DEFAULT_BASE_URL = 'https://api.form.io';
 
-// What a Project URL is, with an example per deployment kind. This is the guidance
-// the unset-project error and the server's instructions carry, because the project
-// URL is the one value a user is asked for.
-//
-// It deliberately does NOT explain the base URL. That value is derived from
-// whichever project URL the user is about to supply, so guidance about it cannot be
-// acted on before that answer exists — and carrying it here made a message asking
-// for one value read as asking for two.
 /**
  * The Project URL, for the PERSON being asked for one.
  *
@@ -20,8 +12,9 @@ export const DEFAULT_BASE_URL = 'https://api.form.io';
  * eight lines long.
  *
  * The prohibitions are not lost: they stay in PROJECT_URL_GUIDANCE, which the server's
- * own instructions carry, so an agent with no skills installed still meets them at
- * connect time — the surface they were written for.
+ * own instructions carry — and carry ALONE, so this text reaches no agent-only surface
+ * and that one reaches no user. An agent with no skills installed still meets the
+ * prohibitions at connect time, which is what they were written for.
  */
 export const PROJECT_URL_FOR_A_USER = [
   'A Project URL is the full URL of one Form.io project.',
@@ -31,8 +24,13 @@ export const PROJECT_URL_FOR_A_USER = [
 
 /**
  * The same thing for an AGENT, with the rules that stop it building a URL rather than
- * asking for one. Carried by the server's instructions and by the surfaces only a model
- * reads — never by a report a user is shown; see PROJECT_URL_FOR_A_USER.
+ * asking for one. Carried by the server's instructions and by nothing else — never by a
+ * report a user is shown; see PROJECT_URL_FOR_A_USER.
+ *
+ * Neither text explains the base URL, and that is deliberate. It is derived from
+ * whichever project URL is about to be supplied, so guidance about it cannot be acted on
+ * before that answer exists — and carrying it here made a message asking for one value
+ * read as asking for two.
  */
 export const PROJECT_URL_GUIDANCE = [
   'A Project URL is the full URL of one Form.io project — the project an application reads and writes.',
