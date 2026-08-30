@@ -115,20 +115,36 @@ describe('guidance is written for the audience that reads it', () => {
   // A backstop against REGROWTH, not a target to trim toward.
   //
   // The three assertions above name the material that must stay out; this catches the
-  // next paragraph nobody thought to name. It is calibrated, not chosen: the report is
-  // 837 characters of prose today, and the guidance removed from it was 270 — so a
-  // ceiling here fails the moment something of that size comes back, and leaves room for
-  // ordinary editing in the meantime. Raising it is a decision to make deliberately,
-  // which is the point of writing the number down.
+  // next paragraph nobody thought to name.
+  //
+  // EVERY surface is measured before anything is asserted, and the failure names all of
+  // them. That is not tidiness — the previous version put the assertion inside the loop,
+  // so it threw on the first entry and could only ever report the CLI surface, which is
+  // how the ceiling came to be calibrated against the SHORTEST of the three. It was set
+  // to 900 from a comment citing "the report is 837 characters", leaving eleven
+  // characters of headroom on the longest and firing on any reworded sentence.
+  //
+  // Measured today: the CLI report 837, the tool report 880, the error a tool raises 889.
+  // The guidance removed from these surfaces was 270 characters, so regrowth of that size
+  // lands at 1159 or above. A ceiling of 1050 still fails on it and leaves 161 characters
+  // for ordinary editing. Raising it past 1159 retires the check rather than relaxing it,
+  // which is the decision the numbers are written down to make visible.
   //
   // Measured with the directory PATH removed. It appears three times and is as long as
   // the caller's directory happens to be, so counting it measured the fixture's own
   // scratch path rather than the prose this assertion is about.
   it('keeps the unconfigured report brief', async () => {
-    for (const [name, report] of Object.entries(await unconfiguredReports())) {
+    const measured = Object.entries(await unconfiguredReports()).map(([name, report]) => {
       const prose = report.split(repo).join('<dir>');
+      return { name, length: prose.length, prose };
+    });
 
-      expect(prose.length, `${name} is ${prose.length} characters:\n${prose}`).toBeLessThan(900);
-    }
+    const tally = measured.map(({ name, length }) => `${name} ${length}`).join(', ');
+    const over = measured.filter(({ length }) => length >= 1050);
+
+    expect(
+      over.map(({ name, length }) => `${name} is ${length} characters`),
+      `every surface: ${tally}\n\n${over.map(({ prose }) => prose).join('\n\n')}`
+    ).toEqual([]);
   });
 });
