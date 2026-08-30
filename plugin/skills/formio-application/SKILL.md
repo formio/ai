@@ -10,7 +10,7 @@ You are the library's default "build me an app" skill. When a user describes an 
 
 ## Preflight — the Form.io MCP server
 
-**Check this when you reach your first Form.io tool call, not when this skill activates.** The check is whether `form_list` is callable by you. If it is, proceed. If it is not, load the `formio-mcp-setup` skill and use it to help the user connect the server; that skill is the only remedy you offer, and this skill writes no MCP configuration itself.
+**Check this when you reach your first Form.io tool call, not when this skill activates.** The check is whether `form_list` is callable by you, under whatever name this client exposes it. If it is, proceed. If it is not, load the `formio-mcp-setup` skill and use it to help the user connect the server; that skill is the only remedy you offer, and this skill writes no MCP configuration itself.
 
 **A missing server blocks the import, not the turn.** Step 3 (Import) is this skill's first Form.io tool call. Steps 1 and 2 — understanding the request, running the planner, and writing `template.md` + `template.json` — need no server, no project, and no authentication. Do that work first and in full — it is most of this pipeline — and raise the gap at Step 3, where it actually bites. Opening a "build me an app" request with a blocked-on-setup message, or asking for a Project URL before a template exists to import, spends the user's turn on a step that was not due.
 
@@ -22,7 +22,7 @@ That ban is on **build-time** work — the configuring you do in this session. I
 
 ## Which project the tools target
 
-**Available tools are not a configured project.** Every Form.io tool resolves which project it targets per working directory, so pass `cwd` — the user's current working directory — on every Form.io tool call; omitting it resolves against the MCP server's own directory, which is fixed at spawn and may be mapped to a different project. Before the first call that reads from or writes to a deployment, ask the server what this directory resolves to by calling the `project_get` tool with `cwd` set to the user's current working directory. Do not shell out for this: the connected server answers it directly, with the same resolver every other tool uses, so what it reports is what the next call targets.
+**Available tools are not a configured project.** Every Form.io tool resolves which project it targets per working directory, so pass `cwd` — the user's current working directory — on every Form.io tool call; omitting it resolves against the MCP server's own directory, which is fixed at spawn and may be mapped to a different project. Before the first call that reads from or writes to a deployment, ask the server what this directory resolves to by calling the `project_get` tool with `cwd` set to the user's current working directory. Do not shell out for this: the connected server answers it directly, with the same resolver every other tool uses, so what it reports is what the next call targets. If `project_get` is not callable, the connected server predates it — load the `formio-mcp-setup` skill, which moves the pinned version forward.
 
 In this skill that first call is Step 3's import, and asking there is the whole of the configuration work. Not earlier — a Project URL asked for at Step 1 is asked for before the user has anything to put in it.
 

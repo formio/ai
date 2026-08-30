@@ -58,7 +58,9 @@ describe('no skill but the setup skill carries a Form.io install command', () =>
 
   it('none carries the old fallback quote', () => {
     expect(
-      offenders(nonSetupDocs(), (text) => /so the Form\.io MCP server isn't connected/.test(text))
+      offenders(nonSetupDocs(), (text) =>
+        /`formio-mcp-setup` skill that would connect it is not installed/.test(text)
+      )
     ).toEqual([]);
   });
 

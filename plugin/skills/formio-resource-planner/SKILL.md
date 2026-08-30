@@ -10,9 +10,9 @@ Turn a natural-language application description into a concrete Form.io resource
 
 ## Preflight — the Form.io MCP server
 
-**Planning needs no server.** This skill calls no MCP tool: it interviews, decides a resource model, and writes `template.md` + `template.json` to the working directory. Every one of those steps runs with no Form.io server connected, no project configured, and no authentication — so run the whole two-phase flow to completion before the subject of a server comes up at all. Whoever imports the result owns that gate; you do not hold it, and you must not open with it.
+**Planning needs no server.** This skill calls no MCP tool: it interviews, decides a resource model, and writes `template.md` + `template.json` to the working directory. Every one of those steps runs with no Form.io server connected, no project configured, and no authentication — so run the whole two-phase flow to completion before the subject of a server comes up at all. Whoever imports the result owns that gate; you do not hold it, and you must not open with it. If a later turn does take you to a Form.io tool call, the check below applies then and not before.
 
-**Check this when you reach your first Form.io tool call, not when this skill activates.** The check is whether `form_list` is callable by you. If it is, proceed. If it is not, load the `formio-mcp-setup` skill and use it to help the user connect the server; that skill is the only remedy you offer, and this skill writes no MCP configuration itself.
+**Check this when you reach your first Form.io tool call, not when this skill activates.** The check is whether `form_list` is callable by you, under whatever name this client exposes it. If it is, proceed. If it is not, load the `formio-mcp-setup` skill and use it to help the user connect the server; that skill is the only remedy you offer, and this skill writes no MCP configuration itself.
 
 ## Never work around missing tools
 

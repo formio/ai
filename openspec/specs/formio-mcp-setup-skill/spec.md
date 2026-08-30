@@ -7,7 +7,9 @@ Defines the `formio-mcp-setup` skill and the preflight every other skill carries
 
 Every `SKILL.md` in the library SHALL carry a preflight section in its **body** — not its frontmatter description, which is bound by the 1,024-character budget — instructing the agent to verify that the Form.io MCP tools are available before making its first Form.io tool call.
 
-The preflight SHALL: name representative tools to look for (`form_list`, `form_create`, `project_import`, `project_set`); direct the agent to the `formio-mcp-setup` skill when they are absent; carry a fallback message for the case where that skill is not installed; and forbid working around missing tools with raw HTTP calls against a Form.io deployment.
+The preflight SHALL: name ONE representative tool to look for (`form_list`), asking whether it is callable under whatever name the client exposes it; direct the agent to the `formio-mcp-setup` skill when it is not; and forbid working around missing tools with raw HTTP calls against a Form.io deployment. It names one tool rather than four because the server registers its whole tool surface before it authenticates, so `form_list` is callable exactly when the server is connected. `project_get` is the one exception, being newer than the rest of the surface: the section that calls it SHALL route to `formio-mcp-setup` when it is absent, which is how a stale pinned version reaches the upgrade branch.
+
+The preflight SHALL NOT carry a fallback message for the case where `formio-mcp-setup` is itself missing. `npx skills add formio/ai` installs the library as a unit, so a gated skill that is present never has the setup skill absent beside it.
 
 The raw-HTTP prohibition is the load-bearing part. `formio-api` documents the entire REST surface, so an agent with no tools and no prohibition will hand-roll requests against a live deployment — a worse outcome than stopping.
 
