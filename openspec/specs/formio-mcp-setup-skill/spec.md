@@ -7,11 +7,11 @@ Defines the `formio-mcp-setup` skill and the preflight every other skill carries
 
 Every `SKILL.md` in the library SHALL carry a preflight section in its **body** — not its frontmatter description, which is bound by the 1,024-character budget — instructing the agent to verify that the Form.io MCP tools are available before making its first Form.io tool call.
 
-The preflight SHALL: name ONE representative tool to look for (`form_list`), asking whether it is callable under whatever name the client exposes it; direct the agent to the `formio-mcp-setup` skill when it is not; and forbid working around missing tools with raw HTTP calls against a Form.io deployment. It names one tool rather than four because the server registers its whole tool surface before it authenticates, so `form_list` is callable exactly when the server is connected. `project_get` is the one exception, being newer than the rest of the surface: the section that calls it SHALL route to `formio-mcp-setup` when it is absent, which is how a stale pinned version reaches the upgrade branch.
+The preflight SHALL: name ONE representative tool to look for (`form_list`), asking whether it is callable under whatever name the client exposes it; and direct the agent to the `formio-mcp-setup` skill when it is not. It names one tool rather than four because the server registers its whole tool surface before it authenticates, so `form_list` is callable exactly when the server is connected. `project_get` is the one exception, being newer than the rest of the surface: the section that calls it SHALL route to `formio-mcp-setup` when it is absent, which is how a stale pinned version reaches the upgrade branch.
 
 The preflight SHALL NOT carry a fallback message for the case where `formio-mcp-setup` is itself missing. `npx skills add formio/ai` installs the library as a unit, so a gated skill that is present never has the setup skill absent beside it.
 
-The raw-HTTP prohibition is the load-bearing part. `formio-api` documents the entire REST surface, so an agent with no tools and no prohibition will hand-roll requests against a live deployment — a worse outcome than stopping.
+The raw-HTTP prohibition lives in a `##` section of its own beside the preflight, not inside it: it is not a precondition check but a standing rule for the rest of the session. Every gated `SKILL.md` SHALL carry it, and it is the load-bearing part of the pair. `formio-api` documents the entire REST surface, so an agent with no tools and no prohibition will hand-roll requests against a live deployment — a worse outcome than stopping.
 
 There are twelve `SKILL.md` files under `plugin/skills/`, because the nested `formio-angular/formio-angular-resources/SKILL.md` is one of them and the recursive walk in the conformance suite includes it. Eleven carry the preflight; `formio-mcp-setup/SKILL.md` is the handoff target and is exempt.
 
@@ -27,13 +27,13 @@ The skill SHALL branch on the `status` the report carries. On `ok` it SHALL trea
 
 A call that FAILS OUTRIGHT rather than returning a `status` is a broken record, not an absent one. The skill SHALL relay the error and stop, and SHALL NOT interview: a `project_set` would fail for the same unreported reason and the loop would repeat with the cause never named.
 
-The preflight SHALL carry exactly three things about the URLs themselves, and no more — this is the whole of what the skills library states about them, since no skill document owns the topic any longer:
+The section that resolves the project — a sibling of the preflight rather than part of it — SHALL carry exactly three things about the URLs themselves, and no more — this is the whole of what the skills library states about them, since no skill document owns the topic any longer:
 
 1. A one-sentence definition of each: the Project URL is the full URL of the Form.io project the app reads and writes; the Base URL is the deployment hosting it. This exists so an agent can name what it is asking for without first provoking an error.
 2. The two tools — `project_get` to read, `project_set` to write.
 3. The prohibition on editing `~/.formio/projects.json` by any means other than those tools.
 
-The preflight SHALL NOT restate anything else. It SHALL NOT contain the three-valid-shapes enumeration, plain-language URL descriptions beyond the one-sentence definitions above, example URL values, URL validation rules, a Base-URL derivation table, or a `project get` exit-code table; those live in the server's instructions and error messages, which the agent relays verbatim. The preflight SHALL forbid guessing a base URL and reusing one from another project or an earlier session.
+That section SHALL NOT restate anything else. It SHALL NOT contain the three-valid-shapes enumeration, plain-language URL descriptions beyond the one-sentence definitions above, example URL values, URL validation rules, a Base-URL derivation table, or a `project get` exit-code table; those live in the server's instructions and error messages, which the agent relays verbatim. It SHALL forbid guessing a base URL and reusing one from another project or an earlier session.
 
 The probe is proactive so the common path does not need a failed tool call to discover a missing configuration. It is not the enforcement, though: the server raises the same messages when something calls a tool without probing, which is what makes an agent with no skills installed behave correctly too.
 
@@ -48,10 +48,11 @@ The probe requirement binds the **build-time** project mapping only. It SHALL NO
 - **WHEN** every `SKILL.md` under `plugin/skills/` is inspected
 - **THEN** each body contains a preflight section naming `project_set` and the `formio-mcp-setup` skill
 
-#### Scenario: Preflight forbids the HTTP workaround
+#### Scenario: The HTTP workaround is forbidden, in a section of its own
 
-- **WHEN** any skill's preflight section is inspected
+- **WHEN** any gated `SKILL.md` is inspected
 - **THEN** it instructs the agent not to fall back to direct HTTP requests against a Form.io deployment when the MCP tools are missing
+- **AND** that instruction sits in its own section rather than inside the preflight
 
 #### Scenario: Every tool-calling skill probes with the project_get tool
 

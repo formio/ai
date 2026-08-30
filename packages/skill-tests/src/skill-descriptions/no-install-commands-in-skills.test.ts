@@ -6,8 +6,10 @@
 // Two problems with keeping it. It duplicates, in eleven places, instructions the
 // setup skill owns and keeps current; and it is a runtime remote-code-execution
 // instruction sitting in a document whose own rule is that the setup skill is the
-// only remedy it offers. A skill that cannot reach its tools can say so and name
-// where the install route is documented without carrying the commands itself.
+// only remedy it offers. A skill that cannot reach its tools routes to the setup
+// skill and stops; it names no install route of its own, because `npx skills add
+// formio/ai` installs the library as a unit and the setup skill is therefore always
+// present beside it.
 //
 // `formio-mcp-setup` is exempt: writing that configuration is its entire job.
 // Angular's own scaffolding commands in BOOTSTRAP.md are a different subject —

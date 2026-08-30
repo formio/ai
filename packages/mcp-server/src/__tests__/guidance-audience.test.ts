@@ -87,16 +87,23 @@ describe('guidance is written for the audience that reads it', () => {
     };
   };
 
+  // Every surface is checked before anything is asserted, for the reason spelled out on
+  // the length assertion below: an `expect` inside the loop throws on the first entry, so
+  // a regrowth present in two surfaces would name only the first one.
   it.each(PROHIBITIONS)('keeps %s out of the report a user is shown', async (prohibition) => {
-    for (const [name, report] of Object.entries(await unconfiguredReports())) {
-      expect(report, `${name} carries an agent-only prohibition`).not.toMatch(prohibition);
-    }
+    const carrying = Object.entries(await unconfiguredReports())
+      .filter(([, report]) => prohibition.test(report))
+      .map(([name]) => name);
+
+    expect(carrying, 'these surfaces carry an agent-only prohibition').toEqual([]);
   });
 
   it.each(SHAPES)('still tells the user %s', async (shape) => {
-    for (const [name, report] of Object.entries(await unconfiguredReports())) {
-      expect(report, `${name} dropped a shape the user needs to answer`).toMatch(shape);
-    }
+    const missing = Object.entries(await unconfiguredReports())
+      .filter(([, report]) => !shape.test(report))
+      .map(([name]) => name);
+
+    expect(missing, 'these surfaces dropped a shape the user needs to answer').toEqual([]);
   });
 
   // The prohibitions are not deleted — they move. An agent that never reads a skill

@@ -63,9 +63,16 @@ function everySkillMd(dir: string): string[] {
 }
 
 describe('prose duplicated across skills is duplicated exactly', () => {
-  // Every gated skill: the ones whose SKILL.md carries the preflight at all.
-  const skills = everySkillMd(skillsRoot).filter((skillMdPath) =>
-    readFileSync(skillMdPath, 'utf8').includes('project_get')
+  // Every gated skill, derived the way `preflight-blocking-scope` derives it: everything
+  // except the setup skill that is the handoff target.
+  //
+  // Selecting on `project_get` instead silently dropped formio-resource-planner, which
+  // must NOT contain that token (project-config-preflight asserts so) — and the planner
+  // carries the shared preflight paragraph byte-identical to the other ten. An edit to
+  // that paragraph could land in ten files, miss the planner, and leave this guard green,
+  // which is the exact failure the file was written to catch.
+  const skills = everySkillMd(skillsRoot).filter(
+    (skillMdPath) => !skillMdPath.includes('/formio-mcp-setup/')
   );
 
   it('has gated skills to compare', () => {
