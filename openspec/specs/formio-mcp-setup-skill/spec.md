@@ -15,17 +15,23 @@ The raw-HTTP prohibition is the load-bearing part. `formio-api` documents the en
 
 There are twelve `SKILL.md` files under `plugin/skills/`, because the nested `formio-angular/formio-angular-resources/SKILL.md` is one of them and the recursive walk in the conformance suite includes it. Eleven carry the preflight; `formio-mcp-setup/SKILL.md` is the handoff target and is exempt.
 
-Every skill that calls Form.io tools SHALL carry a **second** probe, run after the tools are confirmed present and before the first call that reads from or writes to a deployment: run `npx -y @formio/mcp@<pinned> project get --cwd <the user's working directory>`. On success the agent SHALL treat the printed URLs as the configuration and SHALL NOT ask the user to confirm or re-supply them. On a non-zero exit the agent SHALL:
+Every skill that calls Form.io tools SHALL carry a **second** probe, run after the tools are confirmed present and before the first call that reads from or writes to a deployment: call the `project_get` MCP tool with `cwd` set to the user's working directory.
 
-1. Relay the message's own instruction to the user, asking for the one value it names — the project URL, or the base URL for the project URL it echoes.
-2. Persist that value by running the `project set` command the message names.
-3. Retry `project get`, and repeat if it names the second value.
+The skill SHALL NOT shell out to `npx -y @formio/mcp project get` for this. The connected server answers over the open transport with the same resolver every other tool uses, so what it reports is what the next call targets; a subprocess resolves against its own environment rather than the server's, and a binary older than the `project` command ignores the arguments and exits **0 with no output**, reporting success while finding nothing. The CLI subcommands remain for `formio-mcp-setup`, which runs before any tool exists to call.
+
+The skill SHALL branch on the `status` the report carries. On `ok` it SHALL treat the reported URLs as the configuration and SHALL NOT ask the user to confirm or re-supply them. On `not-configured` or `base-url-unresolved` it SHALL:
+
+1. Relay the report's own instruction to the user, asking for the one value it names — the Project URL, or the Base URL for the Project URL it echoes.
+2. Record that value the way the report names: the `project_set` tool where this directory's mapping is the record, carried structurally as `remedy`; an edit to the file where a committed `formio.json` holds the project, since the server reads a committed file and never writes one.
+3. Call `project_get` again, and repeat if it names the second value.
+
+A call that FAILS OUTRIGHT rather than returning a `status` is a broken record, not an absent one. The skill SHALL relay the error and stop, and SHALL NOT interview: a `project_set` would fail for the same unreported reason and the loop would repeat with the cause never named.
 
 The preflight SHALL carry exactly three things about the URLs themselves, and no more — this is the whole of what the skills library states about them, since no skill document owns the topic any longer:
 
 1. A one-sentence definition of each: the Project URL is the full URL of the Form.io project the app reads and writes; the Base URL is the deployment hosting it. This exists so an agent can name what it is asking for without first provoking an error.
-2. The two commands — `project get` to read, `project set` to write.
-3. The prohibition on editing `~/.formio/projects.json` by any means other than those commands or the equivalent MCP tool.
+2. The two tools — `project_get` to read, `project_set` to write.
+3. The prohibition on editing `~/.formio/projects.json` by any means other than those tools.
 
 The preflight SHALL NOT restate anything else. It SHALL NOT contain the three-valid-shapes enumeration, plain-language URL descriptions beyond the one-sentence definitions above, example URL values, URL validation rules, a Base-URL derivation table, or a `project get` exit-code table; those live in the server's instructions and error messages, which the agent relays verbatim. The preflight SHALL forbid guessing a base URL and reusing one from another project or an earlier session.
 
@@ -47,11 +53,12 @@ The probe requirement binds the **build-time** project mapping only. It SHALL NO
 - **WHEN** any skill's preflight section is inspected
 - **THEN** it instructs the agent not to fall back to direct HTTP requests against a Form.io deployment when the MCP tools are missing
 
-#### Scenario: Every tool-calling skill probes with project get
+#### Scenario: Every tool-calling skill probes with the project_get tool
 
-- **WHEN** every `SKILL.md` under `plugin/skills/` except `formio-mcp-setup/SKILL.md` is inspected
-- **THEN** each preflight instructs running `project get` with the user's working directory before the first deployment-touching call
-- **AND** each instructs relaying the command's own error and running the `project set` command that error names
+- **WHEN** every `SKILL.md` under `plugin/skills/` except `formio-mcp-setup/SKILL.md` and `formio-resource-planner/SKILL.md` is inspected
+- **THEN** each preflight instructs calling the `project_get` MCP tool with the user's working directory before the first deployment-touching call
+- **AND** none instructs shelling out to the `project get` CLI subcommand to do it
+- **AND** each instructs branching on the reported `status` and applying the remedy that report names
 - **AND** each forbids guessing a base URL, reusing another project's, or editing `~/.formio/projects.json`
 
 #### Scenario: No skill restates the build-time URL guidance the server owns
@@ -71,7 +78,7 @@ The probe requirement binds the **build-time** project mapping only. It SHALL NO
 
 - **WHEN** `plugin/skills/formio-resource-planner/SKILL.md` is inspected
 - **THEN** it carries the tool-availability check and the raw-HTTP prohibition
-- **AND** it does not instruct running `project get`
+- **AND** it does not call `project_get`
 
 #### Scenario: Reference-only work needs no project
 
