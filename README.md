@@ -70,10 +70,10 @@ Neither install route asks for a URL. Both are resolved per working directory, s
 
 ```bash
 # What does this directory resolve to?
-npx -y @formio/mcp@0.12.2 project get --cwd "$(pwd)"
+npx -y @formio/mcp@0.12.3 project get --cwd "$(pwd)"
 
 # Record it for this machine…
-npx -y @formio/mcp@0.12.2 project set --project-url "<project url>" --cwd "$(pwd)"
+npx -y @formio/mcp@0.12.3 project set --project-url "<project url>" --cwd "$(pwd)"
 
 # …or commit it with the application, tracked in git and shared with everyone who clones it:
 # write a formio.json in the application's own folder (the server reads it, never writes it)
@@ -188,7 +188,7 @@ It is also listed in the [official MCP Registry](https://registry.modelcontextpr
   "mcpServers": {
     "formio-mcp": {
       "command": "npx",
-      "args": ["-y", "@formio/mcp@0.12.2"]
+      "args": ["-y", "@formio/mcp@0.12.3"]
     }
   }
 }
@@ -203,7 +203,7 @@ That is the **JSON `mcpServers`** shape — what Claude Code (`.mcp.json`), Curs
   "servers": {
     "formio-mcp": {
       "command": "npx",
-      "args": ["-y", "@formio/mcp@0.12.2"]
+      "args": ["-y", "@formio/mcp@0.12.3"]
     }
   }
 }
@@ -214,7 +214,7 @@ That is the **JSON `mcpServers`** shape — what Claude Code (`.mcp.json`), Curs
 ```toml
 [mcp_servers.formio-mcp]
 command = "npx"
-args = ["-y", "@formio/mcp@0.12.2"]
+args = ["-y", "@formio/mcp@0.12.3"]
 ```
 
 Authentication is the same everywhere: the first authenticated tool call opens the browser portal-login flow, or set `FORMIO_API_KEY` to skip the browser entirely — required on any host with no browser, such as a cloud agent, a container, or CI.
@@ -316,7 +316,7 @@ The probe runs lazily — only when the local auth page is actually served.
 | `FORMIO_AUTH_HOST` / `FORMIO_AUTH_PORT` | no | `127.0.0.1` / ephemeral | Bind address and port for the login server. Set both when running in a container so the login page is reachable through a published port. | — | `0.0.0.0` / `43117` |
 | `FORMIO_INSECURE_TLS` | no | `false` | When `true`, skips TLS certificate verification (sets `NODE_TLS_REJECT_UNAUTHORIZED=0`) — for self-hosted deployments behind self-signed certs. Do not use against production. | — | `true` |
 
-<sub>\* Not at startup — the server starts and lists every tool without it, and only errors when a tool actually needs a project. The alternative is the `project_set` tool, which maps a working directory to a project in `~/.formio/projects.json` so one server can serve several workspaces. Resolution runs by scope, narrowest first: a committed `formio.json` found by walking up from the caller's `cwd`, then the mapping for that `cwd`, then `FORMIO_PROJECT_URL` in the environment as the weakest source, then the error. Map a directory before any client connects with `npx -y @formio/mcp@0.12.2 project set --project-url <url> --cwd <path>` — the deployment is derived from the project URL wherever it can be, so add `--base-url <url>` only when the server says it cannot be determined. `project get --cwd <path>` prints what resolves and which source won, exiting `0` when it resolved, `1` when nothing is mapped, `2` when the command itself failed, and `3` when a project resolved but its Base URL could not be determined — the half-configured directory, repaired by supplying that one value. `project set --cwd <path>` exits `0` when the directory is ready to serve a call, `1` when a named value is still missing, `2` when the command could not answer, and `3` when the record WAS written and the directory still resolves no Base URL — a committed `formio.json` governs it and supplies none, so the remedy is an edit to that file rather than another write.</sub>
+<sub>\* Not at startup — the server starts and lists every tool without it, and only errors when a tool actually needs a project. The alternative is the `project_set` tool, which maps a working directory to a project in `~/.formio/projects.json` so one server can serve several workspaces. Resolution runs by scope, narrowest first: a committed `formio.json` found by walking up from the caller's `cwd`, then the mapping for that `cwd`, then `FORMIO_PROJECT_URL` in the environment as the weakest source, then the error. Map a directory before any client connects with `npx -y @formio/mcp@0.12.3 project set --project-url <url> --cwd <path>` — the deployment is derived from the project URL wherever it can be, so add `--base-url <url>` only when the server says it cannot be determined. `project get --cwd <path>` prints what resolves and which source won, exiting `0` when it resolved, `1` when nothing is mapped, `2` when the command itself failed, and `3` when a project resolved but its Base URL could not be determined — the half-configured directory, repaired by supplying that one value. `project set --cwd <path>` exits `0` when the directory is ready to serve a call, `1` when a named value is still missing, `2` when the command could not answer, and `3` when the record WAS written and the directory still resolves no Base URL — a committed `formio.json` governs it and supplies none, so the remedy is an edit to that file rather than another write.</sub>
 
 ---
 
