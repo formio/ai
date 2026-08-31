@@ -24,8 +24,12 @@ export function registerActionDeleteTool(server: McpServer, config: FormioConfig
     async ({ cwd, formId, actionId }) => {
       try {
         const cfg = resolveProjectConfig(cwd, config);
+        // The API answers this DELETE with the plain text body `OK`, so the
+        // response is read as text. Left to default to `res.json()` it threw
+        // "Unexpected token 'O'" and the delete reported failure after succeeding.
         await formioFetch(`form/${formId}/action/${actionId}`, {}, cfg, {
           method: 'DELETE',
+          responseType: 'text',
         });
         // Text stays 'OK' — the payload carries the detail, and a bare
         // acknowledgement is what a model reading this wants.
