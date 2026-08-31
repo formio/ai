@@ -44,7 +44,7 @@ describe('action_delete tool', () => {
       `form/${formId}/action/${actionId}`,
       {},
       TEST_CONFIG,
-      { method: 'DELETE' }
+      { method: 'DELETE', responseType: 'text' }
     );
     expect(result.content).toEqual([{ type: 'text', text: 'OK' }]);
   });
