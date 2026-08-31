@@ -4,7 +4,7 @@
     "formio-mcp": {
       "type": "stdio",
       "command": "npx",
-      "args": ["-y", "@formio/mcp@0.12.2"]
+      "args": ["-y", "@formio/mcp@0.12.3"]
     }
   }
 }

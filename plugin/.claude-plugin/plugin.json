@@ -1,6 +1,6 @@
 {
   "name": "formio-ai",
-  "version": "0.12.2",
+  "version": "0.12.3",
   "description": "Form.io MCP server + skill library. Bundles the Form.io MCP server and a skill library covering every endpoint in the Form.io API, plus form JSON schema guidance for generating and editing Form.io forms and resources.",
   "repository": "https://github.com/formio/ai",
   "license": "MIT",
@@ -11,7 +11,7 @@
   "mcpServers": {
     "formio-mcp": {
       "command": "npx",
-      "args": ["-y", "@formio/mcp@0.12.2"]
+      "args": ["-y", "@formio/mcp@0.12.3"]
     }
   }
 }

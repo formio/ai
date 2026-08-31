@@ -1,5 +1,11 @@
 # @formio/ai
 
+## 0.12.3
+
+### Patch Changes
+
+- Track the @formio/mcp release: the plugin manifests and skills pin the exact server version they launch, so a server release republishes the plugin carrying the new pin.
+
 ## 0.12.2
 
 ### Patch Changes
