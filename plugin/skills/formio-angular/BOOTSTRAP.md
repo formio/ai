@@ -144,6 +144,14 @@ Before advancing, verify all of the following exist:
 
 Check them at that absolute path, spelled out. A check written against "the workspace" and run wherever the shell sits passes in the wrong tree and reports a scaffold that is not where anyone will look for it. If `angular.json` is absent at `workspaceRoot`, stop this phase and find where it actually landed — a tree written to the wrong directory is a scaffold to move or delete with the user's say-so, not one to patch around or re-run on top of.
 
+### Which package manager this workspace uses
+
+Establish it here, before Step 5 installs anything. Read `packageManager` in `<workspaceRoot>/package.json` first, then look for a lockfile: `yarn.lock` → Yarn, `pnpm-lock.yaml` → pnpm, `package-lock.json` → npm, `bun.lockb` → Bun. Capture the answer as `PACKAGE_MANAGER` and use that one tool for every install and script for the rest of the session. Default to npm only when the workspace has none of them. The `npm install` / `npm view` commands written throughout this document assume npm; translate them to `PACKAGE_MANAGER` when it is something else.
+
+**Never introduce a second lockfile.** Running `npm install` in a Yarn or pnpm workspace writes a competing lockfile and a parallel `node_modules`, and the user's own commands keep resolving against the tree you did not build. Nothing warns you: the app you build and test passes, and it is not the app they run.
+
+**Then run the workspace's own dev script once, before the approval gate.** This is what catches the failure a successful install hides. npm hoists every transitive dependency to the top of `node_modules`, so a package that requires something it never declared resolves anyway. Yarn PnP and pnpm's isolated linker do not hoist, and they fail on exactly those imports — so a workspace that installs and builds under npm can still fail on the user's first command with a resolve error naming a package the app never imported. That error is a packaging defect in the dependency, not a fault in the generated app: report it as such, and fix it upstream where you can. Where you cannot, the escape hatch belongs to the user's package manager — Yarn's `packageExtensions`, pnpm's `dependenciesMeta` / hoisting settings — and it is a stopgap to remove once the dependency declares what it uses, never a step to apply by default.
+
 If any are missing, something went wrong inside the scaffolding step (`angular-new-app`, or the `@angular/cli` fallback) or the follow-up install. Do not patch around it; stop BOOTSTRAP and ask the user whether they want to retry, switch to an existing workspace, or abort. If `@angular/core` in the generated `package.json` is a different major than `FORMIO_ANGULAR_SUPPORTED_MAJOR`, the `angular-new-app` invocation did not honor the version pin — stop and surface the mismatch before continuing. If the Form.io entries landed as exact pins or `~` ranges, rewrite them to `^` as described above and re-run `npm install`.
 
 Also add `@formio/angular` and its peer SDK `@formio/js` to the workspace now so CONFIG can `import` from them without a follow-up install step. Install both in a single npm invocation, and use the caret (`^`) range prefix so the resulting `package.json` entries will auto-pick up future minor + patch releases within the same major without another bootstrap run:
@@ -186,7 +194,7 @@ e.g., `npm install --save bootstrap@^5.3.3 bootstrap-icons@^1.11.3`. The resulti
 }
 ```
 
-Then wire the stylesheets into `angular.json` so the Angular build pipeline bundles them. Open `<workspaceRoot>/angular.json`, find the first `projects.<projectName>.architect.build.options.styles` array (and repeat for the matching `test` target's `styles` array — usually immediately below `build`), and ensure these three entries appear **before** the workspace's own `src/styles.css` / `src/styles.scss` so application styles can override Bootstrap defaults:
+Then wire the stylesheets into `angular.json` so the Angular build pipeline bundles them. Open `<workspaceRoot>/angular.json`, find the first `projects.<projectName>.architect.build.options.styles` array (and repeat for the matching `test` target's `styles` array — usually immediately below `build`), and ensure these three entries appear **before** the workspace's own `src/styles.css` / `src/styles.scss` so application styles can override the defaults:
 
 ```json
 "styles": [
@@ -200,11 +208,14 @@ Notes on why these exact paths:
 
 - `bootstrap/dist/css/bootstrap.min.css` is the pre-compiled Bootstrap 5 CSS bundle; using the SCSS entry point (`bootstrap/scss/bootstrap`) would require an SCSS workspace, which the user may not have chosen in `angular-new-app`'s stylesheet interview. The compiled CSS works for both CSS and SCSS workspaces.
 - `bootstrap-icons/font/bootstrap-icons.css` registers the `bi bi-*` class family and ships the webfont; this is the same entry point the Bootstrap Icons docs recommend for non-SCSS consumers.
-- Neither stylesheet goes into `main.ts` or an `@import` in `styles.css` — the `angular.json` `styles` array is the Angular-native place to add workspace-wide stylesheets and is what `angular-new-app` expects.
+- **Do NOT add `@formio/js/dist/formio.form.css` here — `@formio/angular` already supplies it.** Its `FormioComponent` declares `styleUrls: ['.../@formio/js/dist/formio.form.min.css']` with `encapsulation: ViewEncapsulation.None`, and ng-packagr inlines that stylesheet into the published FESM bundle (~44 KB, verified in `@formio/angular@11.0.5`). `ViewEncapsulation.None` is what makes it work: the styles are emitted globally, so they reach the DOM the renderer builds imperatively, which scoped component styles never would. Adding the file to `angular.json` would ship a second copy of the same ~42 KB for no benefit. This is a real difference between the frameworks — `@formio/react` ships no CSS at all and its applications must import the stylesheet explicitly, which is why `formio-react/BOOTSTRAP.md` requires exactly what this document forbids.
+- None of these go into `main.ts` or an `@import` in `styles.css` — the `angular.json` `styles` array is the Angular-native place to add workspace-wide stylesheets and is what `angular-new-app` expects.
 
 Do NOT add Bootstrap's JavaScript bundle (`bootstrap.bundle.min.js` via `angular.json`'s `scripts` array). The Form.io renderer does not depend on Bootstrap's JS behaviors (dropdowns, modals, tooltips), and pulling the JS in would conflict with Angular's own DOM management. If a future resource module needs a Bootstrap JS feature, the Resources sub-skill (`./formio-angular-resources/SKILL.md`) can add it on a per-module basis.
 
-After editing `angular.json`, re-run a clean `npm install` (or `ng build --configuration=development` as a smoke check) to confirm the new style paths resolve. If either path 404s, verify the package version in `node_modules` — a Bootstrap 5+ major always ships `dist/css/bootstrap.min.css`, and Bootstrap Icons always ships `font/bootstrap-icons.css`, so a 404 means the install did not land.
+After editing `angular.json`, re-run a clean install (with the workspace's own package manager — see Step 4) or `ng build --configuration=development` as a smoke check, to confirm the new style paths resolve. If any path 404s, verify the package version in `node_modules` — a Bootstrap 5+ major always ships `dist/css/bootstrap.min.css` and Bootstrap Icons always ships `font/bootstrap-icons.css`, so a 404 means the install did not land.
+
+**Confirm the renderer's own styles reached the page** once a form first renders: a `.formio-component` rule should be present in the document's stylesheets, supplied by `@formio/angular`'s inlined component styles rather than by anything in `angular.json`. If it is absent, suspect the `@formio/angular` install, not a missing entry in the styles array.
 
 ## Step 6 — pin zoneless change detection explicitly
 
@@ -355,6 +366,7 @@ Bootstrap complete
   Bootstrap version:        <BOOTSTRAP_VERSION>              (or "skipped — user opted out" / "skipped — registry unreachable")
   Bootstrap Icons version:  <BOOTSTRAP_ICONS_VERSION>        (or "skipped — user opted out" / "skipped — registry unreachable")
   Angular skills installed: <path reported by npx>
+  Package manager:          <PACKAGE_MANAGER>
   Workspace:                <absolute workspace path>
   Key files:                angular.json, src/app/app-module.ts
   package.json entries:
