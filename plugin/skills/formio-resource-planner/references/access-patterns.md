@@ -42,7 +42,7 @@ Each sub-resource (grandchild or deeper) carries **two** reference selects:
 1. A **normal parent reference** pointing at the immediate parent (e.g., `account` on `Contact`). Standard shape: `reference: true`, no `submissionAccess`. This is the field the user actually fills.
 2. A **hidden, calculated mirror of the group field** (e.g., `team` on `Contact`). This is what actually propagates group access. Only three properties distinguish it from a normal group-reference select:
    - `hidden: true` — invisible to the user
-   - `calculateValue: "value = data.<parent>.data.<group>;"` — auto-populated from the parent's resolved group reference (e.g., `value = data.account.data.team;`)
+   - `calculateValue: "value = data.<parent>?.data?.<group> || value;"` — auto-populated from the parent's resolved group reference (e.g., `value = data.account?.data?.team || value;`). Emit the guard verbatim: without `?.` the expression throws on every load where the parent reference is not expanded, and without `|| value` a nil result is replaced by the component's `emptyValue`, clearing the group reference and stripping access. See `template-json.md` → "select — transitive group-access mirror".
    - `refreshOn: "<parent>"` — recalculate when the parent selection changes
    - Everything else is the same: `reference: true`, `validate.required: true`, and the same field-based `submissionAccess` block as the direct child's group-reference select — same entry types
 

@@ -181,7 +181,7 @@ The shape:
   "key": "team",
   "type": "select",
   "hidden": true,
-  "calculateValue": "value = data.account.data.team;",
+  "calculateValue": "value = data.account?.data?.team || value;",
   "refreshOn": "account",
   "reference": true,
   "submissionAccess": [

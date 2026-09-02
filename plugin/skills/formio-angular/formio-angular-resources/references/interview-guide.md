@@ -22,7 +22,7 @@ What to extract from each artifact of the planner's pair (SKILL.md's "Inputs you
   - `## Roles` — role machine names + capability summaries.
   - `## Access Matrix` — truth table per (resource, actor). Use this to make TWO separate guard decisions per resource — see "Guard decisions from the Access Matrix" below.
   - `## ER Diagram` — Mermaid `erDiagram`; gives you the hierarchy and join topology at a glance, with explicit cardinality semantics (`||--o{`, `}o--o{`). Parse this to discover parent/child pairs and join resources.
-  - `## Access Flow Diagram` — Mermaid `flowchart TD`; shows how ACL propagates at runtime. Critical for deciding whether a field is a real parent reference or a hidden calculated mirror (Angular does NOT touch mirror fields — the planner's form JSON handles them). Hidden calculated mirrors are annotated on the edges: `"hidden calculated mirror<br/>value = data.account.data.team"`.
+  - `## Access Flow Diagram` — Mermaid `flowchart TD`; shows how ACL propagates at runtime. Critical for deciding whether a field is a real parent reference or a hidden calculated mirror (Angular does NOT touch mirror fields — the planner's form JSON handles them). Hidden calculated mirrors are annotated on the edges: `"hidden calculated mirror<br/>value = data.account?.data?.team || value"`.
 - **`template.json`** — read this when you need:
   - Exact field JSON for a `select` component (reference resource, `valueProperty`, `multiple`) to generate grid columns or nested-route parent filters.
   - `template.json.actions` for action names referenced in `template.md` (e.g., verifying `Group Assignment` settings).

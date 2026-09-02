@@ -380,7 +380,7 @@ The mirrored field is invisible to the user — it exists purely to carry the gr
 
   // Critical behaviour for transitive group access:
   "hidden": true, // not shown to the user
-  "calculateValue": "value = data.account.data.team;", // auto-populate from parent's group field
+  "calculateValue": "value = data.account?.data?.team || value;", // auto-populate from parent's group field
   "refreshOn": "account", // recalc when the parent changes
 
   "validate": { "required": true },
@@ -398,10 +398,17 @@ The mirrored field is invisible to the user — it exists purely to carry the gr
 }
 ```
 
-**The calculateValue expression** follows a fixed pattern: `value = data.<parentKey>.data.<groupKey>;`
+**The calculateValue expression** follows a fixed pattern: `value = data.<parentKey>?.data?.<groupKey> || value;`
 
 - `<parentKey>` — the key of the immediate parent's select on this form (e.g., `account`).
 - `<groupKey>` — the key of the group-reference select on the parent resource (e.g., `team`).
+
+**Both halves of the guard are required. Emit the expression exactly as written.**
+
+- **`?.` on the parent and on `.data`.** The unguarded `data.account.data.team` throws `TypeError: Cannot read properties of undefined (reading 'team')` whenever the parent reference is not resolved into a full submission — which is the normal case when loading an existing grandchild, because the stored value is `{ _id }` and nothing has expanded it. The renderer logs `An error occured within custom function for <key>` and the screen is broken from the first click.
+- **`|| value` is the part that prevents damage, and it is NOT stylistic.** `Component.doValueCalculation` seeds `value` with the component's current `dataValue`, and `calculateComponentValue` then does `if (_.isNil(calculatedValue)) { calculatedValue = this.emptyValue; }`. So a bare optional chain returning `undefined` does not leave the field alone — it CLEARS it. On a group mirror that means the row is saved with no group reference, the server stamps no ACL from it, and every member of that group loses access to the record. Silent, and only visible later as rows that vanish for teammates.
+
+Read together: the optional chaining stops the crash, the fallback stops the data loss. Emitting one without the other trades a loud failure for a quiet one.
 
 Because the parent's select uses `reference: true`, Form.io resolves the parent into a full submission object on read, so `data.account.data.team` walks through the resolved account's data to find its team value. The mirror also uses `reference: true` — it stores the same kind of resolvable reference as the original.
 

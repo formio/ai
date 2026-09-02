@@ -689,7 +689,7 @@
           },
           "template": "<span>{{ item.data.name }}</span>",
           "hidden": true,
-          "calculateValue": "value = data.account.data.team;",
+          "calculateValue": "value = data.account?.data?.team || value;",
           "refreshOn": "account",
           "reference": true,
           "validate": {
@@ -845,7 +845,7 @@
           },
           "template": "<span>{{ item.data.name }}</span>",
           "hidden": true,
-          "calculateValue": "value = data.account.data.team;",
+          "calculateValue": "value = data.account?.data?.team || value;",
           "refreshOn": "account",
           "reference": true,
           "validate": {
@@ -1014,7 +1014,7 @@
           },
           "template": "<span>{{ item.data.name }}</span>",
           "hidden": true,
-          "calculateValue": "value = data.account.data.team;",
+          "calculateValue": "value = data.account?.data?.team || value;",
           "refreshOn": "account",
           "reference": true,
           "validate": {
