@@ -13,6 +13,7 @@
 - [What you get](#what-you-get)
 - [Why this exists](#why-this-exists)
 - [Agentic Skill Library](#agentic-skill-library)
+  - [How it all works together](#how-it-all-works-together)
   - [Orchestration skills](#orchestration-skills)
   - [All skills](#all-skills)
 - [Examples and Use Cases](#examples-and-use-cases)
@@ -106,6 +107,10 @@ Form.io has been the data standardization layer for enterprise data for a decade
 ## Agentic Skill Library
 
 The plugin ships an activatable skill library. Claude loads the relevant skill on demand based on what you ask — you rarely need to name one explicitly.
+
+### How it all works together
+
+For the full picture — the skills architecture, how the orchestration skills dynamically load the other skills as an agent works through your prompt, how each flow reaches the Form.io Enterprise Server through the MCP server, and Mermaid diagrams of every process flow (building an application, extending one, building a form, embedding a form, changing a project, configuring auth) — read [PROCESS.md](./PROCESS.md).
 
 ### Orchestration skills
 
@@ -322,7 +327,7 @@ The probe runs lazily — only when the local auth page is actually served.
 
 ## Contributing
 
-This is a pnpm + Turborepo monorepo: the `@formio/mcp` MCP server (`packages/mcp-server/`), the `@formio/ai` agent plugin (`plugin/`, bundling the server + skill library), and the skill test suite (`packages/skill-tests/`). Setup, conventions, skill-authoring guidelines, and the release flow are in [CONTRIBUTING.md](./CONTRIBUTING.md). Security reports: [SECURITY.md](./SECURITY.md).
+This is a pnpm + Turborepo monorepo: the `@formio/mcp` MCP server (`packages/mcp-server/`), the `@formio/ai` agent plugin (`plugin/`, bundling the server + skill library), and the skill test suite (`packages/skill-tests/`). Setup, conventions, skill-authoring guidelines, and the release flow are in [CONTRIBUTING.md](./CONTRIBUTING.md). How the skills and the MCP server fit together at runtime is in [PROCESS.md](./PROCESS.md). Security reports: [SECURITY.md](./SECURITY.md).
 
 ## License
 
