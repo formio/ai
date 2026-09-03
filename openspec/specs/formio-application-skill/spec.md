@@ -42,29 +42,29 @@ The description MUST include `Not for:` clauses pointing at:
 
 - `formio-angular` for framework-explicit Angular requests.
 - `formio-angular-resources` for framework-explicit Angular extension requests.
+- `formio-react` for framework-explicit React requests.
+- `formio-react-resources` for framework-explicit React extension requests.
 - `formio-resource-planner` for data-model-only planning requests without building an app.
 - `formio-api` for endpoint lookups.
 - `formio-form` for embedding or rendering a single form in an existing page or application (no app build or orchestration).
 - `formio-form-builder` for standalone single-form creation requests — one form to collect responses, not a data model, resources, or an app around the data.
 
-The description MUST also state that the skill writes a `.mcp.json` file in the workspace root as part of the flow (so users know a file will be created and why) and that the flow pauses for a Claude Code restart after the `.mcp.json` write.
-
 #### Scenario: formio-application claims generic build-new triggers
 
 - **WHEN** the user says "build me a tool to track maintenance requests" (no framework or Form.io terminology)
 - **THEN** the `formio-application` skill activates
-- **AND** neither `formio-angular` nor `formio-angular-resources` activates
+- **AND** none of `formio-angular`, `formio-angular-resources`, `formio-react`, or `formio-react-resources` activates
 
 #### Scenario: formio-application claims generic extend triggers
 
 - **WHEN** the user says "also let customers leave reviews on products" in a workspace that already has a framework app wired
 - **THEN** the `formio-application` skill activates
-- **AND** `formio-angular-resources` does not activate directly
+- **AND** no framework extend sub-skill activates directly
 
 #### Scenario: Framework-explicit phrasing does NOT route through formio-application
 
-- **WHEN** the user says "build it in Angular" or "add an Angular module for X"
-- **THEN** `formio-angular` (or `formio-angular-resources`) activates directly
+- **WHEN** the user says "build it in Angular", "add an Angular module for X", "build it in React", or "add a React route for X"
+- **THEN** the matching framework skill activates directly
 - **AND** `formio-application` does not activate
 
 #### Scenario: Embed-a-form phrasing does NOT route through formio-application
@@ -81,15 +81,11 @@ The description MUST also state that the skill writes a `.mcp.json` file in the 
 - **AND** `formio-application` does not activate
 - **AND** the `formio-application` description's `Not for:` clauses name the backtick-delimited `` `formio-form-builder` ``
 
-#### Scenario: Description mentions the .mcp.json write
+#### Scenario: Description names no MCP-configuration step
 
 - **WHEN** the `formio-application` `SKILL.md` frontmatter is inspected
-- **THEN** its `description` contains the literal substring `.mcp.json`
-
-#### Scenario: Description mentions the restart pause
-
-- **WHEN** the `formio-application` `SKILL.md` frontmatter is inspected
-- **THEN** its `description` mentions restarting Claude Code (or an equivalent "pause and restart" phrasing) so the user knows the flow is multi-invocation
+- **THEN** its `description` contains no `.mcp.json` reference and no restart-pause phrasing
+- **AND** this matches the shipped skill body, which states there is no restart boundary on either branch
 
 #### Scenario: Description fits the budget
 
@@ -100,34 +96,52 @@ The description MUST also state that the skill writes a `.mcp.json` file in the 
 
 `FRAMEWORK.md` SHALL contain a table of installed UI-framework skills in the following shape:
 
-| Framework | Entry skill      | Extend sub-skill           | Detection signal                                                         |
-| --------- | ---------------- | -------------------------- | ------------------------------------------------------------------------ |
-| Angular   | `formio-angular` | `formio-angular-resources` | `angular.json` in workspace root OR `@angular/core` in `package.json`     |
+| Framework | Entry skill      | Extend sub-skill           | Detection signal                                                      | Default |
+| --------- | ---------------- | -------------------------- | --------------------------------------------------------------------- | ------- |
+| Angular   | `formio-angular` | `formio-angular-resources` | `angular.json` in workspace root OR `@angular/core` in `package.json` | yes     |
+| React     | `formio-react`   | `formio-react-resources`   | `react` in `package.json` dependencies                                | no      |
+
+Exactly one row SHALL carry `Default: yes`. It is Angular, because its implementor configures the library-provided `@formio/angular` `FormioResource` module while React's generates its runtime into the application.
 
 `FRAMEWORK.md` body MUST document:
 
 - That routing is driven by this table.
 - That when the table has exactly one active row, Step 4 routes silently (no user question).
-- That when the table has multiple active rows, Step 4 asks the user to pick, in one question round, using the client's structured question mechanism — which it MAY name as a parenthetical example only.
+- That when the table has multiple active rows, Step 4 asks the user to pick, in one question round, using the client's structured question mechanism — which it MAY name as a parenthetical example only. With both Angular and React registered, this is now the live build-new path, and each option MUST be described in terms of what it generates ("Generate an Angular workspace using `@formio/angular`", "Generate a Vite + React Router workspace using `@formio/react`").
+- That the `Default: yes` row is presented FIRST in that question round and labelled as the default, and that the question round MUST be a real choice rather than a confirmation of a decision already made — the prompt does not name a framework as chosen, and no framework work begins before the answer arrives.
+- That the default resolves the question only when the user declines to choose — an explicit "no preference", "you pick", "whatever you recommend", a non-answer, or a dismissed question round. It is NOT a licence to skip asking. Step 4 SHALL state which framework it is proceeding with whenever the default resolves the choice, so a user who did not mean to defer can correct it.
 - That modify-existing workspaces are detected via the "Detection signal" column, and if exactly one signal matches the routing is direct.
+- That a workspace matching more than one signal — for example one carrying both `angular.json` and a `react` dependency — is a multi-match, and Step 4 asks the user to pick in one question round rather than guessing from signal order.
+- That each row's Detection signal SHALL be written independently of every other row's, testing only for its own framework's presence. A signal that excludes another framework (`react` AND no `angular.json`) collapses the multi-match case into a single match and makes the tie-break branch unreachable, which puts the table's own routing rule in conflict with itself.
 - The Step 4a `frontend-design` pre-check: detect the skill by name, accepting more than one registered form rather than a single client's prefix; when it is missing, offer the install in one question round, naming where the skill ships and deferring the mechanism to the running client's own skill-install route; on decline, apply the Bootstrap 5 brief from `formio-angular/BOOTSTRAP.md` Step 7d inline, disclose that on each UI approval gate, and hand `frontendDesignStatus` downstream. The document MUST NOT instruct a client-specific plugin-install command, plugin browser, or reload command.
-- How to add a new framework entry — the concrete instruction for whoever is adding `formio-react` later.
-
-#### Scenario: Single-framework registry routes silently
-
-- **WHEN** `FRAMEWORK.md`'s table contains exactly one row (Angular) and intent = build-new
-- **THEN** Step 4 routes to `formio-angular` without asking the user
+- How to add a new framework entry — the concrete instruction for whoever is adding a further framework later. Its worked example SHALL name a framework that is NOT already a row (Vue). The shipped document uses React as that example, carrying a detection signal (`vite.config.* with react deps OR next.config.*`) that disagrees with React's real row and names Next.js, which is out of scope; leaving it in place puts two contradictory React signals in one file, one of them in the section a future author copies from.
 
 #### Scenario: Multi-framework registry asks the user
 
-- **WHEN** a future change adds a second row to the table (e.g., React) and intent = build-new
-- **THEN** Step 4 presents the available frameworks in one question round before routing
+- **WHEN** intent = build-new and the table contains both the Angular and React rows
+- **THEN** Step 4 presents both frameworks in one question round before routing
 - **AND** the instruction names no client tool as the mechanism
 
-#### Scenario: Existing-workspace detection routes directly
+#### Scenario: React workspace detection routes directly
+
+- **WHEN** intent = modify-existing and the workspace has `react` in `package.json` and no Angular signal
+- **THEN** exactly one row matches, so Step 4 loads `plugin/skills/formio-react/formio-react-resources/SKILL.md` by path without asking the user
+
+#### Scenario: Existing Angular workspace still routes directly
 
 - **WHEN** intent = modify-existing and the workspace contains `angular.json`
 - **THEN** Step 4 routes to `formio-angular-resources` without asking the user
+
+#### Scenario: Workspace matching both signals asks the user
+
+- **WHEN** intent = modify-existing and the workspace contains both `angular.json` and a `react` dependency
+- **THEN** Step 4 asks the user which framework to extend, in one question round
+
+#### Scenario: The how-to-add example does not name a live framework
+
+- **WHEN** `FRAMEWORK.md`'s "How to add a new framework" section is inspected
+- **THEN** its worked example names Vue, not React or Angular
+- **AND** the file contains no React detection signal other than the one in the registry table
 
 #### Scenario: Pre-check degrades when frontend-design is declined
 
@@ -354,3 +368,44 @@ There SHALL be no MCP-configuration step and no restart boundary on either branc
 - **WHEN** Step 3's approval gate shows the URLs + template summary + merge-overwrite warning and the user declines
 - **THEN** `project_import` is not called
 - **AND** the skill continues with Step 4 (framework routing) so the user can still scaffold against an existing project
+
+### Requirement: Build-new asks which framework, defaulting to Angular
+
+The framework question belongs to greenfield builds only. On the **build-new** branch with more than one active registry row, `formio-application` SHALL ask the user which UI framework to build in, in ONE question round, before any framework skill is invoked and before any workspace is scaffolded. The question SHALL offer one option per active registry row, each described by what it generates, with the `Default: yes` row first and labelled as the default.
+
+When the user declines to choose — "no preference", "you pick", "whatever", a non-answer, or a dismissed question — `formio-application` SHALL proceed with the `Default: yes` framework and SHALL say which one it picked in the same message it continues with. It SHALL NOT re-ask, and it SHALL NOT stall waiting for a preference the user has already declined to express.
+
+The question SHALL NOT be asked on the **modify-existing** branch. An existing workspace's framework is a fact to be detected, not a preference to be collected; the only question there is the double-match tie-break, which is a different question with a different cause.
+
+A user who names a framework in their original request has already answered. `formio-application` SHALL treat that as the answer and skip the round — but framework-explicit phrasing usually routes to the framework skill directly and never reaches Step 4 at all.
+
+#### Scenario: Build-new asks before scaffolding anything
+
+- **WHEN** intent = build-new, the registry has both rows, and the user's request named no framework
+- **THEN** the user is asked which framework to build in, in one question round
+- **AND** no framework skill has been invoked and no workspace files have been written when the question is asked
+
+#### Scenario: Angular is offered first and labelled default
+
+- **WHEN** the framework question round is presented
+- **THEN** the Angular option appears first
+- **AND** it is labelled as the default
+- **AND** each option states what it generates
+
+#### Scenario: No preference falls through to Angular, and says so
+
+- **WHEN** the user answers "no preference" or dismisses the question round
+- **THEN** `formio-application` proceeds with Angular
+- **AND** it states that it is proceeding with Angular as the default before continuing
+- **AND** it does not re-ask
+
+#### Scenario: Framework named in the original request skips the round
+
+- **WHEN** the user's build-new request already names React
+- **THEN** Step 4 routes to `formio-react` without asking
+
+#### Scenario: Modify-existing never asks the preference question
+
+- **WHEN** intent = modify-existing and exactly one detection signal matches
+- **THEN** no framework preference question is asked
+- **AND** routing follows the matched row

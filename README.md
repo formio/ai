@@ -136,6 +136,7 @@ Orchestration skills are special skills that serve as the **entry point** for mo
 | `formio-sdk` | Reference for the `@formio/js` JavaScript SDK and `@formio/js/utils` Utilities — static and instance methods, VanillaJS rendering, plugins, and helpers. |
 | `formio-mcp-setup` | Connects the Form.io MCP server to whichever coding agent is running, and captures the project URL, when the skills were installed without it. |
 | `formio-angular` | Angular framework implementor. Turns an approved `template.json` plus a target project into a working Angular app using `@formio/angular`. Delegated to by `formio-application`. |
+| `formio-react` | React framework implementor. A router over three branches — greenfield build, add CRUD to an existing app, and embed a form — generating a resource kernel over React Router data routers with `@formio/react`. Delegated to by `formio-application`. |
 
 ## Examples and Use Cases
 
