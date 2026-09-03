@@ -213,6 +213,15 @@ describe('preflight contract', () => {
   // to capture both, because the server owns that wording and the step probes
   // before it asks.
   //
+  // formio-application has moved once more: its `Not for:` clause now names
+  // `formio-react` and `formio-react-resources`, because React is a second
+  // framework row in FRAMEWORK.md's registry and framework-explicit React
+  // phrasing must route past the orchestrator the way Angular's already does.
+  //
+  // formio-form has moved too: its `Not for:` clause now names `formio-react`,
+  // because React-named embedding has its own sub-skill, and its Angular clause
+  // was shortened to keep the description inside the 1,024-character budget.
+  //
   // formio-mcp-setup was ADDED to the fixture by that same change. It postdated
   // the original snapshot, so nothing was pinning the one description most likely
   // to drift as the setup flow changed. It has since moved again: the skill writes

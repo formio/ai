@@ -61,9 +61,9 @@ function offenders(paths: string[], predicate: (text: string) => boolean): strin
 }
 
 describe('every tool-calling skill probes the project configuration', () => {
-  it('covers ten skills — the twelve SKILL.md files minus the two exemptions', () => {
-    expect(allSkillMd()).toHaveLength(12);
-    expect(probingSkillMd()).toHaveLength(10);
+  it('covers thirteen skills — the fifteen SKILL.md files minus the two exemptions', () => {
+    expect(allSkillMd()).toHaveLength(15);
+    expect(probingSkillMd()).toHaveLength(13);
   });
 
   // The probe is a TOOL CALL, not a shell command. It used to be
@@ -535,23 +535,33 @@ describe('the skills know about the committed configuration', () => {
 // the only skill offering `--scope repo` was formio-mcp-setup, which runs before a
 // workspace exists and writes at `$(pwd)` — an ancestor of the app, which is the
 // placement that spec calls a misconfiguration rather than a shortcut.
+// Every framework skill that generates a config module owes this step, not just
+// the first one written.
+const SCAFFOLDING_CONFIG_DOCS = ['formio-angular/CONFIG.md', 'formio-react/CONFIG.md'] as const;
+
 describe('the scaffolding skills record the target with the application', () => {
-  it('CONFIG writes formio.json into the workspace it just configured', () => {
-    const config = read(join(skillsRoot, 'formio-angular/CONFIG.md'));
+  it.each(SCAFFOLDING_CONFIG_DOCS)(
+    '%s writes formio.json into the workspace it just configured',
+    (doc) => {
+      const config = read(join(skillsRoot, doc));
 
-    expect(config).toContain('formio.json');
-    // Written directly by the skill: the server reads a committed file and never
-    // writes one. The claim under test is unchanged: CONFIG commits the target.
-    expect(config).toMatch(/never writes it/);
-    expect(config).not.toMatch(/scope[^\n]*"repo"/);
-    expect(config).toMatch(/workspace root|workspace directory/i);
-  });
+      expect(config).toContain('formio.json');
+      // Written directly by the skill: the server reads a committed file and never
+      // writes one. The claim under test is unchanged: CONFIG commits the target.
+      expect(config).toMatch(/never writes it/);
+      expect(config).not.toMatch(/scope[^\n]*"repo"/);
+      expect(config).toMatch(/workspace root|workspace directory/i);
+    }
+  );
 
-  it('says the file belongs in the workspace, never an ancestor', () => {
-    const config = read(join(skillsRoot, 'formio-angular/CONFIG.md'));
+  it.each(SCAFFOLDING_CONFIG_DOCS)(
+    '%s says the file belongs in the workspace, never an ancestor',
+    (doc) => {
+      const config = read(join(skillsRoot, doc));
 
-    expect(config).toMatch(/never (an|its) ancestor|not an ancestor|above the workspace/i);
-  });
+      expect(config).toMatch(/never (an|its) ancestor|not an ancestor|above the workspace/i);
+    }
+  );
 });
 
 // The upward walk that makes per-folder targeting work is the same mechanism that
@@ -659,15 +669,18 @@ describe('endpoint roots are renamed, not removed', () => {
 // could not derive", which never happens: once the value is recorded the report says
 // `ok`, and only `baseUrlSource` says where it came from.
 describe('CONFIG records the deployment when it was not derived', () => {
-  it('keys the decision on baseUrlSource rather than on a failure to derive', () => {
-    const config = read(join(skillsRoot, 'formio-angular/CONFIG.md'));
+  it.each(SCAFFOLDING_CONFIG_DOCS)(
+    '%s keys the decision on baseUrlSource rather than on a failure to derive',
+    (doc) => {
+      const config = read(join(skillsRoot, doc));
 
-    expect(config).toMatch(/baseUrlSource/);
-    expect(config).not.toMatch(/only if `?project_get`? reported one it could not derive/i);
-  });
+      expect(config).toMatch(/baseUrlSource/);
+      expect(config).not.toMatch(/only if `?project_get`? reported one it could not derive/i);
+    }
+  );
 
-  it('says what happens to a clone without it', () => {
-    const config = read(join(skillsRoot, 'formio-angular/CONFIG.md'));
+  it.each(SCAFFOLDING_CONFIG_DOCS)('%s says what happens to a clone without it', (doc) => {
+    const config = read(join(skillsRoot, doc));
 
     expect(config).toMatch(/clone/i);
     expect(config).toMatch(/base-url-unresolved/);

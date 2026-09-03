@@ -1,0 +1,35 @@
+{
+  "skill_name": "formio-react-resources",
+  "evals": [
+    {
+      "id": 0,
+      "name": "crm-two-level",
+      "prompt": "The approved Resource Map below came from `formio-resource-planner`. Scaffold a new React application called `crm` implementing CRUD for this model, with quotes nested under customers. The Form.io project URL is https://crm.form.io. Emit the Phase A Scaffolding Plan first for my review, then write the files after I approve.\n\n```\n## Resource Map \u2014 CRM\n\n### Resources\n\n- Customer (type: resource)\n  Purpose: a company or person the business sells to.\n  Fields:\n    - name: textfield \u2014 company name (required)\n    - email: email \u2014 primary contact address\n  Access: authenticated users read; owners update.\n\n- Quote (type: resource)\n  Purpose: a priced offer belonging to one customer.\n  Fields:\n    - customer: select (dataSrc: resource, resource: Customer) \u2014 the owning customer (required)\n    - number: textfield \u2014 quote reference\n    - status: select \u2014 draft | sent | accepted\n  Access: authenticated users.\n\n- LineItem (type: resource)\n  Purpose: one priced line on a quote.\n  Fields:\n    - quote: select (dataSrc: resource, resource: Quote) \u2014 the owning quote (required)\n    - description: textfield\n    - amount: number\n  Access: authenticated users.\n\n### Users & Auth\n\n- user Resource with login and registration forms. SSO: none. Custom JWT: no.\n\n### Roles\n\n- authenticated, administrator\n```",
+      "expected_output": "A Phase A plan naming routePath/param/form per resource and the full route tree, then a generated src/formio/ kernel plus per-resource configs where quote binds to customer as an imported config object, its list filters on the customer id, and its create screen pre-fills and hides the customer field."
+    },
+    {
+      "id": 1,
+      "name": "crm-three-level",
+      "prompt": "Same approved map as before, but I also want line items nested under each quote, so the URL reads /customer/:customerId/quote/:quoteId/line-item/:lineItemId. Plan it first, then generate.\n\n```\n## Resource Map \u2014 CRM\n\n### Resources\n\n- Customer (type: resource)\n  Purpose: a company or person the business sells to.\n  Fields:\n    - name: textfield \u2014 company name (required)\n    - email: email \u2014 primary contact address\n  Access: authenticated users read; owners update.\n\n- Quote (type: resource)\n  Purpose: a priced offer belonging to one customer.\n  Fields:\n    - customer: select (dataSrc: resource, resource: Customer) \u2014 the owning customer (required)\n    - number: textfield \u2014 quote reference\n    - status: select \u2014 draft | sent | accepted\n  Access: authenticated users.\n\n- LineItem (type: resource)\n  Purpose: one priced line on a quote.\n  Fields:\n    - quote: select (dataSrc: resource, resource: Quote) \u2014 the owning quote (required)\n    - description: textfield\n    - amount: number\n  Access: authenticated users.\n\n### Users & Auth\n\n- user Resource with login and registration forms. SSO: none. Custom JWT: no.\n\n### Roles\n\n- authenticated, administrator\n```",
+      "expected_output": "Three levels composed the same way, with three distinct route params, line-item binding to quote, and no kernel change required for the extra depth."
+    },
+    {
+      "id": 2,
+      "name": "team-user-join",
+      "prompt": "Build a React app for this map. Teams should list their members, and a user's page should list the teams they belong to. Plan first, then generate.\n\n```\n## Resource Map \u2014 Team Tracker\n\n### Resources\n\n- Team (type: resource)\n  Fields:\n    - name: textfield (required)\n\n- User (type: resource, user)\n  Fields:\n    - email: email\n    - password: password\n\n- TeamUser (type: resource, join)\n  Purpose: membership of a user in a team; carries a Group Assignment action.\n  Fields:\n    - team: select (dataSrc: resource, resource: Team) (required)\n    - user: select (dataSrc: resource, resource: User) (required)\n\n### Users & Auth\n\n- user Resource with login and registration forms. SSO: none.\n\n### Roles\n\n- authenticated, administrator\n```",
+      "expected_output": "Two sibling subtrees around the TeamUser join, each composed under the opposite side's item route, and a group-creation path that also writes the creator's membership row."
+    },
+    {
+      "id": 3,
+      "name": "extend-existing-workspace",
+      "prompt": "This existing React app already renders Form.io forms. Add CRUD for a new `Invoice` resource nested under Customer. Don't touch the parts that already work.\n\n```\n## Resource Map \u2014 delta\n\n- Invoice (type: resource)\n  Fields:\n    - customer: select (dataSrc: resource, resource: Customer) (required)\n    - total: number\n```",
+      "expected_output": "An inspection report before any modification, only the Invoice files generated, the existing kernel reused rather than rewritten, and generated screens matching the app's established design language."
+    },
+    {
+      "id": 4,
+      "name": "single-resource",
+      "prompt": "Build a React app for this map. One resource, nothing nested under it. Plan it first, then generate.\n\n```\n## Resource Map \u2014 Task Tracker\n\n### Resources\n\n- Task (type: resource)\n  Purpose: one unit of work someone has to do.\n  Fields:\n    - title: textfield \u2014 short summary (required)\n    - notes: textarea \u2014 detail\n    - due: datetime \u2014 when it is due\n    - done: checkbox \u2014 whether it is finished\n  Access: authenticated users create and read; owners update and delete.\n\n### Users & Auth\n\n- user Resource with login and registration forms. SSO: none. Custom JWT: no.\n\n### Roles\n\n- authenticated, administrator\n```",
+      "expected_output": "A Phase A plan with one resource row and the five-route tree, then a generated src/formio/ kernel plus a single task config declaring routePath 'task', param 'taskId', form 'task' and NO parents array, with designed list/new/item/view/edit screens rather than bare resourceRoutes(config)."
+    }
+  ]
+}

@@ -14,7 +14,11 @@ const harness = (...parts: string[]) => at('packages/skill-tests/evals', ...part
 
 const NEW_ROOT = 'packages/skill-tests/evals';
 
-const HARNESSES = ['formio-resource-planner', 'formio-angular-resources'] as const;
+const HARNESSES = [
+  'formio-resource-planner',
+  'formio-angular-resources',
+  'formio-react-resources',
+] as const;
 
 const RETIRED_LOCATIONS = [
   'plugin/skills/formio-resource-planner/evals',
@@ -34,6 +38,14 @@ describe('eval harnesses live outside the shipped tree', () => {
     expect(existsSync(seed)).toBe(true);
     expect(existsSync(join(seed, 'angular.json'))).toBe(true);
     expect(existsSync(join(seed, 'src/app/app.module.ts'))).toBe(true);
+  });
+
+  it('the React harness keeps its workspace fixture', () => {
+    const seed = harness('formio-react-resources/fixtures/existing-workspace-seed');
+
+    expect(existsSync(seed)).toBe(true);
+    expect(existsSync(join(seed, 'package.json'))).toBe(true);
+    expect(existsSync(join(seed, 'src/formio/index.ts'))).toBe(true);
   });
 
   it('the planner harness keeps its template fixture', () => {
