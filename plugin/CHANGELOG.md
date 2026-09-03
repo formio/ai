@@ -1,5 +1,19 @@
 # @formio/ai
 
+## 0.13.0
+
+### Minor Changes
+
+- f858ff4: Add the `formio-react` skill family — a React framework implementor alongside `formio-angular`.
+
+  `formio-react` routes between three branches: a greenfield Vite + React Router build, adding Form.io CRUD to a React application that already exists, and embedding a single form. `@formio/react` ships no equivalent of `@formio/angular`'s `FormioResource` module, so `formio-react-resources` generates a small resource kernel into the user's application — pure domain functions plus React Router loader and action factories — rather than porting Angular's service, registry, alert bus, and refresh emitter. `formio-react-form` owns React-specific mounting; definition-level behaviour stays with `formio-form`, which now checks the host before writing mounting code.
+
+  React is a second row in `formio-application`'s `FRAMEWORK.md` registry, with a `Default` column, so a greenfield build asks which framework and falls back to Angular when the user declines to choose.
+
+### Patch Changes
+
+- d227986: Guard the transitive group-access mirror's `calculateValue`. Every skill document, example template, Mermaid label, and the planner's pre-emit checklist now spell it `value = data.<parent>?.data?.<group> || value;` — the optional chaining stops the `Cannot read properties of undefined` crash on every grandchild load where the parent is an unexpanded `{ _id }`, and the `|| value` fallback stops a nil result from being replaced by `emptyValue`, which cleared the group reference and silently stripped access. The reference doc now names when the parent is actually expanded (server-side only for `read_all` / owner / admin — never for group members) and what the fallback costs. The planner eval grader requires the guarded form. `formio-angular` BOOTSTRAP establishes the workspace's package manager before its first install, applies the no-second-lockfile rule to the existing-workspace path too, and runs the un-hoisted-dependency check through the Step 6c `ng build` smoke check instead of a dev server.
+
 ## 0.12.3
 
 ### Patch Changes
