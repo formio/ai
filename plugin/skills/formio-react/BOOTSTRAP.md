@@ -8,7 +8,7 @@ A **Vite + React + TypeScript** workspace, created with the Vite React TypeScrip
 
 ## 2. Match the workspace's package manager
 
-**Detect it before installing anything.** Read `packageManager` in `package.json` first, then look for a lockfile: `yarn.lock` → Yarn, `pnpm-lock.yaml` → pnpm, `package-lock.json` → npm, `bun.lockb` → Bun. Use what you find. Default to npm only when the workspace has none of them, and use that one package manager for every install, script and dependency query for the rest of the session.
+**Detect it before installing anything.** Read `packageManager` in `package.json` first, then look for a lockfile: `yarn.lock` → Yarn, `pnpm-lock.yaml` → pnpm, `bun.lock` or `bun.lockb` → Bun, `package-lock.json` → npm. `packageManager` wins over any lockfile, and when more than one lockfile is present the first hit in that order wins — `package-lock.json` is checked last because it is the one a stray `npm install` leaves behind in a workspace that belongs to another tool. Default to npm only when the workspace has none of them, and use that one package manager for every install, script and dependency query for the rest of the session.
 
 **Never introduce a second lockfile.** Running `npm install` in a Yarn or pnpm workspace writes a competing lockfile and a parallel `node_modules`, and the user's own commands keep resolving against the tree you did not build. Nothing warns you: the app you build and test passes, and it is not the app they run.
 

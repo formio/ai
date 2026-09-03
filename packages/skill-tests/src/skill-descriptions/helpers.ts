@@ -12,7 +12,7 @@ import { dirname, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { SkillUnderTest } from './conformance.js';
 
-const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../../../..');
+export const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../../../..');
 const skillsRoot = join(repoRoot, 'plugin/skills');
 
 export const DESCRIPTION_BUDGET = 1024;

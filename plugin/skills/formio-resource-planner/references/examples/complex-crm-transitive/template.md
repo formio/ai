@@ -124,7 +124,7 @@ erDiagram
         string phone
         string notes
         select account "ref=Account, reference=true"
-        select team "ref=Team, HIDDEN calculated mirror: data.account.data.team"
+        select team "ref=Team, HIDDEN calculated mirror: value = data.account?.data?.team || value"
     }
     Deal {
         string title "required"

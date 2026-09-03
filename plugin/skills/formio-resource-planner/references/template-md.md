@@ -240,7 +240,7 @@ erDiagram
     Contact {
         string firstName
         select account "ref=Account"
-        select team "ref=Team, HIDDEN calculated mirror: data.account.data.team"
+        select team "ref=Team, HIDDEN calculated mirror: value = data.account?.data?.team || value"
     }
     Deal {
         string title "required"
@@ -293,7 +293,7 @@ flowchart TD
     SR2 -->|membership row| TU[/TeamUser/]
     TU -->|"Group Assignment<br/>group=team<br/>user=user"| Team[Team]
     Team -->|"field-based access<br/>on Account.team"| Account[Account]
-    Account -->|"hidden calculated mirror<br/>data.account.data.team"| Contact[Contact]
+    Account -->|"hidden calculated mirror<br/>value = data.account?.data?.team || value"| Contact[Contact]
     Account -->|"hidden calculated mirror"| Deal[Deal]
     Account -->|"hidden calculated mirror"| Activity[Activity]
 ```

@@ -1,0 +1,5 @@
+---
+'@formio/ai': patch
+---
+
+Guard the transitive group-access mirror's `calculateValue`. Every skill document, example template, Mermaid label, and the planner's pre-emit checklist now spell it `value = data.<parent>?.data?.<group> || value;` — the optional chaining stops the `Cannot read properties of undefined` crash on every grandchild load where the parent is an unexpanded `{ _id }`, and the `|| value` fallback stops a nil result from being replaced by `emptyValue`, which cleared the group reference and silently stripped access. The reference doc now names when the parent is actually expanded (server-side only for `read_all` / owner / admin — never for group members) and what the fallback costs. The planner eval grader requires the guarded form. `formio-angular` BOOTSTRAP establishes the workspace's package manager before its first install, applies the no-second-lockfile rule to the existing-workspace path too, and runs the un-hoisted-dependency check through the Step 6c `ng build` smoke check instead of a dev server.
