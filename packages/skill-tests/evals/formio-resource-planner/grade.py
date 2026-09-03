@@ -44,7 +44,12 @@ REQUIRED_MD_SECTIONS = [
 REQUIRED_JSON_KEYS = ["title", "version", "name", "roles", "forms", "actions", "resources", "access"]
 
 ACCESS_TOKEN = re.compile(r"\b(all|own|group(\([^)]*\))?|role\([^)]*\)|—|-)\b")
-TRANSITIVE_CALC = re.compile(r"data\.\w+\.data\.team", re.IGNORECASE)
+# The mandated mirror expression: `value = data.<parent>?.data?.team || value;`.
+# Both halves of the guard are required (see the skill's template-json.md,
+# "select — transitive group-access mirror"), so an unguarded `data.x.data.team`
+# does NOT count as a mirror — it is the crash this guard exists to prevent.
+TRANSITIVE_CALC = re.compile(r"data\.\w+\?\.data\?\.team\s*\|\|\s*value", re.IGNORECASE)
+UNGUARDED_CALC = re.compile(r"data\.\w+\??\.data\??\.team")
 GROUP_ASSIGN = re.compile(r"group[ _-]?(assignment|permissions?)", re.IGNORECASE)
 
 
@@ -295,16 +300,26 @@ def grade_run(run_dir: Path, eval_name: str):
     if eval_name == "complex-crm-transitive" and tmpl is not None:
         resources = tmpl.get("resources", {}) or {}
         mirror_hits = []
+        unguarded_hits = []
         for rname, rdef in resources.items():
             comps = rdef.get("components", []) or []
             for c in comps:
-                cv = c.get("calculateValue") or ""
-                if c.get("hidden") and TRANSITIVE_CALC.search(str(cv)):
+                cv = str(c.get("calculateValue") or "")
+                if not c.get("hidden"):
+                    continue
+                if TRANSITIVE_CALC.search(cv):
                     mirror_hits.append(f"{rname}.{c.get('key')}")
+                elif UNGUARDED_CALC.search(cv):
+                    unguarded_hits.append(f"{rname}.{c.get('key')}: {cv}")
         results.append({
             "text": "At least one resource has a hidden calculated team mirror (transitive group access)",
             "passed": len(mirror_hits) >= 1,
             "evidence": f"mirrors found: {mirror_hits or 'none'}",
+        })
+        results.append({
+            "text": "Every mirror calculateValue carries both halves of the guard (`?.` and `|| value`)",
+            "passed": len(unguarded_hits) == 0,
+            "evidence": f"unguarded mirrors: {unguarded_hits or 'none'}",
         })
 
     if eval_name == "minimal-no-auth-feedback" and tmpl is not None:

@@ -31,7 +31,7 @@ This app exercises **transitive group access**: the group (`Team`) sits two leve
   - phone: phoneNumber
   - notes: textarea
   - account: select (resource=Account, reference=true) — parent account (user-visible)
-  - team: select (resource=Team, hidden, calculated from account.team, field-based access) — **invisible mirror; `value = data.account.data.team;` propagates group access** Access: admin-full; group access via the hidden team mirror Actions:
+  - team: select (resource=Team, hidden, calculated from account.team, field-based access) — **invisible mirror; `value = data.account?.data?.team || value;` propagates group access** Access: admin-full; group access via the hidden team mirror Actions:
   - (save only)
 
 - Deal (type: resource; 2 levels below Team) Purpose: a sales opportunity attached to an Account. Fields:
@@ -124,7 +124,7 @@ erDiagram
         string phone
         string notes
         select account "ref=Account, reference=true"
-        select team "ref=Team, HIDDEN calculated mirror: data.account.data.team"
+        select team "ref=Team, HIDDEN calculated mirror: value = data.account?.data?.team || value"
     }
     Deal {
         string title "required"
@@ -156,7 +156,7 @@ flowchart TD
     SR -->|"membership row (one per Team)"| TU[/TeamUser/]
     TU -->|"Group Assignment<br/>group=team<br/>user=user"| Team[Team]
     Team -->|"field-based submissionAccess<br/>on Account.team"| Account[Account]
-    Account -->|"hidden calculated mirror<br/>value = data.account.data.team"| Contact[Contact]
+    Account -->|"hidden calculated mirror<br/>value = data.account?.data?.team || value"| Contact[Contact]
     Account -->|"hidden calculated mirror"| Deal[Deal]
     Account -->|"hidden calculated mirror"| Activity[Activity]
 ```
@@ -166,7 +166,7 @@ Runtime propagation narrative:
 1. User signs up on `userRegister` → Save writes into `user` resource → Role Assignment grants `salesRep` → Login issues JWT.
 2. Admin creates a `TeamUser(team, user)` row → Group Assignment writes an ACL entry onto that Team submission.
 3. `Account.team` carries a field-based `submissionAccess` block (4 entries, empty roles) → Form.io propagates the Team's ACL onto each Account whose `team` matches → `salesRep` can create/read/update Accounts under their Team(s).
-4. `Contact` / `Deal` / `Activity` each carry a hidden `team` select mirroring `Account.team` — `calculateValue: value = data.account.data.team;`, `refreshOn: account`, `hidden: true`, same field-based `submissionAccess` (`write`). The mirror propagates the same ACL to the grandchild row on submit.
+4. `Contact` / `Deal` / `Activity` each carry a hidden `team` select mirroring `Account.team` — `calculateValue: value = data.account?.data?.team || value;`, `refreshOn: account`, `hidden: true`, same field-based `submissionAccess` (`write`). The mirror propagates the same ACL to the grandchild row on submit.
 
 Owner rules: none — all row-level access is group- or role-driven.
 

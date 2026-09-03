@@ -288,7 +288,7 @@ For a new workspace or when the user opts in to Bootstrap 5:
 "scripts": []
 ```
 
-Required `npm install`:
+Required install — shown for npm; run it with the workspace's own package manager (`packageManager` field or lockfile: `yarn.lock` → Yarn, `pnpm-lock.yaml` → pnpm, `bun.lockb` → Bun) so no second lockfile is written (see `../../BOOTSTRAP.md`, "Which package manager this workspace uses"):
 
 ```bash
 npm install @formio/angular @formio/js bootstrap bootstrap-icons
