@@ -445,3 +445,56 @@ describe('the parent phase summaries agree with the phase documents', () => {
     expect(phase5).not.toMatch(/`AppConfig` values|appUrl/);
   });
 });
+
+// The resources sub-skill spends ten lines insisting that `FormioResourceConfig.form`
+// is the form's `path` from template.json and never its camelCase `name` — and the
+// worked example, the document an agent copies from, listed `projectUser` and
+// `userLogin` in a column headed "Resource form". Those are names; the real paths are
+// `project-user` and `user/login`, verified against the eval fixture. The example
+// demonstrated the mistake the rule exists to prevent.
+describe('the resources sub-skill never conflates a resource name with a form path', () => {
+  const sub = (rel: string) => doc(join('formio-angular-resources', rel));
+
+  it('the worked example shows both columns rather than one ambiguous one', () => {
+    const body = sub('references/worked-example.md');
+    expect(body).toMatch(/`form` \(= template\.json path\)/);
+    expect(body).toContain('project-user');
+  });
+
+  it('no document lists a camelCase multi-word value as a form path', () => {
+    // `projectUser` / `userLogin` as a form value are the two that bit.
+    const asFormValue = /form:\s*'(?:projectUser|userLogin|userRegister|teamUser|lineItem)'/;
+    expect(offenders((body) => asFormValue.test(body))).toEqual([]);
+  });
+
+  it('the auth form paths are paths, not machine names', () => {
+    const body = sub('references/worked-example.md');
+    expect(body).toContain('user/login');
+    expect(body).not.toMatch(/→ userLogin\b/);
+  });
+
+  // `useValue` is typed `any`, so the config literal is unchecked without it.
+  it('every FormioResourceConfig literal is annotated with satisfies', () => {
+    const unannotated = allDocs().filter(({ body }) => {
+      const blocks = [
+        ...body.matchAll(
+          /provide: FormioResourceConfig,\n\s*useValue: \{[\s\S]*?\n\s*\}(\s*satisfies FormioResourceConfig)?/g
+        ),
+      ];
+      return blocks.some((m) => !m[1]);
+    });
+    expect(unannotated.map(({ path }) => path)).toEqual([]);
+  });
+
+  // Route.children is `children?: Routes`, so `.children.push()` is TS18048 under
+  // the strictNullChecks a default `ng new` turns on.
+  it('nested-route pushes assert past the optional children array', () => {
+    // Fenced code only: the prose explaining the rule has to name the wrong form
+    // in order to forbid it.
+    const inCode = (body: string) =>
+      [...body.matchAll(/```(?:ts|typescript)\n([\s\S]*?)```/g)].some((m) =>
+        /\.children\.push\(/.test(m[1])
+      );
+    expect(offenders(inCode)).toEqual([]);
+  });
+});
