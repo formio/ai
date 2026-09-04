@@ -20,13 +20,19 @@ That is the whole entry point. It fetches the definition, renders it, saves the 
 
 There is no component decision to make on arrival. When `<formio>` is genuinely the wrong tool — a form mounted outside Angular's tree, a page that must not carry `@formio/angular` at all — the second path is the renderer itself, and [references/renderer-directly.md](./references/renderer-directly.md) is where that goes. It is a different job, not a different component.
 
+## Capture the workspace root first
+
+This branch is exempted from the parent skill's workspace pre-flight, so nothing has captured a path for it — and everything below runs commands and edits files. Capture one absolute path before the first of them: the directory the user invoked you from, which is the working directory this session started in, NOT the output of a `pwd` run after other commands. A shell working directory persists between commands in an agent session, so one `cd` earlier in the turn retargets every relative path after it.
+
+Call it `workspaceRoot`, give every command its own directory (`cd "<workspaceRoot>" && <command>`), read and write files at absolute paths under it, and pass it as `cwd` to `project_get` when [references/config.md](./references/config.md) needs the project URLs. If you cannot account for where the shell currently is, state the path you intend to use and confirm it before touching anything.
+
 ## Before you write a template — two things the workspace may not have
 
 This branch runs none of the application phases, so nothing upstream has prepared the workspace. Establish both of these first; each is cheap, and skipping either produces a failure whose message points somewhere else.
 
 ### 1a. The packages
 
-Read `<working directory>/package.json`. `@formio/angular` and `@formio/js` must both be dependencies. When either is missing, the template you are about to write does not compile, and the error is a module-resolution error that says nothing about the form.
+Read `<workspaceRoot>/package.json`. `@formio/angular` and `@formio/js` must both be dependencies. When either is missing, the template you are about to write does not compile, and the error is a module-resolution error that says nothing about the form.
 
 **First, establish the package manager — before running anything.** Read `packageManager` in `package.json`, then look for a lockfile: `yarn.lock` → Yarn, `pnpm-lock.yaml` → pnpm, `bun.lock` / `bun.lockb` → Bun, `package-lock.json` → npm. `packageManager` wins over any lockfile; when more than one lockfile is present the first hit in that order wins, because `package-lock.json` is the one a stray `npm install` leaves behind in a workspace belonging to another tool. Capture the answer as `PACKAGE_MANAGER` and use that one tool for everything below. Default to npm only when the workspace has none of them.
 
@@ -42,7 +48,15 @@ npm view @formio/js version        # e.g. 5.3.6   → FORMIO_JS_VERSION
 <PACKAGE_MANAGER> add @formio/angular@^<FORMIO_ANGULAR_VERSION> @formio/js@^<FORMIO_JS_VERSION>
 ```
 
-`add` is understood by all four (npm treats it as an alias for `install`), so the line above works verbatim once `<PACKAGE_MANAGER>` is substituted. Use the caret range so future minor and patch releases in the same major flow through without another install, and never leave a `<…>` token unresolved on a command line — a literal `@formio/angular@^<FORMIO_ANGULAR_VERSION>` installs nothing.
+`add` is understood by all four (npm treats it as an alias for `install`), so the line above works verbatim once `<PACKAGE_MANAGER>` is substituted.
+
+**On Yarn, add `lodash` explicitly.** `@formio/angular` declares `lodash` as a non-optional peer dependency and imports it at runtime from its root entry point. npm 7+ and pnpm install missing peers automatically; **Yarn — classic and Berry — does not**, so a Yarn workspace that installs only the two packages above fails at build with `Module not found: 'lodash'`, an error that names neither Form.io nor Angular. On Yarn the line becomes:
+
+```bash
+yarn add @formio/angular@^<FORMIO_ANGULAR_VERSION> @formio/js@^<FORMIO_JS_VERSION> lodash
+```
+
+If the build still reports an unresolved module after this, it is another undeclared or un-hoisted peer rather than a fault in your code: read the name the error gives, add that one, and report it as a packaging defect in the dependency rather than working around it more broadly. Use the caret range so future minor and patch releases in the same major flow through without another install, and never leave a `<…>` token unresolved on a command line — a literal `@formio/angular@^<FORMIO_ANGULAR_VERSION>` installs nothing.
 
 **If the registry is unreachable,** do not guess. Read the versions from the installed `package.json` of either package if one is already present, and otherwise ask the user for the two versions in one round and use what they give you verbatim. A version nobody saw is a version nobody agreed to.
 

@@ -30,9 +30,8 @@ const allDocs = () =>
     body: readFileSync(path, 'utf8'),
   }));
 
-function offenders(predicate: (body: string) => boolean, only?: RegExp): string[] {
+function offenders(predicate: (body: string) => boolean): string[] {
   return allDocs()
-    .filter(({ path }) => (only ? only.test(path) : true))
     .filter(({ body }) => predicate(body))
     .map(({ path }) => path);
 }
@@ -289,8 +288,12 @@ describe('the workspaceRoot discipline reaches the documents that write files', 
   it('no document runs a bare ng build or ng serve', () => {
     // Every shell line must carry its own directory, because a cd earlier in the
     // session retargets it silently.
-    const bare = /^```(?:bash|sh)?\n(?:ng|npx ng) (?:build|serve)/m;
-    expect(offenders((body) => bare.test(body))).toEqual([]);
+    // Any line of a fenced block, not just the first: a bare `ng serve` on line
+    // two of a multi-command fence is the same hazard and used to pass.
+    const bare = /^\s*(?:ng|npx ng) (?:build|serve)\b/m;
+    const inFence = (body: string) =>
+      [...body.matchAll(/```(?:bash|sh)?\n([\s\S]*?)```/g)].some((m) => bare.test(m[1]));
+    expect(offenders(inFence)).toEqual([]);
   });
 });
 
@@ -406,5 +409,39 @@ describe('an auth module that routes actually mounts the routes', () => {
         /`?FormioAuth`?[^\n]{0,80}contributes the [^\n]{0,40}routes automatically/.test(body)
       )
     ).toEqual([]);
+  });
+});
+
+// The parent skill summarises each phase in its own words, and those summaries
+// went stale when AUTH.md was rewritten: Phase 4 still told the agent to
+// configure FormioAuthConfig inside auth.module.ts and import AuthModule into
+// AppModule — the exact wiring AUTH.md now calls a defect. An agent reading the
+// phase table before opening the phase document produces the bug the rewrite
+// removed. The earlier guards missed it because they matched code shapes and a
+// single deleted sentence, and a summary is prose.
+describe('the parent phase summaries agree with the phase documents', () => {
+  const parent = () => doc('SKILL.md');
+
+  it('does not describe importing AuthModule into AppModule', () => {
+    expect(parent()).not.toMatch(/import `?AuthModule`? into `?AppModule`?/i);
+  });
+
+  it('does not treat an existing AuthModule import as a skip signal', () => {
+    const body = parent();
+    const claimsSkip =
+      /inspect [^.]*for an existing `AuthModule`[^.]*\. If the phase's output already matches/i;
+    expect(claimsSkip.test(body)).toBe(false);
+  });
+
+  it('offers no planner run in any phase summary', () => {
+    expect(parent()).not.toMatch(/run the planner, or skip/i);
+  });
+
+  // Scoped to the phase summary itself, NOT through the handoff contract that
+  // follows it — that section names `appUrl` in order to forbid passing it.
+  it('does not tell Phase 5 to hand over the URLs', () => {
+    const body = parent();
+    const phase5 = body.slice(body.indexOf('## Phase 5'), body.indexOf('## Handoff contract'));
+    expect(phase5).not.toMatch(/`AppConfig` values|appUrl/);
   });
 });

@@ -113,7 +113,7 @@ import { AppConfig } from './config';
       useValue: {
         login: { form: 'user/login' }, // === template.json login form's `path`
         register: { form: 'user/register' }, // === template.json register form's `path`
-      },
+      } satisfies FormioAuthConfig,
     },
     FormioAuthService,
     FormioResources,
@@ -159,6 +159,7 @@ Notes on why this shape:
 
 - `FormioAuthConfig` is imported from `@formio/angular/auth`, not from the top-level `@formio/angular` entry point.
 - The value is an inline `useValue` in the root `providers`, not an exported const in the auth module. `formmanager` and `pro.formview.io` both do it this way, and it is what keeps `auth.module.ts` out of the eager import graph.
+- **Keep the `satisfies FormioAuthConfig` annotation.** `useValue` is typed `any`, so without it a misspelled key (`logn`, or a form path under the wrong one) compiles cleanly and fails at runtime as a 404 on sign-in — the exact failure the rules above exist to prevent. `satisfies` restores the check without turning the literal into a separate exported const.
 - `login.form` and `register.form` are **URL path segments**, not machine names. The auth module issues requests against `appUrl + '/' + login.form` (and similarly for register), so the value MUST equal the `path` property of the corresponding form inside `template.json`. On a default user-resource setup the planner records `user/login` and `user/register`; on custom setups (e.g., `User resource: member`) the paths follow the custom resource slug. Never substitute the form's `name` / `machineName` (e.g. `userLogin`) — that produces a 404 on sign-in.
 - `FormioAuthService` is a service the rest of the application consumes to read the current user, log out, and gate routes. It must be registered as a provider within the base `app` module.
 - The role list from `template.json.roles` does not appear in this file directly — roles are enforced at the API level and by route guards in individual resource modules. The Resources sub-skill (nested at `./formio-angular-resources/SKILL.md` under this skill — load the file, do NOT invoke a top-level skill) consumes the role list when it wires per-resource guards.

@@ -94,8 +94,9 @@ describe('symbols the Angular skill imports from @formio/js', () => {
   // — `FormOptions` is exported as a runtime `undefined` for type resolution —
   // but relying on that would make a future type-only export a false positive.)
   it('are all real exports of the installed @formio/js', () => {
+    const exported = exportedNames(); // parse once, not once per import
     const offenders = documentedImports()
-      .filter(({ symbol }) => !exportedNames().has(symbol))
+      .filter(({ symbol }) => !exported.has(symbol))
       .map(({ doc, symbol }) => `${doc}: ${symbol}`);
 
     expect(

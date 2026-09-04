@@ -160,7 +160,7 @@ Every later phase — CONFIG's provider registration, AUTH's `AuthModule` import
 - **`app-module.ts` present.** Nothing to do; continue.
 - **`app.config.ts` present and no `app-module.ts`.** Convert the bootstrap here, in BOOTSTRAP, so every later phase finds the file it expects. This is a real change to the user's new workspace, so show it and get approval first — it is small, and it is the alternative to five phases of conditional edits.
 
-  Create `<workspaceRoot>/src/app/app-module.ts` declaring the existing root component, importing `BrowserModule` and the router module the scaffolder configured, carrying over every provider from `app.config.ts`'s `providers` array, and bootstrapping that component:
+  Create `<workspaceRoot>/src/app/app-module.ts` declaring the existing root component, importing `BrowserModule` and the router module the scaffolder configured, carrying over the providers from `app.config.ts` — **except `provideRouter(routes)`, which `RouterModule.forRoot(routes)` replaces** — and bootstrapping that component:
 
   ```ts
   @NgModule({
@@ -171,6 +171,8 @@ Every later phase — CONFIG's provider registration, AUTH's `AuthModule` import
   })
   export class AppModule {}
   ```
+
+  Carrying `provideRouter(...)` across as well registers the router twice: `ROUTES` is a multi-provider, so every route including `path: ''` appears twice and the router initializes twice. Drop it, keep the rest (`provideZonelessChangeDetection()`, `provideBrowserGlobalErrorListeners()`, and anything the workspace added).
 
   Then point `src/main.ts` at it — `platformBrowser().bootstrapModule(AppModule)` in place of `bootstrapApplication(App, appConfig)` — set `standalone: false` on the root component and remove its `imports` array, and delete `app.config.ts` once nothing references it. Verify with the Step 6c build before advancing.
 
