@@ -121,7 +121,7 @@ Note `FormioResourceRoutes({ resource, view })` — never `FormioResourceRoutes(
 
 ### Keep the `satisfies FormioResourceConfig` annotation
 
-`useValue` is typed `any`, so without it a misspelled or swapped key type-checks cleanly and fails at runtime — a 404 on every request, which is the single most common way a generated resource module is dead on arrival. `satisfies` restores the check while leaving the literal inline. It costs one line and catches the exact class of mistake the next section is about.
+`useValue` is typed `any`, so without it a misspelled key or a wrong-typed value type-checks cleanly and fails at runtime — a 404 on every request, which is the single most common way a generated resource module is dead on arrival. It does NOT catch a `name` and a `form` swapped into each other's slots: both are `string`, so that type-checks either way, and the next section is what guards against it. `satisfies` restores the check while leaving the literal inline. It costs one line and catches the exact class of mistake the next section is about.
 
 ### `name` vs. `form` — DO NOT conflate these two
 

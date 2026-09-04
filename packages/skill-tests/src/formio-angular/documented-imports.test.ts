@@ -221,6 +221,7 @@ describe('TypeScript examples name only types they bring into scope', () => {
     /:\s*([A-Z]\w*)\s*\|/g, // union: `Webform | null`
     /\(\s*\w+:\s*([A-Z]\w*)/g, // first parameter: `onReady(component: FormioBaseComponent`
     /\bas\s+([A-Z]\w*)/g, // assertion
+    /\w<\s*([A-Z]\w*)(?=\s*[|,>])/g, // generic argument: `signal<FormioForm | null>` (a word char before `<` skips `m.<Pascal>Module` placeholders)
   ];
 
   function typeNames(code: string): Set<string> {

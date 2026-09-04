@@ -486,6 +486,17 @@ describe('the resources sub-skill never conflates a resource name with a form pa
     expect(unannotated.map(({ path }) => path)).toEqual([]);
   });
 
+  it('every FormioAuthConfig literal in a code fence is annotated with satisfies', () => {
+    const unannotated = allDocs().filter(({ body }) =>
+      [...body.matchAll(/```(?:ts|typescript)\n([\s\S]*?)```/g)].some((fence) =>
+        [...fence[1].matchAll(/provide: FormioAuthConfig/g)].some(
+          (m) => !fence[1].slice(m.index).slice(0, 400).includes('satisfies FormioAuthConfig')
+        )
+      )
+    );
+    expect(unannotated.map(({ path }) => path)).toEqual([]);
+  });
+
   // Route.children is `children?: Routes`, so `.children.push()` is TS18048 under
   // the strictNullChecks a default `ng new` turns on.
   it('nested-route pushes assert past the optional children array', () => {

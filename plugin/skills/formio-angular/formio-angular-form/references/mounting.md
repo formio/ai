@@ -80,7 +80,7 @@ For "validate against my API, then save, or show the message on the field", the 
 
 ## Declare options objects on the class
 
-An `[options]` or `[renderOptions]` object literal written inline in a template is a new object on every change-detection pass, and `ngOnChanges` compares identity. Put them on the component class or at module scope and bind the field:
+An `[options]` or `[renderOptions]` object literal written inline in a template is a new object on every change-detection pass, and `ngOnChanges` compares identity. Put them on the component class or at module scope and bind the field. Annotate the hook's parameters — the surrounding object literal is untyped, so nothing gives them a contextual type and `strict` reports `TS7006: implicitly has an 'any' type`:
 
 ```ts
 import type { Submission } from '@formio/core/types';
@@ -93,7 +93,10 @@ beforeSubmit(submission: Submission, callback: (err: unknown, sub?: Submission) 
 
 readonly componentOptions = {
   disableAlerts: true,
-  hooks: { beforeSubmit: (submission, callback) => this.beforeSubmit(submission, callback) },
+  hooks: {
+    beforeSubmit: (submission: Submission, callback: (err: unknown, sub?: Submission) => void) =>
+      this.beforeSubmit(submission, callback),
+  },
 };
 ```
 

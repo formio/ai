@@ -17,6 +17,8 @@ The short version of part one: the component handles teardown, double-submit, an
 **Remedy.** Hold the definition in a field, a signal, or an observable and bind that, so its identity changes only when the definition actually does.
 
 ```ts
+import type { FormioForm } from '@formio/angular';
+
 readonly definition = signal<FormioForm | null>(null);
 ```
 

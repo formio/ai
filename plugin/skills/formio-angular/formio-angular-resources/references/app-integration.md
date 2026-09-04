@@ -56,7 +56,7 @@ import { Home } from './home/home'; // legacy naming: `import { HomeComponent } 
     { provide: FormioAppConfig, useValue: AppConfig },
     {
       provide: FormioAuthConfig,
-      useValue: { login: { form: 'user/login' }, register: { form: 'user/register' } },
+      useValue: { login: { form: 'user/login' }, register: { form: 'user/register' } } satisfies FormioAuthConfig,
     },
   ],
   bootstrap: [App],
@@ -128,7 +128,7 @@ export const AppConfig: FormioAppConfig = {
 **The auth config is an inline `useValue` in `app-module.ts`'s root `providers`,** written by the parent's AUTH phase — not an export from `config.ts` and not an export from `auth/auth.module.ts`:
 
 ```typescript
-{ provide: FormioAuthConfig, useValue: { login: { form: 'user/login' }, register: { form: 'user/register' } } },
+{ provide: FormioAuthConfig, useValue: { login: { form: 'user/login' }, register: { form: 'user/register' } } } satisfies FormioAuthConfig,
 FormioAuthService,
 ```
 

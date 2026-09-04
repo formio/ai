@@ -33,6 +33,8 @@ Two things to keep true: the component holding `<formio>` must be reachable **on
 When `@defer` does not fit (the form is created imperatively, or the trigger has to be your own logic), guard the import:
 
 ```ts
+import { isPlatformBrowser } from '@angular/common'; // NOT @angular/core — the usual miss
+import { inject, Input, PLATFORM_ID, ViewChild } from '@angular/core';
 import type { Webform } from '@formio/js';
 
 @Input({ required: true }) formDefinition!: object;
