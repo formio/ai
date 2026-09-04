@@ -60,8 +60,8 @@ function offenders(paths: string[], predicate: (text: string) => boolean): strin
 }
 
 describe('the preflight blocks the tool call, not the turn', () => {
-  it('covers the fourteen gated skills', () => {
-    expect(gatedSkillMd()).toHaveLength(14);
+  it('covers the fifteen gated skills', () => {
+    expect(gatedSkillMd()).toHaveLength(15);
   });
 
   it('carries no instruction to stop before doing anything else', () => {

@@ -1,5 +1,8 @@
 # Resource module patterns
 
+**Every path below is relative to `workspaceRoot`** — the absolute path the parent skill captured and handed to this sub-skill as `workspacePath`. A file written as `src/app/<resource>/<resource>.module.ts` means `<workspaceRoot>/src/app/<resource>/<resource>.module.ts`, and every path in this document is spelled the short way for readability only. Resolve them against that captured path rather than against wherever the shell happens to stand: a shell working directory persists between commands in an agent session, so one `cd` earlier in the turn retargets every relative write after it, and a resource module in the wrong tree compiles nowhere.
+
+
 > **`FormioAppConfig` renames both URLs.** `appUrl` is the **Project URL** — the project this application reads and writes, and the one value anyone supplies. `apiUrl` is the **Base URL** — the deployment hosting it, which is normally derived from the Project URL rather than supplied. Take both from `project_get` (called with `cwd` set to the workspace root) when the Form.io MCP tools are callable by you, and otherwise ask the user for them — see [`project-urls.md`](../../../formio-mcp-setup/references/project-urls.md). Never compose, derive, or hand-type either one yourself.
 
 Every pattern you generate in Phase B. Copy the shape, swap the names, don't invent new structure — `FormioResourceService` is picky about `FormioResourceConfig` and the route tree that `FormioResourceRoutes()` produces.
@@ -30,7 +33,7 @@ You do not re-implement these; you import them from `@formio/angular/resource`.
 ]
 ```
 
-`routes[2].children` is where you push nested resource routes (children, N:N joins, etc.) — see sections 3–5 below for exact code.
+`routes[2].children` is where you push nested resource routes (children, N:N joins, etc.) — see sections 3–5 below for exact code. Angular types `Route.children` as optional (`children?: Routes`), so under the `strictNullChecks` a default `ng new` enables, `routes[2].children.push(...)` is `TS18048: 'children' is possibly 'undefined'`. Write `routes[2].children!.push(...)`: `FormioResourceRoutes()` always returns the `:id` route with its `children` array at index 2, so the assertion is safe and the alternative is a runtime guard for a case that cannot happen.
 
 ### `FormioResourceConfig` shape
 
@@ -53,7 +56,7 @@ You do not re-implement these; you import them from `@formio/angular/resource`.
 4. 1:N nested child module
 5. N:N join — both sides mounted under their opposite parent, each with its own designed index grid
 6. Current-user parent (`{field: 'user', resource: 'currentUser', filter: false}`)
-7. Static (AOT-safe) routes — when dynamic `routes[2].children.push()` fails under strict AOT
+7. Static (AOT-safe) routes — when dynamic `routes[2].children!.push()` fails under strict AOT
 8. Extending `FormioResourceIndexComponent` to customize the grid
 9. Designing the ViewComponent from the resource's fields (recipes by field-shape)
 
@@ -97,7 +100,7 @@ import { ViewComponent } from './view/view.component';
       useValue: {
         name: '<camelCaseResourceName>',            // e.g. 'teamUser' — camelCase registry key
         form: '<template.json.<form>.path verbatim>' // e.g. 'team-user' — MUST equal template.json's form.path
-      }
+      } satisfies FormioResourceConfig
     }
   ]
 })
@@ -115,6 +118,10 @@ Mount from `AppRoutingModule`:
 ```
 
 Note `FormioResourceRoutes({ resource, view })` — never `FormioResourceRoutes()` with no options.
+
+### Keep the `satisfies FormioResourceConfig` annotation
+
+`useValue` is typed `any`, so without it a misspelled key or a wrong-typed value type-checks cleanly and fails at runtime — a 404 on every request, which is the single most common way a generated resource module is dead on arrival. It does NOT catch a `name` and a `form` swapped into each other's slots: both are `string`, so that type-checks either way, and the next section is what guards against it. `satisfies` restores the check while leaving the literal inline. It costs one line and catches the exact class of mistake the next section is about.
 
 ### `name` vs. `form` — DO NOT conflate these two
 
@@ -138,7 +145,7 @@ providers: [
     useValue: {
       name: 'teamUser', // camelCase registry key, consumed by parents: ['teamUser']
       form: 'team-user', // MUST equal template.json form's `path` — the URL segment
-    },
+    } satisfies FormioResourceConfig,
   },
 ];
 ```
@@ -334,7 +341,7 @@ const <parent>Routes = FormioResourceRoutes({
 });
 
 // Push nested children onto the `:id` route's children array.
-<parent>Routes[2].children.push({
+<parent>Routes[2].children!.push({
   path: '<child>',
   loadChildren: () =>
     import('./<child>/<child>.module').then(m => m.<Child>Module)
@@ -355,7 +362,7 @@ const <parent>Routes = FormioResourceRoutes({
       useValue: {
         name: '<camelCaseParentName>',                  // e.g. 'event', 'teamUser'
         form: '<template.json parent form.path verbatim>' // usually kebab-case; NEVER derive from name
-      }
+      } satisfies FormioResourceConfig
     }
   ]
 })
@@ -395,7 +402,7 @@ import {
         name: '<camelCaseChildName>',                    // e.g. 'lineItem'
         form: '<template.json child form.path verbatim>', // usually kebab-case; MUST equal template.json.path
         parents: ['<camelCaseParentName>']               // match the parent module's `name`
-      }
+      } satisfies FormioResourceConfig
     }
   ]
 })
@@ -419,7 +426,7 @@ const teamRoutes = FormioResourceRoutes({
   resource: ResourceComponent,
   view: ViewComponent,
 });
-teamRoutes[2].children.push({
+teamRoutes[2].children!.push({
   path: 'users',
   loadChildren: () => import('./users/team-users.module').then((m) => m.TeamUsersModule),
 });
@@ -458,7 +465,7 @@ import { TeamUsersIndexComponent } from './index/team-users-index.component';
         name: 'teamUsers', // distinct registry key per side (camelCase)
         form: 'user-team', // MUST equal template.json's form.path for the join resource — kebab-case by default
         parents: ['team'], // filter join rows to this team
-      },
+      } satisfies FormioResourceConfig,
     },
   ],
 })
@@ -471,7 +478,7 @@ export class TeamUsersModule {}
 
 ```typescript
 const userRoutes = FormioResourceRoutes({ resource: ResourceComponent, view: ViewComponent });
-userRoutes[2].children.push({
+userRoutes[2].children!.push({
   path: 'teams',
   loadChildren: () => import('./teams/user-teams.module').then((m) => m.UserTeamsModule),
 });
@@ -526,7 +533,7 @@ parents: ['event', { field: 'user', resource: 'currentUser', filter: false }];
 
 ## 7. Static (AOT-safe) routes
 
-Dynamic `routes[2].children.push(...)` works under Angular 15+ with strict AOT, but if the consumer's build fails with "Function calls are not supported in decorators", fall back to static routes:
+Dynamic `routes[2].children!.push(...)` works under Angular 15+ with strict AOT, but if the consumer's build fails with "Function calls are not supported in decorators", fall back to static routes:
 
 ```typescript
 import {

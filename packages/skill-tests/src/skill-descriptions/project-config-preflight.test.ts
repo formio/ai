@@ -61,9 +61,9 @@ function offenders(paths: string[], predicate: (text: string) => boolean): strin
 }
 
 describe('every tool-calling skill probes the project configuration', () => {
-  it('covers thirteen skills — the fifteen SKILL.md files minus the two exemptions', () => {
-    expect(allSkillMd()).toHaveLength(15);
-    expect(probingSkillMd()).toHaveLength(13);
+  it('covers fourteen skills — the sixteen SKILL.md files minus the two exemptions', () => {
+    expect(allSkillMd()).toHaveLength(16);
+    expect(probingSkillMd()).toHaveLength(14);
   });
 
   // The probe is a TOOL CALL, not a shell command. It used to be

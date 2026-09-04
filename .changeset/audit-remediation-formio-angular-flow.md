@@ -1,0 +1,15 @@
+---
+'@formio/ai': patch
+---
+
+Fix the flow defects three independent audits found in `formio-angular` by walking the skill as an agent would.
+
+**The missing-plan path no longer strands.** Its bail-out was gated on the user NOT having said "Angular", which an Angular-explicit request cannot satisfy, so the gap surfaced at AUTH — after a skills-library install, `ng new`, four package installs, and edits to `angular.json`, `app-module.ts`, `config.ts` and `formio.json`. Naming Angular now chooses the framework without supplying the data model: pre-flight has a branch for neither planner artifact being present, and it stops there. `AUTH.md` and the resources sub-skill no longer instruct running the planner themselves — three other places said this skill never does, and a plan nothing imports generates modules against resources the deployment lacks.
+
+**Values a later phase consumes are produced on every path that reaches it.** BOOTSTRAP self-skips in any existing workspace and carried only `PACKAGE_MANAGER` forward, so `FRONTEND_DESIGN_BRIEF` — required by AUTH, by the resources sub-skill, and by the Phase A gate that makes the agent attest it was passed — did not exist. Step 7 now runs on the skip path too, reading its slots off the workspace, and the skip checks for the Form.io packages and the Bootstrap stylesheet a full run would have installed. SETUP stashes `baseUrlSource`, which CONFIG reads.
+
+**A config mismatch has an action for both answers.** "The app is right, the mapping is wrong" had none: `project_set` was reachable only from the other statuses, and CONFIG's "re-run SETUP to match" re-read the same record and looped. SETUP now names the recording fix per record type, and CONFIG defers to it instead of offering a decision it cannot carry out.
+
+**`AuthConfig` has one home** (`auth/auth.module.ts`, which AUTH writes) — a sub-skill reference imported it from `./config` and the plan template planned it there, a build error wherever AUTH had already run. **The login route is `/auth/login` everywhere**, matching AUTH's mandate and its logout redirect; the Phase A plan template described `/login`, so users were approving routes that would break logout. **BOOTSTRAP handles either bootstrap shape**, converting a standalone scaffold to the NgModule the five phases all edit, rather than requiring `app-module.ts` it never asked the scaffolder for. **The handoff contract agrees with itself**: the parent passes `userRequest`, `newResourceNames` and `frontendDesignStatus`, and stops passing URLs the sub-skill resolves itself. **The `workspaceRoot` discipline reaches the two documents that write the most files**, and no document runs a bare `ng build` or `ng serve`.
+
+In the embed branch: it establishes its own prerequisites (the packages, with the lockfile warning, since the workspace is always somebody else's) and says how to find the form URL it calls its only input; `styling.md` gains the direct-renderer exception that `renderer-directly.md` was already pointing at; and the `nosubmit` mechanism is corrected.

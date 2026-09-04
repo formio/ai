@@ -85,7 +85,7 @@ A single monolithic "Form.io skill" would be loaded in full for every request, w
 | **Orchestrator** | [`formio-application`](./plugin/skills/formio-application/SKILL.md) | The whole "build/extend an app" pipeline: intent → plan → import → framework handoff. |
 | **Orchestrator** | [`formio-form-builder`](./plugin/skills/formio-form-builder/SKILL.md) | The whole "build one form" pipeline: intent → schema → save → optional embed. Plus the edit lane for an existing form. |
 | **Planner** | [`formio-resource-planner`](./plugin/skills/formio-resource-planner/SKILL.md) | The data model. Interviews, classifies each entity as Resource or Form, and emits the `template.md` + `template.json` pair. Calls no MCP tool. |
-| **Framework implementor** | [`formio-angular`](./plugin/skills/formio-angular/SKILL.md) | Angular apps via `@formio/angular`. Five gated phases; delegates per-resource work to `formio-angular-resources`. |
+| **Framework implementor** | [`formio-angular`](./plugin/skills/formio-angular/SKILL.md) | Angular apps via `@formio/angular`. A router over two branches: five gated phases for an application, or a single-form embed; delegates to `formio-angular-resources` and `formio-angular-form`. |
 | **Framework implementor** | [`formio-react`](./plugin/skills/formio-react/SKILL.md) | React apps (Vite + React Router data routers) via `@formio/react`. A router over three branches; delegates to `formio-react-resources` and `formio-react-form`. |
 | **Embedding** | [`formio-form`](./plugin/skills/formio-form/SKILL.md) | Framework-agnostic embedding with `@formio/js`, and **all** definition-level behavior — conditionals, calculated values, custom validation, cascading selects, wizard page logic — whatever the host framework. |
 | **Reference** | [`formio-schema`](./plugin/skills/formio-schema/SKILL.md) | Form.io JSON document shapes: projects, forms/resources, submissions, components. |
@@ -95,7 +95,7 @@ A single monolithic "Form.io skill" would be loaded in full for every request, w
 | **Reference** | [`formio-sdk`](./plugin/skills/formio-sdk/SKILL.md) | `@formio/js` and `@formio/js/utils` — statics, instances, `Formio.createForm`, plugins, `Utils`. |
 | **Bootstrap** | [`formio-mcp-setup`](./plugin/skills/formio-mcp-setup/SKILL.md) | Connecting the MCP server to whichever client is running, and capturing the project URL. The single remedy every other skill offers when the tools are absent. |
 
-Nested sub-skills — [`formio-angular-resources`](./plugin/skills/formio-angular/formio-angular-resources/SKILL.md), [`formio-react-resources`](./plugin/skills/formio-react/formio-react-resources/SKILL.md), [`formio-react-form`](./plugin/skills/formio-react/formio-react-form/SKILL.md) — are **loaded by file path** by their parent, not activated by name. They do the per-resource and per-form generation work.
+Nested sub-skills — [`formio-angular-resources`](./plugin/skills/formio-angular/formio-angular-resources/SKILL.md), [`formio-angular-form`](./plugin/skills/formio-angular/formio-angular-form/SKILL.md), [`formio-react-resources`](./plugin/skills/formio-react/formio-react-resources/SKILL.md), [`formio-react-form`](./plugin/skills/formio-react/formio-react-form/SKILL.md) — are **loaded by file path** by their parent, not activated by name. They do the per-resource and per-form generation work.
 
 ## How a skill gets loaded
 
@@ -115,7 +115,7 @@ flowchart TD
     F --> H["Navigate by scope → load one<br/>reference file under references/"]
 
     G --> I["Invoke another <b>skill</b> for a concern it owns<br/><i>planner · schema · actions · auth</i>"]
-    G2 --> J["Load a nested <b>sub-skill</b> by path<br/><i>*-resources · formio-react-form</i>"]
+    G2 --> J["Load a nested <b>sub-skill</b> by path<br/><i>*-resources · *-form</i>"]
 ```
 
 Three distinct mechanisms are in play, and the difference matters when you read a skill:
@@ -136,6 +136,7 @@ Three distinct mechanisms are in play, and the difference matters when you read 
 | "add a phone field to my registration form" | `formio-form-builder` (edit lane) | C, shortened |
 | "embed this form on my page", "pre-fill this form", "hide a field when X" | `formio-form` | [D](#flow-d--embed-a-form-in-an-existing-page-or-app) |
 | "embed a Form.io form in React" | `formio-react` → `formio-react-form` | D, React mounting |
+| "embed a Form.io form in Angular", "render a form in my Angular app" | `formio-angular` → `formio-angular-form` | D, Angular mounting |
 | "add Form.io CRUD to my React app", "wire this project into my existing React app" | `formio-react` (existing branch) | [H](#flow-h--add-formio-to-an-application-that-already-exists) |
 | "design the resources for a library system" (no app) | `formio-resource-planner` | A, planning only |
 | "create a Patient resource", "export my project", "list every form" | `formio-api` + the MCP tools | [E](#flow-e--change-a-project-directly) |
@@ -327,7 +328,7 @@ sequenceDiagram
     participant Sch as formio-schema
     participant Act as formio-actions
     participant MCP as @formio/mcp
-    participant Emb as formio-form / formio-react-form
+    participant Emb as formio-form / formio-react-form / formio-angular-form
 
     U->>FB: “build a college application wizard”
     FB->>U: Step 1 INTENT (batched) — webform, wizard, or PDF form? embed afterward?
@@ -361,7 +362,7 @@ flowchart TD
     Q -->|"a conditional, a calculated value,<br/>a validation rule, a cascading select,<br/>wizard page logic"| Def["<b>formio-form answers it</b><br/>identical in every framework"]
     Q -->|"mounting code"| H{"Inspect the host"}
     H -->|"package.json lists react"| RJ["hand off to formio-react's embed branch<br/>→ formio-react-form · the Form component"]
-    H -->|"Angular"| AN["say @formio/angular ships its own renderer<br/>and that no Angular embed skill exists yet,<br/>then continue with @formio/js"]
+    H -->|"package.json lists @angular/core"| AN["hand off to formio-angular's embed branch<br/>→ formio-angular-form · the &lt;formio&gt; component"]
     H -->|"plain page / undetectable"| VJ["Formio.createForm against a DOM element"]
     U --> E{"Does the form exist yet?"}
     E -->|"form_get misses"| FB["route to formio-form-builder first,<br/>then resume embedding with the saved URL"]
