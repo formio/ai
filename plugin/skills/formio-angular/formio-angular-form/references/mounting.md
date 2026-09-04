@@ -67,7 +67,7 @@ This is the single most common way an option "does nothing".
 ></formio>
 ```
 
-Two more inputs shadow renderer options and win over them, so set them here rather than in `[renderOptions]`: `[readOnly]`, and `[viewOnly]` (which also switches the renderer to `renderMode: 'html'`). `[hideComponents]` takes an array of component keys and is applied reactively.
+Two more inputs write renderer options directly: `[readOnly]`, and `[viewOnly]` (which also switches the renderer to `renderMode: 'html'`). **`[renderOptions]` is merged last and therefore wins over both** — `getRendererOptions()` builds its defaults, including `readOnly` from the input, and then spreads `renderOptions` on top. So `[readOnly]="true"` with `[renderOptions]="{ readOnly: false }"` gives an editable form, and if a `[readOnly]` binding appears to do nothing, that collision is the first thing to check. Pick one channel per option rather than setting the same thing twice. `[hideComponents]` takes an array of component keys and is applied reactively; it has no `renderOptions` counterpart to collide with.
 
 ### The two `beforeSubmit` hooks are different hooks
 
@@ -84,8 +84,13 @@ An `[options]` or `[renderOptions]` object literal written inline in a template 
 
 ```ts
 readonly renderOptions = { icons: 'bi' };
-readonly componentOptions = { disableAlerts: true, hooks: { beforeSubmit: this.beforeSubmit } };
+readonly componentOptions = {
+  disableAlerts: true,
+  hooks: { beforeSubmit: (submission, callback) => this.beforeSubmit(submission, callback) },
+};
 ```
+
+**Bind the hook.** The component calls it as a bare function, so a plain `beforeSubmit: this.beforeSubmit` reference arrives with `this` undefined and throws on the first `this.` inside it — at submit time, on the one path the hook exists for. An arrow wrapper (above) or `this.beforeSubmit.bind(this)` both fix it; a method reference alone does not.
 
 ## Wizards and PDFs
 

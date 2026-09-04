@@ -28,12 +28,17 @@ This branch runs none of the application phases, so nothing upstream has prepare
 
 Read `<working directory>/package.json`. `@formio/angular` and `@formio/js` must both be dependencies. When either is missing, the template you are about to write does not compile, and the error is a module-resolution error that says nothing about the form.
 
-Resolve the versions from the npm registry — the same registry the install resolves against — and install both in one command:
+Resolve the versions from the npm registry — the same registry the install resolves against — then install both in one command:
 
 ```bash
-npm view @formio/angular version
-npm view @formio/js version
+npm view @formio/angular version   # e.g. 11.0.5  → FORMIO_ANGULAR_VERSION
+npm view @formio/js version        # e.g. 5.3.6   → FORMIO_JS_VERSION
+npm install --save @formio/angular@^<FORMIO_ANGULAR_VERSION> @formio/js@^<FORMIO_JS_VERSION>
 ```
+
+Use the caret range so future minor and patch releases in the same major flow through without another install. Never leave a `<…>` token unresolved on a command line — a literal `@formio/angular@^<FORMIO_ANGULAR_VERSION>` installs nothing.
+
+**If the registry is unreachable,** do not guess. Read the versions from `node_modules/@formio/angular/package.json` and `node_modules/@formio/js/package.json` if either is already present in some form, and otherwise ask the user for the two versions in one round and use what they give you verbatim. A version nobody saw is a version nobody agreed to.
 
 **Use the workspace's own package manager, and never introduce a second lockfile.** Read `packageManager` in `package.json` first, then look for a lockfile: `yarn.lock` → Yarn, `pnpm-lock.yaml` → pnpm, `bun.lock` / `bun.lockb` → Bun, `package-lock.json` → npm. `packageManager` wins over any lockfile; when more than one lockfile is present the first hit in that order wins, because `package-lock.json` is the one a stray `npm install` leaves behind in a workspace belonging to another tool. Running `npm install` in a Yarn or pnpm workspace writes a competing lockfile and a parallel `node_modules`, and the user's own commands keep resolving against the tree you did not build — nothing warns you, and the app you tested is not the app they run. This branch is the one where the workspace is always somebody else's, so the rule matters here more than anywhere.
 
@@ -118,14 +123,19 @@ If the codebase already mounts a `<formio>` that is not this component, or mount
 
 ## Surfaces this skill does not document
 
-`@formio/angular` ships far more than a renderer component, across six entry points. Embedding uses one of them; the rest are out of scope here:
+`@formio/angular` ships far more than a renderer component. Embedding uses `<formio>` from the package root; everything below is out of scope here.
 
-- **The form builder** — `<form-builder>`.
+Other components of that same root entry point:
+
+- **`<form-builder>`** — the form builder.
+- **`<formio-report>`** — the reporting renderer.
+
+And the sub-path entry points:
+
 - **`@formio/angular/manager`** — the form-management application (`FormManagerModule`).
 - **`@formio/angular/grid`** — `FormioGrid`, the paginated form and submission tables.
 - **`@formio/angular/resource`** — `FormioResource`, the CRUD module.
 - **`@formio/angular/auth`** — the login, registration, and reset-password surface.
-- **`<formio-report>`** — the reporting renderer.
 
 **This library documents no form-management guidance.** Building an application where users create and manage their own forms is a different job from embedding a form, and nothing here covers it. Say so if asked; do not improvise it.
 

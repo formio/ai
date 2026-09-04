@@ -44,7 +44,7 @@ Everything above assumes `<formio>` is on the page. It is the component that car
 ]
 ```
 
-`dist/*` is exported by `@formio/js`, so that specifier resolves under npm, Yarn PnP, and pnpm alike.
+That literal `node_modules/...` path is what the Angular builder's `styles` array expects, and it is what npm and pnpm both resolve. **Under Yarn PnP there is no `node_modules` tree, so it does not resolve** — there, import the stylesheet by package specifier (`@formio/js/dist/formio.form.css`, which the package's `exports` map does allow) from the workspace's own `src/styles.css`, and leave this array to Bootstrap. That is the one place the earlier "not as an `@import`" rule gives way, because on PnP the alternative is no stylesheet at all.
 
 **In an application that has both kinds of page, list it once here and accept the duplicate.** A workspace-wide entry is the only way to serve a direct-renderer route that a user can deep-link to, and the cost is one copy of a stylesheet the browser caches — cheaper than a route that renders an unstyled form for anyone who did not arrive via a `<formio>` screen first.
 

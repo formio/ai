@@ -20,7 +20,8 @@ Everything else — wanting fewer inputs, disliking the alert chrome, preferring
 import { Component, ElementRef, OnDestroy, ViewChild, inject, signal } from '@angular/core';
 import { ChangeDetectorRef, AfterViewInit } from '@angular/core';
 import { Formio } from '@formio/js';
-import type { Webform, Submission } from '@formio/js';
+import type { Webform } from '@formio/js';
+import type { Submission } from '@formio/core/types';
 
 @Component({
   selector: 'app-intake-form',
@@ -58,6 +59,8 @@ export class IntakeFormComponent implements AfterViewInit, OnDestroy {
 // module scope, so its identity is stable and nothing rebuilds on a re-render
 const OPTIONS = { noAlerts: false };
 ```
+
+**`Submission` comes from `@formio/core/types`, not from `@formio/js`.** `@formio/js` exports the renderer classes (`Webform`, `Form`, `Formio`, `Utils`, `Templates`, …) and no submission type; importing one from there is a `TS2305` before anything runs. `@formio/core` arrives transitively with `@formio/js`, and `@formio/angular`'s own components take the type from exactly this path — add `@formio/core` as an explicit dependency if the workspace prefers not to rely on a transitive one for types.
 
 ## The four obligations
 

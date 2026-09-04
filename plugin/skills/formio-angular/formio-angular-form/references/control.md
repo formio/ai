@@ -4,9 +4,11 @@ Two ways in, and they answer different needs.
 
 ## 1. Events as outputs
 
-Twenty-four of them:
+Twenty-two of them:
 
-`(ready)`, `(render)`, `(change)`, `(submit)`, `(beforeSubmit)`, `(invalid)`, `(error)`, `(errorChange)`, `(customEvent)`, `(formLoad)`, `(submissionLoad)`, `(prevPage)`, `(nextPage)`, `(page)`, `(changeItemsPerPage)`, `(fileUploadingStatus)`, and the datagrid row set: `(rowAdd)`, `(rowAdded)`, `(rowEdit)`, `(rowEdited)`, `(rowDelete)`, `(rowClick)`, `(rowSelectChange)`.
+`(ready)`, `(render)`, `(change)`, `(submit)`, `(beforeSubmit)`, `(invalid)`, `(errorChange)`, `(customEvent)`, `(formLoad)`, `(submissionLoad)`, `(prevPage)`, `(nextPage)`, `(page)`, `(changeItemsPerPage)`, `(fileUploadingStatus)`, and the datagrid row set: `(rowAdd)`, `(rowAdded)`, `(rowEdit)`, `(rowEdited)`, `(rowDelete)`, `(rowClick)`, `(rowSelectChange)`.
+
+**`error` is not among them — it is an `@Input()`,** and the output that reports errors is `(errorChange)`. Writing `(error)="…"` compiles, because Angular falls back to a DOM event listener for the native `error` event on the host element, and that never fires: the handler silently never runs and errors appear to vanish. See section 2 for what `[error]` is actually for.
 
 ```html
 <formio [src]="formUrl" (submit)="onSubmit($event)" (errorChange)="onErrors($event)"></formio>
