@@ -1,5 +1,8 @@
 # Resource module patterns
 
+**Every path below is relative to `workspaceRoot`** — the absolute path the parent skill captured and handed to this sub-skill as `workspacePath`. A file written as `src/app/<resource>/<resource>.module.ts` means `<workspaceRoot>/src/app/<resource>/<resource>.module.ts`, and every path in this document is spelled the short way for readability only. Resolve them against that captured path rather than against wherever the shell happens to stand: a shell working directory persists between commands in an agent session, so one `cd` earlier in the turn retargets every relative write after it, and a resource module in the wrong tree compiles nowhere.
+
+
 > **`FormioAppConfig` renames both URLs.** `appUrl` is the **Project URL** — the project this application reads and writes, and the one value anyone supplies. `apiUrl` is the **Base URL** — the deployment hosting it, which is normally derived from the Project URL rather than supplied. Take both from `project_get` (called with `cwd` set to the workspace root) when the Form.io MCP tools are callable by you, and otherwise ask the user for them — see [`project-urls.md`](../../../formio-mcp-setup/references/project-urls.md). Never compose, derive, or hand-type either one yourself.
 
 Every pattern you generate in Phase B. Copy the shape, swap the names, don't invent new structure — `FormioResourceService` is picky about `FormioResourceConfig` and the route tree that `FormioResourceRoutes()` produces.

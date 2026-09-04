@@ -53,8 +53,8 @@ End-to-end walk-through of `../SKILL.md`'s flow: the planner's input, the Phase 
 
 | Path                           | Module                   | Resource form | Parents       |
 | ------------------------------ | ------------------------ | ------------- | ------------- |
-| `/login`                       | AuthModule               | userLogin     | —             |
-| `/register`                    | AuthModule               | userRegister  | —             |
+| `/auth/login`                  | AuthModule               | userLogin     | —             |
+| `/auth/register`               | AuthModule               | userRegister  | —             |
 | `/project`                     | ProjectModule            | project       | —             |
 | `/project/:id/tasks`           | ProjectTasksModule       | task          | ['project']   |
 | `/project/:id/users`           | ProjectUsersModule       | projectUser   | ['project']   |
@@ -69,7 +69,7 @@ End-to-end walk-through of `../SKILL.md`'s flow: the planner's input, the Phase 
 - ProjectUser: mounted on Project only (User side omitted — admin operation on the join, not a normal user view). Index grid column `user` → link to that user's profile (or omitted if no User CRUD).
 
 ### Auth
-- `/login` → userLogin, `/register` → userRegister, `/logout` → FormioAuthService.logout(). These three stay unguarded.
+- `/auth/login` → userLogin and `/auth/register` → userRegister, mounted as children of the `/auth` route the parent AUTH phase adds; logout is `FormioAuthService.logout()` redirecting to `/auth/login`. The auth routes stay unguarded.
 - `authGuard` (`src/app/auth/auth.guard.ts`) applied via `canActivate: [authGuard]` on the root `/project` and `/task` routes in `app-routing-module.ts` (anonymous has no access per `## Access Matrix`). The nested `/project/:id/tasks` and `/project/:id/users` routes inherit protection from the guarded parent. Per-group narrowing stays server-side — no role/group guard.
 ```
 

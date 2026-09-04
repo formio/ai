@@ -20,7 +20,14 @@ Skip BOOTSTRAP if any of the following hold at `workspaceRoot`:
 2. `package.json` exists and lists `@angular/core` as a dependency — same as above, slightly different detection signal (monorepos sometimes relocate `angular.json`).
 3. `formio-application` invoked you in handoff mode and the `workspacePath` it passed — which is `workspaceRoot` — already contains `angular.json`; trust the orchestrator's detection.
 
-If any of those hit, tell the user in one sentence: "Angular workspace already present at `<path>` — skipping BOOTSTRAP, continuing to CONFIG." Do not re-run `npx skills add` on a workspace that already exists; it is not destructive but it is noise. One part of this phase still applies: establish the workspace's package manager exactly as Step 4's "Which package manager this workspace uses" describes and capture it as `PACKAGE_MANAGER` before any later phase installs anything — an existing workspace is precisely where a Yarn or pnpm lockfile is likely, and a scaffold you did not create is the one whose lockfile you can silently duplicate.
+If any of those hit, tell the user in one sentence: "Angular workspace already present at `<path>` — skipping BOOTSTRAP, continuing to CONFIG." Do not re-run `npx skills add` on a workspace that already exists; it is not destructive but it is noise.
+
+**Two parts of this phase still apply, and skipping them is what makes a later phase fail with no visible cause.**
+
+1. **The package manager.** Establish it exactly as Step 4's "Which package manager this workspace uses" describes and capture it as `PACKAGE_MANAGER` before any later phase installs anything — an existing workspace is precisely where a Yarn or pnpm lockfile is likely, and a scaffold you did not create is the one whose lockfile you can silently duplicate.
+2. **Step 7, in full.** AUTH, the Resources sub-skill, and the sub-skill's Phase A gate all consume `FRONTEND_DESIGN_BRIEF`, and Step 7d is the only thing that produces it — the Phase A gate makes the agent declare that the brief was passed in, which cannot be answered honestly if nothing ever wrote one. Run 7a–7d here. Step 7d's version and stack slots come from Step 1 on a full run; on this path Step 1 did not run, so read them off the workspace instead — `@formio/angular` and `@angular/core` from `package.json`, and the design language from whatever `angular.json`'s `styles` array actually loads (see Step 7d's own note).
+
+Also check what the existing workspace is missing that a full run would have installed: `@formio/angular` and `@formio/js` in `package.json` (Step 4's "Add the Form.io packages"), and a Bootstrap 5 stylesheet in `angular.json` if the generated screens are to be styled at all (Step 5). Neither is automatic on this path. Add what is absent under the same approval you would ask for on a full run, and say in one line which of the two you found already present — a workspace with `@formio/angular` but no Bootstrap renders correct forms with no styling, and that reads as a rendering bug.
 
 Otherwise, run BOOTSTRAP.
 
@@ -122,7 +129,7 @@ Show the command and get approval for it too, then continue at Step 4 — Step 3
 
 ## Step 3 — delegate to `angular-new-app`
 
-Skip this step entirely when Step 2 took the local `@angular/cli` fallback — there is no `angular-new-app` to call. Otherwise, once the install succeeds, invoke the `angular-new-app` skill to create the Angular workspace in the current working directory. The skill is designed to handle its own interview — routing (yes/no), stylesheet choice (CSS/SCSS/etc.), strict mode, and anything else `ng new` accepts — so you do NOT re-ask those questions on its behalf.
+Skip this step entirely when Step 2 took the local `@angular/cli` fallback — there is no `angular-new-app` to call. **Two things it would have decided still need deciding**, because the fallback command names them: the project name (same rule as below — derive it from the Project URL's first path or sub-domain segment when there is one, otherwise use the directory's own name, and never invent one the user has not seen, since `--directory .` writes it permanently into `angular.json` and `package.json`), and the Angular version, which the command already carries as `@angular/cli@<FORMIO_ANGULAR_SUPPORTED_MAJOR>`. Otherwise, once the install succeeds, invoke the `angular-new-app` skill to create the Angular workspace at `workspaceRoot` — the captured absolute path, never the shell's current directory. The skill is designed to handle its own interview — routing (yes/no), stylesheet choice (CSS/SCSS/etc.), strict mode, and anything else `ng new` accepts — so you do NOT re-ask those questions on its behalf.
 
 What to pass to `angular-new-app`:
 
@@ -138,13 +145,36 @@ Do not override `angular-new-app`'s approval gates — it runs its own, and laye
 Before advancing, verify all of the following exist:
 
 - `<workspaceRoot>/angular.json`
-- `<workspaceRoot>/src/app/app-module.ts`
+- an application bootstrap — **either** `<workspaceRoot>/src/app/app-module.ts` (NgModule) **or** `<workspaceRoot>/src/app/app.config.ts` plus a standalone root component. See "Which bootstrap shape landed" immediately below; one of the two is a normal outcome, not a failure.
 - `<workspaceRoot>/package.json` with `@angular/core` present at the major resolved in Step 1
 - `<workspaceRoot>/package.json` with `@formio/angular` pinned as `"^<FORMIO_ANGULAR_VERSION>"` and `@formio/js` pinned as `"^<FORMIO_JS_VERSION>"`
 
 Check them at that absolute path, spelled out. A check written against "the workspace" and run wherever the shell sits passes in the wrong tree and reports a scaffold that is not where anyone will look for it. If `angular.json` is absent at `workspaceRoot`, stop this phase and find where it actually landed — a tree written to the wrong directory is a scaffold to move or delete with the user's say-so, not one to patch around or re-run on top of.
 
-If any are missing, something went wrong inside the scaffolding step (`angular-new-app`, or the `@angular/cli` fallback) or the follow-up install. Do not patch around it; stop BOOTSTRAP and ask the user whether they want to retry, switch to an existing workspace, or abort. If `@angular/core` in the generated `package.json` is a different major than `FORMIO_ANGULAR_SUPPORTED_MAJOR`, the `angular-new-app` invocation did not honor the version pin — stop and surface the mismatch before continuing. If the Form.io entries landed as exact pins or `~` ranges, rewrite them to `^` as described above and re-run the install with `PACKAGE_MANAGER`.
+### Which bootstrap shape landed
+
+Every later phase — CONFIG's provider registration, AUTH's `AuthModule` import, and every resource module the sub-skill generates — edits `src/app/app-module.ts`, and the skill's stance is NgModules with `standalone: false`. Recent Angular CLI versions scaffold a **standalone** application instead: `app.config.ts` with `ApplicationConfig` providers, a standalone root component, and no `app-module.ts` at all. Nothing this phase passes to the scaffolder reliably changes that, so detect the shape rather than assuming it.
+
+- **`app-module.ts` present.** Nothing to do; continue.
+- **`app.config.ts` present and no `app-module.ts`.** Convert the bootstrap here, in BOOTSTRAP, so every later phase finds the file it expects. This is a real change to the user's new workspace, so show it and get approval first — it is small, and it is the alternative to five phases of conditional edits.
+
+  Create `<workspaceRoot>/src/app/app-module.ts` declaring the existing root component, importing `BrowserModule` and the router module the scaffolder configured, carrying over every provider from `app.config.ts`'s `providers` array, and bootstrapping that component:
+
+  ```ts
+  @NgModule({
+    declarations: [App],
+    imports: [BrowserModule, RouterModule.forRoot(routes)],
+    providers: [/* everything app.config.ts provided */],
+    bootstrap: [App],
+  })
+  export class AppModule {}
+  ```
+
+  Then point `src/main.ts` at it — `platformBrowser().bootstrapModule(AppModule)` in place of `bootstrapApplication(App, appConfig)` — set `standalone: false` on the root component and remove its `imports` array, and delete `app.config.ts` once nothing references it. Verify with the Step 6c build before advancing.
+
+  Say in one line what you changed and why: the generated Form.io wiring is NgModule-based, so the workspace's bootstrap has to be too.
+
+If `angular.json` is missing, or neither bootstrap shape is present, something went wrong inside the scaffolding step (`angular-new-app`, or the `@angular/cli` fallback) or the follow-up install. Do not patch around it; stop BOOTSTRAP and ask the user whether they want to retry, switch to an existing workspace, or abort. If `@angular/core` in the generated `package.json` is a different major than `FORMIO_ANGULAR_SUPPORTED_MAJOR`, the `angular-new-app` invocation did not honor the version pin — stop and surface the mismatch before continuing. If the Form.io entries landed as exact pins or `~` ranges, rewrite them to `^` as described above and re-run the install with `PACKAGE_MANAGER`.
 
 ### Which package manager this workspace uses
 
@@ -215,7 +245,7 @@ Notes on why these exact paths:
 
 Do NOT add Bootstrap's JavaScript bundle (`bootstrap.bundle.min.js` via `angular.json`'s `scripts` array). The Form.io renderer does not depend on Bootstrap's JS behaviors (dropdowns, modals, tooltips), and pulling the JS in would conflict with Angular's own DOM management. If a future resource module needs a Bootstrap JS feature, the Resources sub-skill (`./formio-angular-resources/SKILL.md`) can add it on a per-module basis.
 
-After editing `angular.json`, re-run a clean install (with the workspace's own package manager — see Step 4) or `ng build --configuration=development` as a smoke check, to confirm the new style paths resolve. If any path 404s, verify the package version in `node_modules` — a Bootstrap 5+ major always ships `dist/css/bootstrap.min.css` and Bootstrap Icons always ships `font/bootstrap-icons.css`, so a 404 means the install did not land.
+After editing `angular.json`, re-run a clean install (with the workspace's own package manager — see Step 4) or `cd "<workspaceRoot>" && ng build --configuration=development` as a smoke check, to confirm the new style paths resolve. If any path 404s, verify the package version in `node_modules` — a Bootstrap 5+ major always ships `dist/css/bootstrap.min.css` and Bootstrap Icons always ships `font/bootstrap-icons.css`, so a 404 means the install did not land.
 
 **Confirm the renderer's own styles reached the page — later, not here.** No form renders during BOOTSTRAP, and Angular injects a `ViewEncapsulation.None` component's styles only when that component is first instantiated, so this check has no moment in this phase. Carry it forward to the first phase that renders a `<formio>` component (AUTH's login screen at the earliest): a `.formio-component` rule should then be present in the document's stylesheets, supplied by `@formio/angular`'s inlined component styles rather than by anything in `angular.json`. If it is absent there, suspect the `@formio/angular` install, not a missing entry in the styles array.
 
@@ -248,7 +278,7 @@ The Form.io SDK's promises (`loadSubmissions`, `loadForms`, …) resolve outside
 ### 6c. Smoke-check
 
 ```bash
-ng build --configuration=development
+cd "<workspaceRoot>" && ng build --configuration=development
 ```
 
 Invoke it through `PACKAGE_MANAGER` (`npx ng`, `pnpm exec ng`, `yarn ng`, `bunx ng`) so the build resolves against the tree the user's own commands use — this is the run that surfaces an undeclared transitive dependency under Yarn PnP or pnpm's isolated linker (see Step 4, "Which package manager this workspace uses"). A clean build confirms the `polyfills` shape matches the builder and the CD provider import resolves. If the app logs `NG0908` / `Zone is not defined` at runtime, a dependency still expects `zone.js` — re-check that no generated code imports `zone.js` and that `provideZonelessChangeDetection()` is actually registered.
@@ -357,7 +387,7 @@ Every later phase that invokes `frontend-design` prepends this brief to the prom
 
 ## The approval gate
 
-BOOTSTRAP's approval gate is lightweight because the destructive work (creating files in the workspace) is gated inside `angular-new-app` itself. After Steps 1–7 succeed, print a one-block summary and pause for acknowledgement:
+BOOTSTRAP's gate covers what happens outside `angular-new-app`. Creating the workspace tree is gated inside that skill's own approval, but Steps 4 through 6 are not: the package installs, the `angular.json` `styles` edits, the change-detection provider, and any bootstrap conversion from Step 4 all land before this gate prints. So the gate is where the user reviews those, and the summary below has to name them rather than only reporting that a workspace exists. After Steps 1–7 succeed, print a one-block summary and pause for acknowledgement:
 
 ```
 Bootstrap complete

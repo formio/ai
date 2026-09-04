@@ -46,7 +46,9 @@ Same rule as `FormioResourceConfig.form` in the Resources sub-skill: the `form` 
 
 If there is no `template.md` / `template.json` pair available, pause at the start of this phase and offer two options in one question round, using the client's structured question mechanism (in Claude Code, `AskUserQuestion`):
 
-1. **Run `formio-resource-planner` first** — the planner is the canonical upstream producer of the artifact pair this phase consumes. The parent will pause, hand off to the planner, and resume here once `template.md` + `template.json` are approved.
+1. **Route to `formio-application`** — it owns planning AND the import that has to follow it. This skill runs neither (see the parent's Stance), and the distinction matters here rather than being a formality: the planner alone would produce a `template.json` that nothing imports, so AUTH would go on to configure a login form and Role Assignment against resources that do not exist in the deployment. The app would compile and 404 at runtime. `formio-application` runs the planner, imports, and hands back to this skill with the pair in scope.
+
+   **This should not be the first time the gap is raised.** The parent's pre-flight is where a missing pair is meant to surface, before SETUP and before anything is written. Reaching AUTH without one means that check did not fire — say so, and stop rather than pressing on.
 2. **Skip AUTH with a TODO** — generate `AppModule` without importing an `AuthModule`, but insert a TODO comment that points at the endpoints the user will need to wire auth manually later:
 
 ```ts

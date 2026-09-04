@@ -55,8 +55,8 @@ For each join resource, pin down how both sides should be named in the URL:
 
 `template.md`'s `## Users & Auth` section names the `Login form` and `Registration form` explicitly. Default: generate `AuthModule` wired to those exact form names via `@formio/angular/auth`'s `FormioAuthConfig`. Confirm:
 
-- Should `/login` and `/register` be public top-level routes? (default yes — these stay unguarded so anonymous users can reach them)
-- Is there a `/logout` convenience route? (default yes, via `FormioAuthService.logout()`)
+- Confirm the auth routes stay public: `@formio/angular/auth` mounts login and register as children of the `/auth` route the parent AUTH phase adds, so they are `/auth/login` and `/auth/register` and they stay unguarded so anonymous users can reach them. Do not re-path them — AUTH's logout redirect and guard both target `/auth/login`, and moving one without the other breaks both.
+- Is there a logout affordance in the nav? (default yes, via `FormioAuthService.logout()`, which redirects to `/auth/login`)
 - **Authentication guard — default YES for every non-public resource route.** Any resource whose Access Matrix gives the `anonymous` actor no access (`—`) MUST mount `canActivate: [authGuard]` so an anonymous visitor is redirected to `/auth/login` rather than navigating into a page that 401/403s and shows broken/empty content. The `authGuard` file is produced by the parent skill's AUTH phase (`auth.guard.ts`); this sub-skill attaches it to each protected route. Only routes the matrix marks reachable by `anonymous` stay unguarded.
 - **Authorization guard (role/group) — default no.** Gating _which_ authenticated role or group sees a route is left to the server: authenticated routes stay open among logged-in users and the backend 403s. Add a role guard only if the user explicitly asks for client-side role gating. Keep this separate from the authentication guard above — server-side authorization is not a reason to drop the authentication guard.
 

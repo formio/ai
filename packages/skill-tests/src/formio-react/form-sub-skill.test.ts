@@ -277,10 +277,15 @@ describe('formio-form host check', () => {
     expect(text).toMatch(/rather than asking|without asking/);
   });
 
+  // Angular used to have no embedding skill, and this asserted that formio-form
+  // said so. It has one now, so the truth to tell is the handoff.
   it('tells the truth about Angular', () => {
     const text = body();
     expect(text).toContain('@formio/angular');
-    expect(text.toLowerCase()).toMatch(/no angular embedding skill|does not exist yet/);
+    expect(text).toContain('formio-angular');
+    expect(text.toLowerCase()).not.toMatch(
+      /no angular embedding skill|angular embedding skill does not exist/
+    );
   });
 
   it('names formio-react in its Not for clause, within budget', () => {

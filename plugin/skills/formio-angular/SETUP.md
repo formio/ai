@@ -39,11 +39,15 @@ On a status of `not-configured` — nothing is recorded for this directory — r
 If Phase 0 (pre-flight) read an existing `src/app/config.ts` exporting a `FormioAppConfig`, compare its `appUrl` / `apiUrl` against what `project_get` reported:
 
 - **They match** — nothing to decide; CONFIG will be skipped for that reason.
-- **They differ** — stop and ask. Name both pairs and where each came from: `config.ts` is what the application ships with, and the mapping is what every build-time tool call resolves. Writing either one over the other silently leaves the app pointed at one deployment while the tools target another. The user chooses which is correct before anything is written.
+- **They differ** — stop and ask. Name both pairs and where each came from: `config.ts` is what the application ships with, and the mapping is what every build-time tool call resolves. Writing either one over the other silently leaves the app pointed at one deployment while the tools target another. The user chooses which is correct before anything is written, and each answer has a different action:
+  - **"The mapping is right, the app is wrong."** Keep the resolved values and let CONFIG overwrite `config.ts` with them. Nothing else to do.
+  - **"The app is right, the mapping is wrong."** The record has to change, and which record decides how. When this directory's own mapping is what `project_get` reported resolving from, record the `config.ts` project with `project_set`, passing `cwd` set to `workspaceRoot` — then call `project_get` again and continue with what it now reports. When a committed `formio.json` is the source, that file is the fix: name its path and its key, and ask the user to change it or confirm you may, because the server reads a committed file and never writes one. Either way re-resolve rather than proceeding on the value you were told is right — the point is that the tools and the app agree afterwards, which only re-reading proves.
+
+  Do not offer "re-run SETUP" as a fix on its own: re-running reads the same unchanged record and returns to this same question.
 
 ## The approval gate
 
-Print the resolved values in one block and wait for an explicit `yes`/`approve`/`proceed` response. Do not write any files yet — CONFIG is the first phase that touches the disk.
+Print the resolved values in one block and wait for an explicit `yes`/`approve`/`proceed` response. This phase itself writes nothing to the workspace — but the next one does: BOOTSTRAP scaffolds the tree and edits `angular.json` and `app-module.ts`, so this gate is the last stop before the workspace changes.
 
 ```
 Form.io deployment
@@ -62,6 +66,6 @@ If the user declines, stop. Do not advance to CONFIG. Do not write partial state
 
 ## Where to stash the resolved values
 
-Keep the two URLs in the parent orchestrator's working context as `projectUrl` and `baseUrl`. `CONFIG.md` consumes them directly to populate `appUrl` and `apiUrl` in the `config.ts` template. `AUTH.md` references the project URL when describing how `FormioAuthConfig` picks up the project context.
+Keep three things in the parent orchestrator's working context: the two URLs as `projectUrl` and `baseUrl`, and `baseUrlSource` — the field of the `project_get` report that says where the Base URL came from (`derived` or otherwise). CONFIG reads `baseUrlSource` to decide whether the committed `formio.json` needs a `baseUrl` key, and by then the report itself is gone. On the no-tools path there is no report and no such field: treat a Base URL the user supplied as not derived, because a value they had to type is by definition one nothing could derive. Keep the URLs as `projectUrl` and `baseUrl`. `CONFIG.md` consumes them directly to populate `appUrl` and `apiUrl` in the `config.ts` template. `AUTH.md` references the project URL when describing how `FormioAuthConfig` picks up the project context.
 
 Write these values into no project file other than the eventual `src/app/config.ts` — no dotfile, no `.env`, no `appsettings.json`. The Angular application reads them at runtime from the `FormioAppConfig` provider.

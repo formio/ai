@@ -35,7 +35,8 @@ import { FormioGrid } from '@formio/angular/grid';
 import { FormioAuthService, FormioAuthConfig } from '@formio/angular/auth';
 import { FormioResources } from '@formio/angular/resource';
 
-import { AppConfig, AuthConfig } from './config';
+import { AppConfig } from './config';
+import { AuthModule, AuthConfig } from './auth/auth.module';
 import { AppRoutingModule } from './app-routing-module';
 import { App } from './app'; // legacy naming: `import { AppComponent } from './app.component';`
 import { Home } from './home/home'; // legacy naming: `import { HomeComponent } from './home/home.component';`
@@ -109,24 +110,28 @@ Why `useHash: true`? Matches the angular-demo and sidesteps server-rewrite confi
 
 **Authentication vs. authorization — do not conflate them.** The guard enforces _authentication_ only (is anyone logged in). It does NOT enforce _authorization_ (which role / group) — that stays server-side and is allowed to 403. So: a group-access resource (e.g. Task gated by ProjectUser membership) STILL gets `canActivate: [authGuard]` because anonymous users have no access at all; the per-group narrowing is left to the backend. "Server enforces access" justifies skipping a role/group guard, never the authentication guard.
 
-## 3. `AppConfig` — `FormioAppConfig` + `FormioAuthConfig`
+## 3. `AppConfig` — and where `AuthConfig` actually lives
 
-`src/app/config.ts` — the SAME file the parent skill's CONFIG phase generates (see parent `CONFIG.md`). On an orchestrated run this file already exists with `AppConfig`; extend it with the `AuthConfig` export if missing rather than creating a second config file. Do NOT name it `app.config.ts` — that name is reserved by Angular standalone convention for `ApplicationConfig`, and the parent's SETUP/CONFIG phases read `src/app/config.ts`:
+Two exports, two files, and putting them in one file is a build error waiting to happen.
+
+**`src/app/config.ts` holds `AppConfig` and nothing else** — the SAME file the parent skill's CONFIG phase generates (see parent `CONFIG.md`), which writes it exactly and permits no extras. Do NOT name it `app.config.ts`: that name is reserved by Angular standalone convention for `ApplicationConfig`, and the parent's SETUP/CONFIG phases read `src/app/config.ts`.
 
 ```typescript
 import { FormioAppConfig } from '@formio/angular';
-import { FormioAuthConfig } from '@formio/angular/auth';
 
 export const AppConfig: FormioAppConfig = {
   appUrl: '{projectUrl}', // Project URL — from `project_get`, never hand-typed
   apiUrl: '{baseUrl}', // Base URL — the deployment; from `project_get`, never hand-typed
 };
-
-export const AuthConfig: FormioAuthConfig = {
-  login: { form: 'user/login' }, // === template.json login form's `path`
-  register: { form: 'user/register' }, // === template.json register form's `path`
-};
 ```
+
+**`AuthConfig` belongs to `src/app/auth/auth.module.ts`,** which the parent's AUTH phase writes and exports it from. Import it from there:
+
+```typescript
+import { AuthModule, AuthConfig } from './auth/auth.module';
+```
+
+Do not re-declare it in `config.ts` and do not import it from `./config`. On any orchestrated run AUTH has already written it in the auth module, so a second declaration is either a compile error (`AuthConfig` not exported from `./config`) or a silent second copy that drifts from the one the `AuthModule` actually provides. If the workspace has no auth module at all, that is AUTH's phase to run — not this sub-skill's to substitute for.
 
 These two values are **URL path segments**, not form machine names: `@formio/angular/auth` appends `'/' + login.form` to `appUrl` to load the form, so each must equal the `path` property of the corresponding form in `template.json` byte-for-byte. Default projects use `user/login` and `user/register`. A machine name (`userLogin`, `userRegister`) 404s on sign-in. See the parent `AUTH.md` → "`FormioAuthConfig.login.form` / `.register.form` MUST equal `template.json.<form>.path`".
 
@@ -327,7 +332,7 @@ See `formio-api/references/platform-auth` for the exact IdP endpoint shape.
 Ensure these four are in `dependencies`:
 
 ```json
-"@formio/angular": "^<latest-5.x>",
+"@formio/angular": "^<FORMIO_ANGULAR_VERSION>",
 "@formio/js":      "^<compatible>",
 "bootstrap":       "^5.3.0",
 "bootstrap-icons": "^1.11.0"
@@ -341,7 +346,7 @@ When mode is "existing workspace," before writing `app-module.ts` / `app-routing
 
 1. Read the existing file.
 2. Merge: add new `import` lines, add new entries to `imports: [...]`, `declarations: [...]`, `providers: [...]`, `routes: [...]`. Leave untouched everything you didn't add.
-3. If the file declares `FormioAppConfig` / `FormioResources` / `FormioAuthService` already, do NOT re-declare. Verify the existing `appUrl` matches what the user gave — if not, flag a conflict and ask.
+3. If the file declares `FormioAppConfig` / `FormioResources` / `FormioAuthService` already, do NOT re-declare. Verify the existing `appUrl` matches what `project_get` reported for this workspace — if not, that is the split-brain the sub-skill's handoff-mode check covers: stop and ask which is correct, naming both pairs and where each came from. Do not ask the user to re-supply a URL; the report already carries it.
 4. Same for `angular.json` styles — append, don't replace.
 5. Read the shell template (`src/app/app.html`, legacy `app.component.html`). If `<router-outlet>` is not inside a page-layout element that supplies horizontal gutters and a max content width, add one per the parent skill's `AUTH.md` → "Page layout contract" — it is the only thing that pads the library-rendered routes. Report it in the Phase A plan as a shell modification.
 

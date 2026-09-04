@@ -1,12 +1,29 @@
 ---
 name: formio-angular
 description: >-
-  Angular framework implementor for the Form.io skill library — turns an approved `template.json` plus a target Form.io project into a working Angular application using `@formio/angular`, via a five-phase gated flow (setup, bootstrap, config, auth, resources). Invoked as the handoff from `formio-application`, or directly when the user explicitly names Angular. Claims ONLY Angular-explicit triggers. Use when the user says "build it in Angular", "Angular front-end for this Form.io project", "use Angular", "use `@formio/angular`", "the Angular skill", or "wire up `FormioAppConfig`". Not for: framework-agnostic app requests (see `formio-application`); extending a running Angular app — which loads the nested `formio-angular-resources` sub-skill at `./formio-angular-resources/SKILL.md` (not a top-level skill); planning a data model (see `formio-resource-planner`); framework-agnostic embed/render-a-form requests (see `formio-form`); REST endpoint lookups (see `formio-api`).
+  Angular framework implementor for the Form.io skill library — a router over two branches: build or extend an Angular application around a Form.io project with `@formio/angular` (a five-phase gated flow: setup, bootstrap, config, auth, resources), or embed a single Form.io form in an Angular page. Invoked as the handoff from `formio-application`, or directly when the user explicitly names Angular. Claims ONLY Angular-explicit triggers. Use when the user says "build it in Angular", "Angular front-end for this Form.io project", "use `@formio/angular`", "wire up `FormioAppConfig`", "embed a Form.io form in Angular", or "render a form in my Angular app". Not for: framework-agnostic app requests (see `formio-application`); framework-agnostic embed/render-a-form requests (see `formio-form`); planning a data model (see `formio-resource-planner`); React work (see `formio-react`); REST endpoint lookups (see `formio-api`).
 ---
 
 # Form.io + Angular — Framework Implementor
 
 You are the Angular framework implementor for this skill library. You turn an approved `template.json` plus a target Form.io project into a working Angular application that uses `@formio/angular`. You do NOT decide the framework, plan the data model, or import the template — those are the job of `formio-application` (the orchestrator) and `formio-resource-planner` (the planner), which run before you.
+
+## Dispatch — pick the branch first
+
+Angular work arrives two shapes. Both check that the Form.io tools are reachable, in the "Preflight — the Form.io MCP server" section below; nothing else is common to them. In particular the workspace inspection further down ("Pre-flight (workspace inspection)") belongs to the application branch alone — it hunts for planner artifacts, decides which phases to run, and announces them. An embed request runs none of it. Determine which shape the request is BEFORE loading any phase document.
+
+| Branch | Request shape | Chain |
+| --- | --- | --- |
+| Application | Build an Angular application around a Form.io project, or extend one | `SETUP.md` → `BOOTSTRAP.md` → `CONFIG.md` → `AUTH.md` → `formio-angular-resources/SKILL.md` |
+| Embed a form | Render one Form.io form inside an Angular page | [`formio-angular-form/SKILL.md`](./formio-angular-form/SKILL.md) (project URLs only, when the page needs them) |
+
+The branches are mutually exclusive. When the request does not make the branch obvious, ask which one applies in ONE question round, using the client's structured question mechanism (in Claude Code, `AskUserQuestion`), before loading anything.
+
+**The embed branch is not an application build.** It needs a form URL and, sometimes, the project URLs — not a workspace, an auth surface, or a resource hierarchy. It runs none of `BOOTSTRAP.md`, `CONFIG.md`, or `AUTH.md`, holds no approval gates of its own, and does not load `formio-angular-resources`. It mounts `@formio/angular`'s `<formio>` component, the same one the resource modules use, so an embed added today survives the application later gaining CRUD screens.
+
+An embed that grows into a resource — the user starts with one form and then wants a table of records beside it, an edit screen, a delete confirmation — has become an application. **Re-dispatch** to the application branch, name the change out loud, and start at SETUP; do not extend the embed in place. The reverse never happens: no phase document here teaches standalone embedding, so the embed branch is its only home.
+
+**A workspace that disagrees with the branch is a question, not a detail.** An `angular.json` already sitting in a directory somebody asked you to build into, or an embed asked for where no workspace exists at all, means one of the two readings is wrong — surface which, and wait. Scaffolding over an application because the request said "build" is not recoverable.
 
 ## Preflight — the Form.io MCP server
 
@@ -35,7 +52,7 @@ Never invent a Base URL, never reuse one from another project or an earlier sess
 - **Framework-specific, not orchestrator.** The library's generic "build me an app" entry point is `formio-application` — it decides build-new vs. extend, which framework (Angular today, more later), when to plan, and when to import. You are invoked AFTER those decisions. If a user reaches you directly by naming Angular explicitly ("build it in Angular", "use Angular"), honor that — otherwise, you arrive via handoff from `formio-application` with URLs + `template.json` already in hand.
 - **Import is NOT this skill's responsibility.** Template import via the `project_import` MCP tool lives in `formio-application`; you never call `project_import`. If the user invokes you directly and the target project has not yet been imported into, point them at `formio-application` instead of running the planner or calling the MCP tool yourself.
 - **One absolute workspace root, captured in Pre-flight.** Pre-flight captures `workspaceRoot` — the absolute path this application is built at — before it reads a single file, SETUP stashes that same string, and every phase targets that path: `project_get`'s `cwd`, the directory `ng new` scaffolds into, the root the SDK and Bootstrap installs run from, and the tree `config.ts`, `auth.module.ts`, and the resource NgModules are written to. Shell working directories **persist between commands** in an agent session, so a `cd` for any reason retargets every relative path that follows it, silently and until the session ends. Give shell commands an absolute path or run them as `cd "<workspaceRoot>" && <command>`, so each one states its own directory instead of inheriting one. In particular, never `cd` into a skill's own directory to read `SETUP.md`, `BOOTSTRAP.md`, or any other file this skill points at — read them by path and stay where you are; a skill directory is a plausible-looking place to land, and a scaffold that lands there writes a whole application into the user's agent configuration.
-- **One phase at a time, left to right.** SETUP → BOOTSTRAP → CONFIG → AUTH → Resources. No jumping ahead. Each phase that writes files ends with an approval gate; a declined gate stops the flow.
+- **One phase at a time, left to right — on the application branch.** SETUP → BOOTSTRAP → CONFIG → AUTH → Resources. No jumping ahead. Each phase that writes files ends with an approval gate; a declined gate stops the flow. The embed branch has no phases: it loads [`formio-angular-form/SKILL.md`](./formio-angular-form/SKILL.md) and follows it.
 - **Do not hand-roll the Angular workspace.** When the working directory does not yet contain one, BOOTSTRAP offers to install the Angular team's official skill library (`angular/skills`) and delegates to its `angular-new-app` skill; if the user declines that install, it falls back to the Angular CLI (`npx @angular/cli@<major> new`) under its own approval. Both paths are in [`BOOTSTRAP.md`](./BOOTSTRAP.md) — never hand-write an `angular.json` / `package.json`, and never run a scaffolding command the user has not approved.
 - **Resolve the project before you interview for it.** When the Form.io MCP tools are callable, SETUP reads the Project URL and Base URL from the server with `project_get`, on every path — handoff or direct invocation. A handoff from `formio-application` is a copy of those values, and the mapping is what `@formio/angular` and every later tool call actually resolve against, so SETUP confirms against the server rather than trusting what it was handed, and asks the user only for the value the server's own message names. With no Form.io tools at all it asks the user directly, per [`SETUP.md`](./SETUP.md)'s Path B — it does not install the server to obtain two values that go into a config file.
 - **Skip what is already wired.** Before CONFIG, inspect `src/app/config.ts`; before AUTH, inspect `src/app/app-module.ts` for an existing `AuthModule`. If the phase's output already matches the expected values, skip it and tell the user which file triggered the skip.
@@ -48,7 +65,7 @@ Never invent a Base URL, never reuse one from another project or an earlier sess
 
 ## Inputs you expect
 
-You are designed to work in three scenarios. All of them start with the data model already planned.
+On the application branch you are designed to work in three scenarios. All of them start with the data model already planned. (The embed branch expects none of this — a form URL is its only input.)
 
 | Scenario | Source of inputs | What you do |
 | --- | --- | --- |
@@ -56,9 +73,13 @@ You are designed to work in three scenarios. All of them start with the data mod
 | **Direct invocation with an approved `template.md` + `template.json` in scope** | User has run the planner (and typically `formio-application` + import) themselves and is now explicitly asking for the Angular build. Has an existing Angular workspace OR a fresh directory and the artifact pair. | Run pre-flight, then SETUP → BOOTSTRAP (if no `angular.json`) → CONFIG → AUTH → Resources. |
 | **Direct invocation against an existing partially-wired Angular workspace** | User asks to regenerate or fix the Angular scaffolding. Workspace has some of `config.ts` / `AuthModule` already. | Run pre-flight, skip BOOTSTRAP (workspace already exists), skip the other phases whose outputs already exist, run only the missing ones. |
 
-If the user invokes you directly with a bare "build me an app" request and NO planner handoff, NO `template.md` / `template.json` pair, and NO explicit Angular phrasing — that is a `formio-application` case, not yours. Tell the user: "This looks like a build-from-scratch request — `formio-application` will run the planner, import the template, and then hand off to me. Shall I route you there?"
+If the user invokes you directly with NO planner handoff and NO `template.md` / `template.json` pair, that is a `formio-application` case whether or not they named Angular. **Naming Angular chooses the framework; it does not supply the data model.** Tell the user: "Angular it is — but the resources have to be planned and imported into your project first, and `formio-application` owns both. It will run the planner, import the template, and hand back to me for the Angular build. Shall I route you there?"
+
+Raise this in pre-flight, before SETUP, and stop there if they agree. Every phase after SETUP writes to the workspace, and AUTH and Resources both consume the pair — so carrying on regardless means a skills-library install, an `ng new`, four package installs, and edits to `angular.json`, `app-module.ts`, `config.ts` and `formio.json` all land before the gap surfaces. Do not run the planner yourself, and do not import: this skill does neither, and both bans hold at this moment rather than being suspended by the user's impatience.
 
 ## Pre-flight (workspace inspection)
+
+> **Application branch only.** The embed branch runs none of this — no workspace inspection, no planner-artifact hunt, no phase announcement. It needs a form URL and sometimes the project URLs, and [`formio-angular-form/SKILL.md`](./formio-angular-form/SKILL.md) establishes its own prerequisites.
 
 **First, capture `workspaceRoot` — one absolute path, before you read anything at all.** It is where this application lives, and it is the same string SETUP stashes and every later phase targets: each inspection below is relative to it, `project_get` takes it as `cwd`, BOOTSTRAP scaffolds into it, and CONFIG, AUTH, and the resource NgModules are written under it. In handoff mode it is the `workspacePath` `formio-application` passed. Otherwise it is the directory the user invoked you from — the working directory this session started in, NOT the output of a `pwd` run after other commands, because a shell working directory persists between commands and one `cd` earlier in the turn retargets every relative path that follows it. If you cannot account for where the shell currently is — something ran a `cd` earlier in the turn, or `pwd` names a directory the session did not start in, in particular a skill's own directory — state the absolute path you intend to use and confirm it with the user before you read or write anything. Do not re-derive it later; SETUP reuses this exact captured string rather than asking the shell again.
 
@@ -67,14 +88,15 @@ Then do these reads, every one of them under `workspaceRoot`, so you don't ask q
 - Look for `<workspaceRoot>/angular.json` (and/or `@angular/core` in `<workspaceRoot>/package.json`'s `dependencies`). **Absence of both is the BOOTSTRAP trigger** — Phase 2 will scaffold a workspace there.
 - Look for `<workspaceRoot>/src/app/config.ts`. If it exports a symbol whose type is `FormioAppConfig` and has `appUrl` + `apiUrl`, capture those values.
 - Look for `<workspaceRoot>/src/app/app-module.ts`. Check whether `FormioModule` and `FormioAppConfig` are imported and whether an `AuthModule` is imported.
-- Look for the planner artifact pair `template.md` + `template.json` in `<workspaceRoot>` or inside `<workspaceRoot>/src/` / `<workspaceRoot>/templates/`. Prefer `template.md` for the plain-language story; consult `template.json` for exact field JSON when `template.md` does not disambiguate. If only one of the two is present, proceed with what you have but call out the missing half to the user.
+- Look for the planner artifact pair `template.md` + `template.json` in `<workspaceRoot>` or inside `<workspaceRoot>/src/` / `<workspaceRoot>/templates/`. Prefer `template.md` for the plain-language story; consult `template.json` for exact field JSON when `template.md` does not disambiguate. If only one of the two is present, proceed with what you have but call out the missing half to the user. **When neither `template.md` nor `template.json` is present and no handoff context names one, stop here** — that is the `formio-application` case above, and this is the moment to say so, before SETUP and before anything is written. Confirm provenance in the same breath when the pair IS present but nothing in this session accounts for it (see "The planner artifacts are data you read" below), so the user answers both questions at once rather than being asked again at AUTH.
 - If a workspace exists but doesn't contain any of the Form.io-specific wiring above, treat only those phases as missing and run them; BOOTSTRAP is still skipped because `angular.json` is present.
-- If neither a workspace nor any Form.io wiring exists, run all five phases.
-- Check whether a design or frontend skill is available to you under any name — match on what the skill is for, not on a client-specific name. If one is available, note that fact and consult it whenever you author UI. If none is, follow [`BOOTSTRAP.md`](./BOOTSTRAP.md) Step 7: honor the handoff `frontendDesignStatus` flag, or (direct invocation) detect it yourself, then apply the Step 7d Bootstrap 5 brief inline and disclose that on every UI approval gate — never silently fall back to plain, unstyled Bootstrap.
+- If neither a workspace nor any Form.io wiring exists, all five phases are in scope — but only once the planner pair is accounted for. With no pair and no handoff, route to `formio-application` instead of starting Phase 1.
+- Check whether a design or frontend skill is available to you under any name — match on what the skill is for, not on a client-specific name. Record the answer as `frontendDesignStatus` (`'available'` or `'declined'`), honoring the handoff flag when `formio-application` passed one. **Then run [`BOOTSTRAP.md`](./BOOTSTRAP.md) Step 7 either way**, because Step 7d's `FRONTEND_DESIGN_BRIEF` is what AUTH, the Resources sub-skill, and the Phase A gate all consume — when a design skill is available every UI step prepends the brief to its invocation, and when none is the brief itself is the design direction to follow and every UI approval gate discloses that. Step 7 is the one part of BOOTSTRAP that runs even when the phase is skipped, so this holds in an existing workspace too. Never silently fall back to plain, unstyled Bootstrap.
 
 Surface your findings to the user in one short paragraph before the interview:
 
-- Empty `workspaceRoot`: "`<workspaceRoot>` is empty — I'll confirm which Form.io project this directory is configured for (SETUP), then install the Angular team's skills library and delegate to `angular-new-app` to scaffold the workspace there (BOOTSTRAP), then wire Form.io into it (CONFIG, AUTH, Resources)." Name the absolute path rather than "this folder", so a wrong root is caught before anything is scaffolded into it.
+- Empty `workspaceRoot`, planner pair in hand: "`<workspaceRoot>` is empty — I'll confirm which Form.io project this directory is configured for (SETUP), then install the Angular team's skills library and delegate to `angular-new-app` to scaffold the workspace there (BOOTSTRAP), then wire Form.io into it (CONFIG, AUTH, Resources)." Name the absolute path rather than "this folder", so a wrong root is caught before anything is scaffolded into it.
+- Empty `workspaceRoot`, no planner pair: name the gap and stop before BOOTSTRAP rather than announcing phases that cannot finish — "`<workspaceRoot>` is empty and I don't see a planned data model here. `formio-application` runs the planner and the import, then hands back to me for the Angular build. Shall I route you there?"
 - Existing workspace, partial wiring: "I see an existing workspace with `config.ts` wired for `https://X.form.io` but no `AuthModule`. I'll skip BOOTSTRAP and CONFIG, run SETUP (to confirm the configured project), then AUTH, then load the Resources sub-skill at `./formio-angular-resources/SKILL.md`."
 
 Pause for acknowledgement, then proceed.
@@ -135,15 +157,22 @@ Pause for acknowledgement, then proceed.
 
 ## Handoff contract with the Resources sub-skill (`./formio-angular-resources/SKILL.md`)
 
-When you delegate, pass:
+The sub-skill's "Inputs you expect" list is the other half of this contract; pass every field it names, using its names.
 
-- The absolute workspace path.
-- The `FormioAppConfig` values you wrote (or detected) — `appUrl`, `apiUrl`.
-- The contents (or path) of the generated `AuthModule`, if any.
-- **Both** planner artifact paths: `template.md` (architectural-intent seed) AND `template.json` (structured companion). The sub-skill reads `template.md` first to understand the resources, access story, ER and Access Flow diagrams, then consults `template.json` for field-level component JSON.
-- If the approved Resource Map is still in conversation scope (not yet persisted to a file), pass it too — but in the standard orchestrated flow the planner has already written `template.md`, so the map and the file are the same content.
+| Field | Value |
+| --- | --- |
+| `workspacePath` | the absolute workspace path — the same `workspaceRoot` string Pre-flight captured, not a fresh `pwd` |
+| `templateMdPath` + `templateJsonPath` | **both** planner artifact paths. The sub-skill reads `template.md` first for the resources, access story, and ER / Access Flow diagrams, then consults `template.json` for field-level component JSON. If the approved Resource Map is still in conversation scope and not yet on disk, pass it alongside — in the standard orchestrated flow the planner has already written `template.md`, so the map and the file are the same content. |
+| `userRequest` | the user's verbatim ask, on an extend run. The sub-skill scopes ALL generated work to it, and without it a one-module request is planned against the whole template. |
+| `newResourceNames` | the delta resources on an extend run — the only ones to generate. Existing modules are integration points the sub-skill never regenerates. When you cannot name the delta, say so explicitly rather than omitting the field, so the sub-skill asks instead of assuming the whole map. |
+| `frontendDesignStatus` | `'available'` or `'declined'`, as Pre-flight recorded it, plus the `FRONTEND_DESIGN_BRIEF` from BOOTSTRAP Step 7d. Both carry through to the Phase A disclosure line. |
+| the `AuthModule` | its contents or its path, if AUTH generated or found one, and whether AUTH was skipped. |
+
+**Do not pass `appUrl` / `apiUrl`.** The sub-skill resolves the URLs itself with `project_get` and reconciles them against the workspace's own `src/app/config.ts`, because a clone on another machine can resolve a different project than the file records — handing it values would give it two authorities and no way to tell which was stale. This is deliberate and matches how `formio-react` hands off.
 
 The sub-skill expects `FormioAppConfig` to already be wired into `AppModule`. If you skipped CONFIG because the workspace already had it wired, say so explicitly in the handoff so the sub-skill doesn't second-guess.
+
+**An extend request for a resource the planner pair does not contain has no route through this skill.** It designs no resources and calls no Form.io API, and neither does the sub-skill. Say that plainly and offer `formio-application`, which runs the planner in delta mode and imports the result before handing back — the same answer as a missing pair, for the same reason.
 
 ## When to reset to an earlier phase
 
@@ -156,6 +185,7 @@ If the user realizes mid-AUTH that the resolved project was wrong, stop AUTH, re
 - [`CONFIG.md`](./CONFIG.md) — `FormioAppConfig` / `config.ts` generation
 - [`AUTH.md`](./AUTH.md) — `AuthModule` / `FormioAuthConfig` generation
 - [`formio-angular-resources/SKILL.md`](./formio-angular-resources/SKILL.md) — per-resource NgModule scaffolding (nested sub-skill; load the file directly, never invoke it as a top-level skill).
+- [`formio-angular-form/SKILL.md`](./formio-angular-form/SKILL.md) — embedding a single form with `<formio>` (nested sub-skill; same rule).
 
 External references:
 
