@@ -35,6 +35,9 @@ Five inputs are emitters the component subscribes to, so a parent drives the for
 | `[submitDone]` | emit a submission to fire the renderer's `submitDone` event, which is what a form's own post-submit behaviour listens for |
 
 ```ts
+import type { FormioRefreshValue } from '@formio/angular';
+import type { Submission } from '@formio/core/types'; // NOT @formio/js — it exports no submission type
+
 readonly refresh = new EventEmitter<FormioRefreshValue>();
 readonly triggerError = new EventEmitter<unknown>();
 
@@ -54,6 +57,8 @@ The renderer's `Webform` (or `Wizard`, or `PDF`) instance is the full API: read 
 This is the trap. `ready` is typed `EventEmitter<FormioBaseComponent>` and emits the component itself; the renderer instance is on its `formio` property:
 
 ```ts
+private instance: Webform | null = null;
+
 onReady(component: FormioBaseComponent) {
   this.instance = component.formio;      // NOT the $event itself
 }
@@ -88,9 +93,12 @@ Prefer this one. `(ready)` is for the case where the template is already wiring 
 `instance.on(name, handler)` reaches every renderer event, including the ones with no output:
 
 ```ts
+private readonly audit = inject(AuditService);
+private readonly drafts = inject(DraftService);
+// ...
 const instance = await this.formio.formioReady;
-instance.on('componentChange', (event) => this.audit(event));
-instance.on('saveDraft', (submission) => this.draftSaved(submission));
+instance.on('componentChange', (event) => this.audit.record(event));
+instance.on('saveDraft', (submission) => this.drafts.save(submission));
 ```
 
 **A handler registered this way is outside Angular's notification path.** The component's `ngZone.run` bridging applies only to the events it maps to its own outputs. So publish anything the view depends on explicitly — a `signal()` write or a `markForCheck()`. [change-detection.md](./change-detection.md) is the whole story, and it is short.

@@ -84,6 +84,11 @@ An `[options]` or `[renderOptions]` object literal written inline in a template 
 
 ```ts
 readonly renderOptions = { icons: 'bi' };
+
+beforeSubmit(submission: Submission, callback: (err: unknown, sub?: Submission) => void) {
+  callback(null, submission);
+}
+
 readonly componentOptions = {
   disableAlerts: true,
   hooks: { beforeSubmit: (submission, callback) => this.beforeSubmit(submission, callback) },
@@ -113,6 +118,8 @@ readonly renderOptions = {
 **2. Drive the flow from the instance.** `nextPage()`, `prevPage()`, `setPage(i)`, and `submit()` are `Wizard` methods, reached through the instance — [control.md](./control.md) has both ways to get hold of it. `nextPage()` validates the current page first and rejects if it fails, leaving the wizard where it is with the errors rendered, so awaiting it is also your gate.
 
 ```ts
+private wizard: Wizard | null = null;   // captured in (ready) — see control.md
+
 async next() {
   await this.wizard?.nextPage();
 }

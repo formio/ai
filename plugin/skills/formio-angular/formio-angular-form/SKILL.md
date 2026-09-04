@@ -24,27 +24,41 @@ There is no component decision to make on arrival. When `<formio>` is genuinely 
 
 This branch runs none of the application phases, so nothing upstream has prepared the workspace. Establish both of these first; each is cheap, and skipping either produces a failure whose message points somewhere else.
 
-### 1. The packages
+### 1a. The packages
 
 Read `<working directory>/package.json`. `@formio/angular` and `@formio/js` must both be dependencies. When either is missing, the template you are about to write does not compile, and the error is a module-resolution error that says nothing about the form.
 
-Resolve the versions from the npm registry — the same registry the install resolves against — then install both in one command:
+**First, establish the package manager — before running anything.** Read `packageManager` in `package.json`, then look for a lockfile: `yarn.lock` → Yarn, `pnpm-lock.yaml` → pnpm, `bun.lock` / `bun.lockb` → Bun, `package-lock.json` → npm. `packageManager` wins over any lockfile; when more than one lockfile is present the first hit in that order wins, because `package-lock.json` is the one a stray `npm install` leaves behind in a workspace belonging to another tool. Capture the answer as `PACKAGE_MANAGER` and use that one tool for everything below. Default to npm only when the workspace has none of them.
+
+**Never introduce a second lockfile.** Running `npm install` in a Yarn or pnpm workspace writes a competing lockfile and a parallel `node_modules`, and the user's own commands keep resolving against the tree you did not build — nothing warns you, and the app you tested is not the app they run. This branch is the one where the workspace is always somebody else's, so the rule matters here more than anywhere.
+
+Then resolve the versions from the npm registry — the same registry the install resolves against — and install what is missing in one command:
 
 ```bash
 npm view @formio/angular version   # e.g. 11.0.5  → FORMIO_ANGULAR_VERSION
 npm view @formio/js version        # e.g. 5.3.6   → FORMIO_JS_VERSION
-npm install --save @formio/angular@^<FORMIO_ANGULAR_VERSION> @formio/js@^<FORMIO_JS_VERSION>
+
+# through PACKAGE_MANAGER, not literally `npm` unless that is what the workspace uses:
+<PACKAGE_MANAGER> add @formio/angular@^<FORMIO_ANGULAR_VERSION> @formio/js@^<FORMIO_JS_VERSION>
 ```
 
-Use the caret range so future minor and patch releases in the same major flow through without another install. Never leave a `<…>` token unresolved on a command line — a literal `@formio/angular@^<FORMIO_ANGULAR_VERSION>` installs nothing.
+npm spells that `npm install --save`; Yarn, pnpm and Bun all spell it `add`. Use the caret range so future minor and patch releases in the same major flow through without another install, and never leave a `<…>` token unresolved on a command line — a literal `@formio/angular@^<FORMIO_ANGULAR_VERSION>` installs nothing.
 
-**If the registry is unreachable,** do not guess. Read the versions from `node_modules/@formio/angular/package.json` and `node_modules/@formio/js/package.json` if either is already present in some form, and otherwise ask the user for the two versions in one round and use what they give you verbatim. A version nobody saw is a version nobody agreed to.
+**If the registry is unreachable,** do not guess. Read the versions from the installed `package.json` of either package if one is already present, and otherwise ask the user for the two versions in one round and use what they give you verbatim. A version nobody saw is a version nobody agreed to.
 
-**Use the workspace's own package manager, and never introduce a second lockfile.** Read `packageManager` in `package.json` first, then look for a lockfile: `yarn.lock` → Yarn, `pnpm-lock.yaml` → pnpm, `bun.lock` / `bun.lockb` → Bun, `package-lock.json` → npm. `packageManager` wins over any lockfile; when more than one lockfile is present the first hit in that order wins, because `package-lock.json` is the one a stray `npm install` leaves behind in a workspace belonging to another tool. Running `npm install` in a Yarn or pnpm workspace writes a competing lockfile and a parallel `node_modules`, and the user's own commands keep resolving against the tree you did not build — nothing warns you, and the app you tested is not the app they run. This branch is the one where the workspace is always somebody else's, so the rule matters here more than anywhere.
+### 1b. Bootstrap, when the workspace has no stylesheet of its own
 
-Installing into a user's workspace is a change to their dependency tree: show the command and the resolved versions and get approval before running it.
+A rendered form needs a Bootstrap 5 stylesheet as well as the renderer's own — [references/styling.md](./references/styling.md) explains which of the two `<formio>` already brings. BOOTSTRAP Step 5, which installs Bootstrap on an application build, does **not** run on this branch, so check for it here: `bootstrap` and `bootstrap-icons` in `package.json`, or an existing design system in `angular.json`'s `styles` array.
 
-A Bootstrap 5 stylesheet is the other prerequisite, and it belongs to [references/styling.md](./references/styling.md) rather than here, because whether the workspace already has one is a styling question.
+When the workspace already ships a design system, leave it alone and go to `styling.md`'s "Replacing the Bootstrap half". When it ships nothing, install them with the same `PACKAGE_MANAGER` before writing any `angular.json` `styles` entry — an entry pointing at a package that is not installed fails the build with an unresolved-path error that says nothing about forms:
+
+```bash
+npm view bootstrap@5 version       # take the last line → BOOTSTRAP_VERSION
+npm view bootstrap-icons version   # → BOOTSTRAP_ICONS_VERSION
+<PACKAGE_MANAGER> add bootstrap@^<BOOTSTRAP_VERSION> bootstrap-icons@^<BOOTSTRAP_ICONS_VERSION>
+```
+
+Installing into a user's workspace is a change to their dependency tree: show the commands and the resolved versions and get approval before running any of them.
 
 ### 2. Which form
 

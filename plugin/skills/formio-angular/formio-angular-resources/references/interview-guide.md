@@ -53,7 +53,7 @@ For each join resource, pin down how both sides should be named in the URL:
 
 ## Round 4 — Confirm auth
 
-`template.md`'s `## Users & Auth` section names the `Login form` and `Registration form` explicitly. Default: generate `AuthModule` wired to those exact form names via `@formio/angular/auth`'s `FormioAuthConfig`. Confirm:
+`template.md`'s `## Users & Auth` section names the `Login form` and `Registration form` explicitly. Default: the parent AUTH phase provides `FormioAuthConfig` at the application root, pointing at those exact form paths, and generates a lazy `AuthModule` reached only through the `/auth` route. Confirm:
 
 - Confirm the auth routes stay public: `@formio/angular/auth` mounts login and register as children of the `/auth` route the parent AUTH phase adds, so they are `/auth/login` and `/auth/register` and they stay unguarded so anonymous users can reach them. Do not re-path them — AUTH's logout redirect and guard both target `/auth/login`, and moving one without the other breaks both.
 - Is there a logout affordance in the nav? (default yes, via `FormioAuthService.logout()`, which redirects to `/auth/login`)

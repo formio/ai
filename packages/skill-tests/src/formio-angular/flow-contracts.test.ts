@@ -101,25 +101,69 @@ describe('the design brief exists on every path that consumes it', () => {
   });
 });
 
-// AUTH writes AuthConfig into src/app/auth/auth.module.ts and imports it from
-// there. One sub-skill reference imported it from './config' and the plan
-// template planned it into config.ts, which is a build error in any workspace
-// where AUTH already ran.
-describe('AuthConfig has one home', () => {
-  it('nothing imports AuthConfig from ./config', () => {
-    expect(offenders((body) => /AuthConfig[^\n]*\}\s*from\s*'\.\/config'/.test(body))).toEqual([]);
-  });
-
-  it('nothing plans FormioAuthConfig into config.ts', () => {
+// The auth wiring follows what Form.io's own applications ship (formmanager,
+// pro.formview.io): FormioAuthService and FormioAuthConfig provided at the
+// application ROOT, and auth.module.ts reached ONLY through the /auth
+// loadChildren route.
+//
+// The earlier shape exported an AuthConfig const from auth.module.ts and put
+// AuthModule in AppModule.imports. That is a real bug, not a style choice:
+// FormioAuth declares no providers and no exports, so the eager import gains
+// nothing, while its RouterModule.forChild(FormioAuthRoutes()) contributes a
+// SECOND root-level `path: ''` route — and the static import of the module for
+// its AuthConfig export kept the "lazy" chunk in the eager graph.
+describe('auth is wired the way the shipped Form.io applications wire it', () => {
+  // Matched as a bare array ELEMENT (`    AuthModule,` on its own line), which is
+  // the shape the defect took. Prose that names it in order to forbid it — and the
+  // template comment saying it is deliberately absent — must not trip this.
+  it('AuthModule is never placed in an imports array', () => {
+    const asArrayElement = /^\s*AuthModule,?\s*$/m;
     expect(
-      offenders((body) =>
-        /FormioAuthConfig[^\n]{0,60}config\.ts|config\.ts[^\n]{0,60}FormioAuthConfig/.test(body)
-      )
+      offenders((body) => asArrayElement.test(body)),
+      'AuthModule belongs only as the /auth loadChildren target'
     ).toEqual([]);
   });
 
-  it('AUTH still owns the file it writes', () => {
-    expect(doc('AUTH.md')).toContain("from './auth/auth.module'");
+  it('nothing statically imports the auth module outside a prohibition', () => {
+    const offending = allDocs().filter(({ body }) =>
+      body
+        .split('\n')
+        .some(
+          (line) =>
+            /^\s*import\s+\{[^}]*\}\s+from\s+'\.\/auth\/auth\.module'/.test(line) &&
+            !/never|not|NOT/.test(line)
+        )
+    );
+    expect(offending.map(({ path }) => path)).toEqual([]);
+  });
+
+  it('no document exports an AuthConfig const from the auth module', () => {
+    expect(offenders((body) => /export const AuthConfig/.test(body))).toEqual([]);
+  });
+
+  it('AUTH provides both auth symbols at the root instead', () => {
+    const body = doc('AUTH.md');
+    expect(body).toMatch(/provide: FormioAuthConfig,\s*\n?\s*useValue:/);
+    expect(body).toContain('FormioAuthService,');
+  });
+
+  it('AUTH explains why the eager import is wrong, not just that it is', () => {
+    const body = doc('AUTH.md');
+    expect(body).toMatch(/Why `AuthModule` is NOT in `AppModule.imports`/);
+    expect(body.toLowerCase()).toMatch(/no `?providers`?|declares no providers/);
+    expect(body).toMatch(/path: ''/);
+  });
+
+  it('cites the applications the pattern comes from', () => {
+    const body = doc('AUTH.md');
+    expect(body).toContain('formmanager');
+    expect(body).toContain('pro.formview.io');
+  });
+
+  it('nothing plans the auth config into the CONFIG phase file', () => {
+    const intoAppConfig =
+      /FormioAuthConfig[^\n]{0,40}src\/app\/config\.ts|src\/app\/config\.ts[^\n]{0,40}FormioAuthConfig/;
+    expect(offenders((body) => intoAppConfig.test(body))).toEqual([]);
   });
 });
 

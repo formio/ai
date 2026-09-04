@@ -328,7 +328,7 @@ sequenceDiagram
     participant Sch as formio-schema
     participant Act as formio-actions
     participant MCP as @formio/mcp
-    participant Emb as formio-form / formio-react-form
+    participant Emb as formio-form / formio-react-form / formio-angular-form
 
     U->>FB: “build a college application wizard”
     FB->>U: Step 1 INTENT (batched) — webform, wizard, or PDF form? embed afterward?

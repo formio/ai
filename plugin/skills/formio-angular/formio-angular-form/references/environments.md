@@ -33,12 +33,16 @@ Two things to keep true: the component holding `<formio>` must be reachable **on
 When `@defer` does not fit (the form is created imperatively, or the trigger has to be your own logic), guard the import:
 
 ```ts
+@Input({ required: true }) formDefinition!: object;
+@ViewChild('host', { static: true }) host!: ElementRef<HTMLElement>;
+
 private readonly platformId = inject(PLATFORM_ID);
+private instance: Webform | null = null;
 
 async ngAfterViewInit() {
   if (!isPlatformBrowser(this.platformId)) return;
   const { Formio } = await import('@formio/js');
-  this.instance = await Formio.createForm(this.host.nativeElement, this.formUrl);
+  this.instance = await Formio.createForm(this.host.nativeElement, this.formDefinition);
 }
 ```
 

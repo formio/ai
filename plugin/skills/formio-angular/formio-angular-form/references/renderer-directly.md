@@ -17,8 +17,7 @@ Everything else — wanting fewer inputs, disliking the alert chrome, preferring
 ## The shape
 
 ```ts
-import { Component, ElementRef, OnDestroy, ViewChild, inject, signal } from '@angular/core';
-import { ChangeDetectorRef, AfterViewInit } from '@angular/core';
+import { AfterViewInit, Component, ElementRef, Input, OnDestroy, ViewChild } from '@angular/core';
 import { Formio } from '@formio/js';
 import type { Webform } from '@formio/js';
 import type { Submission } from '@formio/core/types';
@@ -28,6 +27,7 @@ import type { Submission } from '@formio/core/types';
   template: '<div #host></div>',
 })
 export class IntakeFormComponent implements AfterViewInit, OnDestroy {
+  @Input({ required: true }) formDefinition!: object; // the definition, NOT a URL — see below
   @ViewChild('host', { static: true }) host!: ElementRef<HTMLElement>;
 
   private instance: Webform | null = null;
@@ -35,7 +35,7 @@ export class IntakeFormComponent implements AfterViewInit, OnDestroy {
   private inFlight = false;
 
   async ngAfterViewInit() {
-    const instance = await Formio.createForm(this.host.nativeElement, this.formUrl, OPTIONS);
+    const instance = await Formio.createForm(this.host.nativeElement, this.formDefinition, OPTIONS);
 
     // (2) the component may already be gone
     if (this.destroyed) {
@@ -48,12 +48,14 @@ export class IntakeFormComponent implements AfterViewInit, OnDestroy {
   }
 
   ngOnDestroy() {
-    this.destroyed = true;         // (2)
-    this.instance?.destroy(true);   // (1)
+    this.destroyed = true; // (2)
+    this.instance?.destroy(true); // (1)
     this.instance = null;
   }
 }
 ```
+
+**This scaffold takes a definition object, deliberately.** Hand `createForm` a **URL** instead and the renderer owns the save — it posts the submission itself, and a `submit` handler that also writes a record writes it **twice**, which is the failure [mounting.md](./mounting.md) warns about. Obligation 3 below assumes you are the one saving, so the two only compose safely on this branch. If the form must be fetched by URL, either drop your own save and treat `submit` as a notification, or load the definition yourself (`new Formio(url).loadForm()`) and pass the result here.
 
 ```ts
 // module scope, so its identity is stable and nothing rebuilds on a re-render
@@ -77,6 +79,8 @@ Building a form is asynchronous, so the component can be destroyed while `create
 ### 3. Latch submit
 
 ```ts
+private readonly records = inject(RecordsService);
+
 private async onSubmit(submission: Submission) {
   if (this.inFlight) return;
   this.inFlight = true;
@@ -92,7 +96,7 @@ The renderer can emit `submit` more than once for one interaction. `<formio>` ho
 
 A plain field, not a signal and not a disabled button: the duplicate arrives in the same tick, before change detection runs, so a disabled attribute has not taken effect yet.
 
-The latch is unnecessary when the renderer is doing the saving — a URL passed to `createForm` sets the instance up to post the submission itself, and your handler is being notified rather than asked to act. [mounting.md](./mounting.md) has which is which.
+**The latch belongs with a definition-object mount, not a URL mount.** A URL passed to `createForm` sets the instance up to post the submission itself, so your handler is being notified rather than asked to act — save again there and you have two records, not a duplicate-click problem. The scaffold above passes a definition for exactly this reason. [mounting.md](./mounting.md) has which binding means which.
 
 ### 4. Publish renderer callbacks into Angular
 

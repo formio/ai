@@ -10,7 +10,7 @@ Every resource module you generate plugs into a shared foundation. This file is 
 
 1. `AppModule`
 2. `AppRoutingModule`
-3. `AppConfig` (FormioAppConfig + FormioAuthConfig)
+3. `AppConfig` (FormioAppConfig in config.ts; the auth config inline at root)
 4. Root component (`App`) and `Home`
 5. `AuthModule` and `authGuard`
 6. `angular.json` — Bootstrap 5 + Bootstrap Icons
@@ -36,7 +36,6 @@ import { FormioAuthService, FormioAuthConfig } from '@formio/angular/auth';
 import { FormioResources } from '@formio/angular/resource';
 
 import { AppConfig } from './config';
-import { AuthModule, AuthConfig } from './auth/auth.module';
 import { AppRoutingModule } from './app-routing-module';
 import { App } from './app'; // legacy naming: `import { AppComponent } from './app.component';`
 import { Home } from './home/home'; // legacy naming: `import { HomeComponent } from './home/home.component';`
@@ -55,7 +54,10 @@ import { Home } from './home/home'; // legacy naming: `import { HomeComponent } 
     FormioAuthService,
     FormioResources,
     { provide: FormioAppConfig, useValue: AppConfig },
-    { provide: FormioAuthConfig, useValue: AuthConfig },
+    {
+      provide: FormioAuthConfig,
+      useValue: { login: { form: 'user/login' }, register: { form: 'user/register' } },
+    },
   ],
   bootstrap: [App],
 })
@@ -110,9 +112,7 @@ Why `useHash: true`? Matches the angular-demo and sidesteps server-rewrite confi
 
 **Authentication vs. authorization — do not conflate them.** The guard enforces _authentication_ only (is anyone logged in). It does NOT enforce _authorization_ (which role / group) — that stays server-side and is allowed to 403. So: a group-access resource (e.g. Task gated by ProjectUser membership) STILL gets `canActivate: [authGuard]` because anonymous users have no access at all; the per-group narrowing is left to the backend. "Server enforces access" justifies skipping a role/group guard, never the authentication guard.
 
-## 3. `AppConfig` — and where `AuthConfig` actually lives
-
-Two exports, two files, and putting them in one file is a build error waiting to happen.
+## 3. `AppConfig` — and where the auth config actually lives
 
 **`src/app/config.ts` holds `AppConfig` and nothing else** — the SAME file the parent skill's CONFIG phase generates (see parent `CONFIG.md`), which writes it exactly and permits no extras. Do NOT name it `app.config.ts`: that name is reserved by Angular standalone convention for `ApplicationConfig`, and the parent's SETUP/CONFIG phases read `src/app/config.ts`.
 
@@ -125,20 +125,16 @@ export const AppConfig: FormioAppConfig = {
 };
 ```
 
-**`AuthConfig` belongs to `src/app/auth/auth.module.ts`,** which the parent's AUTH phase writes and exports it from. Import it from there:
+**The auth config is an inline `useValue` in `app-module.ts`'s root `providers`,** written by the parent's AUTH phase — not an export from `config.ts` and not an export from `auth/auth.module.ts`:
 
 ```typescript
-import { AuthModule, AuthConfig } from './auth/auth.module';
+{ provide: FormioAuthConfig, useValue: { login: { form: 'user/login' }, register: { form: 'user/register' } } },
+FormioAuthService,
 ```
 
-Do not re-declare it in `config.ts` and do not import it from `./config`. On any orchestrated run AUTH has already written it in the auth module, so a second declaration is either a compile error (`AuthConfig` not exported from `./config`) or a silent second copy that drifts from the one the `AuthModule` actually provides. If the workspace has no auth module at all, that is AUTH's phase to run — not this sub-skill's to substitute for.
+This sub-skill does not write either one. Verify they are present and move on; if the auth providers are missing, that is the parent's AUTH phase to run.
 
-These two values are **URL path segments**, not form machine names: `@formio/angular/auth` appends `'/' + login.form` to `appUrl` to load the form, so each must equal the `path` property of the corresponding form in `template.json` byte-for-byte. Default projects use `user/login` and `user/register`. A machine name (`userLogin`, `userRegister`) 404s on sign-in. See the parent `AUTH.md` → "`FormioAuthConfig.login.form` / `.register.form` MUST equal `template.json.<form>.path`".
-
-**`appUrl` vs `apiUrl`:**
-
-- `appUrl` = the **Project URL** that `project_get` reported. This is what `FormioResourceService` calls to load forms and submissions. It is the value every `form_*` MCP tool uses and every `formio-api/references/project-*` / `formio-api/references/runtime-*` skill means by "project URL."
-- `apiUrl` = the **Base URL** that `project_get` reported. Used for cross-project concerns (team / project / tenant management). Take it from that command and nowhere else — do not fill in `https://api.form.io` because the app has one project, since that value is correct only for a project on a `form.io` host and points a self-hosted app's login at a deployment it does not use.
+**Do not import `AuthModule` into `AppModule`, and do not add it to any `imports` array.** It belongs exactly once, as the `loadChildren` target of the `/auth` route. `FormioAuth` declares no providers and no exports, so importing it gains nothing, while its `RouterModule.forChild(FormioAuthRoutes())` would contribute a second root-level `path: ''` route and make the lazy chunk eager. Both shipped Form.io applications (`formmanager`, `pro.formview.io`) wire it the lazy-only way. The parent's `AUTH.md` has the full reasoning under "Why `AuthModule` is NOT in `AppModule.imports`".
 
 ## 4. Root component (`App`) and `Home`
 
@@ -253,7 +249,7 @@ import { LogoutComponent } from './logout.component';
 export class AuthModule {}
 ```
 
-`FormioAuth` (module from `@formio/angular/auth`) contributes the `login` and `register` routes automatically; they are wired to the form names in `FormioAuthConfig`.
+`FormioAuth` (module from `@formio/angular/auth`) contributes the `login` and `register` routes automatically; they are wired to the form paths in the root `FormioAuthConfig` provider. Note this module is reached only through the `/auth` `loadChildren` route — it is never added to an `imports` array.
 
 `src/app/auth/logout.component.ts`:
 

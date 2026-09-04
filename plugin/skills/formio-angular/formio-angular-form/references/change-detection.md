@@ -19,6 +19,8 @@ So every output in [control.md](./control.md) — `(submit)`, `(change)`, `(page
 The bridging covers the component's own outputs and nothing else. `instance.on('nextPage', …)`, registered after `formioReady`, bypasses it:
 
 ```ts
+@ViewChild(FormioComponent) formio!: FormioComponent;
+
 readonly page = signal(0);
 
 async ngAfterViewInit() {
@@ -31,6 +33,7 @@ With a non-signal field, say it explicitly:
 
 ```ts
 private readonly cdr = inject(ChangeDetectorRef);
+private currentPage = 0;
 // ...
 instance.on('nextPage', ({ page }) => {
   this.currentPage = page;
