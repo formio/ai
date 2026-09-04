@@ -83,6 +83,8 @@ For "validate against my API, then save, or show the message on the field", the 
 An `[options]` or `[renderOptions]` object literal written inline in a template is a new object on every change-detection pass, and `ngOnChanges` compares identity. Put them on the component class or at module scope and bind the field:
 
 ```ts
+import type { Submission } from '@formio/core/types';
+
 readonly renderOptions = { icons: 'bi' };
 
 beforeSubmit(submission: Submission, callback: (err: unknown, sub?: Submission) => void) {
@@ -118,7 +120,17 @@ readonly renderOptions = {
 **2. Drive the flow from the instance.** `nextPage()`, `prevPage()`, `setPage(i)`, and `submit()` are `Wizard` methods, reached through the instance — [control.md](./control.md) has both ways to get hold of it. `nextPage()` validates the current page first and rejects if it fails, leaving the wizard where it is with the errors rendered, so awaiting it is also your gate.
 
 ```ts
-private wizard: Wizard | null = null;   // captured in (ready) — see control.md
+import type { Webform } from '@formio/js';
+
+// `Wizard` is not exported by @formio/js and its deep path is not in the package's
+// `exports` map, so name the methods you use structurally rather than importing it.
+type WizardInstance = Webform & {
+  nextPage(): Promise<void>;
+  prevPage(): Promise<void>;
+  setPage(page: number): Promise<void>;
+};
+
+private wizard: WizardInstance | null = null;   // captured via formioReady — see control.md
 
 async next() {
   await this.wizard?.nextPage();

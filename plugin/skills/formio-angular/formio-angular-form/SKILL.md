@@ -42,7 +42,7 @@ npm view @formio/js version        # e.g. 5.3.6   → FORMIO_JS_VERSION
 <PACKAGE_MANAGER> add @formio/angular@^<FORMIO_ANGULAR_VERSION> @formio/js@^<FORMIO_JS_VERSION>
 ```
 
-npm spells that `npm install --save`; Yarn, pnpm and Bun all spell it `add`. Use the caret range so future minor and patch releases in the same major flow through without another install, and never leave a `<…>` token unresolved on a command line — a literal `@formio/angular@^<FORMIO_ANGULAR_VERSION>` installs nothing.
+`add` is understood by all four (npm treats it as an alias for `install`), so the line above works verbatim once `<PACKAGE_MANAGER>` is substituted. Use the caret range so future minor and patch releases in the same major flow through without another install, and never leave a `<…>` token unresolved on a command line — a literal `@formio/angular@^<FORMIO_ANGULAR_VERSION>` installs nothing.
 
 **If the registry is unreachable,** do not guess. Read the versions from the installed `package.json` of either package if one is already present, and otherwise ask the user for the two versions in one round and use what they give you verbatim. A version nobody saw is a version nobody agreed to.
 

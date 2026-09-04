@@ -158,3 +158,114 @@ describe('TypeScript examples declare the members they use', () => {
     ).toEqual([]);
   });
 });
+
+// The third instance of one class of defect: a TYPE used in an example that
+// nothing imports and nothing declares. `Submission` was imported from the wrong
+// package; `Wizard` was used with no import at all and turns out not to be
+// exported by @formio/js — nor reachable by deep path, since `./lib/*` is absent
+// from the published `exports` map. Neither the import guard nor the `this.`
+// guard sees this shape, so it gets its own.
+describe('TypeScript examples name only types they bring into scope', () => {
+  const TS_FENCE = /```ts\n([\s\S]*?)```/g;
+
+  // Angular, TypeScript, and DOM names an example may use without importing them
+  // in the snippet — the reader's own workspace supplies these.
+  const AMBIENT = new Set([
+    'Component',
+    'NgModule',
+    'Injectable',
+    'Input',
+    'Output',
+    'ViewChild',
+    'ElementRef',
+    'EventEmitter',
+    'ChangeDetectorRef',
+    'NgZone',
+    'OnInit',
+    'OnDestroy',
+    'OnChanges',
+    'AfterViewInit',
+    'Routes',
+    'Router',
+    'ActivatedRoute',
+    'RouterModule',
+    'CommonModule',
+    'BrowserModule',
+    'ApplicationConfig',
+    'Promise',
+    'Record',
+    'Partial',
+    'Array',
+    'Set',
+    'Map',
+    'Error',
+    'Event',
+    'HTMLElement',
+    'Document',
+    'Observable',
+    'Subscription',
+    'CanActivateFn',
+    'PLATFORM_ID',
+    'InjectionToken',
+    'Signal',
+    'WritableSignal',
+  ]);
+
+  // Only real TYPE positions. A loose `: X` also matches object-literal values
+  // (`useValue: AppConfig`, `auth: CustomAuthComponent`) and template
+  // placeholders (`m.<Pascal>Module`), which are not types and produced four
+  // false positives on the first run.
+  const TYPE_POSITIONS = [
+    /[!?]:\s*([A-Z]\w*)/g, // class field: `formio!: FormioComponent`
+    /:\s*([A-Z]\w*)\s*\|/g, // union: `Webform | null`
+    /\(\s*\w+:\s*([A-Z]\w*)/g, // first parameter: `onReady(component: FormioBaseComponent`
+    /\bas\s+([A-Z]\w*)/g, // assertion
+  ];
+
+  function typeNames(code: string): Set<string> {
+    const names = new Set<string>();
+    for (const pattern of TYPE_POSITIONS) {
+      for (const match of code.matchAll(pattern)) {
+        names.add(match[1]);
+      }
+    }
+    return names;
+  }
+
+  it('every type annotation is imported, declared, or ambient', () => {
+    const offenders: string[] = [];
+
+    for (const path of everyMarkdownUnder(angularRoot)) {
+      const body = readFileSync(path, 'utf8');
+      const code = [...body.matchAll(TS_FENCE)].map((m) => m[1]).join('\n');
+      if (!code) continue;
+
+      // Imported anywhere in the document, or declared as a local type/class/interface.
+      const inScope = new Set<string>();
+      for (const m of body.matchAll(/import\s+(?:type\s+)?\{([^}]+)\}/g)) {
+        for (const raw of m[1].split(',')) {
+          const name = raw
+            .trim()
+            .split(/\s+as\s+/)
+            .pop()
+            ?.trim();
+          if (name) inScope.add(name);
+        }
+      }
+      for (const m of code.matchAll(/(?:type|interface|class|enum)\s+([A-Z]\w*)/g)) {
+        inScope.add(m[1]);
+      }
+
+      for (const name of typeNames(code)) {
+        if (!inScope.has(name) && !AMBIENT.has(name)) {
+          offenders.push(`${relative(angularRoot, path)}: ${name}`);
+        }
+      }
+    }
+
+    expect(
+      offenders,
+      'an example annotates a type that nothing imports, declares, or supplies ambiently'
+    ).toEqual([]);
+  });
+});

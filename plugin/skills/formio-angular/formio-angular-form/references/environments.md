@@ -33,6 +33,8 @@ Two things to keep true: the component holding `<formio>` must be reachable **on
 When `@defer` does not fit (the form is created imperatively, or the trigger has to be your own logic), guard the import:
 
 ```ts
+import type { Webform } from '@formio/js';
+
 @Input({ required: true }) formDefinition!: object;
 @ViewChild('host', { static: true }) host!: ElementRef<HTMLElement>;
 

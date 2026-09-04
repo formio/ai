@@ -375,3 +375,36 @@ describe('the two branches are distinguishable at the entry point', () => {
     );
   });
 });
+
+// `FormioAuth` is imports-only: it brings the auth components into scope and
+// contributes no routes. The URLs come from mounting FormioAuthRoutes(). One
+// document showed an auth module that imported FormioAuth, mounted
+// RouterModule.forChild with only a redirect and a logout route, and carried a
+// comment claiming FormioAuth supplied login and register — so the generated
+// app's /auth/login resolved to nothing, which is the exact failure AUTH.md
+// warns about two documents away.
+describe('an auth module that routes actually mounts the routes', () => {
+  it('every example importing FormioAuth with forChild also calls FormioAuthRoutes()', () => {
+    const offending = allDocs().filter(({ body }) => {
+      const blocks = [...body.matchAll(/```(?:ts|typescript)\n([\s\S]*?)```/g)].map((m) => m[1]);
+      return blocks.some(
+        (code) =>
+          /\bFormioAuth\b/.test(code) &&
+          /RouterModule\.forChild/.test(code) &&
+          !/FormioAuthRoutes\(/.test(code)
+      );
+    });
+    expect(
+      offending.map(({ path }) => path),
+      'importing FormioAuth does not map any URL — mount FormioAuthRoutes() or /auth/login is dead'
+    ).toEqual([]);
+  });
+
+  it('no document claims FormioAuth contributes routes on its own', () => {
+    expect(
+      offenders((body) =>
+        /`?FormioAuth`?[^\n]{0,80}contributes the [^\n]{0,40}routes automatically/.test(body)
+      )
+    ).toEqual([]);
+  });
+});

@@ -19,6 +19,8 @@ So every output in [control.md](./control.md) — `(submit)`, `(change)`, `(page
 The bridging covers the component's own outputs and nothing else. `instance.on('nextPage', …)`, registered after `formioReady`, bypasses it:
 
 ```ts
+import { FormioComponent } from '@formio/angular';
+
 @ViewChild(FormioComponent) formio!: FormioComponent;
 
 readonly page = signal(0);

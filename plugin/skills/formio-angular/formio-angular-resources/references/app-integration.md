@@ -230,7 +230,7 @@ import { NgModule } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterModule } from '@angular/router';
 import { FormioModule } from '@formio/angular';
-import { FormioAuth } from '@formio/angular/auth';
+import { FormioAuth, FormioAuthRoutes } from '@formio/angular/auth';
 import { LogoutComponent } from './logout.component';
 
 @NgModule({
@@ -239,9 +239,10 @@ import { LogoutComponent } from './logout.component';
     FormioModule,
     FormioAuth,
     RouterModule.forChild([
-      { path: '', redirectTo: 'login', pathMatch: 'full' },
+      // `logout` first: FormioAuthRoutes() opens with a `path: ''` route, and an
+      // app-specific sibling is easier to reason about ahead of it than behind it.
       { path: 'logout', component: LogoutComponent },
-      // '/login' and '/register' are contributed by FormioAuth's own route config
+      ...FormioAuthRoutes(), // '' → redirect to login, plus login / register / resetpass
     ]),
   ],
   declarations: [LogoutComponent],
@@ -249,7 +250,9 @@ import { LogoutComponent } from './logout.component';
 export class AuthModule {}
 ```
 
-`FormioAuth` (module from `@formio/angular/auth`) contributes the `login` and `register` routes automatically; they are wired to the form paths in the root `FormioAuthConfig` provider. Note this module is reached only through the `/auth` `loadChildren` route — it is never added to an `imports` array.
+**`FormioAuthRoutes()` is what maps the URLs — importing `FormioAuth` does not.** That module is imports-only: it brings the login, register, and reset-password components into scope and contributes no routes of its own. Mount the function's result or `/auth/login` resolves to nothing, which is the failure the parent's `AUTH.md` describes under "Why `FormioAuthRoutes()` matters".
+
+`FormioAuthRoutes()` supplies the `login`, `register`, and `resetpass` child paths; they are wired to the form paths in the root `FormioAuthConfig` provider. Note this module is reached only through the `/auth` `loadChildren` route — it is never added to an `imports` array.
 
 `src/app/auth/logout.component.ts`:
 

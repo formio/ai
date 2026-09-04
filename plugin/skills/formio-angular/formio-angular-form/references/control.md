@@ -57,6 +57,9 @@ The renderer's `Webform` (or `Wizard`, or `PDF`) instance is the full API: read 
 This is the trap. `ready` is typed `EventEmitter<FormioBaseComponent>` and emits the component itself; the renderer instance is on its `formio` property:
 
 ```ts
+import type { FormioBaseComponent } from '@formio/angular';
+import type { Webform } from '@formio/js';
+
 private instance: Webform | null = null;
 
 onReady(component: FormioBaseComponent) {
