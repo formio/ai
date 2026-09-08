@@ -51,14 +51,18 @@ End-to-end walk-through of `../SKILL.md`'s flow: the planner's input, the Phase 
 
 ### Module & route map
 
-| Path                           | Module                   | Resource form | Parents       |
-| ------------------------------ | ------------------------ | ------------- | ------------- |
-| `/login`                       | AuthModule               | userLogin     | —             |
-| `/register`                    | AuthModule               | userRegister  | —             |
-| `/project`                     | ProjectModule            | project       | —             |
-| `/project/:id/tasks`           | ProjectTasksModule       | task          | ['project']   |
-| `/project/:id/users`           | ProjectUsersModule       | projectUser   | ['project']   |
-| `/task`                        | TaskModule               | task          | —             |
+The `name` and `form` columns are deliberately both shown: `name` is the camelCase registry key, `form` is the form's `path` from `template.json`, and on multi-word resources they diverge. Copying a `name` into a `form` is the failure `resource-module-patterns.md` → "`name` vs. `form` — DO NOT conflate these two" exists to prevent.
+
+| Path                           | Module                   | `name`        | `form` (= template.json path) | Parents       |
+| ------------------------------ | ------------------------ | ------------- | ----------------------------- | ------------- |
+| `/auth/login`                  | AuthModule               | —             | `user/login`                  | —             |
+| `/auth/register`               | AuthModule               | —             | `user/register`               | —             |
+| `/project`                     | ProjectModule            | `project`     | `project`                     | —             |
+| `/project/:id/tasks`           | ProjectTasksModule       | `task`        | `task`                        | ['project']   |
+| `/project/:id/users`           | ProjectUsersModule       | `projectUser` | `project-user`                | ['project']   |
+| `/task`                        | TaskModule               | `task`        | `task`                        | —             |
+
+The auth rows have no `name` — they are `FormioAuthConfig.login.form` / `.register.form`, not resource modules, and they take the path for the same reason (`userLogin` there 404s on sign-in). `projectUser` is the row that shows the divergence: camelCase key, kebab-case path.
 
 ### UI design sketch per resource (for review)
 - **Project.view**: 2-col Bootstrap grid. Left card — `<h3>{{ service.resource?.data.name }}</h3>` header, description body. Right card — "Team & Work" header, with count badges for tasks and members and a prominent "New Task" button linking to `./tasks/new`.
@@ -69,7 +73,7 @@ End-to-end walk-through of `../SKILL.md`'s flow: the planner's input, the Phase 
 - ProjectUser: mounted on Project only (User side omitted — admin operation on the join, not a normal user view). Index grid column `user` → link to that user's profile (or omitted if no User CRUD).
 
 ### Auth
-- `/login` → userLogin, `/register` → userRegister, `/logout` → FormioAuthService.logout(). These three stay unguarded.
+- `/auth/login` → the form at path `user/login`, and `/auth/register` → `user/register`, mounted as children of the `/auth` route the parent AUTH phase adds (the planner names those forms `userLogin` / `userRegister`; the config takes their `path`, never the name); logout is `FormioAuthService.logout()` redirecting to `/auth/login`. The auth routes stay unguarded.
 - `authGuard` (`src/app/auth/auth.guard.ts`) applied via `canActivate: [authGuard]` on the root `/project` and `/task` routes in `app-routing-module.ts` (anonymous has no access per `## Access Matrix`). The nested `/project/:id/tasks` and `/project/:id/users` routes inherit protection from the guarded parent. Per-group narrowing stays server-side — no role/group guard.
 ```
 
@@ -93,11 +97,11 @@ const projectRoutes = FormioResourceRoutes({
   resource: ResourceComponent,
   view: ViewComponent,
 });
-projectRoutes[2].children.push({
+projectRoutes[2].children!.push({
   path: 'tasks',
   loadChildren: () => import('./tasks/project-tasks.module').then((m) => m.ProjectTasksModule),
 });
-projectRoutes[2].children.push({
+projectRoutes[2].children!.push({
   path: 'users',
   loadChildren: () => import('./users/project-users.module').then((m) => m.ProjectUsersModule),
 });
@@ -112,7 +116,7 @@ projectRoutes[2].children.push({
       useValue: {
         name: 'project', // camelCase registry key (single-word, so no divergence)
         form: 'project', // === template.json form.path — coincides with `name` here only because the resource is single-word
-      },
+      } satisfies FormioResourceConfig,
     },
   ],
 })

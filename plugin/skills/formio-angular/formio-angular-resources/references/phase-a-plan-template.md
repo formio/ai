@@ -23,10 +23,10 @@ Emit the plan as a single fenced markdown block. Use this exact template — ter
   src/app/
     app.html (or app.component.html)                    MODIFY  (nav link per resource; verify the shell page-layout wrapper)
     app-module.ts                                       MODIFY  (adds imports)
-    app-routing-module.ts                               NEW
-    config.ts                                           NEW or MODIFY  (FormioAppConfig + FormioAuthConfig — same file the parent CONFIG phase writes)
+    app-routing-module.ts                               NEW or MODIFY  (NEW only if the workspace has none; AUTH already added the `/auth` route)
+    config.ts                                           VERIFY  (FormioAppConfig only — the parent CONFIG phase owns this file)
     home/home.{ts,html,scss}                            NEW     (legacy naming: home/home.component.*)
-    auth/auth.module.ts                                 NEW
+    auth/auth.module.ts                                 VERIFY  (routes only; lazy-loaded via /auth — the parent AUTH phase owns this file)
     <resource>/<resource>.module.ts                     NEW     (one per browsable resource)
     <resource>/resource.component.{ts,html,scss}        NEW     (designed nav — tabs / breadcrumb / sidebar)
     <resource>/view/view.component.{ts,html,scss}       NEW     (designed view — cards / stats / field layout)
@@ -45,8 +45,8 @@ The `Guard` column records whether the route mounts `canActivate: [authGuard]` (
 
 | Path                                | Module                     | Resource (`form`)    | Parents           | Guard         |
 | ----------------------------------- | -------------------------- | -------------------- | ----------------- | ------------- |
-| `/login`                            | AuthModule → login         | userLogin            | —                 | —             |
-| `/register`                         | AuthModule → register      | userRegister         | —                 | —             |
+| `/auth/login`                       | AuthModule → login         | userLogin            | —                 | —             |
+| `/auth/register`                    | AuthModule → register      | userRegister         | —                 | —             |
 | `/<resource>`                       | <Resource>Module           | <resource>           | —                 | `authGuard`   |
 | `/<resource>/:id/<nested>`          | <Nested>Module             | <nested>             | ['<resource>']    | `authGuard`   |
 | `/<resource>/:id/<joinOther>`       | <ResourceJoinOther>Module  | <join>               | ['<resource>']    | `authGuard`   |
@@ -58,17 +58,18 @@ The `Guard` column records whether the route mounts `canActivate: [authGuard]` (
   - index grid column `<otherSideKey>` rendered as link to `/<otherSide>/<id>/view`
 
 ### Auth
-- Login form: `userLogin` → route `/login` (no guard — must stay reachable while anonymous)
-- Register form: `userRegister` → route `/register` (no guard)
-- Logout: `/logout` → FormioAuthService.logout() then `/login`
-- FormioAuthConfig provided in src/app/config.ts (alongside FormioAppConfig)
+- Login form: `userLogin` → route `/auth/login` (no guard — must stay reachable while anonymous)
+- Register form: `userRegister` → route `/auth/register` (no guard)
+- Logout: FormioAuthService.logout(), then redirect to `/auth/login`
+- FormioAuthConfig + FormioAuthService provided inline in app-module.ts root providers (parent AUTH phase; NOT in config.ts, NOT in auth.module.ts)
+- AuthModule reached ONLY via the /auth loadChildren route — never in an imports array
 - Authentication guard: `authGuard` (`src/app/auth/auth.guard.ts`, from parent AUTH phase) applied via `canActivate: [authGuard]` to every authenticated route above. Authorization (role/group narrowing) stays server-side — no client-side role guard unless explicitly requested.
 
 ### Integration points touched in an existing app
 - `AppModule.imports` ← adds FormioModule, FormioGrid, and RouterModule entries for each resource
-- `AppModule.providers` ← adds FormioResources, FormioAuthService, FormioAppConfig, FormioAuthConfig
+- `AppModule.providers` ← adds FormioResources, FormioAuthService, FormioAppConfig, FormioAuthConfig (AppModule.imports gains NO AuthModule)
 - `AppRoutingModule` ← imports `authGuard` and adds `canActivate: [authGuard]` to each new authenticated resource route (leaves existing routes untouched)
-- `angular.json` ← adds Bootstrap 5 + FontAwesome CSS (only if selected)
+- `angular.json` ← Bootstrap 5 + Bootstrap Icons CSS (verify; BOOTSTRAP Step 5 adds these)
 - `index.html` ← no changes unless CDN-based styling is requested
 ```
 

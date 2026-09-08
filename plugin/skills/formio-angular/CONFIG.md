@@ -17,7 +17,7 @@ If both conditions hold AND the captured `appUrl`/`apiUrl` match the SETUP value
 
 > Skipping CONFIG — `src/app/config.ts` already exports `AppConfig` with `appUrl = X, apiUrl = Y`, matching the project this directory resolves to, and `AppModule` already imports `FormioModule` and registers the `FormioAppConfig` provider. Moving to AUTH. Say if you want to regenerate `config.ts` anyway.
 
-If the existing values **disagree** with the SETUP values, do not silently overwrite. Show the diff to the user and ask whether to keep the existing values (re-run SETUP to match) or overwrite `config.ts` with the new values. This is the one place in the orchestrator where the user might have meant something different from the SETUP answer.
+If the existing values **disagree** with the SETUP values, do not silently overwrite. SETUP owns this case and has already resolved it — see its "When an existing config.ts disagrees", which gives a different action for each of the two answers the user can give. Reaching CONFIG with the disagreement still open means SETUP's check did not run: go back and run it rather than deciding here, because one of the two answers changes the recorded mapping and this phase cannot do that.
 
 ## `src/app/config.ts` template
 

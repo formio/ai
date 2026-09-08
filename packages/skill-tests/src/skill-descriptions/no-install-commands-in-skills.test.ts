@@ -88,8 +88,8 @@ describe('the replacement still tells the user what to do', () => {
       (path) => path.endsWith('SKILL.md') && !path.includes('/formio-mcp-setup/')
     );
 
-  it('covers the fourteen gated skills', () => {
-    expect(gatedSkillMd()).toHaveLength(14);
+  it('covers the fifteen gated skills', () => {
+    expect(gatedSkillMd()).toHaveLength(15);
   });
 
   it('each still routes to the setup skill first', () => {

@@ -1,7 +1,7 @@
 ---
 name: formio-form
 description: >-
-  Embed and render Form.io forms in any web application with the Vanilla JS renderer `@formio/js` — render by URL or JSON, pre-fill with submissions, JavaScript control, renderer options, conditional fields, calculated values, JSON Logic validation, cascading selects, and conditional wizard pages. The library's default "embed a form" entry point. Use when the user asks to "embed a form", "render a form", "add this form to my page/site/app", "pre-fill a form", "show or hide a field based on another field", "calculate a field value", or "add custom validation to a field" — field behavior inside ANY framework's rendered form stays here. Not for: Angular app builds (see `formio-angular`); React-named embedding (see `formio-react`); building an app around data (see `formio-application`); designing the data model (see `formio-resource-planner`); REST endpoints (see `formio-api`); the raw SDK/Utils API reference (see `formio-sdk`); creating a NEW form — embed-only skill (see `formio-form-builder`).
+  Embed and render Form.io forms in any web application with the Vanilla JS renderer `@formio/js` — render by URL or JSON, pre-fill with submissions, JavaScript control, renderer options, conditional fields, calculated values, JSON Logic validation, cascading selects, and conditional wizard pages. The library's default "embed a form" entry point. Use when the user asks to "embed a form", "render a form", "add this form to my page/site/app", "pre-fill a form", "show or hide a field based on another field", "calculate a field value", or "add custom validation to a field" — field behavior inside ANY framework's rendered form stays here. Not for: Angular embedding and app builds (see `formio-angular`); React-named embedding (see `formio-react`); building an app around data (see `formio-application`); designing the data model (see `formio-resource-planner`); REST endpoints (see `formio-api`); the raw SDK/Utils API reference (see `formio-sdk`); creating a NEW form — embed-only skill (see `formio-form-builder`).
 ---
 
 # Embedding Form.io Forms (Vanilla JS renderer)
@@ -44,7 +44,7 @@ This is one step, deliberately **not a framework dispatch table** with per-frame
 
 **The check covers the mounting half only.** A question about a form definition — a conditional, a calculated value, a validation rule, a cascading select, wizard page logic — is answered here whatever the host, because the answer is identical in every framework.
 
-**When the host is Angular** — detected from the workspace or named in the request — note that `@formio/angular` ships its own renderer component and that no Angular embedding skill exists yet, then continue with the guidance below. Angular-named embedding stays here for that reason: `formio-angular` claims application builds, not single-form embeds. It does work inside an Angular application; it is simply not the recommended Angular approach.
+When `package.json` lists `@angular/core`, hand off to `formio-angular`'s embed branch the same way and for the same reason — `@formio/angular` ships its own `<formio>` renderer component, which owns the mounting, the teardown, and the change-detection bridge that this skill's `Formio.createForm` guidance would leave to the caller.
 
 **Keep it cheap.** When the host is not detectable from the workspace, proceed with this skill's own guidance rather than asking. This is a check, not an interview.
 

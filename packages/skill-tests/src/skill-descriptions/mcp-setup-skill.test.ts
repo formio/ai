@@ -222,6 +222,12 @@ describe('preflight contract', () => {
   // because React-named embedding has its own sub-skill, and its Angular clause
   // was shortened to keep the description inside the 1,024-character budget.
   //
+  // formio-angular and formio-form moved again when Angular gained an embedding
+  // sub-skill: the Angular parent became a two-branch router and claims Angular-named
+  // embed triggers, and formio-form's Angular clause turned from "no such skill
+  // exists" into a handoff. Both fixture entries were re-snapshotted with those
+  // descriptions, which is what a deliberate change looks like here.
+  //
   // formio-mcp-setup was ADDED to the fixture by that same change. It postdated
   // the original snapshot, so nothing was pinning the one description most likely
   // to drift as the setup flow changed. It has since moved again: the skill writes
