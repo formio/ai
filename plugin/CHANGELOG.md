@@ -1,5 +1,49 @@
 # @formio/ai
 
+## 0.13.0
+
+### Minor Changes
+
+- 0285a1c: Add the `formio-angular-form` embedding sub-skill, and turn `formio-angular` into a two-branch router.
+
+  Angular now has the embedding coverage React had: `formio-angular` dispatches between an application build (its five gated phases) and a single-form embed, and the embed branch loads `formio-angular-form`. Its eight references cover mounting, the event surface and the live `Webform` instance, the lifecycle contract, change detection under `zone.js` and zoneless, project URLs and `FormioAppConfig`, server-rendering limits, stylesheets, and mounting the renderer directly. Definition-level behaviour stays with `formio-form`, which now hands an Angular workspace over instead of reporting that no Angular embedding skill exists.
+
+  The skill documents `@formio/angular`'s `<formio>` component and nothing else — the same component `@formio/angular/resource`'s CRUD screens mount, so an embed added today survives the application later gaining those screens.
+
+  The second path is `Formio.createForm` in a component, which is honest about what it hands over: `references/renderer-directly.md` names the three cases that warrant it and states the four obligations as its price — `destroy(true)` in `ngOnDestroy`, a destroyed-mid-build guard, a submit latch in a plain field, and publishing renderer callbacks with a `signal()` write or `markForCheck` rather than `NgZone.run`, which is a no-op under zoneless.
+
+- f858ff4: Add the `formio-react` skill family — a React framework implementor alongside `formio-angular`.
+
+  `formio-react` routes between three branches: a greenfield Vite + React Router build, adding Form.io CRUD to a React application that already exists, and embedding a single form. `@formio/react` ships no equivalent of `@formio/angular`'s `FormioResource` module, so `formio-react-resources` generates a small resource kernel into the user's application — pure domain functions plus React Router loader and action factories — rather than porting Angular's service, registry, alert bus, and refresh emitter. `formio-react-form` owns React-specific mounting; definition-level behaviour stays with `formio-form`, which now checks the host before writing mounting code.
+
+  React is a second row in `formio-application`'s `FRAMEWORK.md` registry, with a `Default` column, so a greenfield build asks which framework and falls back to Angular when the user declines to choose.
+
+### Patch Changes
+
+- 0285a1c: Fix the flow defects three independent audits found in `formio-angular` by walking the skill as an agent would.
+
+  **The missing-plan path no longer strands.** Its bail-out was gated on the user NOT having said "Angular", which an Angular-explicit request cannot satisfy, so the gap surfaced at AUTH — after a skills-library install, `ng new`, four package installs, and edits to `angular.json`, `app-module.ts`, `config.ts` and `formio.json`. Naming Angular now chooses the framework without supplying the data model: pre-flight has a branch for neither planner artifact being present, and it stops there. `AUTH.md` and the resources sub-skill no longer instruct running the planner themselves — three other places said this skill never does, and a plan nothing imports generates modules against resources the deployment lacks.
+
+  **Values a later phase consumes are produced on every path that reaches it.** BOOTSTRAP self-skips in any existing workspace and carried only `PACKAGE_MANAGER` forward, so `FRONTEND_DESIGN_BRIEF` — required by AUTH, by the resources sub-skill, and by the Phase A gate that makes the agent attest it was passed — did not exist. Step 7 now runs on the skip path too, reading its slots off the workspace, and the skip checks for the Form.io packages and the Bootstrap stylesheet a full run would have installed. SETUP stashes `baseUrlSource`, which CONFIG reads.
+
+  **A config mismatch has an action for both answers.** "The app is right, the mapping is wrong" had none: `project_set` was reachable only from the other statuses, and CONFIG's "re-run SETUP to match" re-read the same record and looped. SETUP now names the recording fix per record type, and CONFIG defers to it instead of offering a decision it cannot carry out.
+
+  **`AuthConfig` has one home** (`auth/auth.module.ts`, which AUTH writes) — a sub-skill reference imported it from `./config` and the plan template planned it there, a build error wherever AUTH had already run. **The login route is `/auth/login` everywhere**, matching AUTH's mandate and its logout redirect; the Phase A plan template described `/login`, so users were approving routes that would break logout. **BOOTSTRAP handles either bootstrap shape**, converting a standalone scaffold to the NgModule the five phases all edit, rather than requiring `app-module.ts` it never asked the scaffolder for. **The handoff contract agrees with itself**: the parent passes `userRequest`, `newResourceNames` and `frontendDesignStatus`, and stops passing URLs the sub-skill resolves itself. **The `workspaceRoot` discipline reaches the two documents that write the most files**, and no document runs a bare `ng build` or `ng serve`.
+
+  In the embed branch: it establishes its own prerequisites (the packages, with the lockfile warning, since the workspace is always somebody else's) and says how to find the form URL it calls its only input; `styling.md` gains the direct-renderer exception that `renderer-directly.md` was already pointing at; and the `nosubmit` mechanism is corrected.
+
+- 939ecf6: Add `project set --force`, for a pair the domain rules cannot tell from a mistake.
+
+  A `*.form.io` project is served by `https://api.form.io` and by nothing else, so recording it against another deployment is refused — the failure it prevents is unexplained 404s and a portal login sent to a deployment the user does not have. One deployment shape is indistinguishable from that mistake: an internal, non-SaaS deployment served from a `*.form.io` domain, which QA tests. `project set --force --project-url <url> --base-url <url> --cwd <path>` records that pair as given, and the reader honours it — `project get` reports it as forced instead of refusing it, and every tool resolves it.
+
+  Two properties keep it narrow. `--force` requires BOTH halves in the same call, so the override applies to a pair stated in full rather than to one half completed from the record or by derivation. And it belongs to the pair rather than to the directory: a write that leaves both halves untouched keeps it — an agent re-stating the project it already resolved must not undo a developer's override — while a write that moves either half forms a pair nobody vouched for and is judged by the ordinary rules again.
+
+  Because an unforced write of the same pair therefore changes nothing, `project set --reset --cwd <path>` is added as the way back: it clears that directory's entry — nothing else — reports what it held and what the directory resolves to afterwards, and takes no URLs, so whatever is recorded next is judged by the ordinary rules. Every report of a forced pair names it, and both writers carry the override in what they report: `project_get` and `project_set` return `forced` and say what it means, so a pair the rules would refuse is never reported bare.
+
+  It is a shell-only flag. The `project_set` tool does not take one, and no environment variable and no committed `formio.json` grants it: a check is waived by a developer at a shell, not by an agent or a launch configuration.
+
+- d227986: Guard the transitive group-access mirror's `calculateValue`. Every skill document, example template, Mermaid label, and the planner's pre-emit checklist now spell it `value = data.<parent>?.data?.<group> || value;` — the optional chaining stops the `Cannot read properties of undefined` crash on every grandchild load where the parent is an unexpanded `{ _id }`, and the `|| value` fallback stops a nil result from being replaced by `emptyValue`, which cleared the group reference and silently stripped access. The reference doc now names when the parent is actually expanded (server-side only for `read_all` / owner / admin — never for group members) and what the fallback costs. The planner eval grader requires the guarded form. `formio-angular` BOOTSTRAP establishes the workspace's package manager before its first install, applies the no-second-lockfile rule to the existing-workspace path too, and runs the un-hoisted-dependency check through the Step 6c `ng build` smoke check instead of a dev server.
+
 ## 0.12.3
 
 ### Patch Changes
