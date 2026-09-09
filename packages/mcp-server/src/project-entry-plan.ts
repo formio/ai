@@ -21,13 +21,26 @@ import { classifyPair, deriveBaseUrl } from './pair-rule.js';
  */
 export interface ProjectEntryPlanRequest {
   cwd: string;
-  /** What the caller passed. Validated strictly — this is their own typing. */
-  requested: { projectUrl?: string; baseUrl?: string };
+  /**
+   * What the caller passed. Validated strictly — this is their own typing.
+   *
+   * `force` overrides the pair rule for the pair in this same call. It is the developer
+   * taking responsibility for a pair the rules cannot tell from a mistake — an internal
+   * deployment on a *.form.io domain — so it requires BOTH halves: force licenses a
+   * pair, never half of one, and a forced record never derives its deployment.
+   */
+  requested: { projectUrl?: string; baseUrl?: string; force?: boolean };
   /**
    * What the record being written holds today, read as it is on disk — the mapping
    * entry's env, since the mapping is the only record this server writes.
+   *
+   * `forced` is that entry's own override flag, so a call that leaves the pair
+   * unchanged leaves the override in place. Nothing else preserves it: an agent
+   * re-stating the project it already resolved is an ordinary call and must not
+   * quietly undo a developer's override, while a call that changes either half forms a
+   * pair nobody has vouched for and is judged by the ordinary rules again.
    */
-  record: { projectUrl?: string; baseUrl?: string };
+  record: { projectUrl?: string; baseUrl?: string; forced?: boolean };
   /**
    * Where the project lives when this record has none, for a write that cannot reach
    * it. The committed file carries its path, because the refusal that names it
@@ -39,6 +52,8 @@ export interface ProjectEntryPlanRequest {
 /** The entry to write, in the shape `writeProjectEntry` takes. */
 export interface PlannedEntry {
   env: Record<string, string>;
+  /** Present and true only for a pair that was forced past the domain rules. */
+  forced?: boolean;
 }
 
 export interface PlannedWrite {
@@ -73,6 +88,14 @@ export type ProjectRecord = 'committed' | 'mapping' | 'environment';
 export type ProjectEntryPlan =
   | { outcome: 'no-values'; cwd: string }
   | { outcome: 'project-required'; cwd: string }
+  /**
+   * `--force` arrived with one half of the pair.
+   *
+   * Refused rather than completed from the record or by derivation: the override says
+   * "this pair is right", and a pair half of which came from somewhere else is not a
+   * pair anyone vouched for. `missing` is the half to ask for, so the refusal names it.
+   */
+  | { outcome: 'force-requires-both'; cwd: string; missing: 'projectUrl' | 'baseUrl' }
   /**
    * A project URL that names no deployment arrived without one.
    *
@@ -134,6 +157,18 @@ export function planProjectEntry({
 }: ProjectEntryPlanRequest): ProjectEntryPlan {
   if (!requested.projectUrl && !requested.baseUrl) {
     return { outcome: 'no-values', cwd };
+  }
+
+  // Asked of the ARGUMENTS, before any record is read. The override is about the pair
+  // in this call, so nothing on disk can complete it — and answering "which half is
+  // missing?" from the record would let a forced write inherit a value the force was
+  // meant to replace.
+  if (requested.force && !(requested.projectUrl && requested.baseUrl)) {
+    return {
+      outcome: 'force-requires-both',
+      cwd,
+      missing: requested.projectUrl ? 'baseUrl' : 'projectUrl',
+    };
   }
 
   // The stored project is hand-editable DATA, not the caller's typing, and this write
@@ -254,6 +289,53 @@ export function planProjectEntry({
   // nothing: the deployment belonged to the project being replaced.
   const keptBaseUrl = recordProjectUrl === projectUrl ? recordBaseUrl : undefined;
   let baseUrl = requestedBaseUrl ?? keptBaseUrl ?? deriveBaseUrl(projectUrl);
+  // Forced by this call, or forced earlier and left exactly as it was. An unforced call
+  // that reaches the same pair — an agent re-stating the project it already resolved,
+  // a user re-confirming what is on disk — must not undo a developer's override, and a
+  // call that moves either half forms a pair nobody vouched for, so the rules decide it
+  // again.
+  //
+  // `Boolean(recordBaseUrl)` is not redundant beside the equality: both halves are
+  // undefined for a record holding a project alone, so the comparison alone called
+  // that record forced — and the reader does not, because force licenses a PAIR
+  // (see classifyPair). The writer then skipped the verdicts that record's own
+  // project URL fails and answered with a demand for a Base URL for something that
+  // is not a project at all.
+  const forced =
+    Boolean(requested.force) ||
+    (Boolean(record.forced) &&
+      recordProjectUrl === projectUrl &&
+      Boolean(recordBaseUrl) &&
+      recordBaseUrl === baseUrl);
+
+  // A forced pair is not judged AT ALL, and it is answered here — before the three
+  // classifications below — so the override is one branch rather than a `forced` term
+  // carried into each of them. Carried into each, it held for two and lapsed for the
+  // third, which is the "one rule, several copies" shape every defect on this surface
+  // has had.
+  //
+  // `baseUrl` is guaranteed here: a call carrying the flag must state both halves (see
+  // the force-requires-both outcome above), and a preserved override requires the
+  // record's own deployment. The condition says so rather than asserting it, so a
+  // forced record that somehow holds no deployment falls through to the ordinary
+  // demand for one instead of writing an entry with half a pair in it.
+  if (forced && baseUrl) {
+    return {
+      // Adding the override to a pair already on disk is a WRITE. Compared on the pair
+      // alone, `project set --force` over the pair it was already targeting reported
+      // "no change" and left the entry unforced, so the very next read refused it.
+      outcome:
+        recordProjectUrl === projectUrl && recordBaseUrl === baseUrl && record.forced
+          ? 'unchanged'
+          : 'write',
+      cwd,
+      entry: { env: { FORMIO_PROJECT_URL: projectUrl, FORMIO_BASE_URL: baseUrl }, forced: true },
+      projectUrl,
+      baseUrl,
+      ...(previousProjectUrl ? { previousProjectUrl } : {}),
+      setAProject: Boolean(requestedProjectUrl),
+    };
+  }
   // A KEPT deployment that the pair rule rejects is stale data, not an answer the
   // caller just gave — so it is dropped and the derived value used, exactly as the
   // reader does with the same record. Refusing instead produced a remedy that named
@@ -333,12 +415,20 @@ export function planProjectEntry({
     return { outcome: validity, cwd, projectUrl, baseUrl };
   }
 
+  // Nothing forced reaches here, so this entry never carries the flag — which is also
+  // how the override is CLEARED for a pair the rules accept: the map stores what a
+  // write hands it, whole.
   const entry: PlannedEntry = {
     env: { FORMIO_PROJECT_URL: projectUrl, FORMIO_BASE_URL: baseUrl },
   };
 
   return {
-    outcome: recordProjectUrl === projectUrl && recordBaseUrl === baseUrl ? 'unchanged' : 'write',
+    // A record that holds the override and a pair the rules accept still changes when
+    // this write drops the flag, so `record.forced` counts as a difference.
+    outcome:
+      recordProjectUrl === projectUrl && recordBaseUrl === baseUrl && !record.forced
+        ? 'unchanged'
+        : 'write',
     cwd,
     entry,
     projectUrl,

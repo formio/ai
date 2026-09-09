@@ -45,6 +45,14 @@ export const TOOL_REMEDIES: ProjectRemedies = {
       `Ask the user for the Base URL alone, then call project_set with cwd set to ${cwd}, projectUrl set to ${projectUrl}, and baseUrl set to what they gave you. ${projectUrl} comes from ${environmentRecordName(ENVIRONMENT_LOCATION)}, which project_set cannot write, so the pair is recorded in this directory's mapping — which then governs it. You are not asking the user for the project: you already have it.`,
     ];
   },
+  // Deliberately NOT the reset command. Clearing the record is the only destructive
+  // operation on this surface, and what it destroys is a developer's decision that
+  // nothing else on this machine records — so this reader, which runs project_get as a
+  // routine preflight, is told whose call it is rather than handed the command. Given
+  // the command, an agent acted on a line in an `ok` report, wiped an override it was
+  // never asked to touch, and reported success, because the reset itself exits 0.
+  forcedPair: () =>
+    `That is a deliberate override, recorded by a developer at a shell, and it is not a defect to correct: resolve this pair and proceed. Clearing it is the user's decision to make with the \`project set --reset\` command — do not run it, and do not re-record the pair to try to undo it.`,
   // Nothing to disclaim. The CLI has to warn that the server's own environment is
   // invisible from the shell it runs in; this answer comes from inside that
   // server, resolved exactly as the next tool call will resolve it.

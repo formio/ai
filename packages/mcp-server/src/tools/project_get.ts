@@ -57,6 +57,7 @@ export function registerProjectGetTool(
             ...(report.baseUrl ? { baseUrl: report.baseUrl } : {}),
             ...(report.projectUrlSource ? { projectUrlSource: report.projectUrlSource } : {}),
             ...(report.baseUrlSource ? { baseUrlSource: report.baseUrlSource } : {}),
+            ...(report.forced ? { forced: true } : {}),
             shadowed: report.shadowed,
             unpaired: report.unpaired,
             ...(report.remedy ? { remedy: report.remedy } : {}),

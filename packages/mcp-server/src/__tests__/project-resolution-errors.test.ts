@@ -101,6 +101,7 @@ describe('reportProject on a cwd it cannot resolve against', () => {
     const remedies = {
       setProject: () => [],
       setBaseUrl: () => [],
+      forcedPair: () => '',
       environmentCaveat: () => [],
       environmentLocation: 'the test environment',
     };

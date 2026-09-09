@@ -3,6 +3,7 @@ import { InvalidRequestedUrlError, readHttpUrlEnv } from '../config.js';
 import { COMMITTED_CONFIG_FILE, findCommittedConfig } from '../committed-config.js';
 import {
   readProjectEntryForWrite,
+  removeProjectEntry,
   unusableRecordProjectUrl,
   writeProjectEntry,
 } from '../project-map.js';
@@ -22,6 +23,7 @@ import {
 } from '../write-refusals.js';
 import {
   BASE_URL_NOT_DETERMINED,
+  FORCED_PAIR_FACT,
   ProjectRemedies,
   environmentRecordName,
   reportProject,
@@ -62,9 +64,15 @@ export const EXIT_BASE_URL_UNRESOLVED = 3;
 // is this package's bin and nothing puts it on PATH — the plugin and every skill
 // launch the server through npx — so a usage line naming the bare bin printed a
 // command that answers `command not found`.
+//
+// Every token after a subcommand stays BRACKETED. A synopsis line whose first token is
+// a bare flag is picked up as a runnable command by anything that scans these messages
+// for what to run — the meta-tests over this surface do exactly that — and a synopsis
+// is not runnable: `set --reset [--cwd <absolute path>]` was extracted and executed
+// with `[--cwd` as an argument.
 const USAGE = [
   'Usage:',
-  `  ${PROJECT_CLI} set [--project-url <url>] [--base-url <url>] [--cwd <absolute path>]`,
+  `  ${PROJECT_CLI} set [--project-url <url>] [--base-url <url>] [--force] [--reset] [--cwd <absolute path>]`,
   `  ${PROJECT_CLI} get [--cwd <absolute path>]`,
   '',
   `set writes the machine-local mapping in ~/.formio/projects.json. To record the project`,
@@ -72,6 +80,16 @@ const USAGE = [
   `committed ${COMMITTED_CONFIG_FILE} in the application's own folder: a JSON object holding`,
   `{"projectUrl": "..."}, plus "baseUrl" only when it cannot be derived. This command`,
   `reads that file and never writes it.`,
+  '',
+  `--force records the pair as given — for the one shape the checks that tie a Project`,
+  `URL to the deployment serving it cannot tell from a mistake: an internal deployment`,
+  `served from a *.form.io domain. EVERY check is skipped for that pair, including the`,
+  `ones about a Project URL on its own, so what is recorded is exactly what you type.`,
+  `It requires BOTH --project-url`,
+  `and --base-url in the same call, and the pair it records is honoured on every later`,
+  `read. Re-recording the same pair WITHOUT --force changes nothing and keeps the`,
+  `override, so --reset is the way back: it clears this directory's record, and`,
+  `whatever is recorded next is judged by the checks again. --reset takes no URLs.`,
 ].join('\n');
 
 // The environment, the working directory, and the cache directory are all
@@ -102,23 +120,37 @@ export function isProjectCommand(args: string[]): boolean {
 // a caller passing a flag this command no longer takes — `--scope repo`, from a
 // release that had a committed-file writer — would otherwise have its write land
 // in a record it did not choose, and be told it succeeded.
-function parseFlags(args: string[], known: ReadonlyArray<string>): Record<string, string> {
+// `switches` are the flags that take NO value — `--force` — recorded as 'true' when
+// present so one map carries both kinds. They are listed separately rather than
+// inferred from what follows them: inferred, `--force --cwd /w/app` would read the next
+// flag as a value or the value as a stray argument depending on the order they were
+// typed in.
+function parseFlags(
+  args: string[],
+  known: ReadonlyArray<string>,
+  switches: ReadonlyArray<string> = []
+): Record<string, string> {
+  const takesAValue = (name: string) => known.includes(name) && !switches.includes(name);
   return args.reduce<Record<string, string>>((flags, token, index) => {
     if (!token.startsWith('--')) {
       const flagBefore = args[index - 1];
-      if (flagBefore?.startsWith('--') && known.includes(flagBefore.slice(2))) {
+      if (flagBefore?.startsWith('--') && takesAValue(flagBefore.slice(2))) {
         return flags;
       }
       throw new Error(`Unexpected argument: ${token}`);
     }
-    if (!known.includes(token.slice(2))) {
+    const name = token.slice(2);
+    if (!known.includes(name)) {
       throw new Error(`Unknown flag: ${token}\n\n${USAGE}`);
+    }
+    if (switches.includes(name)) {
+      return { ...flags, [name]: 'true' };
     }
     const value = args[index + 1];
     if (value === undefined || value.startsWith('--')) {
       throw new Error(`${token} requires a value.`);
     }
-    return { ...flags, [token.slice(2)]: value };
+    return { ...flags, [name]: value };
   }, {});
 }
 
@@ -186,12 +218,132 @@ function fail(stderr: string, notes: readonly string[] = []): ProjectCommandResu
   };
 }
 
+/**
+ * Clear this directory's mapping, and report what the directory resolves to afterwards.
+ *
+ * The way out of a forced pair. Force is preserved by any write that leaves both halves
+ * untouched — that is what stops an agent's ordinary re-statement of the project from
+ * undoing a developer's override — so "record it again without --force" cannot be the
+ * way back: it reports no change and keeps the flag. Clearing the record leaves nothing
+ * to preserve, and whatever is recorded next is judged by the ordinary rules.
+ *
+ * Exit 0 whenever the clear happened, INCLUDING when the directory then resolves
+ * nothing: the requested operation is the removal, and reporting it as a failure would
+ * break `set --reset && set --project-url …`, which is how the two-step repair is
+ * actually run. What the directory resolves to now is printed rather than encoded —
+ * `project get` remains the command whose exit code answers that question.
+ */
+function runReset(cwd: string, context: CommandContext): ProjectCommandResult {
+  const notes = context.notes;
+  const removed = removeProjectEntry({ cwd, cacheDir: context.cacheDir });
+  // Named, never cleared in silence. This is the only copy of the pair it held — a
+  // forced one especially, since nothing else on this machine records it — and a user
+  // who mistyped the directory has to be able to put it back.
+  //
+  // Read as UNVALIDATED data, which is what removeProjectEntry returns and has to
+  // return: a malformed entry is exactly the kind this clears, so validating it would
+  // fail the one operation that removes it. Dereferenced as a well-formed entry, the
+  // clear landed on disk and this command then died formatting its own success message
+  // — exit 2, no report, and the documented two-step repair broken at step one for the
+  // state most likely to need it.
+  const held = (entry: { env?: unknown; forced?: unknown }): string => {
+    const env = entry.env;
+    if (typeof env !== 'object' || env === null || Array.isArray(env)) {
+      return `its contents were not a usable record, so there is nothing to name: ${JSON.stringify(entry)}`;
+    }
+    const values = env as Record<string, unknown>;
+    const url = (name: string) =>
+      typeof values[name] === 'string' ? (values[name] as string) : undefined;
+    return `${url('FORMIO_PROJECT_URL') ?? '(no project)'} on ${url('FORMIO_BASE_URL') ?? '(no deployment)'}${entry.forced === true ? ', which was forced' : ''}`;
+  };
+  const cleared = removed
+    ? `Cleared the mapping for ${cwd}: ${held(removed)}.`
+    : `No mapping is recorded for ${cwd}, so there was nothing to clear.`;
+
+  // What the directory resolves to NOW is asked of the reader, for the same reason
+  // every other outcome of this command asks it: a committed formio.json or the
+  // environment can still govern, and this command has no business deciding that for
+  // itself.
+  let settled;
+  try {
+    settled = reportProject({
+      cwd,
+      baseConfig: {
+        projectUrl: readHttpUrlEnv({
+          raw: context.env.FORMIO_PROJECT_URL,
+          name: 'FORMIO_PROJECT_URL',
+          onIgnored: (message) => notes.push(message),
+        }),
+        baseUrl: readHttpUrlEnv({
+          raw: context.env.FORMIO_BASE_URL,
+          name: 'FORMIO_BASE_URL',
+          onIgnored: (message) => notes.push(message),
+        }),
+      },
+      cacheDir: context.cacheDir,
+      remedies: CLI_REMEDIES,
+      notes,
+    });
+  } catch (error) {
+    // The clear landed and the reader cannot answer — an unreadable committed file,
+    // say. The removal is still reported: it happened, and a caller told only about the
+    // read failure would clear the same directory twice looking for the effect.
+    return {
+      exitCode: EXIT_FAILED,
+      stdout: cleared,
+      stderr: [...notes, error instanceof Error ? error.message : String(error)]
+        .filter(Boolean)
+        .join('\n'),
+    };
+  }
+
+  return {
+    exitCode: EXIT_OK,
+    stdout: [cleared, ``, settled.message].join('\n'),
+    stderr: settled.notes.join('\n'),
+  };
+}
+
+// Said once, for both the guard on the caller's own flags and the plan's outcome. The
+// guard exists because the generic "pass at least one" answer reaches a bare `--force`
+// first; the outcome exists because the plan is where every rule about a write lives.
+// Two wordings of one refusal is the drift this surface is built to avoid.
+function forceRequiresBoth(missing: 'projectUrl' | 'baseUrl'): string {
+  const flag = missing === 'projectUrl' ? '--project-url' : '--base-url';
+  return `--force requires both --project-url and --base-url in the same call, and ${flag} is missing. Forcing waives the checks that tie a Project URL to the deployment serving it, so it applies to a pair you state in full — not to one half of a pair completed from the record or by derivation.\n\n${USAGE}`;
+}
+
 function runSet(flags: Record<string, string>, context: CommandContext): ProjectCommandResult {
-  if (!flags['project-url'] && !flags['base-url']) {
+  const resetting = flags.reset === 'true';
+  // Clearing a record and recording one are opposite requests, so a call that says
+  // both says nothing. Refused as a usage error rather than settled by a precedence
+  // nobody can see — and refused BEFORE the reset happens, because the alternative is
+  // a directory cleared on the way to an error.
+  if (resetting && (flags['project-url'] || flags['base-url'] || flags.force)) {
+    return fail(
+      `--reset clears this directory's record and takes no other values, so it cannot be combined with ${[
+        flags['project-url'] && '--project-url',
+        flags['base-url'] && '--base-url',
+        flags.force && '--force',
+      ]
+        .filter(Boolean)
+        .join(' or ')}. Clear the record first, then record the pair in a second call.\n\n${USAGE}`
+    );
+  }
+  // BEFORE the generic demand below: "pass at least one of them" is true of an
+  // ordinary write and false of a forced one, so a bare `--force` was answered with an
+  // offer of a one-URL call that the very next attempt refuses.
+  if (flags.force && !(flags['project-url'] && flags['base-url'])) {
+    return fail(forceRequiresBoth(!flags['project-url'] ? 'projectUrl' : 'baseUrl'));
+  }
+  if (!resetting && !flags['project-url'] && !flags['base-url']) {
     return fail(`Pass at least one of --project-url or --base-url.\n\n${USAGE}`);
   }
 
   const cwd = resolveCwd(flags.cwd, context.cwd);
+  if (resetting) {
+    return runReset(cwd, context);
+  }
 
   const notes = context.notes;
   const onIgnored = (message: string) => notes.push(message);
@@ -206,10 +358,15 @@ function runSet(flags: Record<string, string>, context: CommandContext): Project
   const committed = findCommittedConfig(cwd, { onNote: onIgnored });
   const plan = planProjectEntry({
     cwd,
-    requested: { projectUrl: flags['project-url'], baseUrl: flags['base-url'] },
+    requested: {
+      projectUrl: flags['project-url'],
+      baseUrl: flags['base-url'],
+      force: flags.force === 'true',
+    },
     record: {
       projectUrl: mapped.status === 'usable' ? mapped.entry.env.FORMIO_PROJECT_URL : undefined,
       baseUrl: mapped.status === 'usable' ? mapped.entry.env.FORMIO_BASE_URL : undefined,
+      forced: mapped.status === 'usable' ? mapped.entry.forced : undefined,
     },
     elsewhere: {
       // Where the project lives when this mapping has none. A file too broken to read
@@ -240,6 +397,12 @@ function runSet(flags: Record<string, string>, context: CommandContext): Project
 
   if (plan.outcome === 'no-values') {
     return fail(`Pass at least one of --project-url or --base-url.\n\n${USAGE}`, notes);
+  }
+  // A usage error, so exit 2: the caller typed a command that cannot be carried out,
+  // and no value from the user completes it — the override is about the pair in the
+  // call, not about whatever half is already on disk.
+  if (plan.outcome === 'force-requires-both') {
+    return fail(forceRequiresBoth(plan.missing), notes);
   }
   // Exit 1, not 2. A named value is missing and the message says which — the same
   // answer `project get` gives for an unconfigured directory, and callers branch on the
@@ -302,8 +465,26 @@ function runSet(flags: Record<string, string>, context: CommandContext): Project
     );
   }
   if (plan.outcome === 'hosted-project-foreign-deployment') {
+    // The one refusal on this surface that a correct configuration can hit: an
+    // internal, non-SaaS deployment served from a form.io domain is indistinguishable
+    // from the mistake this rule exists to catch. The override is named HERE and
+    // nowhere else — this message is read by a developer at a shell, who is the only
+    // party that may waive a check — and named without a runnable command, because a
+    // printed command is a thing readers run before deciding whether it applies to
+    // them.
+    //
+    // Not offered where a committed formio.json holds the project. The override lives
+    // in the machine-local mapping, and a mapping written under that file does not take
+    // effect: following the hint there reported a successful write while the directory
+    // went on resolving the derived deployment, with the pair the user forced visible
+    // nowhere.
+    const forceIsAvailable = !committed?.projectUrl;
     return notConfigured(
-      `${plan.baseUrl} is not the deployment for ${plan.projectUrl}. ${HOSTED_CLOUD_DEPLOYMENT} Run: ${projectCommand(`set --project-url ${plan.projectUrl} --cwd ${cwd}`)}\n\n${USAGE}`,
+      `${plan.baseUrl} is not the deployment for ${plan.projectUrl}. ${HOSTED_CLOUD_DEPLOYMENT} Run: ${projectCommand(`set --project-url ${plan.projectUrl} --cwd ${cwd}`)}\n\n${
+        forceIsAvailable
+          ? `If that project really is served by an internal, non-SaaS deployment on a form.io domain, re-run this command with --force and both URLs to record the pair as given.`
+          : `A pair like that can be recorded as given with --force, but only into this directory's own mapping — and the committed ${COMMITTED_CONFIG_FILE} at ${committed?.filePath} governs this directory, so a mapping written under it would not take effect. Remove that file, or ask the user which record should hold the project.`
+      }\n\n${USAGE}`,
       notes
     );
   }
@@ -318,7 +499,7 @@ function runSet(flags: Record<string, string>, context: CommandContext): Project
   }
 
   if (plan.outcome === 'write') {
-    writeProjectEntry({ cwd, env: plan.entry.env, cacheDir: context.cacheDir });
+    writeProjectEntry({ cwd, ...plan.entry, cacheDir: context.cacheDir });
   }
 
   // A committed file GOVERNS this directory, whether or not it names the same project:
@@ -368,6 +549,13 @@ function runSet(flags: Record<string, string>, context: CommandContext): Project
       : []),
     `Project URL: ${settled.projectUrl}`,
     `Base URL:    ${settled.baseUrl ?? BASE_URL_NOT_DETERMINED}`,
+    // Read off the READER, like the pair above it: what this block says was recorded
+    // has to be what the next `project get` says resolves, and a committed file
+    // governing the directory means the pair printed here is not the one just written.
+    // Read off the READER, so it describes what resolves. A forced entry that a
+    // committed file shadows is reported below instead: it was recorded, and it does
+    // not take effect.
+    ...(settled.forced ? [`Forced:      ${FORCED_PAIR_FACT} ${CLI_REMEDIES.forcedPair(cwd)}`] : []),
     // A committed file governs this directory whether or not it names the same project,
     // so a mapping write under one does not take effect — the pair the resolver
     // reports comes from that file, not from what was just written. Said for every
@@ -377,7 +565,17 @@ function runSet(flags: Record<string, string>, context: CommandContext): Project
       ? [
           ``,
           shadowedByCommitted !== plan.projectUrl
-            ? `Note: the committed ${COMMITTED_CONFIG_FILE} names ${shadowedByCommitted}, which outranks this directory's mapping (${plan.projectUrl}). ${shadowedByCommitted} is the active project until that file changes; what was recorded here is the fallback if it goes away.`
+            ? `Note: the committed ${COMMITTED_CONFIG_FILE} names ${shadowedByCommitted}, which outranks this directory's mapping (${plan.projectUrl}). ${shadowedByCommitted} is the active project until that file changes; what was recorded here is the fallback if it goes away.${
+                // A pair recorded with --force under a committed file is the one write
+                // whose whole point is invisible in the report above: the reader says
+                // nothing is forced, because what resolves comes from that file. Said
+                // here, or a developer who followed the documentation rather than
+                // hitting the refusal that suppresses its own --force hint is left
+                // believing the override took effect.
+                plan.entry.forced
+                  ? ` The pair recorded here was forced, and a forced pair only takes effect where the mapping is the record that governs — remove that file, or ask the user which record should hold the project.`
+                  : ''
+              }`
             : `Note: the committed ${COMMITTED_CONFIG_FILE} governs this directory, so it supplies the pair that resolves — this mapping does not take effect while that file is there, and is the fallback if it goes away. To change what resolves, edit that file directly; this command reads a committed file and never writes one.`,
         ]
       : []),
@@ -436,6 +634,10 @@ const CLI_REMEDIES: ProjectRemedies = {
       `${projectUrl} comes from ${environmentRecordName(ENVIRONMENT_LOCATION)}, which this command cannot write, so the pair is recorded in this directory's mapping — which then governs it.`,
     ];
   },
+  // This reader is a developer at a shell — the only party that may waive a check, and
+  // therefore the only one handed the command that un-waives it.
+  forcedPair: (cwd) =>
+    `To put the rules back, clear this directory's record and then record the pair again: ${projectCommand(`set --reset --cwd ${cwd}`)}`,
   // This command runs in the caller's shell, not in the MCP server's process. A
   // plugin- or bundle-launched server carries its own env block, so what it
   // resolves can differ from what is printed here — and the difference is
@@ -512,7 +714,14 @@ export function runProjectCommand(
 
   try {
     if (subcommand === 'set') {
-      return runSet(parseFlags(args.slice(2), ['project-url', 'base-url', 'cwd']), context);
+      return runSet(
+        parseFlags(
+          args.slice(2),
+          ['project-url', 'base-url', 'force', 'reset', 'cwd'],
+          ['force', 'reset']
+        ),
+        context
+      );
     }
     if (subcommand === 'get') {
       return runGet(parseFlags(args.slice(2), ['cwd']), context);
