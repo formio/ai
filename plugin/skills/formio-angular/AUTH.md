@@ -234,6 +234,8 @@ The canonical reference for the event surface is the Form.io Angular wiki: https
 - **`onError`** — emitted when the auth request itself fails (bad credentials, network error, form validation failure). Do NOT navigate on `onError`; `FormioAuth`'s built-in login component already renders the error alert on-screen. Optionally log it for diagnostics.
 - **`ready`** — a Promise (not an EventEmitter) that resolves once every auth subsystem has finished initializing (JWT restore attempt, user fetch). `await auth.ready` in an APP_INITIALIZER or in an auth-guard's `canActivate` to block first render until you know whether the user is authenticated. Prevents the "flash of login form" a returning user sees before the token is restored.
 
+**Always `await auth.ready` before reading `auth.user` or `auth.authenticated`.** Both are resolved outside Angular's zone, so on a cold session — straight after registering, a hard reload, or a deep link — either can still be empty when your code runs. Code that reads them without gating takes a silent wrong branch: it treats a signed-in user as anonymous, or writes a record without the user it needed. Gate on `ready` first, and treat a still-missing user as a real failure rather than falling through to a default.
+
 ### Canonical root component
 
 Edit the root component file the Angular CLI generated — `src/app/app.ts` on Angular 20+ default naming, `src/app/app.component.ts` on legacy naming. Add the `FormioAuthService` dependency, subscribe in `ngOnInit`, and navigate with Angular's `Router`. Unsubscribe in `ngOnDestroy` so hot-reload / test teardown does not leak the subscription.
