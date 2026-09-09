@@ -85,6 +85,19 @@ jobs:
 
           echo "npm still does not have @formio/mcp@${VERSION} after 60s — skipping downstream publishes."
 
+      # Asked as "does the registry already have THIS version?", by exact query.
+      #
+      # Read as `max` of the version strings it lists, the comparison was
+      # lexicographic rather than semver: "0.9.0" sorts above "0.12.3". So from
+      # 0.10.0 onward every push to main concluded the current version was
+      # unpublished, tried to publish it, and failed on the registry's own
+      # "cannot publish duplicate version" — which failed the whole job and took
+      # the .mcpb bundle, the GitHub release, the Smithery publish and the image
+      # decision down with it, on a push that had released nothing at all.
+      #
+      # An exact query is also immune to the pagination this search will hit as
+      # versions accumulate: a listing that omits the newest reads exactly like a
+      # version that was never published.
       - name: Decide whether to publish to the MCP Registry
         id: mcp
         if: steps.pkg.outputs.version != ''
@@ -92,12 +105,14 @@ jobs:
           set -euo pipefail
           VERSION='${{ steps.pkg.outputs.version }}'
           NAME='${{ steps.pkg.outputs.name }}'
-          PUBLISHED=$(curl -fsS "https://registry.modelcontextprotocol.io/v0/servers?search=${NAME}" \
-            | jq -r --arg n "$NAME" '[.servers[]? | select(.server.name == $n) | .server.version] | max // ""')
-          if [ "$PUBLISHED" = "$VERSION" ]; then
+          FOUND=$(curl -fsS --get 'https://registry.modelcontextprotocol.io/v0/servers' \
+            --data-urlencode "search=${NAME}" --data-urlencode "version=${VERSION}" \
+            | jq -r --arg n "$NAME" --arg v "$VERSION" \
+              '[.servers[]? | select(.server.name == $n and .server.version == $v)] | length')
+          if [ "$FOUND" != "0" ]; then
             echo "Registry already has ${NAME}@${VERSION} — skipping."
           else
-            echo "Publishing ${NAME}@${VERSION} (registry currently at '${PUBLISHED:-none}')."
+            echo "Publishing ${NAME}@${VERSION}."
             echo "version=$VERSION" >> "$GITHUB_OUTPUT"
           fi
 
