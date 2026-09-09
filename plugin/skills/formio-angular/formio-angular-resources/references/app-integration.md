@@ -56,7 +56,10 @@ import { Home } from './home/home'; // legacy naming: `import { HomeComponent } 
     { provide: FormioAppConfig, useValue: AppConfig },
     {
       provide: FormioAuthConfig,
-      useValue: { login: { form: 'user/login' }, register: { form: 'user/register' } } satisfies FormioAuthConfig,
+      useValue: {
+        login: { form: 'user/login' },
+        register: { form: 'user/register' },
+      } satisfies FormioAuthConfig,
     },
   ],
   bootstrap: [App],
@@ -337,7 +340,7 @@ Ensure these four are in `dependencies`:
 "bootstrap-icons": "^1.11.0"
 ```
 
-Do not pin versions inside the skill — the user's Angular version dictates the compatible `@formio/angular` major. Look up latest at <https://www.npmjs.com/package/@formio/angular> or rely on `npm install` to resolve.
+Do not hard-code a version into this document — the user's Angular version dictates the compatible `@formio/angular` major. Resolve it from the npm registry the way [`BOOTSTRAP.md`](../../BOOTSTRAP.md) Step 1 does (`npm view @formio/angular version` and its `peerDependencies`), install that resolved version, and let the committed lockfile pin the rest.
 
 ## 10. Reading an existing workspace — don't overwrite
 

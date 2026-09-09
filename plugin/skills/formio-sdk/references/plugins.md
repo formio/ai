@@ -32,6 +32,8 @@ Formio.setProjectUrl('https://myproject.form.io');
 
 Plugins observe every request the SDK issues against `baseUrl` or `projectUrl` — configure URLs before registering plugins so the plugin sees consistent endpoints.
 
+A plugin runs inside every one of those requests, including the ones that carry `x-jwt-token`, and can retarget the URL, read the headers, or replace the response. Register only plugins from the application's own source or a dependency it audits, once at bootstrap, and never build a plugin's target URL from submission data or a query parameter — see the Security section in [../SKILL.md](../SKILL.md).
+
 ## API
 
 Plugin registration:

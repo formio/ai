@@ -509,3 +509,73 @@ describe('the resources sub-skill never conflates a resource name with a form pa
     expect(offenders(inCode)).toEqual([]);
   });
 });
+
+// The `skills` CLI defines `--all` as shorthand for `--skill '*' --agent '*' -y`.
+// The bootstrap used to pass it alongside `-a <agent>`, which the shorthand
+// silently discards — every skill in the repository landed in every agent's
+// directory, not the one named skill in the one agent this session runs in.
+// The repository ships two skills and this flow needs one; the install names it,
+// previews the repository first, and never widens to the whole thing.
+describe('BOOTSTRAP installs one named Angular skill, never the repository', () => {
+  it('no document in the skill family passes --all to the skills CLI', () => {
+    expect(offenders((body) => /\s--all\b/.test(body))).toEqual([]);
+  });
+
+  it('the install names angular-new-app and the agent, and previews the repository first', () => {
+    const body = doc('BOOTSTRAP.md');
+    expect(body).toContain('--skill angular-new-app');
+    expect(body).toContain('-a <agent>');
+    const preview = body.indexOf('--list');
+    const install = body.indexOf('--skill angular-new-app');
+    expect(preview).toBeGreaterThan(-1);
+    expect(preview).toBeLessThan(install);
+  });
+
+  it('the offer names one skill and no longer says every skill is installed', () => {
+    const body = doc('BOOTSTRAP.md');
+    expect(body).toMatch(/exactly one skill|one skill, named|a single skill/i);
+    expect(body).not.toMatch(/installs every skill/i);
+  });
+});
+
+// The caret paragraph said two things an agent cannot both do: "do NOT override
+// the user's `.npmrc`" and, in the same sentence, force `^` with `--save-prefix`
+// regardless. Caret stays the default; a workspace that configured its own
+// prefix keeps it, and the committed lockfile — not the range spelling — is what
+// fixes the installed versions.
+describe('BOOTSTRAP honors the workspace’s configured save prefix', () => {
+  it('never forces the caret over the user’s .npmrc', () => {
+    const body = doc('BOOTSTRAP.md');
+    expect(body).not.toContain("--save-prefix='^'");
+    expect(body).not.toMatch(/rewrite [^.\n]{0,60}`\^`/);
+  });
+
+  it('keeps caret as the default install range and names the lockfile', () => {
+    const body = doc('BOOTSTRAP.md');
+    const start = body.indexOf('### Add the Form.io packages');
+    const section = body.slice(start, body.indexOf('\n## ', start));
+    expect(section).toContain(
+      '@formio/angular@^<FORMIO_ANGULAR_VERSION> @formio/js@^<FORMIO_JS_VERSION>'
+    );
+    expect(section).toMatch(/lockfile/);
+  });
+
+  it('the post-scaffold check accepts whichever range form the workspace writes', () => {
+    const body = doc('BOOTSTRAP.md');
+    expect(body).toMatch(/`\^`, `~`, or (an )?exact/);
+    // No "must contain" block re-asserts a literal caret after the rule above.
+    expect(body).not.toMatch(/`package\.json` must contain/);
+  });
+
+  it('the resources sub-skill does not tell the agent not to pin, and imports through the tool', () => {
+    expect(doc('formio-angular-resources/references/app-integration.md')).not.toMatch(
+      /Do not pin versions/
+    );
+    expect(doc('formio-angular-resources/references/app-integration.md')).toMatch(
+      /committed lockfile/
+    );
+    // The library-wide ban on hand-rolled requests applies to the Next-steps block too.
+    expect(offenders((body) => /x-jwt-token: \$JWT/.test(body))).toEqual([]);
+    expect(doc('formio-angular-resources/SKILL.md')).toContain('`project_import` tool');
+  });
+});

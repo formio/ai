@@ -53,6 +53,7 @@ Detection path — inspect the workspace to find out which framework is already 
 3. **Multiple matches** (a workspace carrying both `angular.json` and a `react` dependency): ask the user to pick in one question round, same shape as the build-new multi-framework case. Never resolve a multi-match by the table's row order — signal order must not decide which framework a user's existing application is treated as.
 
    The framework-preference question belongs to build-new only. On this branch the framework is a fact about the workspace, detected rather than asked; the multi-match tie-break is a different question with a different cause.
+
 4. **Zero matches:** the workspace does not have a recognized framework installed. Two sub-cases:
    - Workspace is empty — the user probably meant build-new. Bounce back to Step 1: "I don't see an existing app in this directory — did you mean to build a new one?"
    - Workspace has non-framework code — tell the user we couldn't detect a supported framework, list the ones in the registry, and ask them to pick. Accept their pick but warn that the extend sub-skill may fail if the workspace does not meet its expectations.
@@ -96,7 +97,7 @@ The Entry skill uses this to load the template pair (both files on disk — `tem
 ```
 {
   workspacePath: string,               // absolute
-  userRequest: string,                 // verbatim plain-language request
+  userRequest: string,                 // the plain-language request, quoted as requirements
   templateMdPath: string,              // absolute, planner's delta template.md
   templateJsonPath: string,            // absolute, planner's delta template.json
   newResourceNames: string[],          // machine names of the resources added by this delta

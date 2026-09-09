@@ -47,6 +47,8 @@ Static helpers:
 
 Provider metadata on the submission: every uploaded file is stored as a JSON descriptor — `{ storage: 's3', name, originalName, url, size, type, hash?, key? }`. The `storage` field determines which provider handles subsequent `downloadFile` / `deleteFile` calls.
 
+A descriptor lives in `data.*`, so it is end-user input like any other submitted value — and one the application acts on: `storage` selects which provider runs, and `url` is an address the page will navigate to or a provider will fetch. Check `storage` against the providers the application registered and `url` against the application's own storage origin before opening it or handing it to a provider; a descriptor edited by whoever filled in the form otherwise chooses the destination.
+
 ## Examples
 
 ### Upload a file to S3 against a form's File component

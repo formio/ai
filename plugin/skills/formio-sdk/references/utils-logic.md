@@ -49,6 +49,8 @@ Action shapes (see `Utils.LogicAction*` types in `packages/core/src/utils/logic.
 - Merge schema — `{ type: 'mergeComponentSchema', schemaDefinition: '({ disabled: data.locked })' }`.
 - Custom — `{ type: 'customAction', customAction: 'instance.show = data.kind === "vip";' }`.
 
+`javascript` triggers and the `value`, `mergeComponentSchema`, and `customAction` bodies are all compiled and executed. They belong to a form definition the application's project owns; a `logic` array that arrived from anywhere else — a submission, a request, a third-party host — is not processed. See the Security section in [../SKILL.md](../SKILL.md).
+
 ## Examples
 
 ### Run logic for every component in a form

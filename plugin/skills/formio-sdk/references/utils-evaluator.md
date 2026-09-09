@@ -26,8 +26,8 @@ Caveat under ESM: `Utils.Evaluator` and named imports like `import { Evaluator }
 
 Template syntax (core `Evaluator.ts`):
 
-- `{{ data.firstName }}` — variable interpolation; HTML-escaped.
-- `{{{ data.htmlField }}}` — raw (un-escaped) interpolation.
+- `{{ data.firstName }}` — variable interpolation, inserted raw (lodash `interpolate`); NOT HTML-escaped.
+- `{{{ data.htmlField }}}` — HTML-escaped interpolation (lodash `escape`).
 - `{% if (data.x) { %} … {% } %}` — code execution.
 - `{{ data.method() }}` — function-call interpolation; suppressed when `options.noeval` is true.
 
@@ -39,7 +39,40 @@ Hot-swap helpers (`packages/core/src/utils/Evaluator.ts` and the renderer index 
 
 ## Examples
 
+### Install a sandboxed evaluator
+
+Call `registerEvaluator(custom)` at bootstrap, before any other SDK code reads `Utils.Evaluator`. The override takes effect for subsequent SDK-internal evaluations (template interpolation, conditionals, formulas). Existing references held by application code are not retroactively rebound. Installing this one disables JavaScript expressions in the application's own form definitions too — `calculateValue`, `validate.custom`, and custom `logic` stop evaluating, because the renderer routes them through the same singleton. Adopt it for an application whose forms are JSONLogic-only, or narrow the check to the expressions you want refused.
+
+```ts
+import { registerEvaluator, DefaultEvaluator } from '@formio/js/utils';
+
+class SandboxedEvaluator extends DefaultEvaluator {
+  evaluate(func, args, ret, interpolate, context, options = {}) {
+    // Reject any non-JSONLogic input.
+    if (typeof func === 'string' || typeof func === 'function') {
+      throw new Error('JavaScript expressions are disabled.');
+    }
+    return super.evaluate(func, args, ret, interpolate, context, options);
+  }
+}
+
+registerEvaluator(new SandboxedEvaluator({ noeval: true }));
+```
+
+### Evaluate a JSONLogic expression
+
+JSONLogic is data, not code — the shape to prefer for any rule that arrives at runtime rather than being written into the application.
+
+```ts
+import { Utils } from '@formio/js/utils';
+
+const ok = Utils.Evaluator.evaluate({ '>=': [{ var: 'data.age' }, 18] }, { data: { age: 21 } });
+console.log(ok); // true
+```
+
 ### Interpolate a template string
+
+The template is an authored literal in the application's own source. A template that arrives at runtime is not interpolated at all.
 
 ```ts
 import { Utils } from '@formio/js/utils';
@@ -52,6 +85,8 @@ console.log(greeting); // "Hello Alice!"
 
 ### Evaluate a custom validation expression
 
+The expression is an authored literal — the same `validate.custom` string you would write into one of your own form definitions. It is never a value read from a user, a submission, or a request.
+
 ```ts
 import { Utils } from '@formio/js/utils';
 
@@ -59,16 +94,9 @@ const valid = Utils.Evaluator.evaluate('valid = data.age >= 18;', { data: { age:
 console.log(valid); // true
 ```
 
-### Evaluate a JSONLogic expression
-
-```ts
-import { Utils } from '@formio/js/utils';
-
-const ok = Utils.Evaluator.evaluate({ '>=': [{ var: 'data.age' }, 18] }, { data: { age: 21 } });
-console.log(ok); // true
-```
-
 ### Compile and reuse a function
+
+The function body is an authored literal. `evaluator` is `new Function` with a friendlier signature, so a runtime string here is remote code execution.
 
 ```ts
 import { Utils } from '@formio/js/utils';
@@ -96,24 +124,4 @@ console.log(safe.toString());
 // '<p>Hello <img src="x"></p>' — the onerror handler is stripped.
 ```
 
-The `{ noeval: true }` option controls only function-call interpolation (`{{ data.method() }}`); it does not affect HTML escaping. If you need plain-text output, call `String(value)` yourself or strip HTML with `Utils.removeHTML(raw)`.
-
-### Install a sandboxed evaluator
-
-Call `registerEvaluator(custom)` at bootstrap, before any other SDK code reads `Utils.Evaluator`. The override takes effect for subsequent SDK-internal evaluations (template interpolation, conditionals, formulas). Existing references held by application code are not retroactively rebound.
-
-```ts
-import { registerEvaluator, DefaultEvaluator } from '@formio/js/utils';
-
-class SandboxedEvaluator extends DefaultEvaluator {
-  evaluate(func, args, ret, interpolate, context, options = {}) {
-    // Reject any non-JSONLogic input.
-    if (typeof func === 'string' || typeof func === 'function') {
-      throw new Error('JavaScript expressions are disabled.');
-    }
-    return super.evaluate(func, args, ret, interpolate, context, options);
-  }
-}
-
-registerEvaluator(new SandboxedEvaluator({ noeval: true }));
-```
+The `{ noeval: true }` option controls only function-call interpolation (`{{ data.method() }}`); it does not affect HTML escaping. If you need plain-text output, call `String(value)` yourself, strip HTML with `Utils.removeHTML(raw)`, or write the marker as `{{{ … }}}`, which HTML-escapes the value on the way in.

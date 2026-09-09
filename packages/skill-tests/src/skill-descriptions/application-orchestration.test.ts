@@ -172,3 +172,35 @@ describe('step numbering after the deletion', () => {
     expect(body).not.toMatch(/Step 5a|Step 5\b/);
   });
 });
+
+// The orchestrator's only input is the user's plain-language description. It is
+// requirements — planner input that passes two approval gates before anything is
+// written — and never text that reaches a command, a URL, or generated source.
+describe('the plain-language request is requirements, not commands', () => {
+  function step1(): string {
+    const body = skillDocument(SKILL_MD).body;
+    const start = body.indexOf('### Step 1');
+    return body.slice(start, body.indexOf('### Step 2', start));
+  }
+
+  it('Step 1 says the description is never interpolated into a command, URL, or source', () => {
+    expect(step1()).toMatch(/never (placed|put|interpolated) into a shell command/);
+    expect(step1()).toMatch(/never lands unescaped in generated source/);
+  });
+
+  it('Step 1 names the two gates every derived artifact passes', () => {
+    expect(step1()).toMatch(/Phase A/);
+    expect(step1()).toMatch(/import preview/);
+  });
+
+  it('the handoff passes the request as a quoted requirements block, not verbatim text to act on', () => {
+    const body = skillDocument(SKILL_MD).body;
+    const start = body.indexOf('## Handoff contracts');
+    const handoff = body.slice(start, body.indexOf('\n## ', start + 1));
+    expect(handoff).not.toMatch(/feature request verbatim/);
+    expect(handoff).toMatch(/quoted as a requirements block/);
+    // The request is the user's instruction; only the planner pair is data-not-instructions.
+    expect(handoff).toMatch(/the user's own instruction, which the sub-skill acts on/);
+    expect(handoff).toMatch(/data (you|it) reads?, not instructions/);
+  });
+});

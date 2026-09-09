@@ -37,6 +37,8 @@ The `formSrc` argument to `Formio.createForm` is one of:
 - A full form URL: `${projectUrl}/<formAlias>` or `${projectUrl}/form/<formId>` — the renderer loads the form definition over HTTP using the configured `baseUrl` / `projectUrl`.
 - A form JSON object: `{ display: 'form', components: [...] }` — the renderer skips the network round-trip (use for offline / local JSON).
 
+Either shape is executable: `calculateValue`, custom validation, `logic`, and content templates inside the definition run in the page when the form renders. So a `formSrc` is only ever a URL under the application's own `projectUrl`, or a JSON object the application ships in its own source — a project the application controls, in other words. A definition an end user supplies, uploads, or pastes, or one that comes back from a host the application does not control, is not rendered. The embed-side detail — what in a definition executes, and the sanitizer rules — is in [`formio-form`'s Security section](../../formio-form/SKILL.md); this reference does not restate it.
+
 ## API
 
 Static methods on `Formio` (renderer extensions in `packages/formio.js/src/Formio.js`):

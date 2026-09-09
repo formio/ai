@@ -72,6 +72,8 @@ Lazy-library and CDN helpers:
 - `Formio.addLibrary(name, src, flag?)` — register a library so the renderer can lazy-load it on demand.
 - `Formio.addLoader(loader)` — install a custom asset loader.
 
+These helpers put code on the page: each writes a `<script>` or `<link>` tag for the URL it is given, and the browser runs whatever that URL serves. A `src` is therefore a version-pinned URL on a host the application owns (or the `Formio.cdn` default the renderer ships with), and it is never assembled from submission data, a query parameter, or a value read out of a form definition. Where the build allows it, `import` the library through npm instead and leave the loader to the renderer's own on-demand assets.
+
 Plugin glue (covered in depth in [plugins.md](./plugins.md)):
 
 - `Formio.registerPlugin(plugin, name): void`
@@ -99,6 +101,8 @@ Formio.setProjectUrl('https://myproject.form.io');
 ```
 
 ### Repoint the CDN for offline / air-gapped builds
+
+`assets.mysite.com` stands for a host the application serves itself — a mirror of the renderer's third-party assets that the deployment owns and pins. That is the only kind of host to point the CDN root at.
 
 ```ts
 import { Formio } from '@formio/js';

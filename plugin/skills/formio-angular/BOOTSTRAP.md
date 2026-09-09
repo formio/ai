@@ -1,14 +1,14 @@
-# BOOTSTRAP — install Angular skills and scaffold the workspace
+# BOOTSTRAP — install the Angular scaffolding skill and scaffold the workspace
 
 This document is loaded by the parent `formio-angular` skill during Phase 2. It is **not** a standalone skill — no frontmatter, no independent trigger. The parent reads it after SETUP has been approved and before CONFIG.
 
 ## Why this phase exists
 
-`formio-angular` does not know how to scaffold an Angular workspace on its own, and it should not try. The Angular team ships a maintained skill library at [`angular/skills`](https://github.com/angular/skills) that already encodes the current best practices for `ng new`, workspace layout, build configuration, and CLI options. The preferred move is to offer to install that library the first time `formio-angular` runs — the user decides, because installing skills adds instructions this session follows — and then delegate the actual workspace creation to the `angular-new-app` skill from it. A user who declines gets the local `@angular/cli` fallback in Step 2 instead; either way the workspace exists before CONFIG. `formio-angular` picks the story back up at CONFIG, where it writes the Form.io-specific files (`config.ts`, `AuthModule`, resource NgModules) into the workspace the Angular skill just created.
+`formio-angular` does not know how to scaffold an Angular workspace on its own, and it should not try. The Angular team ships a maintained skill library at [`angular/skills`](https://github.com/angular/skills) that already encodes the current best practices for `ng new`, workspace layout, build configuration, and CLI options. The preferred move is to offer to install one skill from it — `angular-new-app`, by name, never the whole repository — the first time `formio-angular` runs; the user decides, because an installed skill adds instructions this session follows. Workspace creation is then delegated to that skill. A user who declines gets the local `@angular/cli` fallback in Step 2 instead; either way the workspace exists before CONFIG. `formio-angular` picks the story back up at CONFIG, where it writes the Form.io-specific files (`config.ts`, `AuthModule`, resource NgModules) into the workspace the Angular skill just created.
 
 Doing it this way keeps the framework-agnostic `formio-application` → `formio-angular` (→ its nested `./formio-angular-resources/SKILL.md` sub-skill) chain focused on Form.io concerns, and leans on the Angular team's own skill for the Angular concerns.
 
-BOOTSTRAP also installs the Form.io SDKs (`@formio/angular`, `@formio/js`) and the Bootstrap 5 + Bootstrap Icons stylesheets that the Form.io renderer's default template assumes. All four are pinned with caret ranges so ordinary `npm install` in the future picks up minor/patch releases automatically. Bootstrap can be opted out of by explicit user request; the Form.io SDK pair cannot — every downstream phase imports from them.
+BOOTSTRAP also installs the Form.io SDKs (`@formio/angular`, `@formio/js`) and the Bootstrap 5 + Bootstrap Icons stylesheets that the Form.io renderer's default template assumes. All four are installed with caret ranges by default so ordinary `npm install` in the future picks up minor/patch releases automatically — a workspace whose own `.npmrc` configures a different save prefix keeps it, and the committed lockfile is what fixes the versions either way. Bootstrap can be opted out of by explicit user request; the Form.io SDK pair cannot — every downstream phase imports from them.
 
 ## When to skip this phase
 
@@ -101,21 +101,28 @@ Never guess an Angular major, and never read a package manifest from a CDN or an
 
 **Opt-out:** if the user has explicitly said they do NOT want Bootstrap (e.g., "use Material", "skip Bootstrap", "I'll style it myself"), skip the two Bootstrap queries above and set `BOOTSTRAP_VERSION` + `BOOTSTRAP_ICONS_VERSION` to `null`. Step 5 will then skip its install and `angular.json` edits entirely. The default stays on Bootstrap 5 because the Form.io renderer's default template is Bootstrap 5 and unstyled forms are a bad first impression — an override needs a real user signal.
 
-## Step 2 — offer the Angular skills library, then install it if the user agrees
+## Step 2 — offer the Angular `angular-new-app` skill, then install it if the user agrees
 
-Scaffolding is delegated to the Angular team's own `angular-new-app` skill, which arrives by installing their skill library. That install writes skills into the user's agent configuration, and those skills then direct this session — so it is the user's call, not yours, and it needs an explicit yes before anything runs.
+Scaffolding is delegated to the Angular team's own `angular-new-app` skill, which arrives by installing it from their skill repository. That install writes a skill into the user's agent configuration, and that skill then directs this session — so it is the user's call, not yours, and it needs an explicit yes before anything runs.
 
-Ask once, showing the exact command you would run and where it comes from:
+First show what the repository contains. `--list` installs nothing and needs no approval of its own — its banner may say "installing non-interactively", which describes the CLI's mode, not an install:
 
 ```bash
-npx skills add https://github.com/angular/skills --all -a <agent> -y
+npx skills add https://github.com/angular/skills --list
 ```
 
-State three things with the offer: the source is the Angular team's official repository on GitHub (`angular/skills`), `--all` installs every skill in it — not only `angular-new-app` — and the installed skills become instructions this session follows. Then wait for an answer.
+Then ask once, showing the exact command you would run and where it comes from:
+
+```bash
+npx skills add https://github.com/angular/skills --skill angular-new-app -a <agent> -y
+```
+
+State three things with the offer: the source is the Angular team's official repository on GitHub (`angular/skills`), exactly one skill is installed from it — `angular-new-app`, which the user has just seen in the listing — and the installed skill becomes instructions this session follows. Then wait for an answer.
 
 **If the user agrees**, run it exactly once per session, before invoking `angular-new-app`, and report what it installed.
 
-- `-a <agent>` is the client you are actually running in — substitute it (`claude-code`, `cursor`, `codex`, `copilot`, …) so the skills register where this session will look for them. If you cannot determine the running client, omit the flag entirely: the default target is the universal `.agents/skills/` directory, which Cursor, Codex, and Copilot all read, and which Claude Code reads through a symlink. Never hardcode one client. Run the command from `workspaceRoot` and stay there — those directories are where the CLI writes, not somewhere to move the shell to, and a session that walks into one scaffolds the user's application inside their agent configuration.
+- `--skill angular-new-app` names the one skill this flow needs. Never widen it: the CLI's `--all` is shorthand for `--skill '*' --agent '*' -y`, which puts every skill in the repository into every agent's directory and silently discards the `-a <agent>` selection below.
+- `-a <agent>` is the client you are actually running in — substitute it (`claude-code`, `cursor`, `codex`, `copilot`, …) so the skill registers where this session will look for it. If you cannot determine the running client, omit the flag entirely: the default target is the universal `.agents/skills/` directory, which Cursor, Codex, and Copilot all read, and which Claude Code reads through a symlink. Never hardcode one client. Run the command from `workspaceRoot` and stay there — those directories are where the CLI writes, not somewhere to move the shell to, and a session that walks into one scaffolds the user's application inside their agent configuration.
 - `-y` accepts the default install location and any prompts the `skills` CLI emits. It does not stand in for the user's approval above — that approval is what allows the command to run at all.
 - If the command fails, never retry it against a different source. No other repository, fork, or mirror stands in for `angular/skills`, and no hand-assembled copy of those skills stands in for the CLI that installs them.
 
@@ -149,7 +156,7 @@ Before advancing, verify all of the following exist:
 - `<workspaceRoot>/angular.json`
 - an application bootstrap — **either** `<workspaceRoot>/src/app/app-module.ts` (NgModule) **or** `<workspaceRoot>/src/app/app.config.ts` plus a standalone root component. See "Which bootstrap shape landed" immediately below; one of the two is a normal outcome, not a failure.
 - `<workspaceRoot>/package.json` with `@angular/core` present at the major resolved in Step 1
-- `<workspaceRoot>/package.json` with `@formio/angular` pinned as `"^<FORMIO_ANGULAR_VERSION>"` and `@formio/js` pinned as `"^<FORMIO_JS_VERSION>"`
+- `<workspaceRoot>/package.json` with `@formio/angular` and `@formio/js` present at `FORMIO_ANGULAR_VERSION` and `FORMIO_JS_VERSION` — as `"^<version>"` by default, or in whichever range form (`^`, `~`, or an exact pin) the workspace's own `.npmrc` writes; the version is what is checked, not the prefix
 
 Check them at that absolute path, spelled out. A check written against "the workspace" and run wherever the shell sits passes in the wrong tree and reports a scaffold that is not where anyone will look for it. If `angular.json` is absent at `workspaceRoot`, stop this phase and find where it actually landed — a tree written to the wrong directory is a scaffold to move or delete with the user's say-so, not one to patch around or re-run on top of.
 
@@ -166,7 +173,9 @@ Every later phase — CONFIG's provider registration, AUTH's `AuthModule` import
   @NgModule({
     declarations: [App],
     imports: [BrowserModule, RouterModule.forRoot(routes)],
-    providers: [/* everything app.config.ts provided */],
+    providers: [
+      /* everything app.config.ts provided */
+    ],
     bootstrap: [App],
   })
   export class AppModule {}
@@ -178,7 +187,7 @@ Every later phase — CONFIG's provider registration, AUTH's `AuthModule` import
 
   Say in one line what you changed and why: the generated Form.io wiring is NgModule-based, so the workspace's bootstrap has to be too.
 
-If `angular.json` is missing, or neither bootstrap shape is present, something went wrong inside the scaffolding step (`angular-new-app`, or the `@angular/cli` fallback) or the follow-up install. Do not patch around it; stop BOOTSTRAP and ask the user whether they want to retry, switch to an existing workspace, or abort. If `@angular/core` in the generated `package.json` is a different major than `FORMIO_ANGULAR_SUPPORTED_MAJOR`, the `angular-new-app` invocation did not honor the version pin — stop and surface the mismatch before continuing. If the Form.io entries landed as exact pins or `~` ranges, rewrite them to `^` as described above and re-run the install with `PACKAGE_MANAGER`.
+If `angular.json` is missing, or neither bootstrap shape is present, something went wrong inside the scaffolding step (`angular-new-app`, or the `@angular/cli` fallback) or the follow-up install. Do not patch around it; stop BOOTSTRAP and ask the user whether they want to retry, switch to an existing workspace, or abort. If `@angular/core` in the generated `package.json` is a different major than `FORMIO_ANGULAR_SUPPORTED_MAJOR`, the `angular-new-app` invocation did not honor the version pin — stop and surface the mismatch before continuing. If the Form.io entries landed as exact pins or `~` ranges, that is the workspace's configured save prefix at work — leave them, as long as the version they name is the one Step 1 resolved.
 
 ### Which package manager this workspace uses
 
@@ -196,7 +205,7 @@ Also add `@formio/angular` and its peer SDK `@formio/js` to the workspace now so
 npm install --save @formio/angular@^<FORMIO_ANGULAR_VERSION> @formio/js@^<FORMIO_JS_VERSION>
 ```
 
-e.g., `npm install --save @formio/angular@^10.0.1 @formio/js@^5.3.3`. The resulting `package.json` must contain:
+e.g., `npm install --save @formio/angular@^10.0.1 @formio/js@^5.3.3`. With npm's default save prefix the resulting `package.json` entries come out as follows (a workspace `.npmrc` with `save-exact` or `save-prefix=~` writes them exact or `~`, which is fine):
 
 ```json
 {
@@ -207,19 +216,19 @@ e.g., `npm install --save @formio/angular@^10.0.1 @formio/js@^5.3.3`. The result
 }
 ```
 
-Run this from `workspaceRoot` — the directory `angular-new-app` created the workspace in — either by giving `npm` that path or by prefixing `cd "<workspaceRoot>" && `. The caret prefix matters — npm's default save-prefix writes `^` already, but do NOT override the user's `.npmrc` if they have configured `save-prefix=~` or `save-exact=true`; in that case, invoke `npm install --save --save-prefix='^' @formio/angular@^<FORMIO_ANGULAR_VERSION> @formio/js@^<FORMIO_JS_VERSION>` to force the `^` regardless. After the install, open the workspace's `package.json` and verify both entries read `"^<version>"` — if either one came out as an exact pin or a `~`, rewrite the line to the `^` form and re-run the install with `PACKAGE_MANAGER` so the lockfile matches.
+Run this from `workspaceRoot` — the directory `angular-new-app` created the workspace in — either by giving `npm` that path or by prefixing `cd "<workspaceRoot>" && `. Caret is the default because npm's own save-prefix writes `^` already. It is a default, not a rule to enforce: if the workspace has configured `save-prefix=~` or `save-exact=true` in its `.npmrc`, that is the user's decision for their project, and the entries come out as `~` ranges or exact pins — do not pass a `--save-prefix` to override it, and do not edit the entries afterwards. What fixes the installed versions is the committed lockfile, whatever the range spelling in `package.json`; after the install, open `package.json` and verify only that both entries name `FORMIO_ANGULAR_VERSION` and `FORMIO_JS_VERSION`. The lockfile only pins if it is committed: confirm the install wrote the workspace's lockfile and that it is tracked, and use `npm ci` (or the package manager's frozen-lockfile install) wherever the workspace is built from a clean checkout.
 
 ## Step 5 — add Bootstrap 5 and Bootstrap Icons
 
 Skip this step only when `BOOTSTRAP_VERSION === null` — either because the user explicitly opted out in Step 1, or because the registry was unreachable and they could not name the versions. Otherwise run it unconditionally — the Form.io renderer ships a Bootstrap 5 default template, and the forms the sub-skill generates assume Bootstrap 5 classes (`form-control`, `btn`, `row`, etc.) and `bi bi-*` icon classes are available globally.
 
-Install both packages with the caret prefix so future minor + patch releases in the same major flow through without re-bootstrapping:
+Install both packages with the caret prefix so future minor + patch releases in the same major flow through without re-bootstrapping — subject to the same rule as Step 4: a workspace `.npmrc` that configures a different save prefix wins, and the lockfile is what pins the versions:
 
 ```bash
 npm install --save bootstrap@^<BOOTSTRAP_VERSION> bootstrap-icons@^<BOOTSTRAP_ICONS_VERSION>
 ```
 
-e.g., `npm install --save bootstrap@^5.3.3 bootstrap-icons@^1.11.3`. The resulting `package.json` must contain:
+e.g., `npm install --save bootstrap@^5.3.3 bootstrap-icons@^1.11.3`. With npm's default save prefix the resulting `package.json` entries come out as follows (a workspace `.npmrc` with `save-exact` or `save-prefix=~` writes them exact or `~`, which is fine):
 
 ```json
 {
@@ -401,7 +410,7 @@ Bootstrap complete
   Angular pinned to:        <FORMIO_ANGULAR_TARGET_VERSION>  (latest patch in major)
   Bootstrap version:        <BOOTSTRAP_VERSION>              (or "skipped — user opted out" / "skipped — registry unreachable")
   Bootstrap Icons version:  <BOOTSTRAP_ICONS_VERSION>        (or "skipped — user opted out" / "skipped — registry unreachable")
-  Angular skills installed: <path reported by npx>
+  Angular skill installed:  angular-new-app at <path reported by npx>  (or "skipped — user declined; scaffolded with @angular/cli")
   Package manager:          <PACKAGE_MANAGER>
   Workspace:                <absolute workspace path>
   Key files:                angular.json, src/app/app-module.ts
@@ -410,6 +419,7 @@ Bootstrap complete
     "@formio/js":       "^<FORMIO_JS_VERSION>"
     "bootstrap":        "^<BOOTSTRAP_VERSION>"
     "bootstrap-icons":  "^<BOOTSTRAP_ICONS_VERSION>"
+    (^ is npm's default prefix — print whatever prefix the workspace's .npmrc actually wrote)
   change detection:         zoneless — provideZonelessChangeDetection() registered, angular.json polyfills empty (no zone.js)
   frontend-design:          available in session (strongly recommended; will be consulted on every UI surface)
                             -- or "not installed — applying the Bootstrap 5 brief inline; UI gates will disclose this"

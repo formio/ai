@@ -32,6 +32,8 @@ HTML sanitization (`Utils.sanitize`):
   - `allowedAttrs: string[]` — exact attribute whitelist.
   - `sanitizeConfig: DOMPurify.Config` — escape hatch for the raw DOMPurify config.
 
+Widening is where sanitization is lost: `script`, `on*` event attributes, `srcdoc`, and `javascript:` URLs must never appear in `addTags`, `addAttr`, `allowedTags`, or `allowedAttrs`, and a `sanitizeConfig` that disables DOMPurify's hooks turns this call into a pass-through. The options exist for markup like `<iframe>` or a `target` attribute — nothing that executes.
+
 DOM helpers (`dom` from `@formio/core`):
 
 - `dom.appendTo(element, container): void` — append `element` to `container` if both exist.

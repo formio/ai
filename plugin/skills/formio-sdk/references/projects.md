@@ -68,9 +68,11 @@ import { Formio } from '@formio/js';
 
 const formio = new Formio(Formio.getProjectUrl());
 const project = await formio.loadProject();
-project.settings = { ...project.settings, email: { sendgrid: { auth: { api_key: 'SG.x...' } } } };
+project.settings = { ...project.settings, cors: 'https://app.mysite.com' };
 await formio.saveProject(project);
 ```
+
+Settings that carry a credential — an email provider's API key, a file-storage secret, an OAuth client secret — are not edited this way from application code. Enter them in the Form.io portal's project settings, or have a deployment step write them from the secret store it already reads, so no key is ever a literal in source, in a transcript, or in an example.
 
 ### Inspect access rules
 

@@ -164,9 +164,7 @@ After all files are emitted, finish with a short "Next steps" section. **In hand
 
 1. `cd "<workspaceRoot>"` — the absolute path, not a relative one
 2. Install with the workspace's own package manager — `npm install` (or `npm install @formio/angular @formio/js bootstrap bootstrap-icons` in an existing workspace), translated to Yarn / pnpm / Bun when `package.json`'s `packageManager` or the lockfile names one; never introduce a second lockfile (see `../BOOTSTRAP.md`, "Which package manager this workspace uses")
-3. Import your project template (if not yet imported):
-   `curl -X POST -H "x-jwt-token: $JWT" -H "Content-Type: application/json" \
-     -d "{\"template\": $(cat template.json)}" {projectUrl}/import`
+3. Import your project template (if not yet imported) with the `project_import` tool — `formio-application`'s Step 3 — never with a hand-rolled request; this library does not POST to a deployment directly
 4. `cd "<workspaceRoot>" && ng serve` and open <http://localhost:4200>
 5. Sign up at `/auth/register` — you are the first user; promote yourself to `administrator` in the Form.io portal, then sign back in.
 ```

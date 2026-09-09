@@ -48,7 +48,7 @@ A `<script>` tag hands a third-party host the ability to run code on your page, 
 </script>
 ```
 
-The CDN build exposes the global `Formio`. `formio.form.min.js` and `formio.form.min.css` are the renderer pair — everything `Formio.createForm` needs and nothing else. Recompute the hashes whenever you bump the version: `curl -sL <url> | openssl dgst -sha384 -binary | openssl base64 -A`. Load it from the version-pinned npm CDN path above and nowhere else: an unversioned URL — including a jsDelivr path with the `@5.5.1` omitted, or a vendor-hosted bundle served from a fixed path — cannot be integrity-pinned, so whoever controls that host controls what executes on your page.
+The CDN build exposes the global `Formio`. `formio.form.min.js` and `formio.form.min.css` are the renderer pair — everything `Formio.createForm` needs and nothing else. Recompute the hashes whenever you bump the version, locally and against the same version-pinned URL you are about to embed — this downloads the file only to hash it and executes nothing from it: `curl -sL <url> | openssl dgst -sha384 -binary | openssl base64 -A`. Load it from the version-pinned npm CDN path above and nowhere else: an unversioned URL — including a jsDelivr path with the `@5.5.1` omitted, or a vendor-hosted bundle served from a fixed path — cannot be integrity-pinned, so whoever controls that host controls what executes on your page.
 
 These are the only two supported inclusion modes. Never import from `@formio/core`, never deep-import from `@formio/js/lib/`, and never use CommonJS `require`.
 

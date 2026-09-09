@@ -32,6 +32,8 @@ Formio.setProjectUrl('https://myproject.form.io');
 
 A submission URL is `${formUrl}/submission/<submissionId>`. List endpoint is `${formUrl}/submission`.
 
+Whatever comes back in `data.*` is end-user input — the values whoever filled in the form typed or chose — and the SDK returns it unchanged. Escape a value before it reaches `innerHTML`, a URL, or a template of your own, and pass it through `Utils.sanitize` ([utils-mask-sanitize.md](./utils-mask-sanitize.md)) when the value is HTML you intend to render. The renderer's own sanitizer covers what the renderer draws, not what your code draws.
+
 ## API
 
 Instance methods (on a Formio whose URL is form-scoped or submission-scoped):
@@ -45,7 +47,7 @@ Instance methods (on a Formio whose URL is form-scoped or submission-scoped):
 - `userPermissions(user?, form?, submission?): Promise<{ create, read, edit, delete }>` — compute the current user's access flags for a submission. Loads the form / current user if not passed.
 - `canSubmit(): Promise<boolean>` — convenience for "the current user can create a new submission on this form".
 - `getDownloadUrl(form?): Promise<string>` — return a temp-token-wrapped PDF download URL for the current submission.
-- `getTempToken(expire, allowed, options?): Promise<string>` — mint a short-lived token scoped to specific endpoint patterns (used for downloads or unauthenticated reads).
+- `getTempToken(expire, allowed, options?): Promise<string>` — mint a short-lived token scoped to specific endpoint patterns (used for downloads or unauthenticated reads). Both hand back a URL that carries a credential in its query string: keep `expire` to minutes, keep `allowed` to the narrowest endpoint pattern that works, and treat the URL as the secret it is — never log it, store it, or place it in a page a third party can read.
 
 Static helpers:
 

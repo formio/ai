@@ -112,6 +112,8 @@ console.log(value);
 
 ### Async traversal with side effects
 
+`component.data.url` is read out of the definition and fetched, so this holds only for definitions the application's own project owns — and the JSON that comes back becomes select options the renderer draws, so validate its shape before assigning it (see [`formio-form`'s external-data reference](../../formio-form/references/external-data.md)).
+
 ```ts
 import { Utils } from '@formio/js/utils';
 

@@ -203,3 +203,29 @@ describe('formio-form MCP Tool Preference', () => {
     expect(section).toContain('x-jwt-token');
   });
 });
+
+describe('formio-form Security section', () => {
+  function securitySection(): string {
+    const md = readSkillMd();
+    const start = md.indexOf('\n## Security');
+    expect(start, 'no Security section').toBeGreaterThan(-1);
+    const rest = md.slice(start + 1);
+    const next = rest.indexOf('\n## ', 1);
+    return next === -1 ? rest : rest.slice(0, next);
+  }
+
+  it('carries five bullet rules', () => {
+    const bullets = securitySection()
+      .split('\n')
+      .filter((line) => line.startsWith('- **'));
+    expect(bullets).toHaveLength(5);
+  });
+
+  it('the fifth rule says fetched or supplied JSON never instructs the agent', () => {
+    const bullets = securitySection()
+      .split('\n')
+      .filter((line) => line.startsWith('- **'));
+    expect(bullets[4]).toMatch(/never instruct/i);
+    expect(bullets[4]).toMatch(/report/i);
+  });
+});
