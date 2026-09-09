@@ -66,6 +66,15 @@ export interface ProjectRemedies {
     committedFilePath?: string;
   }) => string[];
   /**
+   * What to say about a pair recorded with `project set --force`, after the shared
+   * fact above.
+   *
+   * A remedy rather than one string, because clearing the record is destructive and
+   * the two readers are not the same party: a developer at a shell gets the command,
+   * an agent gets whose decision it is. See FORCED_PAIR_FACT.
+   */
+  forcedPair: (cwd: string) => string;
+  /**
    * What to say about the environment the answer was NOT read from. The CLI runs
    * in a shell that cannot see the server's environment block; the tool IS the
    * server, so it has nothing to disclaim.
@@ -108,6 +117,30 @@ export function environmentRecordName(environmentLocation: string): string {
  * matching on the line has one string to match rather than three spellings of it.
  */
 export const BASE_URL_NOT_DETERMINED = 'could not be determined.';
+
+/**
+ * How every report spells "the domain rules were waived for this pair", up to the point
+ * where the two readers differ.
+ *
+ * The FACT is shared, like every other fact in this report: a forced pair looks like a
+ * resolver bug wherever it appears unexplained. What differs is what to do about it,
+ * and here the difference is not vocabulary but AUTHORITY. Clearing the record is the
+ * only destructive operation on this surface, and the override it destroys is a
+ * developer's decision that nothing else on the machine records — so a shell reader is
+ * handed the command and an agent running this report as a routine preflight is told
+ * whose call it is. Printed for both, an agent acting on a line in an `ok` report wiped
+ * an override it was never asked to touch, and `--reset` exits 0, so it reported
+ * success.
+ *
+ * The way back is the reset rather than "record it again without --force": an unforced
+ * write of the same pair is no change at all, so the override survives it — the note
+ * this replaces named that call, which reported success and changed nothing.
+ */
+export const FORCED_PAIR_FACT =
+  // The flag alone, never spelled as "`project set --force`": the CLI's own remedy
+  // appends the runnable reset command, and a reader — or a test — scanning that line
+  // for the command it names would find that phrase first and try to run it.
+  `this pair was recorded with --force, so the Project URL / Base URL domain rules were skipped for it. Re-recording the same pair without --force changes nothing and keeps the override.`;
 
 export interface ProjectReportRequest {
   cwd: string;
@@ -175,6 +208,15 @@ export interface ProjectReport {
    * wrong record, an unpaired one sits in an incomplete one.
    */
   unpaired: string[];
+  /**
+   * Whether the pair that resolved was recorded with `project set --force`, which
+   * skips the domain rules for it.
+   *
+   * Said out loud because the pair itself cannot say it: a hosted project on a
+   * deployment the rules forbid looks like a resolver bug until something names the
+   * override.
+   */
+  forced?: boolean;
   /** The full human-readable report, remedies included. */
   message: string;
   /** The same remedy as a call, for a caller that acts rather than reads. */
@@ -552,11 +594,17 @@ export function reportProject({
     baseUrlSource: sources.baseUrl,
     shadowed,
     unpaired,
+    ...(resolution.forced ? { forced: true } : {}),
     notes: [...notes],
     message: [
       `Project URL: ${resolved.projectUrl}`,
       `Base URL:    ${resolved.baseUrl}`,
       `Source:      ${source}`,
+      // Only ever true of a forced record, and only a resolved pair can be one — so
+      // this line appears exactly where the pair it explains is printed.
+      ...(resolution.forced
+        ? [`Forced:      ${FORCED_PAIR_FACT} ${remedies.forcedPair(cwd)}`]
+        : []),
       ...(shadowed.length
         ? [`Shadowed:    ${shadowed.join('; ')} — overridden by the source above.`]
         : []),

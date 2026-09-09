@@ -204,6 +204,12 @@ export const projectMappingShape = {
     .describe(
       'False when the requested mapping was already in place and nothing was written. True means the RECORD changed, which is not necessarily the same as the ACTIVE project changing — a committed formio.json still outranks it'
     ),
+  forced: z
+    .boolean()
+    .optional()
+    .describe(
+      'True when the pair that now resolves was recorded with `project set --force`, which waives the rules tying a Project URL to the deployment that serves it. Set only by that shell command — this tool cannot force a pair, and an unforced call that leaves both halves untouched keeps an existing override rather than silently dropping it. It explains a pair the rules would refuse; it is not a reason to re-record it'
+    ),
 };
 
 /**
@@ -241,6 +247,12 @@ export const projectResolutionShape = {
     .optional()
     .describe(
       'Which layer supplied the base URL: committed, mapping, environment, derived (read off the project URL), or unresolved'
+    ),
+  forced: z
+    .boolean()
+    .optional()
+    .describe(
+      'True when this pair was recorded with `project set --force`, which waives the rules tying a Project URL to the deployment that serves it — the case those rules cannot tell from a mistake is an internal deployment served from a *.form.io domain. Present only on a resolved pair, and only ever set by that shell command: no tool call and no environment variable grants it. It explains a pair that would otherwise look wrong; it is not a reason to distrust the answer'
     ),
   shadowed: z
     .array(z.string())

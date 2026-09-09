@@ -15,8 +15,9 @@ import {
   COMMITTED_IS_HAND_AUTHORED,
   strandedBaseUrlClause,
 } from '../write-refusals.js';
+import { projectCommand } from '../cli-launch.js';
 import { cwdSchema } from '../project-resolver.js';
-import { ProjectReport, reportProject } from '../project-report.js';
+import { FORCED_PAIR_FACT, ProjectReport, reportProject } from '../project-report.js';
 import { toMcpStructuredResult } from '../mcp-responses.js';
 import { projectMappingShape } from '../output-schemas.js';
 import { local } from '../tool-annotations.js';
@@ -154,6 +155,11 @@ export function registerProjectSetTool(server: McpServer, options: ProjectSetOpt
         record: {
           projectUrl: mapped.status === 'usable' ? mapped.entry.env.FORMIO_PROJECT_URL : undefined,
           baseUrl: mapped.status === 'usable' ? mapped.entry.env.FORMIO_BASE_URL : undefined,
+          // This tool cannot force a pair — that is `project set --force`, a developer
+          // at a shell — but it must not silently UNFORCE one either: an agent
+          // re-stating the project it already resolved is an ordinary call, and the
+          // plan keeps the override only while the pair itself is unchanged.
+          forced: mapped.status === 'usable' ? mapped.entry.forced : undefined,
         },
         // Where the project lives when this mapping has none.
         elsewhere: {
@@ -179,6 +185,17 @@ export function registerProjectSetTool(server: McpServer, options: ProjectSetOpt
       if (plan.outcome === 'no-values') {
         refuse(
           'Pass at least one of projectUrl or baseUrl. With a project already mapped for this cwd, either one alone is a valid update.'
+        );
+      }
+      // Unreachable while this tool takes no force argument, and ANSWERED rather than
+      // left to the checker's exhaustiveness: overriding the domain rules is a
+      // shell-only write — a developer taking responsibility for a pair those rules
+      // cannot tell from a mistake — so the one honest answer here names that command.
+      if (plan.outcome === 'force-requires-both') {
+        refuse(
+          `Recording a pair past the Project URL / Base URL domain rules is a shell-only write, and it takes both halves at once. Run: ${projectCommand(
+            `set --force --project-url <project_url> --base-url <base_url> --cwd ${entryCwd}`
+          )}`
         );
       }
       if (plan.outcome === 'project-required') {
@@ -314,7 +331,7 @@ export function registerProjectSetTool(server: McpServer, options: ProjectSetOpt
         : '';
 
       if (plan.outcome !== 'unchanged') {
-        writeProjectEntry({ cwd: entryCwd, env: plan.entry.env });
+        writeProjectEntry({ cwd: entryCwd, ...plan.entry });
       }
       const settled = settle();
 
@@ -351,7 +368,17 @@ export function registerProjectSetTool(server: McpServer, options: ProjectSetOpt
       // the outcome stays a result, and carries the reader's own message — which names
       // the file and the key to edit — appended to what was written.
       const serviceable = settled.status === 'ok';
-      const fullMessage = serviceable ? message : [message, '', settled.message].join('\n');
+      // A forced pair is one the server's own refusals call impossible, so a result
+      // that reports it bare reads as a bug — and an agent's next move is to "correct"
+      // a record a developer set deliberately. Read off the READER, like the pair
+      // itself: a mapping shadowed by a committed file is not what resolves, so its
+      // override is not what this result is about.
+      const forcedNote = settled.forced
+        ? ` Forced: ${FORCED_PAIR_FACT} ${TOOL_REMEDIES.forcedPair(entryCwd)}`
+        : '';
+      const fullMessage = serviceable
+        ? message + forcedNote
+        : [message + forcedNote, '', settled.message].join('\n');
       return toMcpStructuredResult(
         {
           ok: serviceable,
@@ -360,6 +387,7 @@ export function registerProjectSetTool(server: McpServer, options: ProjectSetOpt
           // Resolved after the write, so it describes the state being reported.
           projectUrl: settled.projectUrl,
           ...(settled.baseUrl ? { baseUrl: settled.baseUrl } : {}),
+          ...(settled.forced ? { forced: true } : {}),
           changed: plan.outcome !== 'unchanged',
         },
         fullMessage

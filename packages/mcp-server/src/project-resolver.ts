@@ -202,6 +202,14 @@ export interface ProjectResolution {
   // inferred because the upward walk means the governing file is usually not in
   // the directory the caller passed.
   committedFilePath?: string;
+  /**
+   * Whether the winning record was forced past the domain rules.
+   *
+   * Reported so a reader can SAY it. A report naming a hosted project on a deployment
+   * the rules forbid, with nothing to account for it, reads as a bug in the resolver —
+   * and the one thing that explains it is invisible in both URLs.
+   */
+  forced: boolean;
   // Every layer that COULD have supplied the project URL, whether or not it won.
   // A reporting caller needs the losers to say what was shadowed — without them,
   // "my project_set did nothing" has no answer in the output.
@@ -304,7 +312,7 @@ function recordName({
 
 interface WinningRecordCheck {
   source: ProjectUrlSource;
-  record: { projectUrl: string; baseUrl?: string };
+  record: { projectUrl: string; baseUrl?: string; forced?: boolean };
   mapCwd: string;
   cacheDir?: string;
   committedFilePath?: string;
@@ -329,7 +337,13 @@ function validateWinningRecord({
   committedFilePath,
   onNote,
 }: WinningRecordCheck):
-  | { source: ProjectUrlSource; projectUrl: string; baseUrl?: string; derived?: string }
+  | {
+      source: ProjectUrlSource;
+      projectUrl: string;
+      baseUrl?: string;
+      derived?: string;
+      forced?: boolean;
+    }
   | undefined {
   // The mapping is the one record whose URLs reach here unvalidated: committed values
   // are normalized by the file's own reader, and environment values by getConfig /
@@ -360,13 +374,21 @@ function validateWinningRecord({
       : record.baseUrl && stripTrailingSlashes(record.baseUrl);
 
   const derived = deriveBaseUrl(projectUrl);
-  const validity: PairValidity = classifyPair(projectUrl, recordBaseUrl || derived);
+  // `project set --force` recorded this pair past the domain rules, so they are skipped
+  // here too — the reader applies them at the point of use, and a pair only the writer
+  // accepted is refused on the next call, which is the whole failure the override
+  // exists to avoid. Only a record holding BOTH halves can be forced: the flag
+  // licenses a pair, so a hand-edited entry claiming it over a project alone is judged
+  // as usual rather than granted a derivation the force was overriding.
+  const forced = Boolean(record.forced) && Boolean(recordBaseUrl);
+  const validity: PairValidity = classifyPair(projectUrl, recordBaseUrl || derived, { forced });
   if (validity === 'ok') {
     return {
       source,
       projectUrl,
       ...(recordBaseUrl ? { baseUrl: recordBaseUrl } : {}),
       ...(recordBaseUrl ? {} : derived ? { derived } : {}),
+      ...(forced ? { forced: true } : {}),
     };
   }
 
@@ -510,11 +532,25 @@ export function resolveProject(
   //
   // Falsy, not nullish: an empty FORMIO_PROJECT_URL is an unanswered prompt, not a
   // pinned project.
+  //
+  // The mapping is the one record that can be FORCED — `project set --force`, a
+  // developer at a shell overriding the domain rules for a pair those rules cannot tell
+  // from a mistake. A committed formio.json is shared with everyone who clones the
+  // repository and the environment is a suggestion any launch configuration can set;
+  // neither is a place to waive a check, so a `force` key in a committed file is an
+  // unknown key like any other and no variable grants it.
   const records: ReadonlyArray<
-    readonly [ProjectUrlSource, { projectUrl?: string; baseUrl?: string }]
+    readonly [ProjectUrlSource, { projectUrl?: string; baseUrl?: string; forced?: boolean }]
   > = [
     ['committed', { projectUrl: committed?.projectUrl, baseUrl: committed?.baseUrl }],
-    ['mapping', { projectUrl: mappedEnv?.FORMIO_PROJECT_URL, baseUrl: mappedEnv?.FORMIO_BASE_URL }],
+    [
+      'mapping',
+      {
+        projectUrl: mappedEnv?.FORMIO_PROJECT_URL,
+        baseUrl: mappedEnv?.FORMIO_BASE_URL,
+        forced: mappedEntry?.forced,
+      },
+    ],
     ['environment', { projectUrl: envProjectUrl || undefined, baseUrl: baseConfig.baseUrl }],
   ];
   // Validity is asked only of the record that WINS, in that record's own repair
@@ -526,7 +562,13 @@ export function resolveProject(
   // suggestion, read tolerantly everywhere else, so an unusable pair there is ignored
   // with a note and resolution falls through to the interview.
   let winner:
-    | { source: ProjectUrlSource; projectUrl: string; baseUrl?: string; derived?: string }
+    | {
+        source: ProjectUrlSource;
+        projectUrl: string;
+        baseUrl?: string;
+        derived?: string;
+        forced?: boolean;
+      }
     | undefined;
   for (const [source, record] of records) {
     if (!record.projectUrl) {
@@ -534,7 +576,7 @@ export function resolveProject(
     }
     const validated = validateWinningRecord({
       source,
-      record: record as { projectUrl: string; baseUrl?: string },
+      record: record as { projectUrl: string; baseUrl?: string; forced?: boolean },
       mapCwd,
       cacheDir,
       committedFilePath: committed?.filePath,
@@ -600,6 +642,7 @@ export function resolveProject(
       projectUrl: projectUrlSource,
       baseUrl: baseUrlSource,
     },
+    forced: Boolean(winner.forced),
     ...(committed?.filePath ? { committedFilePath: committed.filePath } : {}),
     candidates: {
       ...(committed?.projectUrl ? { committed: committed.projectUrl } : {}),

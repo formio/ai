@@ -161,7 +161,35 @@ export function deriveBaseUrl(projectUrl: string): string | undefined {
  * itself and the pair collapses — but "you are on the Open Source server" is the
  * wrong diagnosis for it, and it is the likeliest mistake on this surface.
  */
-export function classifyPair(projectUrl: string, baseUrl: string | undefined): PairValidity {
+export interface PairJudgement {
+  /**
+   * The pair was recorded by a developer who overrode these rules — `project set
+   * --force` — so every verdict below is skipped.
+   *
+   * The one shape these rules cannot tell from a mistake is an internal deployment
+   * served from a *.form.io domain: "a form.io host is served by https://api.form.io
+   * and by nothing else" is true of every project on the hosted cloud and false of
+   * that deployment, and nothing in the two URLs distinguishes them. So the override
+   * is a human at a shell, and it is honoured HERE rather than at the writer alone —
+   * the reader applies the same rules at the point of use, and a pair only the writer
+   * accepts is refused on the next call.
+   *
+   * A forced verdict needs both halves. Force licenses a pair, never half of one, and
+   * never a derivation: a forced record carries the deployment it was given, and
+   * deriving one for a forced project URL would produce exactly the value the force
+   * was overriding.
+   */
+  forced?: boolean;
+}
+
+export function classifyPair(
+  projectUrl: string,
+  baseUrl: string | undefined,
+  { forced = false }: PairJudgement = {}
+): PairValidity {
+  if (forced && baseUrl) {
+    return 'ok';
+  }
   let parsedProject: URL;
   try {
     parsedProject = new URL(projectUrl);

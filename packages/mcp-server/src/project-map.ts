@@ -12,6 +12,17 @@ const PROJECTS_FILE = 'projects.json';
 // deployment could be stored without its project; it has no question left to answer.
 export interface ProjectEntry {
   env: Record<string, string>;
+  /**
+   * The pair in `env` was recorded by `project set --force`, so the domain rules are
+   * skipped for it wherever it is read.
+   *
+   * Stored beside the pair rather than as another `env` key: an FORMIO_* name in this
+   * file means the environment variable of that name, and no variable forces anything —
+   * the override is a developer at a shell, deliberately not a value a launch
+   * configuration or an agent can supply. Absent means false; a forced entry always
+   * holds both halves, because force licenses a pair and never half of one.
+   */
+  forced?: boolean;
 }
 
 type ProjectMap = Record<string, ProjectEntry>;
@@ -157,6 +168,13 @@ function validateEntry(cacheDir: string, cwd: string, value: unknown): ProjectEn
       `has non-string environment values: ${nonString.map(([name, item]) => `${name} is ${describe(item)}`).join(', ')}`
     );
   }
+  // A non-boolean here decides whether the domain rules are skipped for this pair, so
+  // it is not a field to coerce: `"false"` is truthy, and reading it as an override
+  // would silently accept a pair nobody forced.
+  const { forced } = value as { forced?: unknown };
+  if (forced !== undefined && typeof forced !== 'boolean') {
+    return invalid(`has a non-boolean \`forced\` flag: found ${describe(forced)}`);
+  }
   return value as ProjectEntry;
 }
 
@@ -261,15 +279,54 @@ export function unusableRecordProjectUrl(
   return reason === undefined ? undefined : `${reason} The recorded value is ${raw}.`;
 }
 
+/**
+ * Clear one directory's entry, and report what it held.
+ *
+ * The one operation that takes a record OUT. It exists because a pair recorded with
+ * `project set --force` is preserved by any write that leaves both halves untouched —
+ * re-recording it without the flag reports "no change" and keeps the override — so
+ * something has to be able to say "forget this directory", after which the ordinary
+ * rules judge whatever is recorded next. Returns the entry that was removed, or
+ * undefined when there was nothing to remove, so a caller can name the value it
+ * discarded rather than clearing it silently.
+ *
+ * Reads the file immediately before writing it, for the same reason writeProjectEntry
+ * does: the map is shared by every directory on this machine, so a stale snapshot
+ * written back drops another process's mapping.
+ */
+export function removeProjectEntry({
+  cwd,
+  cacheDir = DEFAULT_CACHE_DIR,
+}: {
+  cwd: string;
+  cacheDir?: string;
+}): ProjectEntry | undefined {
+  const key = mapKey(cwd);
+  const map = readMap(cacheDir, key);
+  const existing: unknown = map[key];
+  if (existing === undefined) {
+    return undefined;
+  }
+  delete map[key];
+  writeMap(cacheDir, map);
+  // Reported as it was on disk, unvalidated: the caller is being told what was
+  // discarded, and a malformed entry is exactly the kind this clears. Validating it
+  // would fail the one operation that removes it.
+  return existing as ProjectEntry;
+}
+
 export interface ProjectEntryWrite {
   cwd: string;
   env: Record<string, string>;
+  /** Whether this pair was forced past the domain rules. Written only when true. */
+  forced?: boolean;
   cacheDir?: string;
 }
 
 export function writeProjectEntry({
   cwd,
   env,
+  forced = false,
   cacheDir = DEFAULT_CACHE_DIR,
 }: ProjectEntryWrite): void {
   // The key everything else uses. Passed the raw cwd, an unreadable-map failure printed
@@ -289,6 +346,9 @@ export function writeProjectEntry({
   // is reported differently from damage to the file. The FILE is still validated by
   // readMap above, because a write that cannot read it would destroy every other
   // directory's mapping; those entries travel through verbatim.
-  map[key] = { env };
+  // The flag is written only when it is true, so an ordinary entry keeps the shape it
+  // has always had: this file is read by hand and diffed in bug reports, and a
+  // `"forced": false` on every entry advertises an override nobody asked for.
+  map[key] = { env, ...(forced ? { forced: true } : {}) };
   writeMap(cacheDir, map);
 }
