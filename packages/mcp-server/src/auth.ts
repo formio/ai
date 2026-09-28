@@ -237,8 +237,10 @@ export async function authenticate(
   });
 
   app.post('/callback', (req, res) => {
-    const token = (req.body as { token: string }).token;
-    if (!token) {
+    // Express 5 leaves `req.body` undefined when no parser matched the request's
+    // content type, so a POST that is not JSON arrives with no body at all.
+    const token = (req.body as { token?: unknown } | undefined)?.token;
+    if (typeof token !== 'string' || !token) {
       process.stderr.write('Auth callback received but token is empty\n');
       res.status(400).send('No token received');
       return;
@@ -252,7 +254,19 @@ export async function authenticate(
   // Captured so the timeout error can name it. stderr reaches logs, but the
   // error reaches the user, and the URL is the one thing they need.
   let loginUrl: string | undefined;
-  const server = app.listen(config.authPort ?? 0, host, () => {
+  const server = app.listen(config.authPort ?? 0, host, (err?: Error) => {
+    // Express 5 passes a bind failure here rather than raising it on the server.
+    // A fixed FORMIO_AUTH_PORT that is already taken is the usual one; ignoring
+    // it would leave the caller waiting out the whole login timeout.
+    if (err) {
+      rejectJwt(
+        new Error(
+          `Could not start the Form.io login server on ${host}:${config.authPort ?? 0}: ${err.message}. ` +
+            `Free that port, or set FORMIO_AUTH_PORT to one that is available.`
+        )
+      );
+      return;
+    }
     const addr = server.address();
     if (addr && typeof addr !== 'string') {
       const port = addr.port;
