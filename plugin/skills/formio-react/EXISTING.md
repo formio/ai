@@ -10,6 +10,7 @@ Report all of the following before modifying a single file:
 
 - **Router style.** Does the application route through React Router's **data-router** API (`createBrowserRouter`), or through `<BrowserRouter>` with `<Routes>` alone? See step 2 — this one is a gate.
 - **Packages.** Are `@formio/react` and `@formio/js` installed, and at what versions?
+- **Router package and major.** Is routing on `react-router` 7 or 8, or on `react-router-dom` 6 or 7? The generated kernel imports from `react-router`, which needs version 7 or later; on `react-router-dom` 6.4 or later, generate the same imports from `react-router-dom` instead. Never upgrade the router major without approval: version 8 needs React 19.2.7 or newer and Node 22.22 or newer, and it removes `react-router-dom` altogether, so the bump reaches every file that imports the router.
 - **Renderer stylesheets — both of them.** `@formio/js/dist/formio.form.css` carries the `.formio-*` and `.choices*` rules, and a Bootstrap 5 stylesheet supplies the classes the default template emits. An application that predates this guidance commonly has the Bootstrap half and not the renderer's own, which renders every reference select as an unstyled list. Check for each separately; a form missing either looks broken rather than erroring.
 - **Provider.** Is `FormioProvider` mounted, and against which project URL?
 - **Authentication.** Is there an existing auth surface and a current-user source?

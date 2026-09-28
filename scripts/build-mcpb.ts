@@ -226,7 +226,7 @@ function manifestObject(version: string, tools: object[]) {
     },
     compatibility: {
       platforms: ['darwin', 'win32', 'linux'],
-      runtimes: { node: '>=20.0.0' },
+      runtimes: { node: '>=22.12.0' },
     },
     // Read from the built server on every build (see readToolsFromServer), so the
     // list is accurate without being maintained by hand.
@@ -248,7 +248,7 @@ async function bundleServer() {
     bundle: true,
     platform: 'node',
     format: 'esm',
-    target: 'node20',
+    target: 'node22',
     banner: {
       // Same shim as the plugin build: bundled CJS deps (express) need these globals
       // to resolve inside ESM output.

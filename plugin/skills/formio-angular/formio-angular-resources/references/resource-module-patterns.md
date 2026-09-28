@@ -268,13 +268,14 @@ export class ViewComponent extends FormioResourceViewComponent {}
 
 ```html
 <!-- ANTI-PATTERN — do not emit this as the ViewComponent template -->
-<formio
-  *ngIf="service.form && service.resource"
-  [form]="service.form"
-  [submission]="service.resource"
-  [readOnly]="true"
->
-</formio>
+@if (service.form && service.resource) {
+  <formio
+    [form]="service.form"
+    [submission]="service.resource"
+    [readOnly]="true"
+  >
+  </formio>
+}
 ```
 
 That's equivalent to using the bare `FormioResourceViewComponent` and defeats the purpose of overriding. Only use a whole-form read-only render when the user has explicitly said "just show the form" — and even then, flag it in Phase A.
@@ -287,9 +288,11 @@ That's equivalent to using the bare `FormioResourceViewComponent` and defeats th
     <div class="card">
       <div class="card-body">
         <h3 class="card-title mb-2">{{ service.resource?.data?.<titleField> }}</h3>
-        <p class="text-muted" *ngIf="service.resource?.data?.<descriptionField>">
-          {{ service.resource?.data?.<descriptionField> }}
-        </p>
+        @if (service.resource?.data?.<descriptionField>) {
+          <p class="text-muted">
+            {{ service.resource?.data?.<descriptionField> }}
+          </p>
+        }
         <!-- one <dl> entry per additional scalar field worth showing -->
         <dl class="row small mb-0">
           <dt class="col-sm-3"><FieldLabel></dt>
@@ -511,8 +514,10 @@ export class TeamUsersIndexComponent extends FormioResourceIndexComponent {}
 `team-users-index.component.html`:
 
 ```html
-<formio-grid *ngIf="service.form" [src]="service.formUrl" (rowSelect)="goToOpposite($event)">
-</formio-grid>
+@if (service.form) {
+  <formio-grid [src]="service.formUrl" (rowSelect)="goToOpposite($event)">
+  </formio-grid>
+}
 ```
 
 Override `goToOpposite` to `this.router.navigate(['/user', row.data.user._id, 'view'])`.
@@ -533,7 +538,7 @@ parents: ['event', { field: 'user', resource: 'currentUser', filter: false }];
 
 ## 7. Static (AOT-safe) routes
 
-Dynamic `routes[2].children!.push(...)` works under Angular 15+ with strict AOT, but if the consumer's build fails with "Function calls are not supported in decorators", fall back to static routes:
+Dynamic `routes[2].children!.push(...)` works under Angular 17+ with strict AOT, but if the consumer's build fails with "Function calls are not supported in decorators", fall back to static routes:
 
 ```typescript
 import {
@@ -595,9 +600,11 @@ Most resources have a name/title field and a descriptive long-form field. Surfac
 
 ```html
 <h3 class="card-title">{{ service.resource?.data?.<titleField> }}</h3>
-<p class="card-text text-muted" *ngIf="service.resource?.data?.<descField>">
-  {{ service.resource?.data?.<descField> }}
-</p>
+@if (service.resource?.data?.<descField>) {
+  <p class="card-text text-muted">
+    {{ service.resource?.data?.<descField> }}
+  </p>
+}
 ```
 
 Common title-field names to auto-detect: `name`, `title`, `subject`, `label`, `firstName + lastName` (compose). Common description fields: `description`, `notes`, `summary`, `body`.
@@ -616,9 +623,11 @@ When the map has a `start`/`end` or `startDate`/`endDate` pair, render it as the
 Single `dueDate` / `closeDate`: show as a pill next to the title, with optional color if overdue:
 
 ```html
-<span class="badge bg-warning" *ngIf="service.resource?.data?.dueDate">
-  Due {{ service.resource?.data?.dueDate | date:'mediumDate' }}
-</span>
+@if (service.resource?.data?.dueDate) {
+  <span class="badge bg-warning">
+    Due {{ service.resource?.data?.dueDate | date:'mediumDate' }}
+  </span>
+}
 ```
 
 ### Recipe C — Status / stage (state enums)
@@ -654,12 +663,15 @@ Amount, count, total → render with `number` / `currency` pipe. Pair with a lab
 When a field is a `select` whose `data.resource` points at another resource (e.g., `Task.assignee` → User, `Contact.account` → Account), render the reference as a clickable pill that navigates to the referenced entity's view page:
 
 ```html
-<a *ngIf="service.resource?.data?.<refField>?._id"
-   [routerLink]="['/<otherKebab>', service.resource?.data?.<refField>?._id, 'view']"
-   class="badge bg-light text-dark border">
-  <i class="fa fa-link"></i>
-  {{ service.resource?.data?.<refField>?.data?.<otherTitleField> || 'Open' }}
-</a>
+@if (service.resource?.data?.<refField>?._id) {
+  <a
+    [routerLink]="['/<otherKebab>', service.resource?.data?.<refField>?._id, 'view']"
+    class="badge bg-light text-dark border"
+  >
+    <i class="fa fa-link"></i>
+    {{ service.resource?.data?.<refField>?.data?.<otherTitleField> || 'Open' }}
+  </a>
+}
 ```
 
 ### Recipe F — Nested children — action cards
@@ -683,8 +695,10 @@ Counts can wait — add them in iteration 2 with a `service.resources['<childNam
 For the N:N join's custom `IndexComponent` template (mounted under a parent side — see section 5), render the grid but intercept row clicks to navigate to the opposite entity:
 
 ```html
-<formio-grid *ngIf="service.form" [src]="service.formUrl" (rowSelect)="goToOpposite($event)">
-</formio-grid>
+@if (service.form) {
+  <formio-grid [src]="service.formUrl" (rowSelect)="goToOpposite($event)">
+  </formio-grid>
+}
 ```
 
 ```typescript
@@ -711,20 +725,23 @@ A Deal view with title (A), close-date (B), stage (C), amount (D), account refer
             >{{ service.resource?.data?.stage | titlecase }}</span
           >
         </div>
-        <div class="text-muted small mt-1" *ngIf="service.resource?.data?.closeDate">
-          Closes {{ service.resource?.data?.closeDate | date:'mediumDate' }}
-        </div>
+        @if (service.resource?.data?.closeDate) {
+          <div class="text-muted small mt-1">
+            Closes {{ service.resource?.data?.closeDate | date:'mediumDate' }}
+          </div>
+        }
         <dl class="row mt-3">
           <dt class="col-sm-3">Amount</dt>
           <dd class="col-sm-9">{{ service.resource?.data?.amount | currency:'USD' }}</dd>
           <dt class="col-sm-3">Account</dt>
           <dd class="col-sm-9">
-            <a
-              *ngIf="service.resource?.data?.account?._id"
-              [routerLink]="['/account', service.resource?.data?.account?._id, 'view']"
-            >
-              {{ service.resource?.data?.account?.data?.name }}
-            </a>
+            @if (service.resource?.data?.account?._id) {
+              <a
+                [routerLink]="['/account', service.resource?.data?.account?._id, 'view']"
+              >
+                {{ service.resource?.data?.account?.data?.name }}
+              </a>
+            }
           </dd>
         </dl>
       </div>

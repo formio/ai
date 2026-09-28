@@ -46,12 +46,12 @@ export const LOGIN_PAGE_ASSETS = {
     integrity: 'sha384-Bk5cbLkZQ5raZ0+H2/+VbfYx3WpvxvQK4zqXZr7sYODuaX7bKXoSOnipQxkaS8sv',
   },
   formioCss: {
-    url: 'https://cdn.jsdelivr.net/npm/@formio/js@5.5.1/dist/formio.form.min.css',
-    integrity: 'sha384-/zfd6nkJxXzqXliV/Jlki/NOl+E/K7FujopWT3gKLYXMlIwiratcqMESMZG9ICY2',
+    url: 'https://cdn.jsdelivr.net/npm/@formio/js@5.6.1/dist/formio.form.min.css',
+    integrity: 'sha384-CDJBIuRSWFUjn67g4RLBnTRWt0v/jq5zmdffuJwNAcr1gu1w5usg4kgSb7YwOdoT',
   },
   formioJs: {
-    url: 'https://cdn.jsdelivr.net/npm/@formio/js@5.5.1/dist/formio.form.min.js',
-    integrity: 'sha384-WI14pf615veSnkFtQYllUINR9h5mP1ukKxI47QtGb9DVDYvZlUeaOnWpK/G23Z5x',
+    url: 'https://cdn.jsdelivr.net/npm/@formio/js@5.6.1/dist/formio.form.min.js',
+    integrity: 'sha384-02IWn2JDOme2EHjjVyKXaq/GEA9QTvhupMICCjJpSUDP9DrL8ON8Zpw3U2JGPn+U',
   },
 } as const satisfies Record<string, { url: string; integrity: string }>;
 
@@ -237,8 +237,10 @@ export async function authenticate(
   });
 
   app.post('/callback', (req, res) => {
-    const token = (req.body as { token: string }).token;
-    if (!token) {
+    // Express 5 leaves `req.body` undefined when no parser matched the request's
+    // content type, so a POST that is not JSON arrives with no body at all.
+    const token = (req.body as { token?: unknown } | undefined)?.token;
+    if (typeof token !== 'string' || !token) {
       process.stderr.write('Auth callback received but token is empty\n');
       res.status(400).send('No token received');
       return;
@@ -252,7 +254,19 @@ export async function authenticate(
   // Captured so the timeout error can name it. stderr reaches logs, but the
   // error reaches the user, and the URL is the one thing they need.
   let loginUrl: string | undefined;
-  const server = app.listen(config.authPort ?? 0, host, () => {
+  const server = app.listen(config.authPort ?? 0, host, (err?: Error) => {
+    // Express 5 passes a bind failure here rather than raising it on the server.
+    // A fixed FORMIO_AUTH_PORT that is already taken is the usual one; ignoring
+    // it would leave the caller waiting out the whole login timeout.
+    if (err) {
+      rejectJwt(
+        new Error(
+          `Could not start the Form.io login server on ${host}:${config.authPort ?? 0}: ${err.message}. ` +
+            `Free that port, or set FORMIO_AUTH_PORT to one that is available.`
+        )
+      );
+      return;
+    }
     const addr = server.address();
     if (addr && typeof addr !== 'string') {
       const port = addr.port;

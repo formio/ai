@@ -38,6 +38,8 @@ const router = createBrowserRouter([
 
 The root route carries `id: 'root'` so descendants read the user with `useRouteLoaderData('root')`.
 
+Mount it with `RouterProvider` imported from `react-router/dom`; every other router import in the kernel comes from `react-router`.
+
 ## Protection
 
 **Apply it once, at the protected layout route.** A resource subtree is five or more routes — list, new, item, view, edit — so wrapping each by hand is five chances to miss one, and a missed one fails silently: the screen renders, and nothing reports that it was reachable while signed out. Hoisting protection above the subtrees makes the default structural instead of repeated.

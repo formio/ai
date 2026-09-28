@@ -4,12 +4,15 @@ Two environments need setup beyond installing the package. Most do not.
 
 ## Vite
 
-The React plugin must be configured — particularly on React 18 and 19. A Vite workspace that already renders JSX has it (`@vitejs/plugin-react` or `@vitejs/plugin-react-swc` in `devDependencies`, and in `vite.config.ts`'s `plugins`), and the `react-ts` template `BOOTSTRAP.md` scaffolds ships it. **Confirm before installing**: check `package.json` and `vite.config.ts` first, and add the plugin only when it is genuinely absent — with the workspace's own package manager, and by adding `react()` to the existing `plugins` array rather than replacing a `vite.config.ts` that may carry aliases, proxies, or other plugins.
+The React plugin must be configured — it provides the automatic JSX runtime and Fast Refresh. A Vite workspace that already renders JSX has it (`@vitejs/plugin-react` or `@vitejs/plugin-react-swc` in `devDependencies`, and in `vite.config.ts`'s `plugins`), and the `react-ts` template `BOOTSTRAP.md` scaffolds ships it. **Confirm before installing**: check `package.json` and `vite.config.ts` first, and add the plugin only when it is genuinely absent — with the workspace's own package manager, and by adding `react()` to the existing `plugins` array rather than replacing a `vite.config.ts` that may carry aliases, proxies, or other plugins.
 
-Only when it is missing:
+Only when it is missing, install the plugin major that matches the workspace's Vite — read `vite` in `package.json` first. `@vitejs/plugin-react` 6 declares a peer of Vite 8 only, so an unpinned install into an older workspace fails peer resolution:
 
 ```bash
-<package manager> add -D @vitejs/plugin-react
+# Vite 8
+<package manager> add -D @vitejs/plugin-react@^6
+# Vite 4–7
+<package manager> add -D @vitejs/plugin-react@^5
 ```
 
 ```ts

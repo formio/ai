@@ -37,7 +37,7 @@ describe('eval harnesses live outside the shipped tree', () => {
 
     expect(existsSync(seed)).toBe(true);
     expect(existsSync(join(seed, 'angular.json'))).toBe(true);
-    expect(existsSync(join(seed, 'src/app/app.module.ts'))).toBe(true);
+    expect(existsSync(join(seed, 'src/app/app-module.ts'))).toBe(true);
   });
 
   it('the React harness keeps its workspace fixture', () => {

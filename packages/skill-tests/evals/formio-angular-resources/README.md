@@ -8,7 +8,7 @@ This directory holds everything a teammate needs to run evals against the skill 
 | --- | --- |
 | `evals.json` | The test prompts + expected outcomes. Three cases: task-manager (simple), user-team-bidirectional (N:N + existing-workspace merge), complex-crm-transitive (deep hierarchy with hidden mirrors). |
 | `grade.py` | Converts subagent outputs → pass/fail grades (≈18 structural assertions per eval). Reads run outputs from `.eval-artifacts/`; writes `grading.json` next to each run. |
-| `fixtures/existing-workspace-seed/` | A minimal Angular workspace that eval-1 requires. Copy it into the eval's `with_skill/outputs/workspace/` and `without_skill/outputs/workspace/` so the subagents have something to merge into. |
+| `fixtures/existing-workspace-seed/` | A minimal, buildable Angular 21 NgModule workspace (the shape `ng new --no-standalone` generates: `app-module.ts`, `app-routing-module.ts`, zoneless, no `zone.js`) that eval-1 requires. Keep it on the Angular major `BOOTSTRAP.md` targets, and run `npm install && npx ng build` in a scratch copy after changing it. Copy it into the eval's `with_skill/outputs/workspace/` and `without_skill/outputs/workspace/` so the subagents have something to merge into. |
 
 ## The iteration loop
 

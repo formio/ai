@@ -1,5 +1,6 @@
 {
-  "$schema": "https://v2-9-18.turborepo.dev/schema.json",
+  "$schema": "https://v2-11-5.turborepo.dev/schema.json",
+  "agentGuidance": false,
   "globalDependencies": [
     ".gitignore",
     "plugin/**",

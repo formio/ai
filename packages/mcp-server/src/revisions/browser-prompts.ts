@@ -7,10 +7,7 @@ import express from 'express';
 import { exec } from 'child_process';
 
 export type RevisionsConsentChoice =
-  | 'enable-original'
-  | 'enable-current'
-  | 'proceed-without-history'
-  | 'cancel';
+  'enable-original' | 'enable-current' | 'proceed-without-history' | 'cancel';
 
 export type RevisionsLicenseConsentChoice = 'continue' | 'cancel';
 
@@ -147,18 +144,27 @@ async function runBrowserConsent<TChoice>(
   app.use(express.json());
 
   let resolveChoice!: (value: TChoice) => void;
-  const choicePromise = new Promise<TChoice>((resolve) => {
+  let rejectChoice!: (reason: Error) => void;
+  const choicePromise = new Promise<TChoice>((resolve, reject) => {
     resolveChoice = resolve;
+    rejectChoice = reject;
   });
 
   app.get('/', (_req, res) => res.send(page()));
   app.post('/callback', (req, res) => {
-    const raw = (req.body as { choice?: string }).choice;
+    // Express 5 leaves `req.body` undefined when the request was not JSON.
+    const choice = (req.body as { choice?: unknown } | undefined)?.choice;
+    const raw = typeof choice === 'string' ? choice : undefined;
     res.send('Choice captured. You can close this tab.');
     resolveChoice(normalize(raw));
   });
 
-  const server = app.listen(0, '127.0.0.1', () => {
+  const server = app.listen(0, '127.0.0.1', (err?: Error) => {
+    // Express 5 passes a bind failure here rather than raising it on the server.
+    if (err) {
+      rejectChoice(new Error(`Could not start the consent page server: ${err.message}`));
+      return;
+    }
     const addr = server.address();
     if (addr && typeof addr !== 'string') {
       const consentUrl = `http://127.0.0.1:${addr.port}/`;

@@ -44,13 +44,13 @@ jobs:
 
       # No NODE_AUTH_TOKEN: OIDC supplies short-lived credentials, and leaving a
       # token in the environment makes npm prefer it and skip Trusted Publishing.
-      - uses: changesets/action@v1
+      # v2 is the major for Changesets CLI v3. It takes the job's token from its
+      # own `github-token` input (defaulting to github.token), not from env.
+      - uses: changesets/action@v2
         id: changesets
         with:
-          version: pnpm changeset:version
-          publish: pnpm release
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          version-script: pnpm changeset:version
+          publish-script: pnpm release
 
       ### Publish the MCP server to the official MCP Registry.
       # Deliberately does NOT gate on changesets/action's `published` output:

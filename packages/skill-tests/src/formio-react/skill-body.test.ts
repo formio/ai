@@ -109,6 +109,32 @@ describe('formio-react BOOTSTRAP', () => {
   it('stashes the frontend design brief', () => {
     expect(body()).toContain('FRONTEND_DESIGN_BRIEF');
   });
+
+  // React Router 8 removed the `react-router-dom` package and every v7 future
+  // flag. An agent trained on v6/v7 examples reaches for both.
+  it('imports RouterProvider from react-router/dom and never from react-router-dom', () => {
+    const text = body();
+    expect(text).toContain('react-router/dom');
+    expect(text).toMatch(/[Nn]ever import from `react-router-dom`/);
+    expect(text).toMatch(/no `future` flags/);
+  });
+
+  // react-router 8 hard-requires these; an older Node or React fails the
+  // install, and pinning the router back a major is the wrong fix.
+  it('states the Node and React floors react-router 8 needs, and refuses pinning it back', () => {
+    const text = body();
+    expect(text).toContain('22.22');
+    expect(text).toContain('19.2.7');
+    expect(text).toMatch(/rather than pinning `react-router` 7/);
+  });
+
+  // TypeScript 6+ enables noUncheckedSideEffectImports; a bare CSS import
+  // then fails TS2882 unless the Vite client types are loaded.
+  it('ties the stylesheet imports to the vite/client types', () => {
+    const text = body();
+    expect(text).toContain('vite/client');
+    expect(text).toContain('TS2882');
+  });
 });
 
 describe('formio-react CONFIG', () => {
@@ -205,6 +231,16 @@ describe('formio-react EXISTING', () => {
     const text = body().toLowerCase();
     expect(text).toContain('only what is missing');
     expect(text).toMatch(/integrate with what exists|do not replace it/);
+  });
+
+  // A router major bump drags React and Node floors with it (v8 needs React
+  // 19.2.7+ and Node 22.22+, and removes react-router-dom), so the version is
+  // an inspection finding, not something to change in passing.
+  it('inspects the router package and major, and never bumps it without approval', () => {
+    const text = body();
+    expect(text).toContain('react-router-dom');
+    expect(text.toLowerCase()).toMatch(/router package and major/);
+    expect(text.toLowerCase()).toContain('never upgrade the router major without approval');
   });
 
   it('hands off with the branch and the inspection findings', () => {

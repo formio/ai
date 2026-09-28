@@ -13,14 +13,15 @@
     "clean": "rm -rf coverage"
   },
   "devDependencies": {
-    "@formio/core": "^2.6.6",
-    "@formio/js": "^5.3.6",
-    "@types/node": "^22.19.17",
-    "jsdom": "^25.0.1",
-    "typescript": "^5.8.2",
-    "vitest": "^3.1.1"
+    "@formio/core": "^2.9.0",
+    "@formio/js": "^5.6.1",
+    "@types/node": "^22.20.4",
+    "jsdom": "^30.1.1",
+    "typescript": "^6.0.3",
+    "vite": "^8.3.1",
+    "vitest": "^5.0.2"
   },
   "engines": {
-    "node": ">=20"
+    "node": ">=22.12"
   }
 }

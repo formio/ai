@@ -71,7 +71,7 @@ async function bundleServer() {
     bundle: true,
     platform: 'node',
     format: 'esm',
-    target: 'node20',
+    target: 'node22',
     banner: {
       // Shim CommonJS globals for ESM output so bundled CJS deps (e.g. express) resolve correctly.
       // The source file's own `#!/usr/bin/env node` shebang is preserved by esbuild above this.

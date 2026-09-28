@@ -1,6 +1,6 @@
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
-import { RouterProvider } from 'react-router';
+import { RouterProvider } from 'react-router/dom';
 import { FormioProvider } from '@formio/react';
 // DELIBERATE GAP — do not "fix" this file in the fixture.
 // `@formio/js/dist/formio.form.css` is missing on purpose. This seed represents

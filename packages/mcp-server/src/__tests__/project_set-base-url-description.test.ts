@@ -23,8 +23,7 @@ describe('the baseUrl argument description', () => {
     const { tools } = await client.listTools();
     const tool = tools.find((candidate) => candidate.name === 'project_set');
     const properties = tool?.inputSchema.properties as
-      | Record<string, { description?: string }>
-      | undefined;
+      Record<string, { description?: string }> | undefined;
     return properties?.baseUrl?.description ?? '';
   };
 

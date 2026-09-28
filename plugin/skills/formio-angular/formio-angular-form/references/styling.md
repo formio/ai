@@ -27,7 +27,7 @@ Three consequences.
 ]
 ```
 
-Bootstrap and Bootstrap Icons, and nothing from `@formio/js`. Adding `formio.form.css` here ships a **second copy** of the same tens of kilobytes for no benefit. Put Bootstrap before the workspace's own `src/styles.css` so application styles can override the defaults, and repeat the array on the matching `test` target.
+Bootstrap and Bootstrap Icons, and nothing from `@formio/js`. Adding `formio.form.css` here ships a **second copy** of the same tens of kilobytes for no benefit. Put Bootstrap before the workspace's own `src/styles.css` so application styles can override the defaults, and repeat the array on the matching `test` target only when it has its own `styles` array — a Karma-era workspace does; Angular 21's `@angular/build:unit-test` target has none and reuses the build target's options.
 
 **Not in `main.ts` and not as an `@import` in `styles.css`.** Both work, and both hide a workspace-wide dependency somewhere nobody looks for it.
 

@@ -4,7 +4,7 @@ Thanks for contributing to `@formio/ai` — the Form.io agentic coding toolset.
 
 ## Setup
 
-Requirements: Node.js >= 20, [pnpm](https://pnpm.io) 10 (the repo pins `packageManager: pnpm@10.33.2` — `corepack enable` picks it up automatically).
+Requirements: Node.js >= 22.12, [pnpm](https://pnpm.io) 10 (the repo pins `packageManager: pnpm@10.33.2` — `corepack enable` picks it up automatically).
 
 ```sh
 git clone https://github.com/formio/ai.git

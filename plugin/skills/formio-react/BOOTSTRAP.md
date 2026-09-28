@@ -27,7 +27,7 @@ Pin what you install and record the resolved versions:
 
 - `@formio/react` — the React renderer wrapper. Capture the resolved version as `FORMIO_REACT_VERSION`.
 - `@formio/js` — the renderer core. Capture the resolved version as `FORMIO_JS_VERSION`.
-- `react-router` — routing, used through its **data-router** API.
+- `react-router` — routing, used through its **data-router** API. Version 8 and later require Node 22.22 or newer and React 19.2.7 or newer: check `node -v` and the installed `react` before installing, and report a lower version to the user rather than pinning `react-router` 7 to get round it.
 - `bootstrap` — the Bootstrap 5 stylesheet the renderer's default template is classed for. See step 4.
 
 Both captured labels name resolved npm versions. They are not URLs and not environment variables.
@@ -47,7 +47,7 @@ import '@formio/js/dist/formio.form.css'
 import './<app>.css'
 ```
 
-`dist/*` is exported by `@formio/js`, so that specifier resolves under npm, Yarn PnP and pnpm alike. Pick `formio.form.css` for an app that renders forms; `formio.full.css` is the same plus the form **builder**, so use it only when the app embeds `FormBuilder`, and `formio.builder.css` only for a builder-only surface.
+`dist/*` is exported by `@formio/js`, so that specifier resolves under npm, Yarn PnP and pnpm alike. These bare side-effect imports type-check only because the Vite template's `tsconfig.app.json` lists `"types": ["vite/client"]`: TypeScript 6 and later enable `noUncheckedSideEffectImports` by default, and without those types every `import '….css'` fails with TS2882. Keep the template's TypeScript version and tsconfig rather than replacing them. Pick `formio.form.css` for an app that renders forms; `formio.full.css` is the same plus the form **builder**, so use it only when the app embeds `FormBuilder`, and `formio.builder.css` only for a builder-only surface.
 
 **Verify it landed rather than assuming.** After the first build, confirm a `.formio-component` and a `.choices__list` rule are present in the emitted CSS bundle. A missing stylesheet is invisible in a build log.
 
@@ -55,7 +55,7 @@ This is a **separate decision from the application's design language**. These st
 
 ## 5. Client-rendered, with the data-router API
 
-Route through `createBrowserRouter` with `RouteObject` arrays. The generated resources depend on loaders, actions, `errorElement`, and post-action revalidation.
+Route through `createBrowserRouter` with `RouteObject` arrays. The generated resources depend on loaders, actions, `errorElement`, and post-action revalidation. Import `RouterProvider` from `react-router/dom` and everything else from `react-router`. Never import from `react-router-dom` — React Router 8 removed that package — and pass no `future` flags, because version 8 accepts none of the version 7 ones.
 
 The generated application is **client-rendered**. Server-rendered React Router framework mode is out of scope: its loaders run on the server, and `@formio/js` is DOM-only, so a loader feeding a server-rendered form screen cannot work. Next.js App Router is out of scope for the same reason.
 
