@@ -7,10 +7,7 @@ import express from 'express';
 import { exec } from 'child_process';
 
 export type RevisionsConsentChoice =
-  | 'enable-original'
-  | 'enable-current'
-  | 'proceed-without-history'
-  | 'cancel';
+  'enable-original' | 'enable-current' | 'proceed-without-history' | 'cancel';
 
 export type RevisionsLicenseConsentChoice = 'continue' | 'cancel';
 

@@ -90,7 +90,7 @@ describe('symbols the Angular skill imports from @formio/js', () => {
   // Runtime keys alone are not the whole surface: a `import type { X }` of a
   // genuinely type-only export would be correct TypeScript and invisible to
   // Object.keys. So the check is the union of the runtime keys and the names the
-  // shipped .d.ts re-exports. (As of @formio/js 5.3.6 the two happen to coincide
+  // shipped .d.ts re-exports. (As of @formio/js 5.6.1 the two happen to coincide
   // — `FormOptions` is exported as a runtime `undefined` for type resolution —
   // but relying on that would make a future type-only export a false positive.)
   it('are all real exports of the installed @formio/js', () => {

@@ -13,8 +13,8 @@
     "clean": "rm -rf coverage"
   },
   "devDependencies": {
-    "@formio/core": "^2.6.6",
-    "@formio/js": "^5.3.6",
+    "@formio/core": "^2.9.0",
+    "@formio/js": "^5.6.1",
     "@types/node": "^22.19.17",
     "jsdom": "^25.0.1",
     "typescript": "^5.8.2",

@@ -122,6 +122,28 @@ describe('formio-form canonical inclusion modes', () => {
     );
   });
 
+  // A digest is not checkable by eye, and a wrong one makes the browser block
+  // the renderer outright. The server's login page pins the same CDN URLs and
+  // `pnpm sync:sri --check` verifies those against the bytes served, so the
+  // documented digests are held to the server's rather than typed twice.
+  it('setup.md digests match the ones auth.ts verifies against the CDN', () => {
+    const setup = readFileSync(join(referencesDir, 'setup.md'), 'utf8');
+    const auth = readFileSync(join(repoRoot, 'packages/mcp-server/src/auth.ts'), 'utf8');
+    const verified = new Map(
+      [...auth.matchAll(/url: '([^']+)',\s*integrity: '([^']+)'/g)].map((m) => [m[1], m[2]])
+    );
+    const documented = [
+      ...setup.matchAll(
+        /(?:href|src)="(https:\/\/cdn\.jsdelivr\.net[^"]+)"\s+integrity="([^"]+)"/g
+      ),
+    ];
+    expect(documented.length).toBeGreaterThan(0);
+    for (const [, url, integrity] of documented) {
+      expect(verified.get(url), `${url} must be pinned in auth.ts`).toBeDefined();
+      expect(integrity, url).toBe(verified.get(url));
+    }
+  });
+
   it('no doc loads @formio/js from an unpinnable URL', () => {
     for (const { file, content } of allSkillDocs()) {
       expect(content, `${file} names a fixed-path vendor bundle`).not.toContain('cdn.form.io');

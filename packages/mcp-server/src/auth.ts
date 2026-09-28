@@ -46,12 +46,12 @@ export const LOGIN_PAGE_ASSETS = {
     integrity: 'sha384-Bk5cbLkZQ5raZ0+H2/+VbfYx3WpvxvQK4zqXZr7sYODuaX7bKXoSOnipQxkaS8sv',
   },
   formioCss: {
-    url: 'https://cdn.jsdelivr.net/npm/@formio/js@5.5.1/dist/formio.form.min.css',
-    integrity: 'sha384-/zfd6nkJxXzqXliV/Jlki/NOl+E/K7FujopWT3gKLYXMlIwiratcqMESMZG9ICY2',
+    url: 'https://cdn.jsdelivr.net/npm/@formio/js@5.6.1/dist/formio.form.min.css',
+    integrity: 'sha384-CDJBIuRSWFUjn67g4RLBnTRWt0v/jq5zmdffuJwNAcr1gu1w5usg4kgSb7YwOdoT',
   },
   formioJs: {
-    url: 'https://cdn.jsdelivr.net/npm/@formio/js@5.5.1/dist/formio.form.min.js',
-    integrity: 'sha384-WI14pf615veSnkFtQYllUINR9h5mP1ukKxI47QtGb9DVDYvZlUeaOnWpK/G23Z5x',
+    url: 'https://cdn.jsdelivr.net/npm/@formio/js@5.6.1/dist/formio.form.min.js',
+    integrity: 'sha384-02IWn2JDOme2EHjjVyKXaq/GEA9QTvhupMICCjJpSUDP9DrL8ON8Zpw3U2JGPn+U',
   },
 } as const satisfies Record<string, { url: string; integrity: string }>;
 

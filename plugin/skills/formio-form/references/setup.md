@@ -31,13 +31,13 @@ A `<script>` tag hands a third-party host the ability to run code on your page, 
 />
 <link
   rel="stylesheet"
-  href="https://cdn.jsdelivr.net/npm/@formio/js@5.5.1/dist/formio.form.min.css"
-  integrity="sha384-/zfd6nkJxXzqXliV/Jlki/NOl+E/K7FujopWT3gKLYXMlIwiratcqMESMZG9ICY2"
+  href="https://cdn.jsdelivr.net/npm/@formio/js@5.6.1/dist/formio.form.min.css"
+  integrity="sha384-CDJBIuRSWFUjn67g4RLBnTRWt0v/jq5zmdffuJwNAcr1gu1w5usg4kgSb7YwOdoT"
   crossorigin="anonymous"
 />
 <script
-  src="https://cdn.jsdelivr.net/npm/@formio/js@5.5.1/dist/formio.form.min.js"
-  integrity="sha384-WI14pf615veSnkFtQYllUINR9h5mP1ukKxI47QtGb9DVDYvZlUeaOnWpK/G23Z5x"
+  src="https://cdn.jsdelivr.net/npm/@formio/js@5.6.1/dist/formio.form.min.js"
+  integrity="sha384-02IWn2JDOme2EHjjVyKXaq/GEA9QTvhupMICCjJpSUDP9DrL8ON8Zpw3U2JGPn+U"
   crossorigin="anonymous"
 ></script>
 
