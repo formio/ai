@@ -151,6 +151,15 @@ describe('formio-react-form environments', () => {
     expect(reference('environments.md')).toContain('@vitejs/plugin-react');
   });
 
+  // @vitejs/plugin-react 6 peers on Vite 8 only; an unpinned install into a
+  // Vite 4-7 workspace fails peer resolution.
+  it('matches the React plugin major to the workspace Vite major', () => {
+    const body = reference('environments.md');
+    expect(body).toContain('@vitejs/plugin-react@^6');
+    expect(body).toContain('@vitejs/plugin-react@^5');
+    expect(body).not.toMatch(/add -D @vitejs\/plugin-react\s*$/m);
+  });
+
   it('addresses the Next.js client-component misconception', () => {
     const body = reference('environments.md');
     expect(body).toContain('ssr: false');

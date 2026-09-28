@@ -83,6 +83,33 @@ describe('formio-react-resources eval harness', () => {
   });
 });
 
+// The seed is what an agent inspects on the extend branch, so it tracks the
+// stack BOOTSTRAP.md installs today. A seed a major behind teaches the agent
+// the previous major's imports.
+describe('the seed workspace is on the current router and build stack', () => {
+  const seed = join(harness, 'fixtures/existing-workspace-seed');
+  const manifest = () => JSON.parse(readFileSync(join(seed, 'package.json'), 'utf8'));
+
+  it('declares react-router 8, Vite 8, and the matching React plugin', () => {
+    const { dependencies, devDependencies } = manifest();
+    expect(dependencies['react-router']).toMatch(/^\^8\./);
+    expect(dependencies['react-router-dom']).toBeUndefined();
+    expect(devDependencies.vite).toMatch(/^\^8\./);
+    expect(devDependencies['@vitejs/plugin-react']).toMatch(/^\^6\./);
+  });
+
+  it('mounts RouterProvider from react-router/dom', () => {
+    const entry = readFileSync(join(seed, 'src/main.tsx'), 'utf8');
+    expect(entry).toMatch(/import \{ RouterProvider \} from 'react-router\/dom'/);
+  });
+
+  // TypeScript 6+ fails a bare CSS import (TS2882) without the Vite client types.
+  it('loads the Vite client types so the stylesheet import type-checks', () => {
+    const tsconfig = JSON.parse(readFileSync(join(seed, 'tsconfig.json'), 'utf8'));
+    expect(tsconfig.compilerOptions.types).toContain('vite/client');
+  });
+});
+
 // The seed's missing renderer stylesheet is deliberate: it is the state
 // EXISTING.md's inspection exists to catch, and the only thing outside the new
 // resource that eval 3 expects an agent to add. Recorded here so a future

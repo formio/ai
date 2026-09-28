@@ -198,7 +198,7 @@ The sub-skill SHALL document `@formio/react`'s `Form` component as the way to em
 
 `environments.md` SHALL document the two environments that need setup beyond installing the package:
 
-- **Vite** requires `@vitejs/plugin-react` installed and configured in `vite.config`, particularly on React 18 and 19.
+- **Vite** requires `@vitejs/plugin-react` installed and configured in `vite.config`, at the plugin major that matches the workspace's Vite (`^6` for Vite 8, `^5` for Vite 4–7).
 - **Next.js** requires importing the component dynamically with server-side rendering disabled, because `@formio/js` depends on `window` and other browser globals. The reference SHALL state that marking the file a client component is **not** sufficient on its own, since that is the assumption most readers arrive with, and SHALL show the dynamic import.
 
 The reference SHALL note that Create React App and similar bundlers need no extra configuration, so a reader does not go looking for it.
