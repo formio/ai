@@ -37,7 +37,8 @@ export function registerActionTypeGetTool(server: McpServer, config: FormioConfi
           })) as Array<{ name: string }>;
           const availableTypes = catalog.map((t) => t.name).join(', ');
           throw new Error(
-            `Action type '${actionName}' is not available on this server. Available types: ${availableTypes}`
+            `Action type '${actionName}' is not available on this server. Available types: ${availableTypes}`,
+            { cause: error }
           );
         }
       } catch (error) {
