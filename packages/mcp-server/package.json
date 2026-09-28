@@ -62,7 +62,7 @@
     "fast-glob": "^3.3.3",
     "gray-matter": "^4.0.3",
     "tsx": "^4.23.15",
-    "typescript": "^5.8.2",
+    "typescript": "^6.0.3",
     "vite": "^8.3.1",
     "vitest": "^5.0.2"
   }
