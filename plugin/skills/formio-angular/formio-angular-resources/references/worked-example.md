@@ -131,9 +131,11 @@ And here's the designed `view/view.component.html` that makes this resource feel
     <div class="card h-100">
       <div class="card-body">
         <h3 class="card-title mb-2">{{ service.resource?.data?.name }}</h3>
-        <p class="card-text text-muted" *ngIf="service.resource?.data?.description">
-          {{ service.resource?.data?.description }}
-        </p>
+        @if (service.resource?.data?.description) {
+          <p class="card-text text-muted">
+            {{ service.resource?.data?.description }}
+          </p>
+        }
       </div>
     </div>
   </div>

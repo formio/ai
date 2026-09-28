@@ -28,6 +28,11 @@ BASE = Path(os.environ.get("ARTIFACTS_DIR", str(DEFAULT_ARTIFACTS)))
 ITERATION = os.environ.get("ITERATION", "iteration-1")
 
 STANDALONE_TRUE = re.compile(r"standalone\s*:\s*true")
+# Angular 20+ names the root modules app-module.ts / app-routing-module.ts; a workspace
+# generated before that uses app.module.ts / app-routing.module.ts, and the skill edits
+# either under its own name rather than renaming it.
+APP_MODULE_NAMES = ("app-module.ts", "app.module.ts")
+ROUTING_MODULE_NAMES = ("app-routing-module.ts", "app-routing.module.ts")
 PARENTS_TEAM = re.compile(r"parents\s*:\s*\[\s*['\"]team['\"]")
 PARENTS_USER = re.compile(r"parents\s*:\s*\[\s*['\"]user['\"]")
 PARENTS_PROJECT = re.compile(r"parents\s*:\s*\[\s*['\"]project['\"]")
@@ -129,7 +134,7 @@ def grade_eval_0(out_dir):
         "evidence": f"children.push={has_push}, refs 'users'={has_users_path}"
     })
 
-    app_mod = next((p for p in ts_files if p.name == "app-module.ts"), None)
+    app_mod = next((p for p in ts_files if p.name in APP_MODULE_NAMES), None)
     app_content = read(app_mod) if app_mod else ""
     has_resources = "FormioResources" in app_content
     has_authservice = "FormioAuthService" in app_content
@@ -258,7 +263,7 @@ def grade_eval_1(out_dir):
         "evidence": f"children.push={user_has_push}, refs 'teams'={user_refs_teams}"
     })
 
-    app_mod = next((p for p in ts_files if p.name == "app-module.ts"), None)
+    app_mod = next((p for p in ts_files if p.name in APP_MODULE_NAMES), None)
     app_content = read(app_mod) if app_mod else ""
     homecomp_still = "HomeComponent" in app_content
     has_resources = "FormioResources" in app_content
@@ -271,7 +276,7 @@ def grade_eval_1(out_dir):
         "evidence": f"HomeComponent={homecomp_still}, FormioResources={has_resources}, FormioAuthService={has_authservice}, AppRoutingModule={has_approuting}"
     })
 
-    routing_mod = next((p for p in ts_files if p.name == "app-routing-module.ts"), None)
+    routing_mod = next((p for p in ts_files if p.name in ROUTING_MODULE_NAMES), None)
     routing_content = read(routing_mod) if routing_mod else ""
     original_home_route = "HomeComponent" in routing_content
     has_team = "team" in routing_content

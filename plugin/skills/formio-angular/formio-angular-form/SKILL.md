@@ -41,14 +41,17 @@ Read `<workspaceRoot>/package.json`. `@formio/angular` and `@formio/js` must bot
 Then resolve the versions from the npm registry — the same registry the install resolves against — and install what is missing in one command:
 
 ```bash
-npm view @formio/angular version   # e.g. 11.0.5  → FORMIO_ANGULAR_VERSION
-npm view @formio/js version        # e.g. 5.3.6   → FORMIO_JS_VERSION
+npm view @formio/angular version            # e.g. 11.0.6  → FORMIO_ANGULAR_VERSION
+npm view @formio/angular peerDependencies   # the @angular/core and zone.js ranges
+npm view @formio/js version                 # e.g. 5.6.1   → FORMIO_JS_VERSION
 
 # through PACKAGE_MANAGER, not literally `npm` unless that is what the workspace uses:
 <PACKAGE_MANAGER> add @formio/angular@^<FORMIO_ANGULAR_VERSION> @formio/js@^<FORMIO_JS_VERSION>
 ```
 
 `add` is understood by all four (npm treats it as an alias for `install`), so the line above works verbatim once `<PACKAGE_MANAGER>` is substituted.
+
+**Check the workspace against the peer ranges before installing.** This workspace was not scaffolded against `@formio/angular`, so nothing guarantees it fits. When the installed `@angular/core` is outside the `@angular/core` peer range — npm's `latest` Angular can be a major `@formio/angular` has not declared yet — stop and tell the user which Angular the workspace runs and which majors `@formio/angular` supports; do not install over it, and do not change the application's Angular version to make it fit. Check an installed `zone.js` the same way: the peer is `~0.14.0 || ~0.15.0`, Angular 21 accepts `~0.16.0`, and a workspace on 0.16 fails the install with `ERESOLVE`. Offer `zone.js@~0.15.0`, which satisfies both, and install it only with the user's agreement. Never pass `--legacy-peer-deps` or `--force` to get past either conflict: both install a tree whose peer ranges nobody has checked, and the lockfile then records it as though they had.
 
 **On Yarn, add `lodash` explicitly.** `@formio/angular` declares `lodash` as a non-optional peer dependency and imports it at runtime from its root entry point. npm 7+ and pnpm install missing peers automatically; **Yarn — classic and Berry — does not**, so a Yarn workspace that installs only the two packages above fails at build with `Module not found: 'lodash'`, an error that names neither Form.io nor Angular. On Yarn the line becomes:
 

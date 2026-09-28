@@ -368,18 +368,21 @@ Give the navbar the same inner container and gutters as the content wrapper — 
     <!-- Resource links land here — the Resources sub-skill adds one <li> per browsable resource. -->
     <ul class="navbar-nav me-auto"></ul>
     <ul class="navbar-nav">
-      <li class="nav-item" *ngIf="!auth.authenticated">
-        <a class="nav-link" routerLink="/auth/login" routerLinkActive="active">Sign in</a>
-      </li>
-      <li class="nav-item" *ngIf="!auth.authenticated">
-        <a class="nav-link" routerLink="/auth/register" routerLinkActive="active">Register</a>
-      </li>
-      <li class="nav-item" *ngIf="auth.authenticated">
-        <span class="navbar-text me-2">{{ auth.user?.data?.email }}</span>
-      </li>
-      <li class="nav-item" *ngIf="auth.authenticated">
-        <a class="nav-link" (click)="auth.logout()" style="cursor: pointer">Log out</a>
-      </li>
+      @if (auth.authenticated) {
+        <li class="nav-item">
+          <span class="navbar-text me-2">{{ auth.user?.data?.email }}</span>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link" (click)="auth.logout()" style="cursor: pointer">Log out</a>
+        </li>
+      } @else {
+        <li class="nav-item">
+          <a class="nav-link" routerLink="/auth/login" routerLinkActive="active">Sign in</a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link" routerLink="/auth/register" routerLinkActive="active">Register</a>
+        </li>
+      }
     </ul>
   </div>
 </nav>

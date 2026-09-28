@@ -152,7 +152,7 @@ If the user says revise: incorporate the feedback, re-emit, re-ask — iterate u
 Only when the user has approved the plan:
 
 1. **If mode = new workspace**: print the exact `ng new` / `ng add` commands, then write the files into the created workspace. If you cannot run `ng new` for the user, print the command and pause until the user runs it and confirms.
-2. **If mode = existing workspace**: write the new files under `src/app/`, modify `app-module.ts` and `app-routing-module.ts` in place.
+2. **If mode = existing workspace**: write the new files under `src/app/`, modify `app-module.ts` and `app-routing-module.ts` in place — `app.module.ts` and `app-routing.module.ts` on a workspace generated before Angular 20, edited under their own names and never renamed.
 3. Announce each file path as you write it. Short lines; no file-by-file paragraphs.
 
 Use `references/resource-module-patterns.md` for the exact code for every pattern, and `references/app-integration.md` for `AppModule`, `AppRoutingModule`, `AppConfig`, and the home / auth module shapes. Do not improvise structure.
