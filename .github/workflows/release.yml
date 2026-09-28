@@ -46,11 +46,17 @@ jobs:
       # token in the environment makes npm prefer it and skip Trusted Publishing.
       # v2 is the major for Changesets CLI v3. It takes the job's token from its
       # own `github-token` input (defaulting to github.token), not from env.
+      #
+      # Releases and tags are off here: `pnpm release` is `pnpm -r publish`, not
+      # `changeset publish`, so the action has no publish output to build them
+      # from and would only warn. "Create the GitHub release" below makes both.
       - uses: changesets/action@v2
         id: changesets
         with:
           version-script: pnpm changeset:version
           publish-script: pnpm release
+          create-github-releases: false
+          push-git-tags: false
 
       ### Publish the MCP server to the official MCP Registry.
       # Deliberately does NOT gate on changesets/action's `published` output:
@@ -69,21 +75,35 @@ jobs:
           VERSION=$(jq -r .version packages/mcp-server/package.json)
           echo "name=$(jq -r .mcpName packages/mcp-server/package.json)" >> "$GITHUB_OUTPUT"
 
-          # Retry: npm's read path lags its write path by a few seconds, so a
-          # lookup immediately after a successful publish in this same job can
-          # still 404. Without this the registry and image publishes silently
-          # skipped a version that had in fact just been released.
-          for attempt in 1 2 3 4 5 6; do
+          # Poll: npm accepts a publish and then reports "Your package is being
+          # processed and may take a few minutes to become available". 0.14.0 was
+          # accepted at 20:45:06 and listed at 20:47:25, and a 60s window missed
+          # it — skipping every downstream publish. Wait up to ten minutes.
+          #
+          # On a push that published nothing, package.json names a version npm
+          # already has and the first lookup succeeds. So a version that never
+          # appears is a release that was dropped, and the job must fail rather
+          # than go green with the registry, bundle, release, Smithery and image
+          # steps all silently skipped. Re-running the job publishes them: the
+          # changesets step skips versions already on npm.
+          DEADLINE_SECONDS=600
+          attempt=0
+          while true; do
+            attempt=$((attempt + 1))
             if npm view "@formio/mcp@${VERSION}" version >/dev/null 2>&1; then
-              echo "npm has @formio/mcp@${VERSION} (attempt ${attempt})."
+              echo "npm has @formio/mcp@${VERSION} (attempt ${attempt}, ${SECONDS}s)."
               echo "version=$VERSION" >> "$GITHUB_OUTPUT"
               exit 0
             fi
-            echo "npm has not surfaced @formio/mcp@${VERSION} yet (attempt ${attempt}); waiting…"
-            sleep 10
+            if [ "$SECONDS" -ge "$DEADLINE_SECONDS" ]; then
+              break
+            fi
+            echo "npm has not surfaced @formio/mcp@${VERSION} yet (attempt ${attempt}, ${SECONDS}s); waiting…"
+            sleep 15
           done
 
-          echo "npm still does not have @formio/mcp@${VERSION} after 60s — skipping downstream publishes."
+          echo "::error::npm still does not have @formio/mcp@${VERSION} after ${DEADLINE_SECONDS}s. The MCP Registry, .mcpb bundle, GitHub release, Smithery and Docker publishes did not run. Re-run this job once npm lists the version."
+          exit 1
 
       # Asked as "does the registry already have THIS version?", by exact query.
       #
