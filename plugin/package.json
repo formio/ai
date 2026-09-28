@@ -45,6 +45,6 @@
     "prepublishOnly": "pnpm -w build:plugin && pnpm -w test:plugin"
   },
   "engines": {
-    "node": ">=20"
+    "node": ">=22.12"
   }
 }

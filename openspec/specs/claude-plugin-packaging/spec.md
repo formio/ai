@@ -106,7 +106,7 @@ The plugin source tree SHALL include, and the build SHALL copy to `dist/plugin/s
 
 ### Requirement: Build script produces a self-contained plugin tree
 
-A `scripts/build-plugin.ts` script SHALL clean `dist/plugin/`, copy the `plugin/` source tree into it, sync the plugin manifest `version` field from `plugin/package.json`, and bundle `packages/mcp-server/src/stdio.ts` into `dist/plugin/server/stdio.mjs` as an executable ESM Node.js bundle targeting Node 20 with a CommonJS-compatibility banner that provides `require`, `__filename`, and `__dirname`.
+A `scripts/build-plugin.ts` script SHALL clean `dist/plugin/`, copy the `plugin/` source tree into it, sync the plugin manifest `version` field from `plugin/package.json`, and bundle `packages/mcp-server/src/stdio.ts` into `dist/plugin/server/stdio.mjs` as an executable ESM Node.js bundle targeting Node 22 with a CommonJS-compatibility banner that provides `require`, `__filename`, and `__dirname`.
 
 #### Scenario: Build produces the expected layout
 
