@@ -1,5 +1,40 @@
 # @formio/ai
 
+## 0.14.0
+
+### Minor Changes
+
+- 33e915b: **Breaking: Node.js 22.12 or newer is now required.** Node 20 reached end-of-life in April 2026, and the toolchain this repository builds and tests with (Vitest 5, jsdom 30, Changesets 3) no longer runs on it.
+  
+  `engines.node` is `>=22.12` in every package, the `.mcpb` manifest declares the same runtime range, both bundles (`dist/plugin/server/stdio.mjs` and the `.mcpb` server) are compiled for `node22`, CI tests on Node 22, and `@types/node` tracks 22 so no API newer than the floor type-checks. A new test holds all of them to the root `engines` field.
+
+### Patch Changes
+
+- 33e915b: Bring `formio-angular` up to Angular 21 — the newest major `@formio/angular` 11.0.6 supports — and fix three failures a generated application hit on it, each reproduced in a real Angular 21 `--no-standalone` workspace before the fix was written.
+  
+  **A plain `ng build` failed.** The CLI's default `initial` budget errors at 1 MB, and an application carrying `@formio/angular` and `@formio/js` is about 2.1 MB before compression, so the user's first release build failed on a workspace whose own code was untouched; the development-only smoke check never saw it. BOOTSTRAP's new Step 6c raises the budget to 2.5 MB warning / 3 MB error and allows `@formio/js` and `lodash` as CommonJS dependencies, and the smoke check (now 6e) builds the production configuration too.
+  
+  **`ng test` failed.** Angular 21 runs specs with Vitest through `@angular/build:unit-test`, and any spec reaching `@formio/angular` failed to load — `Named export 'assign' not found` from `lodash`, then `matchMedia is not a function` from jsdom. Step 6d adds a `runnerConfig` that inlines `@formio/angular` and a setup file that stubs `matchMedia`; both halves are needed.
+  
+  **Installing into a zone-based workspace failed with `ERESOLVE`.** `@formio/angular`'s optional `zone.js` peer is `~0.14.0 || ~0.15.0`, while Angular 21 accepts 0.16. The existing-workspace path and the embed branch now check an installed `zone.js` and offer `zone.js@~0.15.0`, and never pass `--legacy-peer-deps` or `--force`. The embed branch also checks the installed `@angular/core` against the peer range before installing, since npm's `latest` Angular is a major `@formio/angular` does not support yet.
+  
+  Generated templates use built-in control flow (`@if` / `@for` / `@switch`): the design brief no longer mandates the `*ngIf` / `*ngFor` directives deprecated since Angular 20, and every example in the skill family is converted. The CLI fallback scaffolds with `--no-standalone`, so it never needs the standalone-to-NgModule conversion. Step 6 no longer describes a `polyfills` array or `provideZonelessChangeDetection()` that Angular 21's `ng new` does not generate, a test target's `styles` array is repeated only on the Karma-era workspaces that have one, and workspaces generated before Angular 20 have their `app.module.ts` / `app-routing.module.ts` edited under their own names. Example versions move to `@formio/angular` 11.0.6, `@formio/js` 5.6.1, Bootstrap 5.3.8, and Bootstrap Icons 1.13.1, and the inlined stylesheet is measured at ~41 KB.
+  
+  The eval seed becomes a buildable Angular 21 NgModule workspace — it previously imported an `AppComponent` and `HomeComponent` it did not contain — and the grader accepts both module file-name conventions, where before eval-1's merge checks could pass only if the agent renamed the user's files.
+- b4ab459: `formio-angular` AUTH now requires awaiting `auth.ready` before reading `auth.user` or `auth.authenticated`. Both are resolved outside Angular's zone, so on a cold session — straight after registering, a hard reload, or a deep link — either can still be empty when generated code reads it, and the code then takes a silent wrong branch: a signed-in user is treated as anonymous, or a record is written without the user it needed. Observed in a generated group-creation flow that saved the group, skipped the creator's membership row because the user id had not resolved yet, and left every later create scoped to that group returning `Unauthorized`. The rule is general rather than group-specific, so it sits beside the existing `ready` bullet in the event-surface section and states that a still-missing user is a real failure rather than a default to fall through to.
+- 33e915b: Move the portal-login page's renderer to `@formio/js` 5.6.1 and take the minor releases of the MCP SDK (1.30) and zod (4.6).
+  
+  The login page's Subresource Integrity digests were re-derived with `pnpm sync:sri` from the bytes jsDelivr serves. `formio-form`'s CDN example carried its own hand-copied digests, which a URL bump alone would have left stale — and a stale digest makes the browser block the renderer outright — so it moves to 5.6.1 with the same digests, and a test now holds every documented digest to the one `auth.ts` verifies.
+- 33e915b: Bring `formio-react` up to the stack its unpinned installs resolve today: React Router 8, Vite 8, `@vitejs/plugin-react` 6, and TypeScript 6.
+  
+  React Router 8 removed the `react-router-dom` package and every v7 `future` flag, and hard-requires Node 22.22+ and React 19.2.7+. `BOOTSTRAP.md` now imports `RouterProvider` from `react-router/dom` and everything else from `react-router`, forbids `react-router-dom` and `future` flags, and states both floors — reporting a lower Node or React rather than pinning the router back a major. It also records why the bare stylesheet imports type-check: TypeScript 6 enables `noUncheckedSideEffectImports`, so without the template's `"types": ["vite/client"]` every `import '….css'` fails with TS2882. The resources sub-skill's router assembly names the same `RouterProvider` import.
+  
+  `EXISTING.md` adds the router package and major to the inspection, generates `react-router-dom` imports for an application still on 6.4+, and never bumps the router major without approval, since v8 drags the React and Node floors with it.
+  
+  `formio-react-form`'s `environments.md` installs the plugin-react major that matches the workspace's Vite (`^6` for Vite 8, `^5` for Vite 4–7): plugin-react 6 peers on Vite 8 only, so the previous unpinned install failed peer resolution in every older workspace.
+  
+  The eval seed moves to React 19.3, React Router 8.4, Vite 8.3, plugin-react 6.1, and TypeScript 6.0, and gains the `vite/client` types it needed to type-check under TypeScript 6.
+
 ## 0.13.2
 
 ### Patch Changes

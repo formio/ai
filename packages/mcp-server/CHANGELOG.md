@@ -1,5 +1,22 @@
 # @formio/mcp
 
+## 0.14.0
+
+### Minor Changes
+
+- 33e915b: **Breaking: Node.js 22.12 or newer is now required.** Node 20 reached end-of-life in April 2026, and the toolchain this repository builds and tests with (Vitest 5, jsdom 30, Changesets 3) no longer runs on it.
+  
+  `engines.node` is `>=22.12` in every package, the `.mcpb` manifest declares the same runtime range, both bundles (`dist/plugin/server/stdio.mjs` and the `.mcpb` server) are compiled for `node22`, CI tests on Node 22, and `@types/node` tracks 22 so no API newer than the floor type-checks. A new test holds all of them to the root `engines` field.
+
+### Patch Changes
+
+- 33e915b: Move the portal-login and revisions-consent servers to Express 5, and handle the two edges it changed.
+  
+  A login port that is already taken — a fixed `FORMIO_AUTH_PORT` in use by something else — now fails `authenticate` at once with an error naming the host and port. Express 5 hands the bind failure to `app.listen`'s callback, which used to ignore it, so the call would have sat on a blank wait until the login timeout. A callback POST that is not JSON is answered 400 on the login page and treated as no choice on the consent page, instead of reading a property off the `req.body` Express 5 no longer defaults to `{}` and failing with a 500. Express 4 also no longer ships alongside the MCP SDK's own Express 5.
+- 33e915b: Move the portal-login page's renderer to `@formio/js` 5.6.1 and take the minor releases of the MCP SDK (1.30) and zod (4.6).
+  
+  The login page's Subresource Integrity digests were re-derived with `pnpm sync:sri` from the bytes jsDelivr serves. `formio-form`'s CDN example carried its own hand-copied digests, which a URL bump alone would have left stale — and a stale digest makes the browser block the renderer outright — so it moves to 5.6.1 with the same digests, and a test now holds every documented digest to the one `auth.ts` verifies.
+
 ## 0.13.0
 
 ### Minor Changes
