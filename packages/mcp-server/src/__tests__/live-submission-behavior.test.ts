@@ -246,7 +246,7 @@ describe.skipIf(!LIVE)(
     });
 
     it('Q2: metadata.agent is stored verbatim', async () => {
-      const agent = { source: 'agent', session: 's', purpose: 'test', nonce: 'n', sig: 'g' };
+      const agent = { source: 'agent', session: 's', purpose: 'test', sig: 'g' };
       const real = ok<Doc>(
         await api(`form/${formId}/submission`, {
           method: 'POST',

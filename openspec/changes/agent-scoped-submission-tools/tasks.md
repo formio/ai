@@ -41,7 +41,7 @@
 ### Red
 
 - [x] 3.1 Write failing test in `agent-scope.test.ts`: `canonicalize` is key-order independent and stable over nested objects and arrays
-- [x] 3.2 Write failing test: `signTag` produces a `metadata.agent` holding `source`, `session`, `purpose`, `nonce`, `sig`, and `verifyRecord` accepts the record it describes
+- [x] 3.2 Write failing test: `signTag` produces a `metadata.agent` holding exactly `source`, `session`, `purpose`, and `sig` (deterministic: the same inputs sign the same tag; the earlier `nonce` was dropped), and `verifyRecord` accepts the record it describes
 - [x] 3.3 Write failing test: `verifyRecord` returns `null` for a missing tag, a different `session`, a different `form`, changed `data` (one value, one added key), a changed `owner`, a changed `purpose`, and a tag copied onto a record with different data
 - [x] 3.4 Write failing test: `verifyRecord` compares signatures with `timingSafeEqual` and returns `null` (never throws) on a malformed `sig`
 - [x] 3.5 Write failing test: `buildListQuery` always sets `metadata.agent.source`, `metadata.agent.session`, and the fixed `select`; adds `metadata.agent.purpose` only when given; and rejects `metadata.*` keys, keys not starting with `data.`, unknown operator suffixes, `$`/`[`/`]` in keys or values, and `__regex` patterns over 200 characters
@@ -66,7 +66,7 @@
 - [x] 4.3 Write failing test: the call sends a `dryrun=1` POST, then a real POST whose body is the dry-run `data` plus a `metadata.agent` that verifies against it
 - [x] 4.4 Write failing test: a dry-run 400 returns `isError: true` with the validation details, and no real POST is sent
 - [x] 4.5 Write failing test: when the stored data differs from the dry-run data, the result names the differing fields and the `_id`, and contains none of the differing values
-- [x] 4.6 Write failing test: the result lists the names of the form's actions whose `method` includes `create`, and contains no `sig`, `nonce`, or `owner`
+- [x] 4.6 Write failing test: the result lists the names of the form's actions whose `method` includes `create`, and contains no `sig` or `owner`
 - [x] 4.7 Write failing test: an unresolved project returns the shared unresolved-project error naming `project_set`
 
 ### Green
@@ -104,7 +104,7 @@
 ### Red
 
 - [x] 6.1 Write failing test: `submission_update` on an unverified `_id` sends no `PUT` and returns the not-found result
-- [x] 6.2 Write failing test: `submission_update` sends GET, a `dryrun=1` PUT, then a PUT whose full `metadata.agent` keeps the original `session`, `purpose`, and `nonce` and verifies against the dry-run data; input carrying `metadata` is refused
+- [x] 6.2 Write failing test: `submission_update` sends GET, a `dryrun=1` PUT, then a PUT whose full `metadata.agent` keeps the original `session` and `purpose`, carries no `nonce`, and verifies against the dry-run data; input carrying `metadata` is refused
 - [x] 6.3 Write failing test: `submission_delete` sends GET then DELETE for a verified record, and no DELETE for an unverified one
 - [x] 6.4 Write failing test: the update and delete results name the form's actions matching `update` / `delete`, and the tools carry the `overwrites` / `removes` annotations
 

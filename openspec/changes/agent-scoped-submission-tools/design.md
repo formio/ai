@@ -34,13 +34,15 @@ Findings from the Form.io server source (`formio/src`, `resourcejs`, `formio-ser
 
 ### D1. Tag under `metadata.agent`, signed, not a bare label
 
-`metadata.agent = { source, session, purpose, nonce, sig }`. `sig = HMAC-SHA256(key, canonical({ projectUrl, formId, owner, session, purpose, nonce, data }))`.
+`metadata.agent = { source, session, purpose, sig }`. `sig = HMAC-SHA256(key, canonical({ projectUrl, formId, owner, session, purpose, data }))`.
 
 - **Why signed:** anyone who submits can write `metadata`, and the rows a dropdown reads are readable by end users, so both a constant `source: agent` and a secret session label leak and can be copied.
 - **Why the whole `data` is covered:** a copied tag verifies only on a record whose data is byte-identical to the agent's own, so outsider-authored content can never verify.
 - **Why `owner` is covered:** a non-admin cannot set `owner` to the developer's account (to confirm in task 1.2), so even an exact replica must come from someone who already administers the project.
 - **Alternative rejected: sign `_id` after create.** Binding to the server-assigned `_id` needs a second write, and a `PATCH` or `PUT` fires update-method actions: a second email or webhook the user did not approve.
 - **Alternative rejected: an id ledger.** It is invisible in the portal, lost on another machine, and has to stay in sync with deletions made in the portal.
+
+- **Why only four fields.** `sig` is the proof, and `source` lets both the index query and a person in the portal pick out agent rows. `session` and `purpose` are not proof — the per-directory key already isolates directories, and the signature already covers both — but each does a job the signature cannot, because Mongo cannot verify an HMAC and can only filter on plain values. `session` confines the index query to this directory's rows, so other directories' agent rows never fill a page and push this directory's own rows past the `limit`. `purpose` is what `submission_list` with `purpose: "test"` filters on, so a later session can find and delete its test rows. An earlier draft also carried a random `nonce`. It was dropped: with the full `data` and `owner` signed, it added no protection, and two identical seed rows sharing a signature is harmless.
 
 ### D2. Dry-run first, then sign what the server will store
 
@@ -74,7 +76,7 @@ The key store lives at `~/.formio/mcp-submission-keys.json` as `{ [normalizedCwd
 
 ### D6. Update and delete verify first; update keeps identity and re-signs
 
-- **Update:** `GET` and verify, dry-run the `PUT` body, sign keeping the original `session`/`purpose`/`nonce`, then `PUT` the full tag, because a `PUT` replaces `metadata` wholesale.
+- **Update:** `GET` and verify, dry-run the `PUT` body, sign keeping the original `session` and `purpose`, then `PUT` the full tag, because a `PUT` replaces `metadata` wholesale.
 - **Delete:** `GET` and verify, then `DELETE`.
 - **Effects are named:** each write result lists the form's actions matching its method, so the user sees what the write triggered. The skill guideline requires naming them before the write as well.
 

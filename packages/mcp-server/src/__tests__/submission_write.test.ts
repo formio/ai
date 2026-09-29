@@ -162,7 +162,7 @@ describe('submission_update', () => {
     const tag = body.metadata?.agent as Record<string, unknown>;
     expect(tag.session).toBe(existing.metadata.agent.session);
     expect(tag.purpose).toBe('test');
-    expect(tag.nonce).toBe(existing.metadata.agent.nonce);
+    expect(tag).not.toHaveProperty('nonce');
     expect(body.metadata?.jwtIssuedAfter).toBe(1);
 
     const key = getOrCreateKey({ cwd: TEST_CWD });

@@ -20,7 +20,6 @@ export interface AgentTag {
   source: 'agent';
   session: string;
   purpose: SubmissionPurpose;
-  nonce: string;
   sig: string;
 }
 
@@ -54,7 +53,6 @@ interface SignedFields {
   owner: string | null;
   session: string;
   purpose: SubmissionPurpose;
-  nonce: string;
   data: unknown;
 }
 
@@ -69,31 +67,12 @@ export interface SignTagInput {
   owner: string | null;
   purpose: SubmissionPurpose;
   data: unknown;
-  /** Supplied on update so the record keeps its identity; generated otherwise. */
-  nonce?: string;
 }
 
-export function signTag({
-  key,
-  projectUrl,
-  formId,
-  owner,
-  purpose,
-  data,
-  nonce,
-}: SignTagInput): AgentTag {
+export function signTag({ key, projectUrl, formId, owner, purpose, data }: SignTagInput): AgentTag {
   const session = sessionLabel(key);
-  const tagNonce = nonce ?? crypto.randomBytes(16).toString('hex');
-  const sig = computeSig(key, {
-    projectUrl,
-    formId,
-    owner,
-    session,
-    purpose,
-    nonce: tagNonce,
-    data,
-  });
-  return { source: 'agent', session, purpose, nonce: tagNonce, sig };
+  const sig = computeSig(key, { projectUrl, formId, owner, session, purpose, data });
+  return { source: 'agent', session, purpose, sig };
 }
 
 function isRecordObject(value: unknown): value is Record<string, unknown> {
@@ -105,17 +84,16 @@ function readTag(record: Record<string, unknown>): AgentTag | null {
   if (!isRecordObject(metadata)) return null;
   const tag = metadata.agent;
   if (!isRecordObject(tag)) return null;
-  const { source, session, purpose, nonce, sig } = tag;
+  const { source, session, purpose, sig } = tag;
   if (
     source !== 'agent' ||
     typeof session !== 'string' ||
     !SUBMISSION_PURPOSES.includes(purpose as SubmissionPurpose) ||
-    typeof nonce !== 'string' ||
     typeof sig !== 'string'
   ) {
     return null;
   }
-  return { source, session, purpose: purpose as SubmissionPurpose, nonce, sig };
+  return { source, session, purpose: purpose as SubmissionPurpose, sig };
 }
 
 function sigMatches(expected: string, actual: string): boolean {
@@ -129,7 +107,7 @@ function sigMatches(expected: string, actual: string): boolean {
   return crypto.timingSafeEqual(a, b);
 }
 
-/** The fields the agent sees for a record. No signature, nonce, owner, or access. */
+/** The fields the agent sees for a record. No signature, owner, or access. */
 export function projectRecord(
   record: Record<string, unknown>,
   purpose: SubmissionPurpose
@@ -171,7 +149,6 @@ export function verifyRecord(
     owner,
     session: tag.session,
     purpose: tag.purpose,
-    nonce: tag.nonce,
     data: record.data,
   });
   if (!sigMatches(expected, tag.sig)) return null;

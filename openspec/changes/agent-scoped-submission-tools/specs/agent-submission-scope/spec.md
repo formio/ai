@@ -21,12 +21,12 @@ The server SHALL keep one signing key per resolved working directory in a local 
 
 ### Requirement: Agent-created submissions carry a server-written, signed tag
 
-Every submission written by `submission_create` or `submission_update` SHALL carry `metadata.agent` containing `source: "agent"`, `session` (the session label), `purpose` (`"reference-data"` or `"test"`), `nonce` (16 random bytes, hex), and `sig`. `sig` SHALL be `HMAC-SHA256(key, canonical({ projectUrl, formId, owner, session, purpose, nonce, data }))`, where `canonical` is key-sorted JSON and `data` is the submission data as the server will store it. The agent SHALL NOT be able to supply any part of `metadata`; any `metadata` in the tool input is rejected.
+Every submission written by `submission_create` or `submission_update` SHALL carry `metadata.agent` containing `source: "agent"`, `session` (the session label), `purpose` (`"reference-data"` or `"test"`), and `sig`, and no other key. `sig` SHALL be `HMAC-SHA256(key, canonical({ projectUrl, formId, owner, session, purpose, data }))`, where `canonical` is key-sorted JSON and `data` is the submission data as the server will store it. The signature is deterministic: the same inputs produce the same tag, and no per-tag randomness is added, because binding the full `data` and `owner` already confines a copied tag to a byte-identical copy of the agent's own row. The agent SHALL NOT be able to supply any part of `metadata`; any `metadata` in the tool input is rejected.
 
 #### Scenario: The tag is written by the server
 
 - **WHEN** `submission_create` is called with `data` and `purpose: "test"`
-- **THEN** the request body's `metadata.agent` holds `source`, `session`, `purpose`, `nonce`, and `sig`, all computed by the server
+- **THEN** the request body's `metadata.agent` holds exactly `source`, `session`, `purpose`, and `sig`, all computed by the server
 
 #### Scenario: Agent-supplied metadata is refused
 
@@ -78,7 +78,7 @@ Before the real write, the server SHALL submit the same body with `?dryrun=1`, w
 
 ### Requirement: Writes act only on verified records and never change the tag's identity
 
-`submission_update` and `submission_delete` SHALL fetch and verify the target before any write, and refuse with a not-found result when verification fails. `submission_update` SHALL keep the original `session`, `purpose`, and `nonce`, SHALL re-sign over the dry-run-normalized new `data`, and SHALL send the full tag, because a `PUT` replaces `metadata` wholesale.
+`submission_update` and `submission_delete` SHALL fetch and verify the target before any write, and refuse with a not-found result when verification fails. `submission_update` SHALL keep the original `session` and `purpose`, SHALL re-sign over the dry-run-normalized new `data`, and SHALL send the full tag, because a `PUT` replaces `metadata` wholesale.
 
 #### Scenario: Updating a record the agent did not create is refused
 
@@ -92,9 +92,9 @@ Before the real write, the server SHALL submit the same body with `?dryrun=1`, w
 
 ### Requirement: Tool results expose only the agent's own fields
 
-Tool results SHALL contain `_id`, `form`, `created`, `modified`, `data`, and `purpose` for each verified record, and SHALL NOT contain `sig`, `nonce`, `owner`, `access`, or any other `metadata` key.
+Tool results SHALL contain `_id`, `form`, `created`, `modified`, `data`, and `purpose` for each verified record, and SHALL NOT contain `sig`, `owner`, `access`, or any other `metadata` key.
 
 #### Scenario: The signature is not echoed
 
 - **WHEN** `submission_get` returns a verified record
-- **THEN** the result has `purpose` and `data`, and no `sig` or `nonce`
+- **THEN** the result has `purpose` and `data`, and no `sig`

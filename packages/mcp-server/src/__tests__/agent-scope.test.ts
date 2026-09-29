@@ -50,26 +50,29 @@ describe('canonicalize', () => {
 });
 
 describe('signTag and verifyRecord', () => {
-  it('writes source, session, purpose, nonce, and sig, and the record it describes verifies', () => {
+  it('writes exactly source, session, purpose, and sig, and the record it describes verifies', () => {
     const record = agentRecord();
     const tag = record.metadata.agent as AgentTag;
 
+    expect(Object.keys(tag).sort()).toEqual(['purpose', 'session', 'sig', 'source']);
     expect(tag.source).toBe('agent');
     expect(tag.session).toBe(sessionLabel(key));
     expect(tag.purpose).toBe('reference-data');
-    expect(tag.nonce).toMatch(/^[0-9a-f]{32}$/);
-    expect(typeof tag.sig).toBe('string');
+    expect(tag.sig).toMatch(/^[0-9a-f]{64}$/);
     expect(verifyRecord(record, ctx)).not.toBeNull();
   });
 
-  it('uses a fresh nonce per tag unless one is supplied', () => {
+  // The signature binds the tag to the project, form, owner, and full data, so no
+  // per-tag randomness is needed: the same inputs sign the same tag, and a copied tag
+  // still verifies only on a byte-identical copy of the agent's own row.
+  it('is deterministic: the same inputs sign the same tag', () => {
     const data = { name: 'x' };
     const a = signTag({ key, projectUrl, formId, owner, purpose: 'test', data });
     const b = signTag({ key, projectUrl, formId, owner, purpose: 'test', data });
-    expect(a.nonce).not.toBe(b.nonce);
-
-    const kept = signTag({ key, projectUrl, formId, owner, purpose: 'test', data, nonce: a.nonce });
-    expect(kept).toEqual(a);
+    expect(b).toEqual(a);
+    expect(
+      signTag({ key, projectUrl, formId, owner, purpose: 'test', data: { name: 'y' } }).sig
+    ).not.toBe(a.sig);
   });
 
   it('rejects a record with no tag', () => {

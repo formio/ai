@@ -68,7 +68,6 @@ export function registerSubmissionUpdateTool(server: McpServer, config: FormioCo
           formId,
           owner: typeof dryRun.owner === 'string' ? dryRun.owner : null,
           purpose: existing.tag.purpose,
-          nonce: existing.tag.nonce,
           data: dryRun.data,
         });
         // A PUT replaces `metadata` wholesale, so the keys the server wrote beside the tag
