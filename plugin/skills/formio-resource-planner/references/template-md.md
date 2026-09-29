@@ -47,6 +47,7 @@ One block per resource. Terse — one sentence per purpose, one clause per field
     - <key>: <component> — <description>
     - ...
   Access: <owner | group-via-<join> | role(<roles>) | public>
+  Seed: reference-data — <the select that reads it; the rows the app needs>   ← only when the app is unusable without rows
   Actions:
     - <action name>: <key settings>
 
@@ -59,6 +60,8 @@ One block per resource. Terse — one sentence per purpose, one clause per field
   Actions:
     - Group Assignment: group=<leftKey>, user=<rightKey>   ← only when this join governs access
 ```
+
+**The `Seed:` line.** Emit `Seed: reference-data` on a Resource when a `select` with `dataSrc: resource` on another form reads it AND the app cannot be used until it has rows — ticket categories, statuses, departments, product types — and name that select and the rows to create. Omit the line everywhere else: a user-type Resource, a group or join Resource, and any Resource whose rows end users create themselves never carry it. `formio-application` reads these lines after import to offer the seed rows; see [agent-submissions.md](../../formio-mcp-setup/references/agent-submissions.md) for the rules those rows follow.
 
 For transitive group access, call out the hidden mirror on every grandchild:
 

@@ -33,6 +33,14 @@ Saved ✓  "{title}" is live at {projectUrl}/{formPath}
 
 The form URL `{projectUrl}/{formPath}` is the handle everything downstream uses — it is what EMBED hands to `formio-form`, and what the user shares, renders, or revisits. If INTENT captured `embedIntent: yes`, continue to Step 4 (EMBED); otherwise the flow ends here — remind the user they can embed later by asking to embed this form.
 
+## After the save — seed a select's Resource, or test the form
+
+Both steps are optional, and each follows [`agent-submissions.md`](../formio-mcp-setup/references/agent-submissions.md): invented values, `action_list` on the target form first, and an approval that shows the rows, the Project URL, and every action the write triggers.
+
+**Seed a select's Resource.** When the saved form has a `select` with `dataSrc: resource` and `submission_list` on that Resource returns no rows, offer a short set of invented `reference-data` rows that fit the field — "Hardware, Software, Network" for a ticket category — and write each with `submission_create` on approval. Never seed a user-type Resource or a form carrying a Login, Role Assignment, or Group Assignment action.
+
+**Test the form.** When the user wants the form's validation, conditional fields, or calculated values checked, write one submission with `purpose: "test"` on approval, read it back with `submission_get`, and report the stored values that answer the question — the calculated total, the field a conditional cleared. A validation error from `submission_create` is itself the answer to a validation question; report it. Then offer to delete the test row with `submission_delete`.
+
 ## Error branches
 
 ### Auth failure (401 / unauthenticated)

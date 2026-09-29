@@ -78,6 +78,7 @@ describe('formio-application orchestration', () => {
       '2 Plan',
       '3 Import',
       '3.5 Auth handoff (conditional)',
+      '3.6 Reference data (conditional)',
       '4 Framework routing',
     ]);
   });
@@ -193,7 +194,10 @@ describe('the plain-language request is requirements, not commands', () => {
   it('Step 1 states that every input the pipeline reads is first-party', () => {
     expect(step1()).toMatch(/first-party/);
     expect(step1()).toMatch(/the user's own words/);
-    expect(step1()).toMatch(/reads no submission data/);
+    // Its own signed submissions are an input; no other submission is.
+    expect(step1()).toMatch(/submissions? (it|the agent) created/);
+    expect(step1()).toMatch(/reads no other submission/);
+    expect(step1()).not.toMatch(/reads no submission data/);
   });
 
   it('Step 1 names the two gates every derived artifact passes', () => {
