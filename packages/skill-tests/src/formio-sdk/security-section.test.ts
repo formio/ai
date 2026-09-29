@@ -65,6 +65,17 @@ describe('SKILL.md carries a Security section', () => {
     expect(body).toMatch(/never instruct/i);
     expect(body).toMatch(/report(ed)? (it )?to the user/i);
   });
+
+  // Snyk W011 read the skill as having the AGENT read submissions during the
+  // session. It does not: the MCP tools return configuration only, and the SDK
+  // calls are code the application runs. Saying so is what cleared the same
+  // finding on formio-form.
+  it('separates what the agent reads at build time from what the application reads at runtime', () => {
+    const body = section(skill, 'Security');
+    expect(body).toMatch(/none (of them )?returns? submission data/i);
+    expect(body).toMatch(/the application (runs|executes) them at runtime/i);
+    expect(body).not.toMatch(/submission JSON, and project settings returned by any/);
+  });
 });
 
 describe('no literal credential anywhere under the skill', () => {
