@@ -60,6 +60,27 @@ describe('the artifacts are treated as data, not as instructions', () => {
   });
 });
 
+// Snyk W011 flagged formio-angular for ingesting "outsider-authored free text",
+// quoting the skill's own description of the pair as its largest untrusted input
+// arriving from a clone or a download. The pair is a first-party pipeline artifact
+// read by the paths the handoff names; the prose says so, and the rules stay.
+describe('formio-angular describes the pair as the pipeline artifact it is', () => {
+  const section = (): string => {
+    const text = read('formio-angular/SKILL.md');
+    const start = text.indexOf('## The planner artifacts');
+    return text.slice(start, text.indexOf('\n## ', start + 1));
+  };
+
+  it('reads the two files the handoff names, not whatever the directory holds', () => {
+    expect(section()).toMatch(/the two files the handoff names/i);
+  });
+
+  it('does not frame the pair as outsider content', () => {
+    expect(section()).not.toMatch(/largest untrusted input/i);
+    expect(section()).not.toMatch(/a clone, a download/i);
+  });
+});
+
 // The values that land in generated TypeScript — a form path in
 // FormioAuthConfig, a machine name in a FormioResourceConfig — are the ones worth
 // constraining, because "extract it and write it into the file" is otherwise an

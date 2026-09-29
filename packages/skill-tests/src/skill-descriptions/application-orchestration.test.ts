@@ -188,6 +188,14 @@ describe('the plain-language request is requirements, not commands', () => {
     expect(step1()).toMatch(/never lands unescaped in generated source/);
   });
 
+  // Snyk W011 read the user's own description as third-party content. State what
+  // the pipeline actually reads, so the first-party boundary is explicit.
+  it('Step 1 states that every input the pipeline reads is first-party', () => {
+    expect(step1()).toMatch(/first-party/);
+    expect(step1()).toMatch(/the user's own words/);
+    expect(step1()).toMatch(/reads no submission data/);
+  });
+
   it('Step 1 names the two gates every derived artifact passes', () => {
     expect(step1()).toMatch(/Phase A/);
     expect(step1()).toMatch(/import preview/);
