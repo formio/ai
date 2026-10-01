@@ -137,7 +137,7 @@
 - [x] 7.2 Add the one-sentence security-section convention to `CLAUDE.md`
 - [x] 7.3 Unwrap edited markdown with `npx prettier --prose-wrap never --ignore-path=/dev/null --write <edited paths only>` and read the diff; none of the edited files carries a markdown-in-markdown fence
 - [x] 7.4 Run `pnpm test`, `pnpm lint`, `pnpm format`
-- [ ] 7.5 After the next plugin release, record the skills.sh re-scan verdicts for the four skills in this change's `design.md` under a "Post-release verification" heading, noting any residual finding as accepted per the proposal
+- [x] 7.5 After the next plugin release, record the skills.sh re-scan verdicts for the four skills in this change's `design.md` under a "Post-release verification" heading, noting any residual finding as accepted per the proposal
 
 ### Refactor
 
