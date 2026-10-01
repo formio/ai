@@ -47,7 +47,7 @@ describe('capability quality', () => {
     const tools = await listToolsUnconfigured();
     // The whole surface, project_set included: every client can map a working
     // directory to a project, so nothing is withheld by launch mode.
-    expect(tools.length).toBe(21);
+    expect(tools.length).toBe(22);
     expect(tools.map((t) => t.name)).toContain('form_list');
     expect(tools.map((t) => t.name)).toContain('project_set');
     // The read half of the same surface. Withholding it is what sent every
@@ -134,7 +134,13 @@ describe('capability quality', () => {
     for (const name of ['form_list', 'form_get', 'role_list', 'action_list', 'project_export']) {
       expect(byName.get(name)!.annotations!.readOnlyHint, `${name} should be read-only`).toBe(true);
     }
-    for (const name of ['form_create', 'form_update', 'role_create', 'project_import']) {
+    for (const name of [
+      'form_create',
+      'form_update',
+      'role_create',
+      'project_import',
+      'pdf_upload',
+    ]) {
       expect(byName.get(name)!.annotations!.readOnlyHint, `${name} writes`).toBe(false);
     }
   });

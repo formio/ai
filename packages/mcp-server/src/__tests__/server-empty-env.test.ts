@@ -67,6 +67,7 @@ describe('createServer with an empty environment', () => {
         'action_delete',
         'project_export',
         'project_import',
+        'pdf_upload',
       ])
     );
   });

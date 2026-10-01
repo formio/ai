@@ -251,3 +251,16 @@ describe('formio-form Security section', () => {
     expect(bullets[4]).toMatch(/report/i);
   });
 });
+
+describe('formio-form ↔ formio-pdf-form', () => {
+  const skill = () => readFileSync(join(repoRoot, 'plugin/skills/formio-form/SKILL.md'), 'utf8');
+
+  it('links the PDF render reference for a display: "pdf" definition', () => {
+    expect(skill()).toContain('(../formio-pdf-form/references/render.md)');
+    expect(skill()).toMatch(/display: "pdf"/);
+  });
+
+  it('routes a PDF that is not yet a form to formio-pdf-form', () => {
+    expect(skill()).toMatch(/PDF[^.]*not (yet )?a form[^.]*`formio-pdf-form`/);
+  });
+});

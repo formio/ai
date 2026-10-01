@@ -1,9 +1,7 @@
 ## Purpose
 
 Defines the automated validation suite for the API and SDK skill libraries: the section layout every reference must have, the canonical auth paragraph, forbidden legacy-auth tokens and deep imports, resolved Postman placeholders, PDF scope, URL terminology, and example-value rules.
-
 ## Requirements
-
 ### Requirement: Validation suite runs under pnpm test
 
 The repository SHALL include a Vitest validation suite that invokes `validateLibrary(libraryDir)` against `plugin/skills/` and fails the test run if any issue is reported. It SHALL live in `@formio/skill-tests` — the package that exists to test the skills library — at `packages/skill-tests/src/library-validation/validate-library.ts`, with its suite beside it. It SHALL NOT live in `packages/mcp-server`: a validator for the skills library kept in the server package is superfluous to that package by construction, which is how the previous implementation came to be deleted while this capability went on specifying it, leaving every rule below as prose nothing ran for four months.
@@ -80,12 +78,17 @@ Placeholders inside fenced or inline code blocks are stripped before matching, s
 
 ### Requirement: PDF-scope endpoints MUST be under /pdf-proxy
 
-Every endpoint heading (`### GET|POST|PUT|PATCH|DELETE <path>`) inside `pdf-api.md` SHALL have a path that begins with `{projectUrl}/pdf-proxy`. The "PDF server direct API" is out of scope.
+Every endpoint heading (`### GET|POST|PUT|PATCH|DELETE <path>`) inside `pdf-api.md` SHALL have a path that begins with `{projectUrl}/` — a route the project serves, either through its PDF proxy (`{projectUrl}/pdf-proxy/…`) or as a project route the enterprise server forwards to the PDF server (`{projectUrl}/upload`, `{projectUrl}/token`, `{projectUrl}/form/:formId/submission/:submissionId/download`). The "PDF server direct API" — any path on a PDF server's own host — is out of scope. The requirement keeps its name for history; the rule it states is that a PDF endpoint is reached through the project, not that it is under `/pdf-proxy`.
 
 #### Scenario: PDF endpoint outside /pdf-proxy fails
 
-- **WHEN** `pdf-api.md` contains `### GET {projectUrl}/file`
+- **WHEN** `pdf-api.md` contains `### GET {pdfServer}/pdf/:projectId/file`
 - **THEN** `validatePdfProxyPath` SHALL emit a `pdf.proxy_path` issue
+
+#### Scenario: Project-routed PDF endpoints pass
+
+- **WHEN** `pdf-api.md` contains `### POST {projectUrl}/upload` or `### GET {projectUrl}/token`
+- **THEN** `validatePdfProxyPath` SHALL emit no issue for it
 
 ### Requirement: Terminology — baseUrl vs projectUrl
 
@@ -106,6 +109,7 @@ Validation SHALL additionally reject an `FORMIO_*` name used as a substitution s
 - **WHEN** a reference or skill document uses `FORMIO_PROJECT_URL` as an endpoint root or as the name of a value handed between phases
 - **THEN** `validateTerminology` SHALL emit an issue
 - **AND** the same name in an environment table or an `env`-block warning SHALL NOT be flagged
+
 ### Requirement: Example values MUST NOT contain collision-avoidance integer suffixes
 
 Example JSON values (`title`, `name`, `path`, `key`, `machineName`) SHALL NOT end in `-<digits>` or ` <digits>` suffixes used solely to avoid name collisions in tests. Canonical examples SHALL present clean human-authored values. The rule SHALL NOT flag MongoDB ObjectId hex strings, UUIDs, PDF overlay field keys (`f1010`, `f1_01[0]`), or single-digit numeric tokens (`email2`).
@@ -177,3 +181,4 @@ Forbidden-import detection SHALL ignore non-import occurrences (prose mentioning
 
 - **WHEN** a fenced JavaScript block contains `const { Formio } = require('@formio/js');`
 - **THEN** `validateFormioSdkSkill` SHALL emit a `formio_sdk.forbidden_import` issue with `import_path: "@formio/js"`
+

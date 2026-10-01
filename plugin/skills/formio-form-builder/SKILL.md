@@ -1,12 +1,12 @@
 ---
 name: formio-form-builder
 description: >-
-  Default "build me a form" orchestrator — builds a single Form.io form end to end: determines the form type (webform, wizard, or PDF form), delegates schema authoring to `formio-schema`, saves the form via the MCP server, and optionally hands off to embedding. Use when the user asks to "build a form", "create a form", make a "multi-page form", or create a "survey", "contact form", "intake form", "registration form", "questionnaire", or "pdf form" — or to edit an existing form's fields: "add a phone field to my registration form". Boundary: "build a form to collect X" (a standalone form) belongs to this skill; "track X / manage X / build an app around X" (a data model, CRUD, resources) belongs to `formio-application` / `formio-resource-planner`. Not for: embedding an EXISTING form (see `formio-form`); building an app (see `formio-application`); designing resources or permissions (see `formio-resource-planner`); raw JSON schema lookups (see `formio-schema`); REST endpoint lookups (see `formio-api`).
+  Default "build me a form" orchestrator — builds a single Form.io form end to end: determines the form type (webform or wizard), delegates schema authoring to `formio-schema`, saves the form via the MCP server, and optionally hands off to embedding. Use when the user asks to "build a form", "create a form", make a "multi-page form", or create a "survey", "contact form", "intake form", "registration form", or "questionnaire" — or to edit an existing form's fields: "add a phone field to my registration form". Boundary: "build a form to collect X" (a standalone form) belongs to this skill; "track X / manage X / build an app around X" (a data model, CRUD, resources) belongs to `formio-application` / `formio-resource-planner`. Not for: embedding an EXISTING form (see `formio-form`); PDF-based forms (see `formio-pdf-form`); building an app (see `formio-application`); designing resources or permissions (see `formio-resource-planner`); raw JSON schema (see `formio-schema`); REST endpoints (see `formio-api`).
 ---
 
 # Form.io Form Builder Orchestrator
 
-You are the library's default "build me a form" skill. When a user asks for a single form — a survey, a contact form, an intake wizard, a PDF form — your job is to drive the full pipeline from plain-language intent to a saved form in their Form.io project, and, only when they asked for it, on to embedding. The user should never have to know form-type terminology, author component JSON, or manually invoke the schema skill or the MCP server.
+You are the library's default "build me a form" skill. When a user asks for a single form — a survey, a contact form, an intake wizard — your job is to drive the full pipeline from plain-language intent to a saved form in their Form.io project, and, only when they asked for it, on to embedding. The user should never have to know form-type terminology, author component JSON, or manually invoke the schema skill or the MCP server.
 
 ## Preflight — the Form.io MCP server
 
@@ -42,11 +42,11 @@ Never invent a Base URL, never reuse one from another project or an earlier sess
 
 ### Step 1 — INTENT
 
-Determine, in one batched interview, (a) the form type — `webform` (single-page form) or `wizard` (multi-page form) — inferring from phrasing when unambiguous and confirming, asking when ambiguous; and (b) whether the user wants the form embedded in an application afterward. See [`INTENT.md`](./INTENT.md) for the question script and [`FORM_TYPES.md`](./FORM_TYPES.md) for what each type is and the phrasing signals that distinguish them.
+Determine, in one batched interview, (a) the form type — `webform` (single-page form) or `wizard` (multi-page form); a PDF form hands off to `formio-pdf-form` instead of continuing here — inferring from phrasing when unambiguous and confirming, asking when ambiguous; and (b) whether the user wants the form embedded in an application afterward. See [`INTENT.md`](./INTENT.md) for the question script and [`FORM_TYPES.md`](./FORM_TYPES.md) for what each type is and the phrasing signals that distinguish them.
 
 ### Step 2 — SCHEMA
 
-Invoke the `formio-schema` skill to select the right components and author the complete form JSON definition for the confirmed form type and the user's described fields. Defer to it entirely — no component or schema documentation lives in this skill. Carry the confirmed form type into the definition (`display: "form"` for a webform, `display: "wizard"` for a wizard, `display: "pdf"` for a PDF form — `formio-schema` owns the exact shapes).
+Invoke the `formio-schema` skill to select the right components and author the complete form JSON definition for the confirmed form type and the user's described fields. Defer to it entirely — no component or schema documentation lives in this skill. Carry the confirmed form type into the definition (`display: "form"` for a webform, `display: "wizard"` for a wizard — `formio-schema` owns the exact shapes).
 
 ### Step 3 — SAVE
 
@@ -88,3 +88,4 @@ Prefer the MCP server's first-party tools over ad-hoc HTTP requests:
 - [`INTENT.md`](./INTENT.md) — Step 1 batched interview script
 - [`SAVE.md`](./SAVE.md) — Step 3 `form_create` gate + error branches
 - [`EMBED.md`](./EMBED.md) — Step 4 conditional embed handoff
+- [`formio-pdf-form`](../formio-pdf-form/SKILL.md) — PDF forms, and PDF templates for a webform's submissions

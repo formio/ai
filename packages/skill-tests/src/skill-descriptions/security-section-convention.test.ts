@@ -18,6 +18,7 @@ const SKILLS_WITH_AN_EXECUTION_SURFACE = [
   'plugin/skills/formio-form/SKILL.md',
   'plugin/skills/formio-react/formio-react-form/SKILL.md',
   'plugin/skills/formio-angular/formio-angular-form/SKILL.md',
+  'plugin/skills/formio-pdf-form/SKILL.md',
 ];
 
 describe('the Security-section convention', () => {

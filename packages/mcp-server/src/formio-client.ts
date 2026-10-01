@@ -27,6 +27,7 @@ export function isMongoId(value: string): boolean {
 
 export interface FormioFetchOptions {
   method?: string;
+  // A FormData body is sent as multipart; anything else is serialized as JSON.
   body?: unknown;
   responseType?: 'text' | 'json';
   signal?: AbortSignal;
@@ -37,18 +38,24 @@ function formatApiError(status: number, url: URL): string {
 }
 
 function buildFetchInit(config: FormioConfig, options?: FormioFetchOptions): RequestInit {
-  const hasBody = options?.body !== undefined;
+  const body = options?.body;
+  const hasBody = body !== undefined;
+  // fetch writes the multipart boundary itself, so a FormData body must carry no
+  // Content-Type of ours.
+  const isMultipart = body instanceof FormData;
   const headers: Record<string, string> = {
     ...getAuthHeader(config),
-    ...(hasBody ? { 'Content-Type': 'application/json' } : {}),
+    ...(hasBody && !isMultipart ? { 'Content-Type': 'application/json' } : {}),
   };
 
   const init: RequestInit = { headers };
   if (options?.method) {
     init.method = options.method;
   }
-  if (hasBody) {
-    init.body = JSON.stringify(options.body);
+  if (isMultipart) {
+    init.body = body;
+  } else if (hasBody) {
+    init.body = JSON.stringify(body);
   }
   if (options?.signal) {
     init.signal = options.signal;

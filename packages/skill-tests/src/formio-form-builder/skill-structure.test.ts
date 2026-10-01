@@ -110,7 +110,6 @@ describe('formio-form-builder three-clause description', () => {
       'intake form',
       'registration form',
       'questionnaire',
-      'pdf form',
     ]) {
       expect(frontmatter, `trigger clause missing "${trigger}"`).toContain(trigger);
     }

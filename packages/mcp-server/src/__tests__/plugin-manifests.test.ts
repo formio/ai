@@ -480,7 +480,7 @@ describe('the @formio/mcp launch pin', () => {
   // whatever it would touch — and, unlike watching the working tree, it cannot be
   // tripped by an unrelated write elsewhere in a parallel test run.
   it('reports agreement from --check without writing a byte', () => {
-    const targets = spawnSync('pnpm', ['-s', 'sync:pins', '--list'], {
+    const targets = spawnSync('pnpm', ['--silent', 'sync:pins', '--list'], {
       cwd: REPO_ROOT,
       encoding: 'utf8',
     })
