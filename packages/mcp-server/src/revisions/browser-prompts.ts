@@ -4,7 +4,7 @@
 // care about.
 
 import express from 'express';
-import { exec } from 'child_process';
+import { openInBrowser } from '../browser-launch.js';
 
 export type RevisionsConsentChoice =
   'enable-original' | 'enable-current' | 'proceed-without-history' | 'cancel';
@@ -169,13 +169,12 @@ async function runBrowserConsent<TChoice>(
     if (addr && typeof addr !== 'string') {
       const consentUrl = `http://127.0.0.1:${addr.port}/`;
       if (options.openBrowser !== false) {
-        const openCmd =
-          process.platform === 'darwin'
-            ? 'open'
-            : process.platform === 'win32'
-              ? 'start'
-              : 'xdg-open';
-        exec(`${openCmd} "${consentUrl}"`);
+        openInBrowser(consentUrl, (err) => {
+          process.stderr.write(
+            `Could not open a browser automatically (${err.message}). ` +
+              `Open ${consentUrl} to make your choice.\n`
+          );
+        });
       }
       options.onReady?.(addr.port);
     }

@@ -1,10 +1,11 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { exec } from 'child_process';
+import { execFile } from 'child_process';
 import net from 'node:net';
 import { authenticate } from '../auth.js';
+import { browserLaunchCommand } from '../browser-launch.js';
 import { ResolvedFormioConfig } from '../config.js';
 
-vi.mock('child_process', () => ({ exec: vi.fn() }));
+vi.mock('child_process', () => ({ execFile: vi.fn() }));
 
 // forceBrowser because these tests exercise the browser path itself: the suite
 // runs on CI, which is exactly what browserless detection refuses to launch a
@@ -52,7 +53,7 @@ describe('authenticate in headless environments', () => {
       stderr.push(typeof chunk === 'string' ? chunk : Buffer.from(chunk).toString());
       return true;
     });
-    vi.mocked(exec).mockReset();
+    vi.mocked(execFile).mockReset();
   });
 
   afterEach(() => {
@@ -94,13 +95,15 @@ describe('authenticate in headless environments', () => {
   // The spawn failure was previously swallowed, leaving no clue why nothing
   // opened.
   it('reports a failure to launch the browser instead of swallowing it', async () => {
-    vi.mocked(exec).mockImplementation(((
-      _cmd: string,
+    vi.mocked(execFile).mockImplementation(((
+      _file: string,
+      _args: readonly string[],
+      _options: unknown,
       cb?: (err: Error | null) => void
     ): unknown => {
-      cb?.(new Error('xdg-open ENOENT'));
+      cb?.(new Error('spawn xdg-open ENOENT'));
       return {};
-    }) as unknown as typeof exec);
+    }) as unknown as typeof execFile);
 
     await authenticate(DEFAULT_CONFIG, {
       onReady: async (port) => {
@@ -143,11 +146,13 @@ describe('authenticate in headless environments', () => {
     // Ephemeral, not a fixed port.
     expect(observedPort).toBeGreaterThan(1024);
 
-    const opener =
-      process.platform === 'darwin' ? 'open' : process.platform === 'win32' ? 'start' : 'xdg-open';
-    const command = vi.mocked(exec).mock.calls[0]?.[0] as string;
-    expect(command).toContain(opener);
-    expect(command).toContain(`http://127.0.0.1:${observedPort}/`);
+    // Launched without a shell, the URL as an argument of its own.
+    const loginUrl = `http://127.0.0.1:${observedPort}/`;
+    const { command, args } = browserLaunchCommand(loginUrl);
+    const [file, passedArgs] = vi.mocked(execFile).mock.calls[0] ?? [];
+    expect(file).toBe(command);
+    expect(passedArgs).toEqual(args);
+    expect(passedArgs).toContain(loginUrl);
   });
 
   it('does not reject when the login arrives before the timeout', async () => {
