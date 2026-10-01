@@ -643,12 +643,14 @@ Grants a role when a submission is created. Typically on a register form.
   "method": ["create"],
   "handler": ["after"],
   "settings": {
-    "association": "new",    // "new" for the submitter, "existing" to target a field
+    "association": "new",    // "new" for the submitter, "existing" for an administrator form targeting a `submission` component (see below)
     "type": "add",            // "add" | "remove"
     "role": "authenticated"   // role's machineName key from `roles`
   }
 }
 ```
+
+Emit `association: "existing"` only on an administrator form that changes another user's roles. Such a form keys its target component exactly `submission` (a select whose data source is the user resource), sets `settings.role` explicitly, and grants `create_all` / `create_own` in its `submissionAccess` to administrator roles only. `formio-actions`'s `references/action-types.md` → Role Assignment has the full configuration.
 
 ### Multi-role user systems — role selectboxes + one conditional Role Assignment per role
 

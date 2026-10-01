@@ -111,7 +111,7 @@ Adds or removes a role from a user's submission. The target user is determined b
 
 | Field | Key | Type | Options | Required | Description |
 | --- | --- | --- | --- | --- | --- |
-| Resource Association | `association` | string | `new`, `existing` | Yes | Which resource to modify |
+| Resource Association | `association` | string | `new`, `existing` | Yes | Which resource to modify — `existing` targets the component keyed `submission` |
 | Action Type | `type` | string | `add`, `remove` | Yes | Whether to add or remove the role |
 | Role | `role` | string | — | Yes | The role ID to assign/remove |
 
@@ -119,7 +119,13 @@ Adds or removes a role from a user's submission. The target user is determined b
 
 **`new`** — The submission being created IS the resource. Use this for registration forms where the new user should receive a role.
 
-**`existing`** — The form references an existing resource submission. The form must contain a component whose value is the target resource's submission ID (typically a hidden field or select resource). Use this for admin panels where one user modifies another user's roles.
+**`existing`** — The form references an existing resource submission. Use this for admin panels where one user modifies another user's roles. Configure it as follows:
+
+- **Target component** — the form contains a component whose key is exactly `submission` (typically a hidden field, or a select whose data source is the target resource). Its value is the target resource's submission ID, or the selected submission object.
+- **Role** — set `settings.role` explicitly to the one role this action adds or removes.
+- **Access** — an `existing` Role Assignment belongs on an administrative form: grant `create_all` and `create_own` in the form's `submissionAccess` to administrator roles only, never to `anonymous` or `authenticated`.
+
+If the role does not reach the target user, confirm the target component's key is exactly `submission`.
 
 ### How It Works
 
