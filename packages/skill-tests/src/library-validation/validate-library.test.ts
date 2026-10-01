@@ -113,13 +113,19 @@ describe('legacy auth mechanisms', () => {
 });
 
 describe('PDF scope', () => {
-  it('requires every pdf-api endpoint under the proxy', () => {
+  it('rejects an endpoint on the PDF server itself', () => {
     const issues = validatePdfProxyPath(
       'formio-api/references/pdf-api.md',
-      '### GET {projectUrl}/file'
+      '### GET {pdfServer}/pdf/:projectId/file'
     );
 
     expect(issues[0].rule).toBe('pdf.proxy_path');
+  });
+
+  it('accepts the project routes the server forwards to the PDF server', () => {
+    for (const heading of ['### POST {projectUrl}/upload', '### GET {projectUrl}/token']) {
+      expect(validatePdfProxyPath('formio-api/references/pdf-api.md', heading)).toEqual([]);
+    }
   });
 
   it('accepts a proxy-rooted endpoint, and ignores other references', () => {

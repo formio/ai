@@ -1,0 +1,67 @@
+%PDF-1.7
+%‚„œ”
+1 0 obj
+<< /Type /Catalog /Pages 2 0 R /AcroForm << /Fields [6 0 R 7 0 R 8 0 R 9 0 R 10 0 R] /NeedAppearances true /DA (/Helv 0 Tf 0 g) /DR << /Font << /Helv 5 0 R >> >> >> >>
+endobj
+2 0 obj
+<< /Type /Pages /Kids [3 0 R] /Count 1 >>
+endobj
+3 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 5 0 R >> >> /Contents 4 0 R /Annots [6 0 R 7 0 R 8 0 R 9 0 R 11 0 R 12 0 R] >>
+endobj
+4 0 obj
+<< /Length 350 >>
+stream
+BT /F1 14 Tf 72 740 Td (Agent PDF Test Form) Tj ET
+BT /F1 11 Tf 72 700 Td (First name *) Tj ET
+BT /F1 11 Tf 72 660 Td (Email address) Tj ET
+BT /F1 11 Tf 72 620 Td (State) Tj ET
+BT /F1 11 Tf 72 580 Td (Agree to terms) Tj ET
+BT /F1 11 Tf 72 540 Td (Contact preference:  Phone   Email) Tj ET
+BT /F1 11 Tf 72 500 Td (If yes, complete Part B below.) Tj ET
+endstream
+endobj
+5 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>
+endobj
+6 0 obj
+<< /Type /Annot /Subtype /Widget /FT /Tx /T (f1_01[0]) /TU (First name) /Ff 2 /Rect [200 695 450 715] /P 3 0 R /DA (/Helv 0 Tf 0 g) >>
+endobj
+7 0 obj
+<< /Type /Annot /Subtype /Widget /FT /Tx /T (f1_02[0]) /Rect [200 655 450 675] /P 3 0 R /DA (/Helv 0 Tf 0 g) >>
+endobj
+8 0 obj
+<< /Type /Annot /Subtype /Widget /FT /Ch /Ff 131072 /T (state) /TU (State of residence) /Opt [[(TX) (Texas)] [(CA) (California)]] /Rect [200 615 450 635] /P 3 0 R /DA (/Helv 0 Tf 0 g) >>
+endobj
+9 0 obj
+<< /Type /Annot /Subtype /Widget /FT /Btn /T (agree) /TU (Agree to terms) /V /Off /AS /Off /Rect [200 575 215 590] /P 3 0 R /MK << >> /AP << /N << /Yes << >> /Off << >> >> >> >>
+endobj
+10 0 obj
+<< /FT /Btn /Ff 49152 /T (contactPref) /TU (Contact preference) /V /Off /Kids [11 0 R 12 0 R] >>
+endobj
+11 0 obj
+<< /Type /Annot /Subtype /Widget /Parent 10 0 R /AS /Off /Rect [300 535 312 547] /P 3 0 R /AP << /N << /phone << >> /Off << >> >> >> >>
+endobj
+12 0 obj
+<< /Type /Annot /Subtype /Widget /Parent 10 0 R /AS /Off /Rect [350 535 362 547] /P 3 0 R /AP << /N << /email << >> /Off << >> >> >> >>
+endobj
+xref
+0 13
+0000000000 65535 f 
+0000000015 00000 n 
+0000000198 00000 n 
+0000000255 00000 n 
+0000000429 00000 n 
+0000000830 00000 n 
+0000000900 00000 n 
+0000001050 00000 n 
+0000001177 00000 n 
+0000001379 00000 n 
+0000001572 00000 n 
+0000001685 00000 n 
+0000001837 00000 n 
+trailer
+<< /Size 13 /Root 1 0 R >>
+startxref
+1989
+%%EOF

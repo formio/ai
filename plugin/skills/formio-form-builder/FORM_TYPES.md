@@ -10,6 +10,8 @@ The standard form type: every field is presented on one page, completed and subm
 
 **When to choose.** Shorter forms the user can finish in one sitting — contact forms, feedback forms, quick surveys, sign-up forms. When in doubt between webform and wizard, a webform is the simpler default for anything under roughly a dozen fields.
 
+**Printed output.** A webform's submissions can download as a laid-out document — a receipt, a contract, a one-page summary — through a PDF template on the form. Designing that template belongs to `formio-pdf-form`, after the webform is saved.
+
 ## Wizard (multi-page form)
 
 A multi-step form that breaks many fields into bite-size pages. Each page is a Panel layout component at the form's root; users navigate with header tabs and Cancel / Previous / Next buttons.
@@ -24,9 +26,9 @@ A multi-step form that breaks many fields into bite-size pages. Each page is a P
 
 A form rendered over an existing PDF document: the PDF is uploaded and hosted by the Form.io PDF server, and interactive components are overlaid onto it in the builder.
 
-**Capabilities.** Overlay components (text fields, email, textarea, number, phone, password, date, checkbox, radio, currency, select, file, signature) positioned on the PDF; submissions viewable with data overlaid on the original document; printable pixel-perfect PDF export of completed submissions. A hybrid mode can collect data as a normal webform while still printing through the PDF template.
+**Capabilities.** Overlay components positioned on the PDF — text field, number, password, email, phone number, currency, checkbox, signature, select, text area, date/time, file, and HTML content; a group of option buttons in the PDF becomes a set of linked checkboxes. Submissions are viewable with their data overlaid on the original document and print as pixel-perfect PDFs.
 
-**Prerequisite — the PDF document.** A PDF form renders over an uploaded, hosted PDF document: the user must upload their PDF (standard page sizes — A4, Letter — non-standard sizes fail) through the Form.io portal, which processes and hosts it. This skill does not convert documents or provide a PDF server — creating a PDF form's definition saves the form; the PDF document itself must exist in (or be uploaded to) the user's project.
+**Built by `formio-pdf-form`.** A PDF form renders over a PDF document uploaded to the project's PDF server. Choosing this type hands the work to `formio-pdf-form`, which uploads the document, reviews the server's conversion of its fields, proposes labels and validation for approval, and saves the form. The project's deployment must include a PDF server and a license for PDF forms.
 
 **When to choose.** Digitizing an existing paper or official document, pixel-perfect output matching a mandated layout (government / compliance forms), or document-centric workflows where the submission must look like the original PDF.
 

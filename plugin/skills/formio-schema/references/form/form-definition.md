@@ -24,6 +24,7 @@ The top-level object representing a form or resource. Only `components` is requi
 | `externalOwner` | `{ sub, iss, customIdClaim? }` | No | OIDC SSO external owner — `sub` (subject) and `iss` (issuer) of the external identity, with optional `customIdClaim: { key, value }` for the `idPath` resolution. Server-only — not in the upstream TypeScript declaration. |
 | `machineName` | `string` | No | Globally unique machine name across projects. |
 | `components` | `Component[]` | **Yes** | Array of form components defining the form's fields and layout. |
+| `pdfComponents` | `Component[]` | No | A non-PDF form's PDF download template: layout components holding references to the form's input components by `key`. Each reference carries only `key`, `type`, `label`, `labelPosition`, `hideLabel`, `labelWidth`, `labelMargin`, and `components`; every other property is supplied at download time from the live component of the same key. Empty unless a template is designed; see `formio-pdf-form`. |
 | `settings` | `FormSettings` | No | Form-level display and behavior settings. |
 | `properties` | `Record<string, string>` | No | Custom key-value properties attached to the form. |
 | `project` | `string` | No | Project ID this form belongs to. |
@@ -63,7 +64,7 @@ The top-level object representing a form or resource. Only `components` is requi
 | `viewAsHtml`             | `boolean` | Render submissions as static HTML instead of form fields. |
 | `viewer`                 | `string`  | Viewer type for rendering.                                |
 | `wizardHeaderType`       | `string`  | Wizard header style (e.g., breadcrumb).                   |
-| `pdf`                    | `object`  | PDF source configuration: `{ src: string, id: string }`.  |
+| `pdf`                    | `object`  | PDF source: `{ src: string, id: string }`. Take it from the `pdf_upload` tool's derived `pdf` object rather than composing it. A `form` or `wizard` carrying it downloads over that PDF. |
 
 ## Access
 

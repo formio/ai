@@ -70,3 +70,25 @@ describe('actions ↔ auth boundary', () => {
     expect(notForClauseOf(descriptionOf('formio-auth'))).toContain('`formio-actions`');
   });
 });
+
+describe('form-builder / form ↔ pdf-form boundary', () => {
+  it('formio-form-builder claims no PDF-document phrasing', () => {
+    expect(triggerClauseOf(descriptionOf('formio-form-builder')).toLowerCase()).not.toMatch(
+      /pdf form|this pdf/
+    );
+  });
+
+  it('formio-form-builder Not for: names `formio-pdf-form`', () => {
+    expect(notForClauseOf(descriptionOf('formio-form-builder'))).toContain('`formio-pdf-form`');
+  });
+
+  it('formio-form Not for: names `formio-pdf-form`', () => {
+    expect(notForClauseOf(descriptionOf('formio-form'))).toContain('`formio-pdf-form`');
+  });
+
+  it('formio-pdf-form claims no bare build-a-form or embed-a-form phrasing', () => {
+    const triggers = triggerClauseOf(descriptionOf('formio-pdf-form'));
+    expect(triggers).not.toMatch(/"(build|create) a form"/i);
+    expect(triggers).not.toMatch(/"embed a form"/i);
+  });
+});

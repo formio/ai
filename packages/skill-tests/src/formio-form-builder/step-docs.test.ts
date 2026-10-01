@@ -46,10 +46,23 @@ describe('FORM_TYPES.md — the form-type reference', () => {
     expect(formTypes).toMatch(/child wizard/i);
   });
 
-  it('states the PDF-document prerequisite instead of promising conversion', () => {
+  it('hands the PDF form type to formio-pdf-form with the overlay types as the builder allows them', () => {
     const formTypes = readStepDoc('FORM_TYPES.md');
-    expect(formTypes).toMatch(/PDF document/);
-    expect(formTypes).toMatch(/upload/i);
+    const pdf = formTypes.slice(formTypes.indexOf('## PDF form'), formTypes.indexOf('## Phrasing'));
+    expect(pdf).toMatch(/PDF document/);
+    expect(pdf).toContain('`formio-pdf-form`');
+    expect(pdf).not.toMatch(/\bradio\b/);
+    expect(pdf).not.toMatch(/non-standard sizes fail/i);
+  });
+
+  it('notes that a webform can download through a PDF template owned by formio-pdf-form', () => {
+    const formTypes = readStepDoc('FORM_TYPES.md');
+    const webform = formTypes.slice(
+      formTypes.indexOf('## Webform'),
+      formTypes.indexOf('## Wizard')
+    );
+    expect(webform).toMatch(/PDF template/);
+    expect(webform).toContain('`formio-pdf-form`');
   });
 });
 
@@ -144,5 +157,18 @@ describe('INTENT.md — the batched interview script', () => {
   it('states the EMBED step fires only on an explicit yes', () => {
     const intent = readStepDoc('INTENT.md');
     expect(intent).toMatch(/explicit yes/i);
+  });
+});
+
+describe('INTENT.md — the PDF answer hands off', () => {
+  it('hands a PDF form type to formio-pdf-form and describes no PDF pipeline', () => {
+    const intent = readStepDoc('INTENT.md');
+    expect(intent).toMatch(/hand[^.]*off[^.]*`formio-pdf-form`/i);
+    expect(intent).not.toContain('pdf_upload');
+    expect(intent).not.toMatch(/surface it to the user before SCHEMA/);
+  });
+
+  it('offers the PDF template lane for a webform whose submissions print as a document', () => {
+    expect(readStepDoc('INTENT.md')).toMatch(/PDF template lane/);
   });
 });

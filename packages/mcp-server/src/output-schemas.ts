@@ -285,3 +285,46 @@ export const projectResolutionShape = {
       'Anything set aside while resolving — an unreadable mapping a committed formio.json made irrelevant, a stored value that is not a URL, or the directory this answer is about when no cwd was passed. A URL the server dropped as unusable at startup is on its stderr rather than here, because it was never a candidate for this resolution'
     ),
 };
+
+export const pdfUploadShape = {
+  path: z
+    .string()
+    .describe('Path of the uploaded PDF on the PDF server, e.g. /pdf/{projectId}/file/{fileId}'),
+  file: z.string().describe('Identifier of the uploaded PDF file'),
+  formfields: z
+    .looseObject({
+      components: z
+        .array(z.looseObject({}))
+        .optional()
+        .describe('Components the PDF server converted from the PDF, each with its overlay'),
+      nonFillableConversionUsed: z
+        .boolean()
+        .optional()
+        .describe('True when the server recognized fields on a PDF that had none'),
+    })
+    .optional()
+    .describe("The PDF server's conversion of the document's fields"),
+  pdf: z
+    .object({
+      id: z.string().describe('settings.pdf.id for a form over this PDF'),
+      src: z.string().describe('settings.pdf.src for a form over this PDF'),
+    })
+    .describe("The value for the form's settings.pdf"),
+  acroform: z
+    .object({
+      fields: z.array(
+        z.object({
+          name: z.string().describe('Fully qualified AcroForm field name'),
+          tooltip: z.string().nullable().describe("The field's tooltip (/TU), when it has one"),
+          required: z.boolean().describe('The PDF marks the field required'),
+          readOnly: z.boolean().describe('The PDF marks the field read-only'),
+          componentKeys: z
+            .array(z.string())
+            .describe('Keys of the converted components that belong to this field'),
+        })
+      ),
+    })
+    .nullable()
+    .describe("Each AcroForm field's tooltip and flags, or null when they could not be read"),
+  acroformError: z.string().optional().describe('Why the AcroForm fields could not be read'),
+};

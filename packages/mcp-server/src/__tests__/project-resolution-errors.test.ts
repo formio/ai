@@ -41,6 +41,7 @@ const PROJECT_SCOPED_CALLS: Array<{ name: string; args: Record<string, unknown> 
   { name: 'action_delete', args: { formId: OBJECT_ID, actionId: ANOTHER_OBJECT_ID } },
   { name: 'project_export', args: {} },
   { name: 'project_import', args: { template: { title: 'T' } } },
+  { name: 'pdf_upload', args: { filePath: '/workspace/unmapped-project/form.pdf' } },
 ];
 
 async function connectAllTools() {

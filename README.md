@@ -144,6 +144,7 @@ Orchestration skills are special skills that serve as the **entry point** for mo
 | --- | --- |
 | `formio-application` | Orchestration entry point for building or extending an application on the Form.io platform (see above). |
 | `formio-form-builder` | Orchestration entry point for building a single form — webform or wizard — end to end (see above). |
+| `formio-pdf-form` | PDF-first forms. Turns a PDF document into a fillable Form.io form — uploads it, reviews the server's field conversion against the page, and proposes labels, validation, and conditionals for approval before saving — and covers re-labelling or replacing the PDF behind a saved form, designing the PDF a webform's submissions download as, rendering PDF forms, and downloading submission PDFs. |
 | `formio-form` | Embeds and renders Form.io forms in any web application with the `@formio/js` renderer — pre-fill, conditional fields, calculated values, custom validation, and conditional wizard pages. |
 | `formio-resource-planner` | Plans the resource structure, field configuration, and access/permission model from high-level requirements, then emits a ready-to-import `template.json`. |
 | `formio-schema` | Reference for Form.io JSON schema — the document shapes for projects, forms/resources, and submissions. Used when constructing, editing, or interpreting any Form.io JSON. |

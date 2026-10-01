@@ -250,6 +250,60 @@ describe('formioFetch', () => {
     expect(result).toBe('Ok');
   });
 
+  describe('FormData bodies', () => {
+    const multipart = () => {
+      const formData = new FormData();
+      formData.set('file', new Blob(['%PDF-1.7'], { type: 'application/pdf' }), 'doc.pdf');
+      return formData;
+    };
+
+    it('sends a FormData body unserialized with no Content-Type header', async () => {
+      mockFetch.mockResolvedValue({ ok: true, json: () => Promise.resolve({ file: 'f1' }) });
+      const body = multipart();
+
+      await formioFetch('upload', {}, config, { method: 'POST', body });
+
+      const calledOptions = mockFetch.mock.calls[0][1] as RequestInit;
+      expect(calledOptions.method).toBe('POST');
+      expect(calledOptions.body).toBe(body);
+      expect(calledOptions.headers).toEqual({ 'x-token': 'abc123' });
+    });
+
+    it('keeps JSON serialization and Content-Type for plain object bodies', async () => {
+      mockFetch.mockResolvedValue({ ok: true, json: () => Promise.resolve({}) });
+
+      await formioFetch('form', {}, config, { method: 'POST', body: { title: 'T' } });
+
+      const calledOptions = mockFetch.mock.calls[0][1] as RequestInit;
+      expect(calledOptions.body).toBe('{"title":"T"}');
+      expect(calledOptions.headers).toEqual({
+        'x-token': 'abc123',
+        'Content-Type': 'application/json',
+      });
+    });
+
+    it('re-sends the same FormData instance on the 401 re-auth retry', async () => {
+      const jwtConfig: ResolvedFormioConfig = {
+        baseUrl: 'https://formio.invalid/sub',
+        projectUrl: 'https://formio.invalid/sub/example',
+        jwt: 'expired-jwt',
+      };
+      mockEnsureAuth.mockImplementation(async () => {
+        jwtConfig.jwt = 'fresh-jwt';
+      });
+      mockFetch
+        .mockResolvedValueOnce({ ok: false, status: 401, statusText: 'Unauthorized' })
+        .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve({ file: 'f1' }) });
+      const body = multipart();
+
+      await formioFetch('upload', {}, jwtConfig, { method: 'POST', body });
+
+      const retryOptions = mockFetch.mock.calls[1][1] as RequestInit;
+      expect(retryOptions.body).toBe(body);
+      expect(retryOptions.headers).toEqual({ 'x-jwt-token': 'fresh-jwt' });
+    });
+  });
+
   it('uses the refreshed config.jwt header on the retry after a successful gate during 401 re-auth', async () => {
     const jwtConfig: ResolvedFormioConfig = {
       baseUrl: 'https://formio.invalid/sub',

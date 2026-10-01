@@ -119,8 +119,9 @@ export function validateForbiddenTokens(path: string, body: string): LibraryIssu
   }));
 }
 
-// Only the proxy surface is in scope. The PDF server's own direct API is a separate
-// deployment an agent has no route to from a project URL.
+// Only routes the project serves are in scope — its PDF proxy and the project routes the
+// server forwards to the PDF server (`{projectUrl}/upload`, `/token`, `/form/…/download`).
+// The PDF server's own direct API is a separate deployment an agent has no route to.
 export function validatePdfProxyPath(path: string, body: string): LibraryIssue[] {
   if (!path.endsWith('pdf-api.md')) {
     return [];
@@ -128,11 +129,11 @@ export function validatePdfProxyPath(path: string, body: string): LibraryIssue[]
   return body
     .split('\n')
     .map((line, index) => ({ match: line.match(ENDPOINT_HEADING), index }))
-    .filter(({ match }) => match && !match[1].startsWith('{projectUrl}/pdf-proxy'))
+    .filter(({ match }) => match && !match[1].startsWith('{projectUrl}/'))
     .map(({ match, index }) => ({
       path,
       rule: 'pdf.proxy_path',
-      message: `endpoint ${match?.[1]} is not under {projectUrl}/pdf-proxy`,
+      message: `endpoint ${match?.[1]} is not a route the project serves under {projectUrl}/`,
       line: index + 1,
     }));
 }

@@ -1,0 +1,104 @@
+{
+  "path": "/pdf/0123456789abcdef01234567/file/7b45f38b-dc26-5b1d-aa33-947522157c57",
+  "file": "7b45f38b-dc26-5b1d-aa33-947522157c57",
+  "formfields": {
+    "components": [
+      {
+        "type": "textfield",
+        "key": "f1010",
+        "label": "f1_01[0]",
+        "overlay": {
+          "width": 445.0000000000001,
+          "height": 35.60000000000008,
+          "top": 137.05999999999983,
+          "left": 356,
+          "page": 1,
+          "style": ""
+        }
+      },
+      {
+        "type": "textfield",
+        "key": "f1020",
+        "label": "f1_02[0]",
+        "overlay": {
+          "width": 445.0000000000001,
+          "height": 35.59999999999992,
+          "top": 208.26,
+          "left": 356,
+          "page": 1,
+          "style": ""
+        }
+      },
+      {
+        "dataSrc": "values",
+        "data": {
+          "values": [
+            { "label": "California", "value": "CA" },
+            { "label": "Texas", "value": "TX" }
+          ]
+        },
+        "type": "select",
+        "key": "state",
+        "label": "state",
+        "overlay": {
+          "width": 445.0000000000001,
+          "height": 35.59999999999995,
+          "top": 279.46,
+          "left": 356,
+          "page": 1,
+          "style": ""
+        }
+      },
+      {
+        "value": "Yes",
+        "type": "checkbox",
+        "key": "agree",
+        "label": "agree",
+        "overlay": {
+          "width": 26.700000000000053,
+          "height": 26.69999999999995,
+          "top": 359.5599999999999,
+          "left": 356,
+          "page": 1,
+          "style": ""
+        }
+      },
+      {
+        "defaultValue": false,
+        "input": true,
+        "value": "phone",
+        "inputType": "radio",
+        "name": "radioGroupKey8ed80b53bd663e290d633aa1f7bdb556113d15a0",
+        "type": "checkbox",
+        "key": "contactPref",
+        "label": "contactPref",
+        "overlay": {
+          "width": 21.36,
+          "height": 21.36,
+          "top": 436.0999999999999,
+          "left": 534,
+          "page": 1,
+          "style": ""
+        }
+      },
+      {
+        "defaultValue": false,
+        "input": true,
+        "value": "email",
+        "inputType": "radio",
+        "name": "radioGroupKey8ed80b53bd663e290d633aa1f7bdb556113d15a0",
+        "type": "checkbox",
+        "key": "contactPref_1",
+        "label": "contactPref",
+        "overlay": {
+          "width": 21.36,
+          "height": 21.36,
+          "top": 436.0999999999999,
+          "left": 623,
+          "page": 1,
+          "style": ""
+        }
+      }
+    ]
+  }
+}

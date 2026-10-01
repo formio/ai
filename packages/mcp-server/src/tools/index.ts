@@ -13,6 +13,7 @@ import { registerFormListTool } from './form_list.js';
 import { registerFormRevisionGetTool } from './form_revision_get.js';
 import { registerFormRevisionsListTool } from './form_revisions_list.js';
 import { registerFormUpdateTool } from './form_update.js';
+import { registerPdfUploadTool } from './pdf_upload.js';
 import { registerHelloTool } from './hello.js';
 import { registerProjectExportTool } from './project_export.js';
 import { registerProjectGetTool } from './project_get.js';
@@ -38,6 +39,7 @@ export function registerAllTools(
   registerFormRevisionGetTool(server, config);
   registerFormRevisionsListTool(server, config);
   registerFormUpdateTool(server, config);
+  registerPdfUploadTool(server, config);
   registerProjectExportTool(server, config);
   // Reports what the tools around it will resolve, so it takes the same config
   // and the same cwd fallback project_set writes under.

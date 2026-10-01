@@ -80,7 +80,7 @@ Prefer first-party MCP tools (`form_create`, `form_get`, `form_list`, `form_upda
 - [runtime-reports](./references/runtime-reports.md) — aggregation pipelines across submissions
 - [runtime-submissions](./references/runtime-submissions.md) — submission CRUD, validate, patch, revisions
 
-### PDF scope — `{projectUrl}/pdf-proxy/`
+### PDF scope — the project's PDF routes
 
 - [pdf-api](./references/pdf-api.md) — PDF template upload, PDF-backed forms, submission-to-PDF download
 

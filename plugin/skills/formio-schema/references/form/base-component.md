@@ -52,7 +52,7 @@ Every component extends this shape. `type`, `key`, and `input` are the only univ
 | `logic` | `AdvancedLogic[]` | No | Advanced logic rules (event-driven actions). |
 | `conditional` | `object` | No | Conditional display logic (simple, JSON Logic, or legacy). |
 | `customConditional` | `string` | No | Custom JavaScript for conditional visibility. |
-| `overlay` | `object` | No | PDF overlay positioning: `{ style, left, top, width, height }`. |
+| `overlay` | `object` | No | Position on a PDF form's page: `{ page, top, left, width, height, style }` — `page` 1-based, the geometry numbers as the PDF server's conversion emits them (the core type declares strings; saved forms carry both), `style` an often-empty string the portal drops on save. Produced by the PDF server's conversion, never hand-authored; see `formio-pdf-form`. |
 | `submissionAccess` | `Access[]` | No | Field-level submission access rules. |
 | `errors` | `Record<string, string>` | No | Custom error messages keyed by validation rule. |
 
