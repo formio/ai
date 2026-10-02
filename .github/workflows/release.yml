@@ -68,21 +68,30 @@ jobs:
       # npm already has this version (the registry verifies ownership by reading
       # "mcpName" from the tarball, so npm must land first) and the registry does
       # not. That makes the step idempotent and safe to re-run.
+      #
+      # Skipped when the push carried changesets: the action then opened or
+      # updated the Version Packages PR rather than publishing, and nothing
+      # downstream has a release to ship. To build that PR it checks out
+      # `changeset-release/main` and bumps the versions in the working tree, and
+      # leaves the tree there, so the version is read from the pushed commit —
+      # never from whatever the tree holds after the action.
       - name: Resolve the released @formio/mcp version
         id: pkg
+        if: steps.changesets.outputs['has-changesets'] != 'true'
         run: |
           set -euo pipefail
-          VERSION=$(jq -r .version packages/mcp-server/package.json)
-          echo "name=$(jq -r .mcpName packages/mcp-server/package.json)" >> "$GITHUB_OUTPUT"
+          MANIFEST=$(git show "${GITHUB_SHA}:packages/mcp-server/package.json")
+          VERSION=$(jq -r .version <<<"$MANIFEST")
+          echo "name=$(jq -r .mcpName <<<"$MANIFEST")" >> "$GITHUB_OUTPUT"
 
           # Poll: npm accepts a publish and then reports "Your package is being
           # processed and may take a few minutes to become available". 0.14.0 was
           # accepted at 20:45:06 and listed at 20:47:25, and a 60s window missed
           # it — skipping every downstream publish. Wait up to ten minutes.
           #
-          # On a push that published nothing, package.json names a version npm
-          # already has and the first lookup succeeds. So a version that never
-          # appears is a release that was dropped, and the job must fail rather
+          # On a push with no changesets that published nothing, the pushed
+          # package.json names a version npm already has and the first lookup
+          # succeeds. So a version that never appears is a release that was dropped, and the job must fail rather
           # than go green with the registry, bundle, release, Smithery and image
           # steps all silently skipped. Re-running the job publishes them: the
           # changesets step skips versions already on npm.
