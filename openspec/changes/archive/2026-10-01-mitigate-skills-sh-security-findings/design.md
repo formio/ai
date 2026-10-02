@@ -83,10 +83,37 @@ Two independent reviews ran after the first implementation pass — one emulatin
 
 **Deliberately not done:** pinning `angular/skills` to a commit SHA (stale-doc risk outweighs the LOW), switching caret to exact pins (lockfile is the integrity control), and any removal of a documented API.
 
+## Post-release verification
+
+The change shipped in the 9 September release (`#75`) and again in 0.14.0 (`#77`, 28 September). skills.sh re-scanned all four skills on 30 September 2026; the verdicts on each skill's page at `skills.sh/formio/ai/<skill>` were read on 1 October 2026.
+
+| Skill | Before this change | Gen Agent Trust Hub | Socket | Snyk |
+| --- | --- | --- | --- | --- |
+| `formio-sdk` | Trust Hub FAIL at HIGH (four findings) | **Pass** | Warn — two LOW anomalies | Warn — W011 MEDIUM (0.30) |
+| `formio-angular` | Two Socket LOWs | Pass | **Pass** | Pass |
+| `formio-form` | Snyk W011 MEDIUM | Pass | Pass | **Pass** |
+| `formio-application` | Snyk W011 MEDIUM | Pass | Pass | Warn — W011 MEDIUM (0.30) |
+
+Against the proposal's expected outcomes, in its priority order:
+
+1. **`formio-sdk` Agent Trust Hub flips to SAFE — met.** It passes with no finding.
+2. **`formio-angular` Socket clears or drops to one LOW — met.** All three audits pass.
+3. **`formio-form` Snyk W011 may or may not clear — cleared.**
+4. **`formio-application` Snyk W011 expected to remain — remained**, at 0.30, after `#80` restated its build-time inputs as first-party. The finding cites user-authored chat requests processed during orchestration, which is the skill's purpose.
+
+**Residual findings, accepted per the proposal** (a documented-and-bounded capability is not removed to satisfy a model-based scanner):
+
+- `formio-sdk` Socket LOW, `references/utils-evaluator.md` — the Evaluator executes expressions dynamically. That is the API being documented; the reference leads with the sandboxed evaluator and marks every string-code example as an authored literal.
+- `formio-sdk` Socket LOW, `references/utils-logic.md` — logic definitions execute code. The reference already warns against processing externally sourced logic; Socket's own note says the finding reflects intentional design rather than supply-chain risk.
+- `formio-sdk` Snyk W011 — submissions read through the SDK carry end-user data. `SKILL.md`'s Security section and `submissions.md` state that `data.*` is untrusted wherever it re-enters a page and never instructs the agent.
+- `formio-application` Snyk W011 — the plain-language request is the skill's input. Step 1 states it is requirements that pass the Phase A gate and the import preview and is never interpolated into a command, URL, or path.
+
+The `formio-sdk` Socket and Snyk warnings were not reported before this change; they appeared once the Trust Hub HIGH findings were resolved. Neither names a defect this change introduced.
+
 ## Migration Plan
 
 No migration. Skill markdown ships with the next plugin release; consumers who installed with `npx skills add formio/ai` pick it up on `skills update`. No file layout, trigger, or reference name changes, so nothing links to a path that moves. Rollback is a revert of the markdown and test edits.
 
 ## Open Questions
 
-- Whether skills.sh re-scans on every published version or on a schedule. If scheduled, the post-release verification task waits for the next scan rather than triggering one.
+- ~~Whether skills.sh re-scans on every published version or on a schedule.~~ Observed: all four skills were re-scanned on 30 September 2026, two days after the 0.14.0 release, so a scan follows a release within days. The cadence is not documented.
