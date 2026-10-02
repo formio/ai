@@ -213,7 +213,7 @@ A registration form typically needs two actions:
 }
 ```
 
-`association: "new"` means "the resource being created by this submission." Use `"existing"` when the form references another resource (e.g., an admin form that modifies another user's roles).
+`association: "new"` means "the resource being created by this submission." Use `"existing"` when the form references another resource (e.g., an admin form that modifies another user's roles): key the target component exactly `submission`, set `settings.role` explicitly, and restrict the form's create access to administrator roles — see [`references/action-types.md`](references/action-types.md#role-assignment).
 
 ### Login form
 
@@ -376,5 +376,5 @@ The `{{ resetlink }}` template variable is replaced with the full URL including 
 **Role not being assigned:**
 
 - For new registrations, use `association: "new"`
-- For admin forms modifying existing users, use `association: "existing"` and ensure the form has a component that submits the target resource's submission ID
+- For admin forms modifying existing users, use `association: "existing"` and ensure the form has a component keyed exactly `submission` that holds the target resource's submission ID
 - Verify the role ID exists (use the project roles API)
