@@ -238,7 +238,7 @@ The JWT is cached in `~/.formio/mcp-tokens.json` (mode `0600`), keyed by the res
 
 ### Headless environments
 
-By default the login page is served on an ephemeral port bound to `127.0.0.1` and the server shells out to `open`/`start`/`xdg-open`, which assumes a desktop browser on the same machine.
+By default the login page is served on an ephemeral port bound to `127.0.0.1` and the server launches the default browser with `open` (macOS), `xdg-open` (Linux), or the `url.dll` protocol handler (Windows) — directly, not through a shell — which assumes a desktop browser on the same machine.
 
 Where that assumption doesn't hold — a container, an SSH session, CI — you have three options:
 

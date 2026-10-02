@@ -14,7 +14,7 @@ import { authenticate } from '../auth.js';
 import { ResolvedFormioConfig } from '../config.js';
 import { requestRevisionsLicenseConsent } from '../revisions/browser-prompts.js';
 
-vi.mock('child_process', () => ({ exec: vi.fn() }));
+vi.mock('child_process', () => ({ execFile: vi.fn() }));
 
 const CONFIG: ResolvedFormioConfig = {
   baseUrl: 'https://formio.invalid/sub',

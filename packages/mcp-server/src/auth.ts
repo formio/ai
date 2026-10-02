@@ -1,6 +1,6 @@
 import express from 'express';
-import { exec } from 'child_process';
 import { browserlessReason, currentBrowserEnvironment } from './browser-availability.js';
+import { openInBrowser } from './browser-launch.js';
 import { ResolvedFormioConfig } from './config.js';
 import { formioRawFetch } from './formio-client.js';
 
@@ -279,19 +279,11 @@ export async function authenticate(
       // no way to reach the login page.
       process.stderr.write(`Form.io login required: ${loginUrl}\n`);
 
-      const openCmd =
-        process.platform === 'darwin'
-          ? 'open'
-          : process.platform === 'win32'
-            ? 'start'
-            : 'xdg-open';
-      exec(`${openCmd} "${loginUrl}"`, (err) => {
-        if (err) {
-          process.stderr.write(
-            `Could not open a browser automatically (${err.message}). ` +
-              `Open the URL above manually to finish signing in.\n`
-          );
-        }
+      openInBrowser(loginUrl, (err) => {
+        process.stderr.write(
+          `Could not open a browser automatically (${err.message}). ` +
+            `Open the URL above manually to finish signing in.\n`
+        );
       });
       options?.onReady?.(port);
     }
