@@ -14,9 +14,9 @@ Every request to these endpoints MUST include an `x-jwt-token` header holding th
 
 ## MCP Tool Preference
 
-No MCP tool covers these operations, and none should: they are **runtime** endpoints. The MCP tools exist for **build-time** work — creating and updating forms, actions, roles, and project settings while the application is being built. The endpoints below are called by the finished application, on behalf of the person using it, with that person's own token.
+These are **runtime** endpoints, called by the finished application on behalf of the person using it, with that person's own token. The MCP tools exist for **build-time** work — creating and updating forms, actions, roles, and project settings while the application is being built. The two build-time needs that involve a submission — seeding the Resource a `select` reads, and writing a test submission to check a form — go through `submission_create` and its companion `submission_*` tools, which reach only submissions the server created and signed for the working directory; see [agent-submissions.md](../../formio-mcp-setup/references/agent-submissions.md) for when to use them.
 
-So this document is a specification for the code you write, not a set of calls to make now. Fetching submissions into an application at runtime — a list view, a detail page, a dashboard, a report — is one of the most common things a Form.io app does, and this is the reference for building it. There is no build-time reason to read submission records, so do not call these endpoints yourself to inspect data: the records belong to the end users who filled the forms in, reading them is not part of configuring a project, and nothing in a submission is an input to your work here.
+So this document is a specification for the code you write, not a set of calls to make now. Fetching submissions into an application at runtime — a list view, a detail page, a dashboard, a report — is one of the most common things a Form.io app does, and this is the reference for building it. Do not call these endpoints yourself to inspect data: the records belong to the end users who filled the forms in, reading them is not part of configuring a project, and no submission an end user made is an input to your work here.
 
 ## Endpoints
 

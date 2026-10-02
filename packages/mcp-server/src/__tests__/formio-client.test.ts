@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { formioFetch } from '../formio-client.js';
+import { formioFetch, FormioApiError } from '../formio-client.js';
 import { ResolvedFormioConfig } from '../config.js';
 import { TEST_CONFIG as config, TEST_PROJECT_URL } from './test-helpers.js';
 
@@ -112,6 +112,33 @@ describe('formioFetch', () => {
 
     const body = { title: 'Bad' };
     await expect(formioFetch('form', {}, config, { method: 'POST', body })).rejects.toThrow('400');
+  });
+
+  it('carries the status and the response body on the error it throws', async () => {
+    mockFetch.mockResolvedValue({
+      ok: false,
+      status: 400,
+      statusText: 'Bad Request',
+      text: () => Promise.resolve('{"name":"ValidationError"}'),
+    });
+
+    const error = (await formioFetch('form', {}, config, { method: 'POST', body: {} }).catch(
+      (e: unknown) => e
+    )) as FormioApiError;
+    expect(error).toBeInstanceOf(FormioApiError);
+    expect(error.status).toBe(400);
+    expect(error.body).toBe('{"name":"ValidationError"}');
+    expect(error.message).toContain('400');
+  });
+
+  it('throws the status error even when the body cannot be read', async () => {
+    mockFetch.mockResolvedValue({ ok: false, status: 500, statusText: 'Server Error' });
+
+    const error = (await formioFetch('form', {}, config).catch(
+      (e: unknown) => e
+    )) as FormioApiError;
+    expect(error).toBeInstanceOf(FormioApiError);
+    expect(error.body).toBeUndefined();
   });
 
   it('sends x-jwt-token header when config.jwt is set', async () => {

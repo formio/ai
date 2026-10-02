@@ -91,4 +91,17 @@ describe('the runtime-scope API references address the application, not the agen
     expect(body).toMatch(/(do not|never) (call|read|fetch|pull)/i);
     expect(body).toMatch(/end users|submitter|people who fill/i);
   });
+
+  // Build-time seeding and testing go through the scoped tools, never these
+  // endpoints; the preference section says so rather than "no tool covers these".
+  it('names the scoped submission tools for build-time seeding and testing', () => {
+    const { body } = skillDocument('plugin/skills/formio-api/references/runtime-submissions.md');
+    const start = body.indexOf('## MCP Tool Preference');
+    const preference = body.slice(start, body.indexOf('\n## ', start + 1));
+
+    expect(preference).toContain('submission_create');
+    expect(preference).toContain('agent-submissions.md');
+    expect(preference).not.toMatch(/No MCP tool covers these operations/);
+    expect(preference).toMatch(/runtime/i);
+  });
 });

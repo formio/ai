@@ -52,6 +52,8 @@ Invoke the `formio-schema` skill to select the right components and author the c
 
 Persist the authored definition into the user's Form.io project via the MCP server's `form_create` tool, behind an approval gate. Confirm the saved form path and full form URL back to the user. Auth errors route through the implicit browser-based portal-login flow. See [`SAVE.md`](./SAVE.md) for the gate script and error branches.
 
+**After SAVE — seed or test (optional).** Two follow-ups use the agent's own submissions through `submission_create`, each behind its own approval: when the saved form has a `select` with `dataSrc: resource` whose Resource has no rows, offer `reference-data` rows so the dropdown has options; and when the user wants the form's validation, conditional fields, or calculated values checked, write one test submission, report what was stored, and offer to delete it. See [`SAVE.md`](./SAVE.md) for the flow and [`agent-submissions.md`](../formio-mcp-setup/references/agent-submissions.md) for the rules every such submission follows.
+
 ### Step 4 — EMBED (conditional)
 
 Only if the user answered an explicit yes to embed intent at INTENT: hand off to the `formio-form` skill to embed the saved form by its form URL in the user's application. Angular-explicit requests route through `formio-angular` instead. See [`EMBED.md`](./EMBED.md) for the handoff contract.

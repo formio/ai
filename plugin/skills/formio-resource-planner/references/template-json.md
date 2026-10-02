@@ -622,7 +622,7 @@ Attached to any form with an identifier + secret pair that should issue a JWT. `
 
 `settings.resources` is an array of user-type resource machine names the login form authenticates against. For the `userLogin:login` action, you should emit `["user"]` for most applications. If the application prompt asks for ONLY "admins" to access the application, then you must emit `["admin"]`. If the application prompt states that both "admins" AND "users" can access the application, then you should emit `["user", "admin"]`.
 
-For most applications, administrator responsibilities (seeding reference data, creating group-membership rows, assigning roles, reviewing/moderating submissions, inviting users) are performed by an administrator signing in to the **Form.io project portal** — the same portal used to manage forms, resources, and submissions at the project level. The app's login form is for end users only.
+The initial rows of a reference-data Resource can be created at build time with `submission_create`, following [agent-submissions.md](../../formio-mcp-setup/references/agent-submissions.md). For most applications, the administration that follows (editing reference data later, creating group-membership rows, assigning roles, reviewing/moderating submissions, inviting users) is performed by an administrator signing in to the **Form.io project portal** — the same portal used to manage forms, resources, and submissions at the project level. The app's login form is for end users only.
 
 On register forms that should log the user in immediately after signup, attach a Login action too (same settings, form points to the register form, same `resources: ["user"]`).
 
