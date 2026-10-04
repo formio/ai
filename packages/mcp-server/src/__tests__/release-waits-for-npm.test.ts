@@ -8,9 +8,16 @@
 // Worse, giving up only printed a line and exited 0, so the job went green with
 // everything downstream skipped and nothing said a release had been dropped.
 //
-// On a push that publishes nothing, `package.json` still names a version npm
-// already has, so the first lookup succeeds. The version is missing only when a
-// publish is still processing or never landed — and then the run must fail.
+// A push with pending changesets publishes nothing: changesets/action opens or
+// updates the Version Packages PR instead, and to do so it checks out
+// `changeset-release/main` and bumps every version in the working tree — leaving
+// the tree there when the step ends. Read from that tree, `package.json` names
+// the NEXT version, which npm will not have until the PR merges, so a push whose
+// changesets bump `@formio/mcp` polled for ten minutes and failed the job. The
+// lookup is therefore skipped when the action reports changesets, and reads the
+// version from the pushed commit rather than from whatever the tree holds. On a
+// push that does publish, the version is missing only when the publish is still
+// processing or never landed — and then the run must fail.
 
 import fs from 'node:fs';
 import path from 'node:path';
@@ -36,6 +43,17 @@ describe('the npm version lookup', () => {
     const deadline = Number(/DEADLINE_SECONDS=(\d+)/.exec(step())?.[1]);
     // Observed: ~140s from accepted to listed. Allow several times that.
     expect(deadline).toBeGreaterThanOrEqual(600);
+  });
+
+  it('is skipped when changesets/action opened the Version Packages PR instead of publishing', () => {
+    // v2 of the action names this output in kebab-case.
+    expect(step()).toMatch(/^\s*if: steps\.changesets\.outputs\['has-changesets'\] != 'true'$/m);
+  });
+
+  it('reads the version from the pushed commit, not the working tree the action left behind', () => {
+    const body = step();
+    expect(body).toContain('git show "${GITHUB_SHA}:packages/mcp-server/package.json"');
+    expect(body).not.toMatch(/jq -r \S+ packages\/mcp-server\/package\.json/);
   });
 
   it('fails the job when the version never appears, rather than skipping downstream publishes', () => {
