@@ -208,6 +208,18 @@ The bundled `@formio/mcp` server exposes these tools. Skills prefer these over r
 | `action_update` | Update an action. |
 | `action_delete` | Detach an action from a form. |
 
+### Submissions
+
+Scoped to the agent's own work: each tool reaches only submissions this server created and signed for the calling working directory, and reports any other submission as not found. Used to seed a Resource a `select` reads and to write test submissions; see [`agent-submissions.md`](../../plugin/skills/formio-mcp-setup/references/agent-submissions.md).
+
+| Tool | Purpose |
+| --- | --- |
+| `submission_create` | Create a signed `reference-data` or `test` submission (dry-run first, then write). |
+| `submission_list` | List this directory's signed submissions on a form, by purpose and data filters. |
+| `submission_get` | Get one of this directory's signed submissions. |
+| `submission_update` | Replace the data of one of this directory's signed submissions. |
+| `submission_delete` | Delete one of this directory's signed submissions. |
+
 ### Project
 
 | Tool | Purpose |

@@ -36,6 +36,28 @@ function formatApiError(status: number, url: URL): string {
   return `Form.io API error: ${status} | URL: ${url.toString()}`;
 }
 
+/** A non-2xx response. Carries the status so a caller can branch on it without parsing text. */
+export class FormioApiError extends Error {
+  readonly status: number;
+  /** The response text, when it could be read — a 400's validation details live here. */
+  readonly body?: string;
+
+  constructor(status: number, url: URL, body?: string) {
+    super(formatApiError(status, url));
+    this.name = 'FormioApiError';
+    this.status = status;
+    this.body = body;
+  }
+}
+
+async function readErrorBody(response: Response): Promise<string | undefined> {
+  try {
+    return typeof response.text === 'function' ? await response.text() : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 function buildFetchInit(config: FormioConfig, options?: FormioFetchOptions): RequestInit {
   const hasBody = options?.body !== undefined;
   const headers: Record<string, string> = {
@@ -79,11 +101,11 @@ export async function formioRawFetch(
       await ensureAuthenticated(config);
       const retryResponse = await fetch(url, buildFetchInit(config, options));
       if (!retryResponse.ok) {
-        throw new Error(formatApiError(retryResponse.status, url));
+        throw new FormioApiError(retryResponse.status, url, await readErrorBody(retryResponse));
       }
       return parseResponse(retryResponse);
     }
-    throw new Error(formatApiError(response.status, url));
+    throw new FormioApiError(response.status, url, await readErrorBody(response));
   }
 
   return parseResponse(response);

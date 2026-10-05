@@ -21,6 +21,11 @@ import { registerProjectSetTool } from './project_set.js';
 import { registerRoleCreateTool } from './role_create.js';
 import { registerRoleListTool } from './role_list.js';
 import { registerRoleUpdateTool } from './role_update.js';
+import { registerSubmissionCreateTool } from './submission_create.js';
+import { registerSubmissionGetTool } from './submission_get.js';
+import { registerSubmissionListTool } from './submission_list.js';
+import { registerSubmissionUpdateTool } from './submission_update.js';
+import { registerSubmissionDeleteTool } from './submission_delete.js';
 
 export interface RegisterAllToolsOptions {
   cwd?: () => string;
@@ -57,6 +62,11 @@ export function registerAllTools(
   registerRoleCreateTool(server, config);
   registerRoleListTool(server, config);
   registerRoleUpdateTool(server, config);
+  registerSubmissionCreateTool(server, config);
+  registerSubmissionGetTool(server, config);
+  registerSubmissionListTool(server, config);
+  registerSubmissionUpdateTool(server, config);
+  registerSubmissionDeleteTool(server, config);
   registerActionTypesListTool(server, config);
   registerActionTypeGetTool(server, config);
   registerActionCreateTool(server, config);

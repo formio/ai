@@ -47,7 +47,7 @@ describe('capability quality', () => {
     const tools = await listToolsUnconfigured();
     // The whole surface, project_set included: every client can map a working
     // directory to a project, so nothing is withheld by launch mode.
-    expect(tools.length).toBe(21);
+    expect(tools.length).toBe(26);
     expect(tools.map((t) => t.name)).toContain('form_list');
     expect(tools.map((t) => t.name)).toContain('project_set');
     // The read half of the same surface. Withholding it is what sent every

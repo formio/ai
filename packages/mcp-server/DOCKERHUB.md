@@ -71,7 +71,7 @@ A private hostname will not resolve inside the container — map it with `--add-
 
 ## Tools
 
-`form_list`, `form_get`, `form_create`, `form_update`, `form_revisions_list`, `form_revision_get`, `role_list`, `role_create`, `role_update`, `action_list`, `action_get`, `action_create`, `action_update`, `action_delete`, `action_types_list`, `action_type_get`, `project_export`, `project_import`, and `hello` for a no-auth smoke test.
+`form_list`, `form_get`, `form_create`, `form_update`, `form_revisions_list`, `form_revision_get`, `role_list`, `role_create`, `role_update`, `action_list`, `action_get`, `action_create`, `action_update`, `action_delete`, `action_types_list`, `action_type_get`, `submission_create`, `submission_list`, `submission_get`, `submission_update`, `submission_delete` (scoped to submissions the server created and signed), `project_export`, `project_import`, and `hello` for a no-auth smoke test.
 
 ## Links
 

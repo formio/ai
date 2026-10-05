@@ -41,6 +41,17 @@ const PROJECT_SCOPED_CALLS: Array<{ name: string; args: Record<string, unknown> 
   { name: 'action_delete', args: { formId: OBJECT_ID, actionId: ANOTHER_OBJECT_ID } },
   { name: 'project_export', args: {} },
   { name: 'project_import', args: { template: { title: 'T' } } },
+  {
+    name: 'submission_create',
+    args: { formIdOrPath: OBJECT_ID, data: { name: 'x' }, purpose: 'test' },
+  },
+  { name: 'submission_get', args: { formIdOrPath: OBJECT_ID, submissionId: ANOTHER_OBJECT_ID } },
+  { name: 'submission_list', args: { formIdOrPath: OBJECT_ID } },
+  {
+    name: 'submission_update',
+    args: { formIdOrPath: OBJECT_ID, submissionId: ANOTHER_OBJECT_ID, data: { name: 'x' } },
+  },
+  { name: 'submission_delete', args: { formIdOrPath: OBJECT_ID, submissionId: ANOTHER_OBJECT_ID } },
 ];
 
 async function connectAllTools() {
