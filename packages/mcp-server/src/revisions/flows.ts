@@ -1,5 +1,6 @@
 import { ResolvedFormioConfig } from '../config.js';
 import { formioFetch } from '../formio-client.js';
+import { ToolError } from '../tool-errors.js';
 import { prefixVnote } from './helpers.js';
 
 export const DRAFT_FIELDS = [
@@ -11,6 +12,14 @@ export const DRAFT_FIELDS = [
   'esign',
   'display',
 ] as const;
+
+/** The form has no draft: GET /draft answered with the live form. */
+export function noDraft(form: string): ToolError {
+  return new ToolError({
+    code: 'NO_DRAFT',
+    message: `No draft exists for form "${form}". Save one with form_update and draft: true.`,
+  });
+}
 
 export const REVERT_FIELDS = ['components', 'tags', 'properties', 'display'] as const;
 
@@ -35,30 +44,30 @@ function pickFields(
   return Object.fromEntries(Object.entries(source).filter(([k]) => fields.includes(k)));
 }
 
-// Draft body must be a subset of DRAFT_FIELDS — anything outside that set is
-// Reject up front so the LLM picks the right tool
-// path (standard form_update for identity/policy edits) instead of staging
-// changes that will vanish.
-function rejectNonDraftFields(form: Record<string, unknown>): void {
-  const allowed = new Set<string>(DRAFT_FIELDS);
-  const offending = Object.keys(form).filter((k) => !allowed.has(k));
-  if (offending.length === 0) return;
-  throw new Error(
-    `Draft body contains fields that cannot be staged: ${offending.join(', ')}. ` +
-      `Drafts only stage these fields: ${DRAFT_FIELDS.join(', ')}. ` +
-      `For identity (title, name, path), policy (access, submissionAccess, revisions), ` +
-      `or other fields, call form_update WITHOUT draft: true to apply them immediately. ` +
-      `Do NOT retry this call with draft: true.`
-  );
+// A draft holds only DRAFT_FIELDS. The body is usually what form_get returned, so
+// the server-owned fields it carries (_id, title, path, created, …) are dropped
+// rather than refused. A body with none of the draft fields would stage nothing
+// but the note, so that is refused before any request.
+function draftFields(form: Record<string, unknown>): Record<string, unknown> {
+  const picked = pickFields(form, DRAFT_FIELDS);
+  if (Object.keys(picked).length === 0) {
+    throw new ToolError({
+      code: 'INVALID_ARGUMENT',
+      message:
+        `The draft body carries none of the fields a draft saves (${DRAFT_FIELDS.join(', ')}), so nothing was saved. ` +
+        `To change other fields (title, name, path, access, revisions, …), call form_update without draft: true.`,
+    });
+  }
+  return picked;
 }
 
 export async function saveDraft({ formId, form, _vnote, cfg }: DraftFlowOptions) {
-  rejectNonDraftFields(form);
+  const fields = draftFields(form);
   // if no draft exists, the endpoint returns the live form
   const base = (await formioFetch(`form/${formId}/draft`, {}, cfg)) as Record<string, unknown>;
   await formioFetch(`form/${formId}/draft`, {}, cfg, {
     method: 'PUT',
-    body: { ...base, ...form, _vnote: prefixVnote(_vnote) },
+    body: { ...base, ...fields, _vnote: prefixVnote(_vnote) },
   });
   // fresh GET since PUT returns stale body
   return await formioFetch(`form/${formId}/draft`, {}, cfg);
@@ -69,9 +78,7 @@ export async function publishDraft({ formId, _vnote, cfg }: Omit<DraftFlowOption
   // by _vid: only the draft revision has _vid === 'draft'.
   const draft = (await formioFetch(`form/${formId}/draft`, {}, cfg)) as Record<string, unknown>;
   if (draft._vid !== 'draft') {
-    throw new Error(
-      `No draft exists for form "${formId}". Create one via form_update with draft: true.`
-    );
+    throw noDraft(formId);
   }
   const live = (await formioFetch(`form/${formId}`, {}, cfg)) as Record<string, unknown>;
   await formioFetch(`form/${formId}`, {}, cfg, {

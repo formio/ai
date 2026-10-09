@@ -72,36 +72,36 @@
 
 ### Red
 
-- [ ] 5.1 Write failing tests for `form_publish`: publishes the draft's allowlisted fields with the note; `NO_DRAFT` with no PUT when there is no draft; no `form` argument; `LICENSE_REQUIRED` when unlicensed
-- [ ] 5.2 Write failing tests for `form_revert`: overlays the revision's allowlisted fields with the note; `NOT_FOUND` for an unknown version; `version` checked by the path-argument rule
-- [ ] 5.3 Write failing tests for `form_update`: no `publish` / `revert` / `version` arguments; `draft: true` with `form_get`'s output saves only the allowlisted fields; a draft body with none of them is `INVALID_ARGUMENT`
+- [x] 5.1 Write failing tests for `form_publish`: publishes the draft's allowlisted fields with the note; `NO_DRAFT` with no PUT when there is no draft; no `form` argument; `LICENSE_REQUIRED` when unlicensed
+- [x] 5.2 Write failing tests for `form_revert`: overlays the revision's allowlisted fields with the note; `NOT_FOUND` for an unknown version; `version` checked by the path-argument rule
+- [x] 5.3 Write failing tests for `form_update`: no `publish` / `revert` / `version` arguments; `draft: true` with `form_get`'s output saves only the allowlisted fields; a draft body with none of them is `INVALID_ARGUMENT`
 
 ### Green
 
-- [ ] 5.4 Register `form_publish` and `form_revert` over `revisions/flows.ts`
-- [ ] 5.5 Remove publish/revert from `form_update`; change draft mode to pick allowlisted fields
+- [x] 5.4 Register `form_publish` and `form_revert` over `revisions/flows.ts`
+- [x] 5.5 Remove publish/revert from `form_update`; change draft mode to pick allowlisted fields
 
 ### Refactor
 
-- [ ] 5.6 Review implementation and refactor as needed
+- [x] 5.6 Review implementation and refactor as needed
 
 ## 6. acceptNoHistory
 <!-- depends_on: 1, 5 -->
 
 ### Red
 
-- [ ] 6.1 Write failing tests: unlicensed `form_create` / `form_update` without `acceptNoHistory` → `HISTORY_NOT_ACCEPTED`, no write; with it → write without `revisions`
-- [ ] 6.2 Write failing tests: licensed `form_update` of a form with `revisions` off → `HISTORY_NOT_ACCEPTED`; retry with `form.revisions: "original"` enables and saves; retry with `acceptNoHistory: true` saves without
-- [ ] 6.3 Write a failing test that no form write sends an elicitation request or opens a local page, and that `~/.formio/revisions-license-consent.json` is neither read nor written
+- [x] 6.1 Write failing tests: unlicensed `form_create` / `form_update` without `acceptNoHistory` → `HISTORY_NOT_ACCEPTED`, no write; with it → write without `revisions`
+- [x] 6.2 Write failing tests: licensed `form_update` of a form with `revisions` off → `HISTORY_NOT_ACCEPTED`; retry with `form.revisions: "original"` enables and saves; retry with `acceptNoHistory: true` saves without
+- [x] 6.3 Write a failing test that no form write sends an elicitation request or opens a local page, and that `~/.formio/revisions-license-consent.json` is neither read nor written
 
 ### Green
 
-- [ ] 6.4 Replace the licence and per-form gates with the `acceptNoHistory` check; delete `revisions/browser-prompts.ts` and the consent persistence and elicitation code
-- [ ] 6.5 Remove the tests that covered the deleted prompt paths (`browser-prompts-launch`, the prompt cases in `revisions`, `local-server-edges`, `runnable-remedies`)
+- [x] 6.4 Replace the licence and per-form gates with the `acceptNoHistory` check; delete `revisions/browser-prompts.ts` and the consent persistence and elicitation code
+- [x] 6.5 Remove the tests that covered the deleted prompt paths (`browser-prompts-launch`, the prompt cases in `revisions`, `local-server-edges`, `runnable-remedies`)
 
 ### Refactor
 
-- [ ] 6.6 Review implementation and refactor as needed
+- [x] 6.6 Review implementation and refactor as needed
 
 ## 7. Argument shapes: role_create, action formId
 <!-- depends_on: 1 -->

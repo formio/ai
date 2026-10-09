@@ -7,14 +7,12 @@ import { formDocument } from '../output-schemas.js';
 import { overwrites } from '../tool-annotations.js';
 import { cwdSchema, resolveProjectConfig } from '../project-resolver.js';
 import {
+  gateFormHistory,
   gateRevisionsLicense,
-  gateRevisionsTracking,
   prefixVnote,
-  publishDraft,
-  revertToRevision,
+  requireRevisionsLicense,
   saveDraft,
 } from '../revisions/index.js';
-import { resourceSegmentArgument } from './path-arguments.js';
 
 export function registerFormUpdateTool(server: McpServer, config: FormioConfig) {
   server.registerTool(
@@ -22,8 +20,7 @@ export function registerFormUpdateTool(server: McpServer, config: FormioConfig) 
     {
       description: [
         "Update an existing form in the Form.io project mapped to the user's current working directory. IMPORTANT: Before calling this tool, first use form_get to fetch the current form definition, then use the formio-schema skill to understand the schema so that you can apply the requested modifications (add, remove, or modify fields and settings), and finally call this tool with the complete updated form JSON.",
-        '`draft`, `publish`, and `revert` are mutually exclusive — pass at most one.',
-        'If `revisions` in the response differs from the stored value, the per-form revisions-mode gate prompted the USER and they chose.',
+        'Pass `draft: true` to save the change as a draft instead of the live form; publish it with form_publish, and restore a prior revision with form_revert.',
       ].join(' '),
       inputSchema: {
         cwd: cwdSchema,
@@ -46,7 +43,7 @@ export function registerFormUpdateTool(server: McpServer, config: FormioConfig) 
               .enum(['current', 'original', ''])
               .optional()
               .describe(
-                'Revision mode. Pass "" to disable; omit to leave the stored value unchanged.'
+                'Revision mode. Omit to leave the stored value unchanged; "" turns history off and needs acceptNoHistory: true.'
               ),
           })
           .catchall(z.unknown())
@@ -54,80 +51,52 @@ export function registerFormUpdateTool(server: McpServer, config: FormioConfig) 
         note: z
           .string()
           .describe(
-            'Required note describing the diff (live form vs updated body) — no action preambles ("Published draft:", "Saved draft:", "Reverted:"). For `revert: true`, default to "Reverted to version {version}" unless the user explicitly provides a different note.'
+            'Required note describing the diff (live form vs updated body) — no action preambles ("Saved draft:", "Updated:").'
           ),
         draft: z
           .boolean()
           .optional()
           .describe(
-            'When true, create or update a draft (PUT /form/{formId}/draft) instead of publishing. Caller `form` fields merge on top of existing draft fields, preserving prior unpublished draft edits.'
+            "When true, save a draft (PUT /form/{formId}/draft) instead of the live form. Only the draft fields of `form` are saved (components, settings, tags, properties, controller, esign, display), merged over any existing draft; every other field is ignored, so form_get's output can be passed as is."
           ),
-        publish: z
+        acceptNoHistory: z
           .boolean()
           .optional()
           .describe(
-            'When true, publish the current draft. Caller `form` body is ignored; only allowlisted revision fields flow from existing draft to live (PUT /form/{formId}).'
-          ),
-        revert: z
-          .boolean()
-          .optional()
-          .describe(
-            'When true, revert the live form to a prior revision. Requires `version`. Caller `form` body is ignored; only allowlisted revision fields flow from the revision to live.'
-          ),
-        version: resourceSegmentArgument('version')
-          .optional()
-          .describe(
-            'Revision identifier for `revert: true` — either the revision `_vid` (e.g. "3") or the revision document `_id` (24-char hex).'
+            'Set to true only after the user agrees to save without revision history. Without it, a save that would keep no history (a deployment without the revisions licence, or a form whose revisions are off) is refused with HISTORY_NOT_ACCEPTED and nothing is written.'
           ),
       },
       outputSchema: formDocument,
       annotations: overwrites('Update a form'),
     },
-    async ({ cwd, formId, form: rawForm, note, draft, publish, revert, version }) => {
+    async ({ cwd, formId, form: rawForm, note, draft, acceptNoHistory }) => {
       try {
-        const exclusiveFlags = [draft, publish, revert].filter(Boolean);
-        if (exclusiveFlags.length > 1) {
-          throw new Error(
-            '`draft`, `publish`, and `revert` flags are mutually exclusive — pass only one.'
-          );
-        }
-        if (revert && !version) {
-          throw new Error('`revert: true` requires `version` (revision `_vid` or document `_id`).');
-        }
         const cfg = resolveProjectConfig(cwd, config);
 
-        const actionLabel = `${revert ? 'revert' : publish ? 'publish' : draft ? 'save a draft of' : 'update'} this form`;
-        const { licensed, form } = await gateRevisionsLicense(server, cfg, {
-          actionLabel,
-          requiresRevisions: Boolean(draft || publish || revert),
-          form: rawForm,
-        });
-
-        if (revert || publish || draft) {
-          const args = { formId, _vnote: note, cfg };
+        if (draft) {
+          await requireRevisionsLicense(cfg, 'save a draft of this form');
           return toMcpStructuredResult(
-            (await (revert && version
-              ? revertToRevision({ ...args, version })
-              : publish
-                ? publishDraft(args)
-                : saveDraft({ ...args, form }))) as Record<string, unknown>
+            (await saveDraft({ formId, form: rawForm, _vnote: note, cfg })) as Record<
+              string,
+              unknown
+            >
           );
         }
 
-        // Standard PUT path. Apply per-form revisions consent (prompts when
-        // the stored form has revisions disabled and the caller did not opt
-        // in via `revisions: 'original'|'current'`).
-        const putBody = await gateRevisionsTracking(server, {
-          formId,
-          form,
-          licensed,
+        const { licensed, form } = await gateRevisionsLicense({
           cfg,
+          actionLabel: 'update this form',
+          form: rawForm,
+          acceptNoHistory,
         });
+        if (licensed) {
+          await gateFormHistory({ cfg, formId, form, acceptNoHistory });
+        }
 
         return toMcpStructuredResult(
           (await formioFetch(`form/${formId}`, {}, cfg, {
             method: 'PUT',
-            body: { ...putBody, _vnote: prefixVnote(note) },
+            body: { ...form, _vnote: prefixVnote(note) },
           })) as Record<string, unknown>
         );
       } catch (error) {

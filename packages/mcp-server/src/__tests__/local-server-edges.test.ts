@@ -1,5 +1,4 @@
-// The two short-lived local servers — the portal login and the revisions consent
-// page — at the edges Express 5 changed.
+// The short-lived local login server at the edges Express 5 changed.
 //
 // Express 5 no longer defaults `req.body` to `{}` when no body parser matched, so
 // a POST without a JSON content type reaches the handler with `req.body`
@@ -12,7 +11,6 @@ import net from 'node:net';
 import { describe, it, expect, vi } from 'vitest';
 import { authenticate } from '../auth.js';
 import { ResolvedFormioConfig } from '../config.js';
-import { requestRevisionsLicenseConsent } from '../revisions/browser-prompts.js';
 
 vi.mock('child_process', () => ({ execFile: vi.fn() }));
 
@@ -66,21 +64,5 @@ describe('a login port that is already taken', () => {
     } finally {
       await new Promise<void>((resolve) => squatter.close(() => resolve()));
     }
-  });
-});
-
-describe('the revisions consent callback', () => {
-  it('treats a POST with no JSON body as no choice rather than failing the request', async () => {
-    // The choice resolves as the response is sent, before the client has read
-    // it, so hold on to the request and await it separately.
-    let posted: Promise<Response> | undefined;
-    const choice = await requestRevisionsLicenseConsent('a deployment', 'an action', {
-      openBrowser: false,
-      onReady: (port) => {
-        posted = postText(port, 'not json');
-      },
-    });
-    expect((await posted)?.status).toBe(200);
-    expect(typeof choice).toBe('string');
   });
 });

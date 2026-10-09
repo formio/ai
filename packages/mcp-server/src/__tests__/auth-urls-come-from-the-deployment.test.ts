@@ -122,10 +122,9 @@ describe('auth URLs are built from the deployment, not the project’s host', ()
     );
 
     const { gateRevisionsLicense } = await import('../revisions/license.js');
-    const server = { server: { createMessage: undefined } } as never;
-    await gateRevisionsLicense(server, config, {
+    await gateRevisionsLicense({
+      cfg: config,
       actionLabel: 'create',
-      requiresRevisions: false,
       form: { title: 'Contact' },
     }).catch(() => undefined);
 

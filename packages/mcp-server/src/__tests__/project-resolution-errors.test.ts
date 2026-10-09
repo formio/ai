@@ -24,6 +24,8 @@ const PROJECT_SCOPED_CALLS: Array<{ name: string; args: Record<string, unknown> 
   { name: 'form_get', args: { formIdOrPath: 'contact' } },
   { name: 'form_create', args: { form: FORM } },
   { name: 'form_update', args: { formId: OBJECT_ID, note: 'n', form: FORM } },
+  { name: 'form_publish', args: { formId: OBJECT_ID, note: 'n' } },
+  { name: 'form_revert', args: { formId: OBJECT_ID, version: '1', note: 'n' } },
   { name: 'form_revision_list', args: { formIdOrPath: 'contact' } },
   { name: 'form_revision_get', args: { formIdOrPath: 'contact', version: '1' } },
   { name: 'role_list', args: {} },

@@ -13,7 +13,7 @@ export function registerFormCreateTool(server: McpServer, config: FormioConfig) 
     'form_create',
     {
       description:
-        'Create a new form in the Form.io project mapped to the user\'s current working directory. IMPORTANT: Before calling this tool, use the formio-schema skill to construct a properly structured Form.io form JSON definition based on the user\'s requirements. The skill documents all component types, validation options, layout patterns, and conditional logic available in Form.io. New forms default to `revisions: \'original\'` so form change history is preserved. NOT for: creating a draft revision of an existing form. When the user says "create/save a draft", "draft <change>", call form_update with `formId` and `draft: true` instead.',
+        'Create a new form in the Form.io project mapped to the user\'s current working directory. IMPORTANT: Before calling this tool, use the formio-schema skill to construct a properly structured Form.io form JSON definition based on the user\'s requirements. The skill documents all component types, validation options, layout patterns, and conditional logic available in Form.io. On a deployment licensed for revisions, new forms default to `revisions: \'original\'` so form change history is preserved. NOT for: creating a draft revision of an existing form. When the user says "create/save a draft", "draft <change>", call form_update with `formId` and `draft: true` instead.',
       inputSchema: {
         cwd: cwdSchema,
         form: z
@@ -33,27 +33,36 @@ export function registerFormCreateTool(server: McpServer, config: FormioConfig) 
             revisions: z
               .enum(['current', 'original', ''])
               .optional()
-              .describe('Revision mode (default: "original"). Pass "" to disable'),
+              .describe(
+                'Revision mode (default: "original"). "" turns history off and needs acceptNoHistory: true'
+              ),
           })
           .catchall(z.unknown())
           .describe('Form.io form JSON definition'),
         note: z.string().optional().describe('Note describing the initial revision'),
+        acceptNoHistory: z
+          .boolean()
+          .optional()
+          .describe(
+            'Set to true only after the user agrees to save without revision history. Without it, a save that would keep no history (a deployment without the revisions licence, or a form whose revisions are off) is refused with HISTORY_NOT_ACCEPTED and nothing is written.'
+          ),
       },
       outputSchema: formDocument,
       annotations: creates('Create a form'),
     },
-    async ({ cwd, form: rawForm, note }) => {
+    async ({ cwd, form: rawForm, note, acceptNoHistory }) => {
       try {
         const cfg = resolveProjectConfig(cwd, config);
-        const { licensed, form } = await gateRevisionsLicense(server, cfg, {
+        const { licensed, form } = await gateRevisionsLicense({
+          cfg,
           actionLabel: 'create this form',
-          requiresRevisions: false,
           form: rawForm,
+          acceptNoHistory,
         });
         const created = (await formioFetch('form', {}, cfg, {
           method: 'POST',
           body: {
-            // gate already stripped `revisions` on unlicensed deployments; on
+            // The gate already stripped `revisions` on unlicensed deployments; on
             // licensed ones default to 'original' unless the caller overrode.
             ...(licensed ? { revisions: 'original', ...form } : form),
             ...(note && { _vnote: prefixVnote(note) }),

@@ -6,6 +6,7 @@ import { toMcpStructuredResult, toMcpError } from '../mcp-responses.js';
 import { formDocument } from '../output-schemas.js';
 import { reads } from '../tool-annotations.js';
 import { cwdSchema, resolveProjectConfig } from '../project-resolver.js';
+import { noDraft } from '../revisions/index.js';
 import { projectPathArgument } from './path-arguments.js';
 
 export function registerFormGetTool(server: McpServer, config: FormioConfig) {
@@ -41,9 +42,7 @@ export function registerFormGetTool(server: McpServer, config: FormioConfig) {
         // GET /draft falls back to the live form when no draft exists, so
         // distinguish by _vid: only the draft revision has _vid === 'draft'.
         if (draft && form._vid !== 'draft') {
-          throw new Error(
-            `No draft exists for form "${formIdOrPath}". Create one via form_update with draft: true.`
-          );
+          throw noDraft(formIdOrPath);
         }
         return toMcpStructuredResult(form);
       } catch (error) {

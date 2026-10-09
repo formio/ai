@@ -1,9 +1,5 @@
-import fs from 'fs/promises';
-import path from 'path';
-import os from 'os';
 import { randomUUID } from 'crypto';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { ResolvedFormioConfig } from '../config.js';
 
 const mockFormioFetch = vi.fn();
@@ -15,30 +11,10 @@ vi.mock('../formio-client.js', async (importOriginal) => {
   };
 });
 
-const mockRequestLicenseConsent = vi.fn();
-const mockRequestRevisionsConsent = vi.fn();
-vi.mock('../revisions/browser-prompts.js', () => ({
-  requestRevisionsLicenseConsent: (...args: unknown[]) => mockRequestLicenseConsent(...args),
-  requestRevisionsConsent: (...args: unknown[]) => mockRequestRevisionsConsent(...args),
-}));
-
-const { checkRevisionsLicensed, confirmProceedWithoutRevisions, gateRevisionsLicense } =
+const { checkRevisionsLicensed, gateRevisionsLicense, requireRevisionsLicense } =
   await import('../revisions/license.js');
-const { gateRevisionsTracking } = await import('../revisions/tracking.js');
+const { gateFormHistory } = await import('../revisions/history.js');
 const { prefixVnote, stripRevisions } = await import('../revisions/helpers.js');
-
-// Minimal stand-in for McpServer with controllable elicitation behavior.
-function makeServer(opts: {
-  elicitation?: boolean;
-  elicit?: (req: unknown) => Promise<unknown>;
-}): McpServer {
-  return {
-    server: {
-      getClientCapabilities: () => (opts.elicitation ? { elicitation: {} } : {}),
-      elicitInput: opts.elicit ?? vi.fn(),
-    },
-  } as unknown as McpServer;
-}
 
 const cfgFor = (baseUrl: string): ResolvedFormioConfig => ({
   baseUrl,
@@ -55,14 +31,8 @@ const stubLicensed = (licensed: boolean) =>
     })
   );
 
-const elicitAccept = (choice: string) =>
-  vi.fn().mockResolvedValue({ action: 'accept', content: { choice } });
-const elicitCancel = () => vi.fn().mockResolvedValue({ action: 'cancel' });
-
 const uniqueBaseUrl = () => `https://license-${randomUUID()}.local`;
-const uniqueFormId = () => `form-${randomUUID()}`;
-
-const CONSENT_FILE = path.join(os.homedir(), '.formio', 'revisions-license-consent.json');
+const FORM_ID = '67890abcdef012345678abcd';
 
 beforeEach(() => {
   vi.resetAllMocks();
@@ -97,95 +67,81 @@ describe('checkRevisionsLicensed', () => {
   });
 });
 
-describe('confirmProceedWithoutRevisions', () => {
-  it('throws USER CANCELLED when user cancels via elicitation', async () => {
-    const baseUrl = uniqueBaseUrl();
+describe('requireRevisionsLicense', () => {
+  it('refuses with LICENSE_REQUIRED on an unlicensed deployment', async () => {
     stubLicensed(false);
-    const server = makeServer({ elicitation: true, elicit: elicitCancel() });
+
+    const attempt = requireRevisionsLicense(cfgFor(uniqueBaseUrl()), 'save a draft of this form');
+    await expect(attempt).rejects.toMatchObject({ code: 'LICENSE_REQUIRED' });
+    await expect(attempt).rejects.toThrow(/Security Module/);
+  });
+
+  it('passes on a licensed deployment', async () => {
+    stubLicensed(true);
 
     await expect(
-      confirmProceedWithoutRevisions(server, cfgFor(baseUrl), 'create this form')
-    ).rejects.toThrow(/USER CANCELLED/);
-  });
-
-  it('falls back to browser prompt when elicitation unsupported and persists on continue', async () => {
-    const baseUrl = uniqueBaseUrl();
-    stubLicensed(false);
-    mockRequestLicenseConsent.mockResolvedValue('continue');
-    const server = makeServer({ elicitation: false });
-
-    await confirmProceedWithoutRevisions(server, cfgFor(baseUrl), 'create this form');
-
-    expect(mockRequestLicenseConsent).toHaveBeenCalledWith(baseUrl, 'create this form');
-    const data = JSON.parse(await fs.readFile(CONSENT_FILE, 'utf-8'));
-    expect(data[baseUrl]).toBe(true);
-  });
-
-  it('throws USER CANCELLED when browser prompt cancels', async () => {
-    const baseUrl = uniqueBaseUrl();
-    stubLicensed(false);
-    mockRequestLicenseConsent.mockResolvedValue('cancel');
-    const server = makeServer({ elicitation: false });
-
-    await expect(
-      confirmProceedWithoutRevisions(server, cfgFor(baseUrl), 'create this form')
-    ).rejects.toThrow(/USER CANCELLED/);
-  });
-
-  it('persists positive consent to file and skips re-prompt for same baseUrl', async () => {
-    const baseUrl = uniqueBaseUrl();
-    stubLicensed(false);
-    const elicit = elicitAccept('continue');
-    const server = makeServer({ elicitation: true, elicit });
-
-    await confirmProceedWithoutRevisions(server, cfgFor(baseUrl), 'create this form');
-
-    const stat = await fs.stat(CONSENT_FILE);
-    expect(stat.mode & 0o777).toBe(0o600);
-    const data = JSON.parse(await fs.readFile(CONSENT_FILE, 'utf-8'));
-    expect(data[baseUrl]).toBe(true);
-
-    // second call → no re-prompt
-    await confirmProceedWithoutRevisions(server, cfgFor(baseUrl), 'create this form');
-    expect(elicit).toHaveBeenCalledTimes(1);
+      requireRevisionsLicense(cfgFor(uniqueBaseUrl()), 'publish this form')
+    ).resolves.toBeUndefined();
   });
 });
 
 describe('gateRevisionsLicense', () => {
-  it('throws when requiresRevisions and unlicensed', async () => {
+  it('refuses with HISTORY_NOT_ACCEPTED when unlicensed and the caller has not accepted', async () => {
     stubLicensed(false);
-    const server = makeServer({ elicitation: true, elicit: vi.fn() });
 
-    await expect(
-      gateRevisionsLicense(server, cfgFor(uniqueBaseUrl()), {
-        actionLabel: 'save a draft of this form',
-        requiresRevisions: true,
-        form: { components: [] },
-      })
-    ).rejects.toThrow(/Security Module is required/);
+    const attempt = gateRevisionsLicense({
+      cfg: cfgFor(uniqueBaseUrl()),
+      actionLabel: 'update this form',
+      form: { components: [] },
+    });
+    await expect(attempt).rejects.toMatchObject({ code: 'HISTORY_NOT_ACCEPTED' });
+    await expect(attempt).rejects.toThrow(/acceptNoHistory: true/);
   });
 
-  it('strips revisions when requiresRevisions is false and unlicensed', async () => {
+  it('strips revisions when unlicensed and the caller accepted saving without history', async () => {
     stubLicensed(false);
-    const server = makeServer({ elicitation: true, elicit: elicitAccept('continue') });
 
-    const result = await gateRevisionsLicense(server, cfgFor(uniqueBaseUrl()), {
+    const result = await gateRevisionsLicense({
+      cfg: cfgFor(uniqueBaseUrl()),
       actionLabel: 'update this form',
-      requiresRevisions: false,
       form: { revisions: 'original', components: [] },
+      acceptNoHistory: true,
     });
     expect(result.licensed).toBe(false);
     expect(result.form).toEqual({ components: [] });
   });
 
+  it('refuses with HISTORY_NOT_ACCEPTED when licensed and the body sets revisions to ""', async () => {
+    stubLicensed(true);
+
+    const attempt = gateRevisionsLicense({
+      cfg: cfgFor(uniqueBaseUrl()),
+      actionLabel: 'update this form',
+      form: { revisions: '', components: [] },
+    });
+    await expect(attempt).rejects.toMatchObject({ code: 'HISTORY_NOT_ACCEPTED' });
+  });
+
+  it('passes a body setting revisions to "" through when licensed and accepted', async () => {
+    stubLicensed(true);
+
+    const form = { revisions: '', components: [] };
+    const result = await gateRevisionsLicense({
+      cfg: cfgFor(uniqueBaseUrl()),
+      actionLabel: 'update this form',
+      form,
+      acceptNoHistory: true,
+    });
+    expect(result).toEqual({ licensed: true, form });
+  });
+
   it('passes through unchanged when licensed', async () => {
     stubLicensed(true);
-    const server = makeServer({ elicitation: true, elicit: vi.fn() });
 
     const form = { revisions: 'original' as const, components: [] };
-    const result = await gateRevisionsLicense(server, cfgFor(uniqueBaseUrl()), {
+    const result = await gateRevisionsLicense({
+      cfg: cfgFor(uniqueBaseUrl()),
       actionLabel: 'update this form',
-      requiresRevisions: false,
       form,
     });
     expect(result.licensed).toBe(true);
@@ -193,147 +149,49 @@ describe('gateRevisionsLicense', () => {
   });
 });
 
-describe('gateRevisionsTracking', () => {
+describe('gateFormHistory', () => {
   const cfg = cfgFor('https://tracking.local');
 
   it.each(['original', 'current'] as const)(
-    'no prompt when caller opted in via revisions: "%s"',
+    'does not read the stored form when the caller enables revisions: "%s"',
     async (mode) => {
-      const elicit = vi.fn();
-      const server = makeServer({ elicitation: true, elicit });
-
-      const out = await gateRevisionsTracking(server, {
-        formId: uniqueFormId(),
-        form: { revisions: mode, components: [] },
-        licensed: true,
-        cfg,
-      });
-      expect(elicit).not.toHaveBeenCalled();
+      await gateFormHistory({ cfg, formId: FORM_ID, form: { revisions: mode, components: [] } });
       expect(mockFormioFetch).not.toHaveBeenCalled();
-      expect(out.revisions).toBe(mode);
     }
   );
 
-  it('no prompt when licensed is false', async () => {
-    const elicit = vi.fn();
-    const server = makeServer({ elicitation: true, elicit });
-    const out = await gateRevisionsTracking(server, {
-      formId: uniqueFormId(),
+  it('does not read the stored form when the caller accepted saving without history', async () => {
+    await gateFormHistory({
+      cfg,
+      formId: FORM_ID,
       form: { components: [] },
-      licensed: false,
-      cfg,
+      acceptNoHistory: true,
     });
-    expect(elicit).not.toHaveBeenCalled();
-    expect(out).toEqual({ components: [] });
+    expect(mockFormioFetch).not.toHaveBeenCalled();
   });
 
-  it('prompts when stored revisions is falsy and applies enable-original', async () => {
-    const formId = uniqueFormId();
-    mockFormioFetch.mockResolvedValue({ name: 'demo', revisions: '' });
-    const elicit = elicitAccept('enable-original');
-    const server = makeServer({ elicitation: true, elicit });
-
-    const out = await gateRevisionsTracking(server, {
-      formId,
-      form: { components: [] },
-      licensed: true,
-      cfg,
-    });
-    expect(elicit).toHaveBeenCalledTimes(1);
-    expect(out.revisions).toBe('original');
-  });
-
-  it('prompts even when caller passes revisions: "" and applies enable-current', async () => {
-    const formId = uniqueFormId();
-    mockFormioFetch.mockResolvedValue({ name: 'demo', revisions: '' });
-    const elicit = elicitAccept('enable-current');
-    const server = makeServer({ elicitation: true, elicit });
-
-    const out = await gateRevisionsTracking(server, {
-      formId,
-      form: { revisions: '', components: [] },
-      licensed: true,
-      cfg,
-    });
-    expect(elicit).toHaveBeenCalledTimes(1);
-    expect(out.revisions).toBe('current');
-  });
-
-  it('proceed-without-history strips revisions and remembers per-form', async () => {
-    const formId = uniqueFormId();
-    mockFormioFetch.mockResolvedValue({ name: 'demo', revisions: '' });
-    const elicit = elicitAccept('proceed-without-history');
-    const server = makeServer({ elicitation: true, elicit });
-
-    const out = await gateRevisionsTracking(server, {
-      formId,
-      form: { revisions: '', components: [] },
-      licensed: true,
-      cfg,
-    });
-    expect(out).toEqual({ components: [] });
-    expect('revisions' in out).toBe(false);
-
-    // Second call for same formId — no prompt, no API GET re-fetch needed beyond first.
-    mockFormioFetch.mockClear();
-    elicit.mockClear();
-    const out2 = await gateRevisionsTracking(server, {
-      formId,
-      form: { components: [{ type: 'textfield', key: 'x' }] },
-      licensed: true,
-      cfg,
-    });
-    expect(elicit).not.toHaveBeenCalled();
-    expect(out2).toEqual({ components: [{ type: 'textfield', key: 'x' }] });
-  });
-
-  it('throws when user cancels', async () => {
-    const formId = uniqueFormId();
-    mockFormioFetch.mockResolvedValue({ name: 'demo', revisions: '' });
-    const server = makeServer({ elicitation: true, elicit: elicitCancel() });
-
-    await expect(
-      gateRevisionsTracking(server, {
-        formId,
-        form: { components: [] },
-        licensed: true,
-        cfg,
-      })
-    ).rejects.toThrow(/User declined/);
-  });
-
-  it('falls back to browser prompt when elicitation unsupported', async () => {
-    const formId = uniqueFormId();
-    mockFormioFetch.mockResolvedValue({ name: 'demo', revisions: '' });
-    mockRequestRevisionsConsent.mockResolvedValue('enable-original');
-    const server = makeServer({ elicitation: false });
-
-    const out = await gateRevisionsTracking(server, {
-      formId,
-      form: { components: [] },
-      licensed: true,
-      cfg,
-    });
-
-    expect(mockRequestRevisionsConsent).toHaveBeenCalledWith('demo', formId);
-    expect(out.revisions).toBe('original');
-  });
-
-  it('does not prompt when stored.revisions is truthy', async () => {
-    const formId = uniqueFormId();
+  it('passes when the stored form has revisions on', async () => {
     mockFormioFetch.mockResolvedValue({ name: 'demo', revisions: 'original' });
-    const elicit = vi.fn();
-    const server = makeServer({ elicitation: true, elicit });
 
-    const out = await gateRevisionsTracking(server, {
-      formId,
-      form: { components: [] },
-      licensed: true,
-      cfg,
-    });
-    expect(elicit).not.toHaveBeenCalled();
-    expect(out).toEqual({ components: [] });
+    await gateFormHistory({ cfg, formId: FORM_ID, form: { components: [] } });
+    expect(mockFormioFetch).toHaveBeenCalledWith(`form/${FORM_ID}`, {}, cfg);
   });
+
+  // Echoing the stored "" back is not a decision about history.
+  it.each([{}, { revisions: '' }])(
+    'refuses with HISTORY_NOT_ACCEPTED when the stored form has revisions off (body %j)',
+    async (extra) => {
+      mockFormioFetch.mockResolvedValue({ name: 'demo', revisions: '' });
+
+      const attempt = gateFormHistory({
+        cfg,
+        formId: FORM_ID,
+        form: { components: [], ...extra },
+      });
+      await expect(attempt).rejects.toMatchObject({ code: 'HISTORY_NOT_ACCEPTED' });
+      await expect(attempt).rejects.toThrow(/"demo"/);
+    }
+  );
 });
 
 describe('helpers', () => {

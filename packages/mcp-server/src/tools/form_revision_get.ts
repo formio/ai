@@ -12,7 +12,7 @@ export function registerFormRevisionGetTool(server: McpServer, config: FormioCon
     'form_revision_get',
     {
       description:
-        'Fetch a single immutable form revision from the Form.io project mapped to the current working directory. `version` accepts either the revision `_vid` (e.g. "3") or the revision document `_id` (24-character hex). To revert the live form to this revision, pass its `form` body to `form_update` with a `note` like `Revert to v<vid>`.',
+        'Fetch a single immutable form revision from the Form.io project mapped to the current working directory. `version` accepts either the revision `_vid` (e.g. "3") or the revision document `_id` (24-character hex). To revert the live form to this revision, call `form_revert` with its `_vid`.',
       inputSchema: {
         cwd: cwdSchema,
         formIdOrPath: projectPathArgument('formIdOrPath').describe(

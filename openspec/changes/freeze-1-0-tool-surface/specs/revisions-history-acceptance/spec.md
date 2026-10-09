@@ -2,7 +2,7 @@
 
 ### Requirement: Saving without revision history is an explicit argument, not a prompt
 
-`form_create` and `form_update` SHALL accept an optional `acceptNoHistory: boolean`. A write that would save a form without revision history — on a deployment without the revisions licence, or to a form whose stored `revisions` setting is off when the caller does not enable it — SHALL proceed only when `acceptNoHistory` is `true`. Otherwise the tool SHALL make no write and return `isError: true` with code `HISTORY_NOT_ACCEPTED` and a message stating why the save would have no history, telling the agent to ask the user and retry with `acceptNoHistory: true`, or (for a licensed deployment) with `form.revisions` set to `"original"` or `"current"` to enable history. No tool SHALL open an elicitation request or a local browser page to ask this, and no answer SHALL be persisted between calls.
+`form_create` and `form_update` SHALL accept an optional `acceptNoHistory: boolean`. A write that would save a form without revision history — on a deployment without the revisions licence, to a form whose stored `revisions` setting is off when the caller does not enable it, or, on a licensed deployment, a `form_create` or `form_update` whose body sets `revisions` to `""` (turning history off, whatever the stored setting) — SHALL proceed only when `acceptNoHistory` is `true`. Otherwise the tool SHALL make no write and return `isError: true` with code `HISTORY_NOT_ACCEPTED` and a message stating why the save would have no history, telling the agent to ask the user and retry with `acceptNoHistory: true`, or (for a licensed deployment) with `form.revisions` set to `"original"` or `"current"` to enable history. No tool SHALL open an elicitation request or a local browser page to ask this, and no answer SHALL be persisted between calls.
 
 #### Scenario: Unlicensed deployment without acceptance
 
@@ -21,6 +21,12 @@
 - **THEN** no PUT is sent and the result has code `HISTORY_NOT_ACCEPTED`
 - **AND WHEN** the call is retried with `form.revisions: "original"`
 - **THEN** the PUT enables revisions and saves
+
+#### Scenario: Explicitly disabling history
+
+- **WHEN** `form_create` or `form_update` is called on a licensed deployment with `form.revisions: ""` and without `acceptNoHistory`
+- **THEN** no write is sent and the result has code `HISTORY_NOT_ACCEPTED`
+- **AND** the message tells the agent to ask the user and retry with `acceptNoHistory: true`, or to omit `revisions` or set it to `"original"` or `"current"`
 
 #### Scenario: Nothing prompts
 

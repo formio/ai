@@ -14,7 +14,7 @@ vi.mock('../revisions/index.js', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../revisions/index.js')>()),
   gateRevisionsLicense: vi
     .fn()
-    .mockImplementation(async (_s, _c, { form }: { form: Record<string, unknown> }) => ({
+    .mockImplementation(async ({ form }: { form: Record<string, unknown> }) => ({
       licensed: true,
       form,
     })),

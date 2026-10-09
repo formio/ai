@@ -10,6 +10,8 @@ import { registerActionUpdateTool } from './action_update.js';
 import { registerFormCreateTool } from './form_create.js';
 import { registerFormGetTool } from './form_get.js';
 import { registerFormListTool } from './form_list.js';
+import { registerFormPublishTool } from './form_publish.js';
+import { registerFormRevertTool } from './form_revert.js';
 import { registerFormRevisionGetTool } from './form_revision_get.js';
 import { registerFormRevisionListTool } from './form_revision_list.js';
 import { registerFormUpdateTool } from './form_update.js';
@@ -39,6 +41,8 @@ export function registerAllTools(
   registerFormRevisionGetTool(server, config);
   registerFormRevisionListTool(server, config);
   registerFormUpdateTool(server, config);
+  registerFormPublishTool(server, config);
+  registerFormRevertTool(server, config);
   registerProjectExportTool(server, config);
   // Reports what the tools around it will resolve, so it takes the same config
   // and the same cwd fallback project_set writes under.

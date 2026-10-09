@@ -1,3 +1,4 @@
+import { vi } from 'vitest';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
@@ -90,4 +91,31 @@ export async function createTestClient(
   await client.connect(clientTransport);
 
   return { client, server, cwd };
+}
+
+let licenceProbeDeployments = 0;
+
+/**
+ * A project URL on a deployment no earlier test has probed. The revisions licence
+ * is cached per deployment for the life of the module, so a test that needs a
+ * particular answer uses a deployment the cache has not seen.
+ */
+export function freshProjectUrl(): string {
+  licenceProbeDeployments += 1;
+  return `https://licence-${licenceProbeDeployments}.invalid/sub/example`;
+}
+
+/**
+ * Answers the anonymous `{baseUrl}/config.js` probe with the given Security Module
+ * flag. Only the licence probe reaches the global fetch in tests that mock
+ * `formioFetch`.
+ */
+export function stubRevisionsLicence(licensed: boolean) {
+  const probe = vi.fn(async () => ({
+    ok: true,
+    status: 200,
+    text: async () => `var sac = ${licensed};`,
+  }));
+  vi.stubGlobal('fetch', probe);
+  return probe;
 }

@@ -1,21 +1,9 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { createTestClient, TEST_CONFIG, TEST_CWD } from './test-helpers.js';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { createTestClient, stubRevisionsLicence, TEST_CONFIG, TEST_CWD } from './test-helpers.js';
 
 const mockFormioFetch = vi.fn();
 vi.mock('../formio-client.js', () => ({
   formioFetch: (...args: unknown[]) => mockFormioFetch(...args),
-}));
-
-// Force the license gate to a no-op pass-through so the revisions consent
-// prompt stays silent in tests.
-vi.mock('../revisions/index.js', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('../revisions/index.js')>()),
-  gateRevisionsLicense: vi
-    .fn()
-    .mockImplementation(async (_s, _c, { form }: { form: Record<string, unknown> }) => ({
-      licensed: true,
-      form,
-    })),
 }));
 
 const { registerFormCreateTool } = await import('../tools/form_create.js');
@@ -23,6 +11,11 @@ const { registerFormCreateTool } = await import('../tools/form_create.js');
 describe('form_create tool', () => {
   beforeEach(() => {
     mockFormioFetch.mockReset();
+    stubRevisionsLicence(true);
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
   });
 
   it('is listed in available tools with skill-referencing description', async () => {

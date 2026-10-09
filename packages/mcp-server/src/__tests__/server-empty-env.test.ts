@@ -53,6 +53,8 @@ describe('createServer with an empty environment', () => {
         'form_get',
         'form_list',
         'form_update',
+        'form_publish',
+        'form_revert',
         'form_revision_list',
         'form_revision_get',
         'role_create',

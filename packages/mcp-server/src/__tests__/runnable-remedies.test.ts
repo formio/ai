@@ -1,18 +1,13 @@
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { PROJECT_CLI } from '../cli-launch.js';
 import { runProjectCommand } from '../cli/project-command.js';
 import { requireBaseUrl, resolveProject } from '../project-resolver.js';
 import { writeProjectEntry } from '../project-map.js';
 
-vi.mock('../revisions/browser-prompts.js', () => ({
-  requestRevisionsLicenseConsent: vi.fn(),
-}));
-
-import { gateRevisionsLicense } from '../revisions/license.js';
-import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import { requireRevisionsLicense } from '../revisions/license.js';
 
 // The rule every message on this surface obeys, shared by every describe below
 // because it binds them all, whichever record the message is about.
@@ -97,11 +92,7 @@ describe('the commands these messages print', () => {
 
     const message = await (async () => {
       try {
-        await gateRevisionsLicense({} as McpServer, config, {
-          actionLabel: 'publish',
-          requiresRevisions: true,
-          form: { title: 'Contact' },
-        });
+        await requireRevisionsLicense(config, 'publish');
       } catch (error) {
         return error instanceof Error ? error.message : String(error);
       }
