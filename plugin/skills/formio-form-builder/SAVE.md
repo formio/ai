@@ -48,6 +48,10 @@ Do not attempt PKCE or API keys — they are not how this server authenticates.
 
 The server rejected the definition. Quote the shortest decisive error line, route the fix back through `formio-schema` (Step 2 owns the definition), and offer the user a choice: retry with the corrected definition, or bail. Never hand-patch the JSON outside the schema skill.
 
+### Saving without revision history (`HISTORY_NOT_ACCEPTED`)
+
+The save would keep no revision history for this form — the deployment is not licensed for revisions, or the definition turns `revisions` off — so the tool wrote nothing. Relay the reason the error gives in one line and ask the user whether to save without history. On a yes, retry the same `form_create` call with `acceptNoHistory: true`; on a no, stop as for a declined gate. In the edit lane the same refusal can come from `form_update` when the stored form has revisions off; its message names the retry for each answer — `revisions: "original"` or `"current"` on the form body to turn history on, or `acceptNoHistory: true` to save without it.
+
 ### Project not found / wrong URL
 
 The target Project URL did not resolve. Re-run `project_get` for this directory and relay what it says; a typo or the wrong project recorded for this directory is the usual cause.

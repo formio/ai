@@ -102,6 +102,6 @@ npx -y @formio/mcp@0.14.1 project get --cwd <absolute path>
 
 ## Verifying the install
 
-Call the `hello` tool — it needs no authentication and confirms the server is reachable. Then call `form_list`, which triggers the login flow on first use.
+Call the `server_status` tool — it needs no authentication, confirms the server is reachable, and reports which project the working directory resolves to. Then call `form_list`, which triggers the login flow on first use.
 
 If `form_list` fails with a missing-configuration error, nothing is recorded for that working directory yet — the error names the value to ask for and the `project_set` call that records it, so relay it rather than reaching for an environment variable, which any mapping overrides anyway. Requires Node.js 20 or newer.

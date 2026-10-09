@@ -1,49 +1,61 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 import { FormioConfig } from '../config.js';
-import { formioFetch } from '../formio-client.js';
 import { toMcpStructuredResult, toMcpError } from '../mcp-responses.js';
-import { formsListShape } from '../output-schemas.js';
+import { formsListOutput } from '../output-schemas.js';
 import { reads } from '../tool-annotations.js';
-import { cwdSchema, resolveProjectConfig } from '../project-resolver.js';
+import { cwdSchema } from '../project-resolver.js';
+import { resolveToolConfig } from './project-resolution.js';
+import { fetchListPage, listArguments, listResult } from './list-contract.js';
+import { ToolError } from '../tool-errors.js';
 
-const DEFAULT_SELECT = '_id,title,name,path,type,tags';
-const DEFAULT_LIMIT = 20;
+// Summary fields only: a page of full form definitions floods the context.
+const DEFAULTS = { select: '_id,title,name,path,type,tags' };
+
+// Form.io splits `tags__all` on commas, so a tag holding one would be read as several
+// and match forms carrying all of those instead of the one the caller named.
+function requireCommaFreeTags(tags: readonly string[] = []): void {
+  const split = tags.filter((tag) => tag.includes(','));
+  if (split.length > 0) {
+    throw new ToolError({
+      code: 'INVALID_ARGUMENT',
+      message: `tags cannot contain a comma: ${split.map((tag) => JSON.stringify(tag)).join(', ')}. Form.io splits the tag filter on commas, so such a tag cannot be matched as one; pass separate tags as separate array entries.`,
+    });
+  }
+}
 
 export function registerFormListTool(server: McpServer, config: FormioConfig) {
   server.registerTool(
     'form_list',
     {
       description:
-        "List forms from the Form.io project mapped to the user's current working directory with optional filtering and pagination.",
+        'List forms from the project `cwd` resolves to, one page at a time, optionally filtered by type and tags.',
       inputSchema: {
         cwd: cwdSchema,
         type: z.enum(['form', 'resource']).optional().describe('Filter by form type'),
-        limit: z.number().optional().describe('Maximum number of forms to return (default: 20)'),
-        skip: z.number().optional().describe('Number of forms to skip for pagination'),
-        sort: z.string().optional().describe('Sort field and direction (e.g. "-created")'),
-        select: z
-          .string()
+        tags: z
+          .array(z.string())
           .optional()
-          .describe('Comma-separated fields to return (default: _id,title,name,path,type,tags)'),
-        tags: z.array(z.string()).optional().describe('Filter by tags'),
+          .describe('Return only forms carrying every one of these tags'),
+        ...listArguments(DEFAULTS),
       },
-      outputSchema: formsListShape,
+      outputSchema: formsListOutput,
       annotations: reads('List forms'),
     },
-    async ({ cwd, type, limit, skip, sort, select, tags }) => {
+    async ({ cwd, type, tags, ...query }) => {
       try {
-        const cfg = resolveProjectConfig(cwd, config);
-        const params: Record<string, string | undefined> = {
-          select: select ?? DEFAULT_SELECT,
-          limit: String(limit ?? DEFAULT_LIMIT),
-          skip: skip !== undefined ? String(skip) : undefined,
-          sort,
-          type,
-          tags: tags?.join(','),
-        };
-        const forms = (await formioFetch('form', params, cfg)) as Record<string, unknown>[];
-        return toMcpStructuredResult({ forms, count: forms.length });
+        requireCommaFreeTags(tags);
+        const cfg = await resolveToolConfig({ server, cwd, config });
+        // `tags=a,b` matches the literal string "a,b"; `tags__all` is all-of.
+        const filters = { type, tags__all: tags?.length ? tags.join(',') : undefined };
+        const page = await fetchListPage({
+          path: 'form',
+          query,
+          config: cfg,
+          defaults: DEFAULTS,
+          filters,
+        });
+        return toMcpStructuredResult(listResult('forms', page));
       } catch (error) {
         return toMcpError(error);
       }

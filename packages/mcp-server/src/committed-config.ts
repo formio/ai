@@ -1,6 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import { normalizeHttpUrl } from './config.js';
+import { ToolError } from './tool-errors.js';
 
 export const COMMITTED_CONFIG_FILE = 'formio.json';
 
@@ -22,7 +23,7 @@ export interface CommittedProjectConfig {
 // caller to project_set, which writes a mapping this file then shadows. The
 // symptom clears, the cause persists, and the precedence order hides it. Same
 // reasoning as ProjectMapUnreadableError, one layer up.
-export class CommittedConfigUnusableError extends Error {
+export class CommittedConfigUnusableError extends ToolError {
   // Carried as a field, not only inside the message, so a caller that acts on the
   // exact path the walk rejected does not have to parse it back out of prose.
   readonly filePath: string;
@@ -35,12 +36,14 @@ export class CommittedConfigUnusableError extends Error {
     // landing on such a file either claims it or refuses with nothing runnable to
     // offer. An edit is an instruction both a human with an editor and an agent with
     // file tools can carry out.
-    super(
-      `The committed Form.io configuration at ${filePath} cannot be used: ${reason}. ` +
+    super({
+      code: 'CONFIG_UNREADABLE',
+      message:
+        `The committed Form.io configuration at ${filePath} cannot be used: ${reason}. ` +
         `Fix that file — it takes precedence over the working-directory mapping, so writing a mapping will not override it. ` +
         `A usable one is a JSON object holding {"projectUrl": "<the project's full URL>"}, plus "baseUrl" only when the deployment cannot be derived from the project URL. ` +
-        `Edit it directly (ask the user first — this server does not own a committed file), or remove it to let the working-directory mapping govern.`
-    );
+        `Edit it directly (ask the user first — this server does not own a committed file), or remove it to let the working-directory mapping govern.`,
+    });
     this.name = 'CommittedConfigUnusableError';
     this.filePath = filePath;
   }

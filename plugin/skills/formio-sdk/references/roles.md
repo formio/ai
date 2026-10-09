@@ -10,7 +10,7 @@ import { Formio } from '@formio/js';
 
 ## URL Configuration
 
-**Where these two values come from.** The hosts below are illustrations — never ship one. Take both URLs from whichever of the two paths applies, per [`project-urls.md`](../../formio-mcp-setup/references/project-urls.md). **If the Form.io MCP tools are callable by you**, call `project_get` with `cwd` set to the user's current working directory and use exactly what it reports: its `projectUrl` for `setProjectUrl`, its `baseUrl` for `setBaseUrl`; if it reports a value missing, relay its instruction, persist the answer with `project_set`, and call it again. **If they are not, ask the user** — for the Project URL first and alone, deriving the Base URL from it, and asking for the Base URL only in the one shape where it cannot be derived. Do not install the MCP server to obtain these two values: writing them into an application reaches no deployment. Either way, do not hardcode an example host, do not derive either URL from the other, and do not carry a value over from another project or an earlier session — a wrong value here ships an application pointed at a deployment nobody is managing.
+**Where these two values come from.** The hosts below are illustrations — never ship one. Take both URLs from whichever of the two paths applies, per [`project-urls.md`](../../formio-mcp-setup/references/project-urls.md). **If the Form.io MCP tools are callable by you**, call `project_get` as the preflight does — without `cwd`, unless its `cwdSource` was `server` or `claude-project-dir` — and use exactly what it reports: its `projectUrl` for `setProjectUrl`, its `baseUrl` for `setBaseUrl`; if it reports a value missing, relay its instruction, persist the answer with `project_set`, and call it again. **If they are not, ask the user** — for the Project URL first and alone, deriving the Base URL from it, and asking for the Base URL only in the one shape where it cannot be derived. Do not install the MCP server to obtain these two values: writing them into an application reaches no deployment. Either way, do not hardcode an example host, do not derive either URL from the other, and do not carry a value over from another project or an earlier session — a wrong value here ships an application pointed at a deployment nobody is managing.
 
 ### Hosted
 
@@ -101,5 +101,7 @@ Inside this workspace, prefer the first-party MCP tools:
 | Create a role | `role_create` | `new Formio(rolesUrl).saveRole(role)` |
 | List roles    | `role_list`   | `new Formio(rolesUrl).loadRoles()`    |
 | Update a role | `role_update` | `new Formio(roleUrl).saveRole(role)`  |
+
+`role_create` takes the role as a nested `role` object — `role: { title, description }` — the same document `saveRole(role)` posts; `role_update` takes it the same way.
 
 There is no first-party `role_delete` MCP tool today — use the SDK or `DELETE ${roleUrl}` for deletion.

@@ -3,9 +3,11 @@ import { z } from 'zod';
 import { FormioConfig } from '../config.js';
 import { formioFetch, isMongoId } from '../formio-client.js';
 import { toMcpStructuredResult, toMcpError } from '../mcp-responses.js';
-import { formShape } from '../output-schemas.js';
+import { formDocument } from '../output-schemas.js';
 import { reads } from '../tool-annotations.js';
-import { cwdSchema, resolveProjectConfig } from '../project-resolver.js';
+import { cwdSchema } from '../project-resolver.js';
+import { resolveToolConfig } from './project-resolution.js';
+import { noDraft } from '../revisions/index.js';
 import { projectPathArgument } from './path-arguments.js';
 
 export function registerFormGetTool(server: McpServer, config: FormioConfig) {
@@ -13,7 +15,7 @@ export function registerFormGetTool(server: McpServer, config: FormioConfig) {
     'form_get',
     {
       description:
-        "Fetch a single form definition from the Form.io project mapped to the user's current working directory, by form ID or path. Pass `draft: true` to fetch the form's current in-flight draft instead of the published form.",
+        'Fetch a form definition, by _id or path, from the project `cwd` resolves to. `draft: true` fetches its in-flight draft instead of the published form.',
       inputSchema: {
         cwd: cwdSchema,
         formIdOrPath: projectPathArgument('formIdOrPath').describe(
@@ -28,12 +30,12 @@ export function registerFormGetTool(server: McpServer, config: FormioConfig) {
           .optional()
           .describe("When true, fetch the form's current draft (GET /<form>/draft)"),
       },
-      outputSchema: formShape,
+      outputSchema: formDocument,
       annotations: reads('Get a form'),
     },
     async ({ cwd, formIdOrPath, select, draft }) => {
       try {
-        const cfg = resolveProjectConfig(cwd, config);
+        const cfg = await resolveToolConfig({ server, cwd, config });
         const params: Record<string, string | undefined> = { select };
         const base = isMongoId(formIdOrPath) ? `form/${formIdOrPath}` : formIdOrPath;
         const path = draft ? `${base}/draft` : base;
@@ -41,9 +43,7 @@ export function registerFormGetTool(server: McpServer, config: FormioConfig) {
         // GET /draft falls back to the live form when no draft exists, so
         // distinguish by _vid: only the draft revision has _vid === 'draft'.
         if (draft && form._vid !== 'draft') {
-          throw new Error(
-            `No draft exists for form "${formIdOrPath}". Create one via form_update with draft: true.`
-          );
+          throw noDraft(formIdOrPath);
         }
         return toMcpStructuredResult(form);
       } catch (error) {

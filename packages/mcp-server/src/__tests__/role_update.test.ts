@@ -17,13 +17,13 @@ describe('role_update tool', () => {
     mockFormioFetch.mockReset();
   });
 
-  it('is listed in available tools with full-replacement guidance', async () => {
+  it('is listed in available tools with update guidance', async () => {
     mockFormioFetch.mockResolvedValue({});
     const { client } = await createTestClient(registerRoleUpdateTool);
     const { tools } = await client.listTools();
     const tool = tools.find((t) => t.name === 'role_update');
     expect(tool).toBeDefined();
-    expect(tool!.description).toContain('full replacement');
+    expect(tool!.description).toContain('left out keep');
   });
 
   it('returns isError for invalid roleId format', async () => {
@@ -40,6 +40,13 @@ describe('role_update tool', () => {
     });
 
     expect(result.isError).toBe(true);
+    // Refused in the handler, so the refusal carries its code: a schema failure is
+    // reported by the SDK as bare text.
+    const text = (result.content as Array<{ text: string }>)[0].text;
+    expect(text.startsWith('[INVALID_ARGUMENT] ')).toBe(true);
+    expect(text).toContain('roleId');
+    expect(text).toContain('role_list');
+    expect(mockFormioFetch).not.toHaveBeenCalled();
   });
 
   it('sends PUT /role/:roleId with role body and returns updated role', async () => {

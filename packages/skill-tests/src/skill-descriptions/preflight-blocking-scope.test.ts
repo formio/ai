@@ -97,7 +97,7 @@ describe('the preflight offers one remedy and invents none', () => {
   // The check names ONE CONCRETE TOOL rather than "the Form.io tools". An abstract check
   // invites an agent to reason about whether the tools are present but not yet usable,
   // and no such state exists here: measured against the built server over stdio with a
-  // clean HOME, `tools/list` returns all 21 tools, `form_list` among them, before any
+  // clean HOME, `tools/list` returns all 23 tools, `form_list` among them, before any
   // authentication and without writing a token cache. Auth moved off startup in
   // `lazy-auth-on-first-tool-call` and fires at the first API call. So `form_list` is
   // callable exactly when this server is connected, and the check needs nothing else.

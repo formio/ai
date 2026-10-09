@@ -528,7 +528,7 @@ Naming a framework or a sub-skill skips the orchestrator, and the skills are bui
 
 ### Snapshotting before a write
 
-The import preview advises `project_export` first — one call that captures roles, resources, forms, and actions as a portable document. It is the cheapest insurance against a same-machine-name overwrite. At form granularity, `form_revisions_list` and `form_revision_get` read the immutable published revisions of a single form where form revisions are enabled.
+The import preview advises `project_export` first — one call that captures roles, resources, forms, and actions as a portable document. It is the cheapest insurance against a same-machine-name overwrite. At form granularity, `form_revision_list` and `form_revision_get` read the immutable published revisions of a single form where form revisions are enabled.
 
 ### URLs in generated code
 

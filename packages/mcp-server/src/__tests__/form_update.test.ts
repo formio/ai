@@ -1,5 +1,12 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { createTestClient, TEST_CONFIG, TEST_CWD } from './test-helpers.js';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import {
+  createTestClient,
+  freshProjectUrl,
+  stubRevisionsLicence,
+  TEST_CONFIG,
+  TEST_CWD,
+} from './test-helpers.js';
+import { ERROR_META_KEY } from '../mcp-responses.js';
 
 const mockFormioFetch = vi.fn();
 vi.mock('../formio-client.js', async (importOriginal) => {
@@ -10,24 +17,16 @@ vi.mock('../formio-client.js', async (importOriginal) => {
   };
 });
 
-// Force the license gate to a no-op pass-through so it stays silent. Each
-// test's mocked stored form sets revisions: 'original' so the real per-form
-// tracking gate (preserved via spread) stays silent too.
-vi.mock('../revisions/index.js', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('../revisions/index.js')>()),
-  gateRevisionsLicense: vi
-    .fn()
-    .mockImplementation(async (_s, _c, { form }: { form: Record<string, unknown> }) => ({
-      licensed: true,
-      form,
-    })),
-}));
-
 const { registerFormUpdateTool } = await import('../tools/form_update.js');
 
 describe('form_update tool', () => {
   beforeEach(() => {
     mockFormioFetch.mockReset();
+    stubRevisionsLicence(true);
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
   });
 
   it('is listed in available tools with workflow guidance', async () => {
@@ -122,43 +121,16 @@ describe('form_update tool', () => {
     ]);
   });
 
-  it('throws when more than one of draft/publish/revert is passed', async () => {
+  it('has no publish, revert or version argument: those are form_publish and form_revert', async () => {
     const { client } = await createTestClient(registerFormUpdateTool);
-    const result = await client.callTool({
-      name: 'form_update',
-      arguments: {
-        cwd: TEST_CWD,
-        formId: '67890abcdef012345678abcd',
-        form: { components: [] },
-        note: 'n',
-        draft: true,
-        publish: true,
-      },
-    });
-    expect(result.isError).toBe(true);
-    expect(result.content).toEqual([
-      expect.objectContaining({ text: expect.stringMatching(/mutually exclusive/) }),
-    ]);
-    expect(mockFormioFetch).not.toHaveBeenCalled();
-  });
-
-  it('throws when revert is true without version', async () => {
-    const { client } = await createTestClient(registerFormUpdateTool);
-    const result = await client.callTool({
-      name: 'form_update',
-      arguments: {
-        cwd: TEST_CWD,
-        formId: '67890abcdef012345678abcd',
-        form: { components: [] },
-        note: 'n',
-        revert: true,
-      },
-    });
-    expect(result.isError).toBe(true);
-    expect(result.content).toEqual([
-      expect.objectContaining({ text: expect.stringMatching(/requires `version`/) }),
-    ]);
-    expect(mockFormioFetch).not.toHaveBeenCalled();
+    const { tools } = await client.listTools();
+    const properties = Object.keys(
+      tools.find((t) => t.name === 'form_update')!.inputSchema.properties ?? {}
+    );
+    expect(properties).not.toContain('publish');
+    expect(properties).not.toContain('revert');
+    expect(properties).not.toContain('version');
+    expect(properties).toEqual(expect.arrayContaining(['cwd', 'formId', 'form', 'note', 'draft']));
   });
 
   it('draft merges caller form over existing draft and stamps _vnote', async () => {
@@ -193,127 +165,240 @@ describe('form_update tool', () => {
     });
   });
 
-  it('draft rejects bodies with non-allowlisted fields', async () => {
+  // An agent edits what form_get returned and saves it back as a draft: the
+  // server-owned fields ride along, and the draft takes only what a draft holds.
+  // The stored draft carries the form's other fields as they stood when it was saved.
+  const STORED_DRAFT = {
+    _id: 'abcdef0123456789abcdef01',
+    _rid: '67890abcdef012345678abcd',
+    _vid: 'draft',
+    title: 'Contact',
+    name: 'contact',
+    path: 'contact',
+    type: 'form',
+    access: [{ type: 'read_all', roles: [] }],
+    submissionAccess: [],
+    revisions: 'original',
+    components: [{ type: 'old' }],
+  };
+
+  const FROM_FORM_GET = {
+    _id: '67890abcdef012345678abcd',
+    _vid: 4,
+    title: 'Contact',
+    name: 'contact',
+    path: 'contact',
+    type: 'form',
+    created: '2026-01-01T00:00:00.000Z',
+    modified: '2026-01-02T00:00:00.000Z',
+    owner: 'abcdef012345678901234567',
+    project: 'fedcba9876543210fedcba98',
+    machineName: 'example:contact',
+    access: [{ type: 'read_all', roles: [] }],
+    submissionAccess: [],
+    revisions: 'original',
+    components: [{ type: 'phoneNumber', key: 'phone' }],
+    settings: { theme: 'dark' },
+    tags: ['common'],
+    display: 'form',
+  };
+
+  it("draft saves only the allowlisted fields of form_get's output", async () => {
+    const formId = '67890abcdef012345678abcd';
+    mockFormioFetch.mockResolvedValue(STORED_DRAFT);
+    const { client } = await createTestClient(registerFormUpdateTool);
+
+    const result = await client.callTool({
+      name: 'form_update',
+      arguments: { cwd: TEST_CWD, formId, form: FROM_FORM_GET, draft: true, note: 'Add phone' },
+    });
+
+    expect(result.isError).toBeFalsy();
+    expect(mockFormioFetch).toHaveBeenCalledWith(`form/${formId}/draft`, {}, TEST_CONFIG, {
+      method: 'PUT',
+      body: {
+        ...STORED_DRAFT,
+        components: FROM_FORM_GET.components,
+        settings: FROM_FORM_GET.settings,
+        tags: FROM_FORM_GET.tags,
+        display: FROM_FORM_GET.display,
+        _vnote: '@formio/mcp: Add phone',
+      },
+    });
+  });
+
+  // A draft saves only the draft fields, so a changed title or path in the body would
+  // be dropped without a word. It is refused instead, naming the field, before any write.
+  it.each([
+    ['title', { title: 'Contact Us' }],
+    ['path', { path: 'contact-us' }],
+  ])(
+    'draft refuses a changed %s with INVALID_ARGUMENT and writes nothing',
+    async (field, change) => {
+      const formId = '67890abcdef012345678abcd';
+      mockFormioFetch.mockResolvedValue(STORED_DRAFT);
+      const { client } = await createTestClient(registerFormUpdateTool);
+
+      const result = (await client.callTool({
+        name: 'form_update',
+        arguments: {
+          cwd: TEST_CWD,
+          formId,
+          form: { ...FROM_FORM_GET, ...change },
+          draft: true,
+          note: 'n',
+        },
+      })) as {
+        isError?: boolean;
+        content: Array<{ text?: string }>;
+        _meta?: Record<string, { code?: string }>;
+      };
+
+      expect(result.isError).toBe(true);
+      expect(result._meta?.[ERROR_META_KEY]?.code).toBe('INVALID_ARGUMENT');
+      expect(result.content[0].text).toContain(field);
+      expect(result.content[0].text).toMatch(/form_update without `?draft/);
+      expect(
+        mockFormioFetch.mock.calls.filter(
+          ([, , , options]) => (options as { method?: string })?.method
+        )
+      ).toEqual([]);
+    }
+  );
+
+  // The draft keeps the title it had when it was saved; a rename since then is on the
+  // live form, which is what form_get returns. Echoing that back is not a change.
+  it("draft accepts form_get's output after the live form was renamed since the draft", async () => {
+    const formId = '67890abcdef012345678abcd';
+    const live = { ...FROM_FORM_GET, title: 'Contact Us', path: 'contact-us' };
+    mockFormioFetch.mockImplementation(
+      (path: string, _q: unknown, _c: unknown, options?: { method?: string }) =>
+        Promise.resolve(options?.method ? {} : path === `form/${formId}` ? live : STORED_DRAFT)
+    );
+    const { client } = await createTestClient(registerFormUpdateTool);
+
+    const result = await client.callTool({
+      name: 'form_update',
+      arguments: { cwd: TEST_CWD, formId, form: live, draft: true, note: 'n' },
+    });
+
+    expect(result.isError).toBeFalsy();
+    expect(mockFormioFetch).toHaveBeenCalledWith(
+      `form/${formId}/draft`,
+      {},
+      TEST_CONFIG,
+      expect.objectContaining({ method: 'PUT' })
+    );
+  });
+
+  it('draft without any field a draft holds writes nothing', async () => {
     const { client } = await createTestClient(registerFormUpdateTool);
     const result = await client.callTool({
       name: 'form_update',
       arguments: {
         cwd: TEST_CWD,
         formId: '67890abcdef012345678abcd',
-        form: { components: [], title: 'X' },
+        form: { title: 'Renamed' },
         draft: true,
         note: 'n',
       },
     });
     expect(result.isError).toBe(true);
-    expect(result.content).toEqual([
-      expect.objectContaining({ text: expect.stringMatching(/cannot be staged/) }),
-    ]);
     expect(mockFormioFetch).not.toHaveBeenCalled();
   });
 
-  it('publish throws when no draft exists', async () => {
-    mockFormioFetch.mockResolvedValueOnce({ _vid: 5, components: [] });
-    const { client } = await createTestClient(registerFormUpdateTool);
+  it('draft refuses with LICENSE_REQUIRED on a deployment without the revisions licence', async () => {
+    stubRevisionsLicence(false);
+    const { client } = await createTestClient(registerFormUpdateTool, {
+      projectUrl: freshProjectUrl(),
+    });
     const result = await client.callTool({
       name: 'form_update',
       arguments: {
         cwd: TEST_CWD,
         formId: '67890abcdef012345678abcd',
         form: { components: [] },
-        publish: true,
+        draft: true,
         note: 'n',
       },
     });
     expect(result.isError).toBe(true);
-    expect(result.content).toEqual([
-      expect.objectContaining({ text: expect.stringMatching(/No draft exists/) }),
-    ]);
+    expect((result._meta as Record<string, { code?: string }>)[ERROR_META_KEY]?.code).toBe(
+      'LICENSE_REQUIRED'
+    );
+    expect(mockFormioFetch).not.toHaveBeenCalled();
   });
 
-  it('publish ignores caller form, overlays draft allowlist on live, stamps _vnote', async () => {
+  // The stored form is read only once the licence says the history check applies. Read
+  // beside the probe, it needs a token, so on an unlicensed deployment a refused call
+  // could still start a browser login in the background for a read nobody uses.
+  it('does not read the stored form when the licence refuses the write', async () => {
+    stubRevisionsLicence(false);
     const formId = '67890abcdef012345678abcd';
-    const draft = { _vid: 'draft', components: [{ type: 'staged' }], title: 'IGNORED' };
-    const live = {
-      _id: formId,
-      title: 'Live',
-      components: [{ type: 'old' }],
-      access: [{ role: 'admin' }],
-    };
-    mockFormioFetch.mockImplementation(
-      (path: string, _p: unknown, _c: unknown, opts?: { method?: string }) => {
-        const isGet = !opts?.method;
-        if (isGet && path === `form/${formId}/draft`) return Promise.resolve(draft);
-        if (isGet && path === `form/${formId}`) return Promise.resolve(live);
-        return Promise.resolve({});
-      }
-    );
+    mockFormioFetch.mockResolvedValue({ _id: formId, name: 'demo', revisions: '' });
+    const { client } = await createTestClient(registerFormUpdateTool, {
+      projectUrl: freshProjectUrl(),
+    });
 
-    const { client } = await createTestClient(registerFormUpdateTool);
-    await client.callTool({
+    const result = (await client.callTool({
       name: 'form_update',
-      arguments: {
-        cwd: TEST_CWD,
-        formId,
-        // draft publish flow ignores mcp tool caller form
-        form: { components: [{ type: 'IGNORED' }] },
-        publish: true,
-        note: 'ship it',
-      },
-    });
+      arguments: { cwd: TEST_CWD, formId, form: { components: [] }, note: 'n' },
+    })) as { isError?: boolean };
 
-    expect(mockFormioFetch).toHaveBeenCalledWith(`form/${formId}`, {}, TEST_CONFIG, {
-      method: 'PUT',
-      body: {
-        ...live,
-        components: [{ type: 'staged' }],
-        _vnote: '@formio/mcp: ship it',
-      },
-    });
+    expect(result.isError).toBe(true);
+    expect(mockFormioFetch).not.toHaveBeenCalled();
   });
 
-  it('revert PUTs live overlaid with revision revert allowlist and stamps _vnote', async () => {
+  // An unlicensed deployment answers with its own refusal, without waiting on a read
+  // that cannot change it.
+  it('refuses as unlicensed without waiting for the stored form', async () => {
+    stubRevisionsLicence(false);
     const formId = '67890abcdef012345678abcd';
-    const revision = {
-      _vid: '3',
-      components: [{ type: 'v3' }],
-      tags: ['t'],
-      display: 'wizard',
-      title: 'IGNORED',
-    };
-    const live = { _id: formId, title: 'Live', components: [{ type: 'current' }] };
-    mockFormioFetch.mockImplementation(
-      (path: string, _p: unknown, _c: unknown, opts?: { method?: string }) => {
-        const isGet = !opts?.method;
-        if (isGet && path === `form/${formId}/v/3`) return Promise.resolve(revision);
-        if (isGet && path === `form/${formId}`) return Promise.resolve(live);
-        return Promise.resolve({});
-      }
-    );
-
-    const { client } = await createTestClient(registerFormUpdateTool);
-    await client.callTool({
-      name: 'form_update',
-      arguments: {
-        cwd: TEST_CWD,
-        formId,
-        // revert flow ignores mcp tool caller form
-        form: { components: [{ type: 'IGNORED' }] },
-        revert: true,
-        version: '3',
-        note: 'Reverted to version 3',
-      },
+    mockFormioFetch.mockReturnValue(new Promise(() => undefined));
+    const { client } = await createTestClient(registerFormUpdateTool, {
+      projectUrl: freshProjectUrl(),
     });
 
-    expect(mockFormioFetch).toHaveBeenCalledWith(`form/${formId}`, {}, TEST_CONFIG, {
+    const result = (await client.callTool({
+      name: 'form_update',
+      arguments: { cwd: TEST_CWD, formId, form: { components: [] }, note: 'n' },
+    })) as { isError?: boolean; content: Array<{ text?: string }> };
+
+    expect(result.isError).toBe(true);
+    expect(result.content[0].text).toMatch(/licence does not include form revisions/);
+  });
+
+  // Unknown is treated as licensed for the history checks, never as unlicensed: the
+  // body is not stripped and the save is not refused on the licence's account, but a
+  // stored form with history off still needs the caller's decision.
+  it('checks the stored form and sends the body as written when the licence is unknown', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new TypeError('fetch failed')));
+    const formId = '67890abcdef012345678abcd';
+    mockFormioFetch.mockResolvedValue({ _id: formId, name: 'demo', revisions: 'original' });
+    const { client } = await createTestClient(registerFormUpdateTool, {
+      projectUrl: freshProjectUrl(),
+    });
+
+    const form = { title: 'Updated', components: [], revisions: 'current' };
+    const result = await client.callTool({
+      name: 'form_update',
+      arguments: { cwd: TEST_CWD, formId, form: { title: 'Updated', components: [] }, note: 'n' },
+    });
+    expect(result.isError ?? false).toBe(false);
+    expect(mockFormioFetch).toHaveBeenCalledWith(
+      `form/${formId}`,
+      { select: 'revisions,name' },
+      expect.anything()
+    );
+
+    mockFormioFetch.mockClear();
+    await client.callTool({
+      name: 'form_update',
+      arguments: { cwd: TEST_CWD, formId, form, note: 'n' },
+    });
+    expect(mockFormioFetch).toHaveBeenCalledWith(`form/${formId}`, {}, expect.anything(), {
       method: 'PUT',
-      body: {
-        ...live,
-        components: [{ type: 'v3' }],
-        tags: ['t'],
-        display: 'wizard',
-        _vnote: '@formio/mcp: Reverted to version 3',
-      },
+      body: { ...form, _vnote: '@formio/mcp: n' },
     });
   });
 });

@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { ToolError } from '../tool-errors.js';
 
 const conditionOperator = z.enum([
   'isEqual',
@@ -32,18 +33,34 @@ const actionCondition = z
       })
     ),
   })
-  .optional()
-  .describe('Condition for when action runs');
+  .optional();
 
+// Form.io's own fields, documented by the formio-actions skill, so they carry no
+// description here: `name` comes from action_type_list, and the keys valid in
+// `settings` from action_type_get's settingsForm.
 export const actionDefinitionSchema = z
   .object({
-    name: z.string().describe('Action type name'),
-    title: z.string().describe('Action title'),
-    handler: z.array(z.string()).describe('Handler phases (e.g. ["before"], ["after"])'),
-    method: z.array(z.string()).describe('Methods (e.g. ["create"], ["update"])'),
-    settings: z.record(z.string(), z.unknown()).optional().describe('Action settings'),
+    name: z.string(),
+    title: z.string(),
+    handler: z.array(z.string()),
+    method: z.array(z.string()),
+    settings: z.record(z.string(), z.unknown()).optional(),
     condition: actionCondition,
-    priority: z.number().optional().describe('Action priority'),
+    priority: z.number().optional(),
   })
   .passthrough()
   .describe('Action definition');
+
+/** The refusal for an action type the form's catalog does not offer. */
+export function unknownActionType({
+  name,
+  available,
+}: {
+  name: string;
+  available: readonly string[];
+}): ToolError {
+  return new ToolError({
+    code: 'UNKNOWN_ACTION_TYPE',
+    message: `Action type '${name}' is not available on this server. Available types: ${available.join(', ')}`,
+  });
+}

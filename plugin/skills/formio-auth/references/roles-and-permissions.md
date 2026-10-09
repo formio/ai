@@ -126,7 +126,7 @@ Beyond the role-keyed `access` / `submissionAccess` arrays, Form.io supports fou
 ## MCP Tool Preference
 
 - `role_list` — discover existing role IDs in the project (default trio plus any custom).
-- `role_create` — add a custom role (`title`, `description`, `admin: false`, `default: false`).
+- `role_create` — add a custom role, passed as the nested `role` object: `role: { title, description, admin: false, default: false }`.
 - `role_update` — adjust an existing role's metadata.
 - `form_get` — read the current `access` / `submissionAccess` on a form before editing it.
 - `form_update` — write new `access` or `submissionAccess` arrays onto a Form or Resource.

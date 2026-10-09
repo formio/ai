@@ -83,4 +83,23 @@ describe('validateToken', () => {
     expect((mockFetch.mock.calls.at(-1)?.[1] as RequestInit).redirect).toBe('manual');
     expect(result).toBe(false);
   });
+
+  // A refused connection is the same failure every other request reports: a
+  // NETWORK_ERROR naming the cause and the URL, not a bare "fetch failed".
+  it('reports a refused connection as NETWORK_ERROR naming the cause and URL', async () => {
+    const cause = Object.assign(new Error('connect ECONNREFUSED 127.0.0.1:443'), {
+      code: 'ECONNREFUSED',
+    });
+    mockFetch.mockRejectedValue(new TypeError('fetch failed', { cause }));
+
+    const attempt = validateToken({
+      baseUrl: 'https://formio.invalid/sub',
+      projectUrl: 'https://formio.invalid/sub/example',
+      jwt: 'valid-token',
+    });
+
+    await expect(attempt).rejects.toMatchObject({ code: 'NETWORK_ERROR' });
+    await expect(attempt).rejects.toThrow(/ECONNREFUSED/);
+    await expect(attempt).rejects.toThrow('https://formio.invalid/sub/current');
+  });
 });

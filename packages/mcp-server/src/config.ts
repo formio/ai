@@ -1,3 +1,4 @@
+import { ToolError } from './tool-errors.js';
 export const DEFAULT_BASE_URL = 'https://api.form.io';
 
 /**
@@ -83,9 +84,9 @@ export function stripTrailingSlashes(url: string): string {
  * refusals on exit 1. A malformed value read from disk is a different thing entirely
  * and stays "could not answer", because no answer from the user fixes a broken record.
  */
-export class InvalidRequestedUrlError extends Error {
+export class InvalidRequestedUrlError extends ToolError {
   constructor(message: string) {
-    super(message);
+    super({ code: 'INVALID_ARGUMENT', message });
     this.name = 'InvalidRequestedUrlError';
   }
 }
@@ -208,7 +209,7 @@ export function getConfig(): FormioConfig {
     authHost: process.env.FORMIO_AUTH_HOST || undefined,
     authPort: parsePositiveInt(process.env.FORMIO_AUTH_PORT),
     authTimeoutMs: toMilliseconds(parsePositiveInt(process.env.FORMIO_AUTH_TIMEOUT)),
-    forceBrowser: process.env.FORMIO_FORCE_BROWSER === '1',
+    forceBrowser: readBooleanEnv(process.env.FORMIO_FORCE_BROWSER),
   };
 }
 
@@ -249,6 +250,17 @@ export function readHttpUrlEnv({
     onIgnored(`Ignoring ${name}: ${message}`);
     return undefined;
   }
+}
+
+/**
+ * The one reading of a boolean environment variable: after trimming, `true` or `1`
+ * in any case is true, and every other value — unset included — is false. Shared
+ * so that every such variable accepts the same spellings; a value that works for
+ * one and is silently ignored by another is a setting nobody can rely on.
+ */
+export function readBooleanEnv(raw: string | undefined): boolean {
+  const normalized = (raw ?? '').trim().toLowerCase();
+  return normalized === 'true' || normalized === '1';
 }
 
 function parsePositiveInt(raw: string | undefined): number | undefined {

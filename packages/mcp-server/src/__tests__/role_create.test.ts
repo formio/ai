@@ -13,11 +13,46 @@ describe('role_create tool', () => {
     mockFormioFetch.mockReset();
   });
 
-  it('is listed in available tools with title, description, default, and admin parameters', async () => {
+  it('takes the working directory and a role object whose title is required', async () => {
     mockFormioFetch.mockResolvedValue({});
     const { client } = await createTestClient(registerRoleCreateTool);
     const { tools } = await client.listTools();
-    expect(tools.map((t) => t.name)).toContain('role_create');
+    const tool = tools.find((t) => t.name === 'role_create');
+    expect(tool).toBeDefined();
+    expect(Object.keys(tool!.inputSchema.properties ?? {}).sort()).toEqual(['cwd', 'role']);
+    expect(tool!.inputSchema.required).toContain('role');
+    const role = (tool!.inputSchema.properties as Record<string, Record<string, unknown>>).role;
+    expect(Object.keys(role.properties as Record<string, unknown>).sort()).toEqual([
+      'admin',
+      'default',
+      'description',
+      'title',
+    ]);
+    expect(role.required).toEqual(['title']);
+  });
+
+  it('refuses flat role fields without a request', async () => {
+    const { client } = await createTestClient(registerRoleCreateTool);
+
+    const result = await client.callTool({
+      name: 'role_create',
+      arguments: { cwd: TEST_CWD, title: 'Employee' },
+    });
+
+    expect(result.isError).toBe(true);
+    expect(mockFormioFetch).not.toHaveBeenCalled();
+  });
+
+  it('refuses a role without a title without a request', async () => {
+    const { client } = await createTestClient(registerRoleCreateTool);
+
+    const result = await client.callTool({
+      name: 'role_create',
+      arguments: { cwd: TEST_CWD, role: { description: 'No title' } },
+    });
+
+    expect(result.isError).toBe(true);
+    expect(mockFormioFetch).not.toHaveBeenCalled();
   });
 
   it('sends POST /role with title only and returns created role', async () => {
@@ -32,7 +67,7 @@ describe('role_create tool', () => {
 
     const result = await client.callTool({
       name: 'role_create',
-      arguments: { cwd: TEST_CWD, title: 'Employee' },
+      arguments: { cwd: TEST_CWD, role: { title: 'Employee' } },
     });
 
     expect(mockFormioFetch).toHaveBeenCalledWith('role', {}, TEST_CONFIG, {
@@ -52,7 +87,7 @@ describe('role_create tool', () => {
       default: false,
       admin: false,
     };
-    await client.callTool({ name: 'role_create', arguments: { cwd: TEST_CWD, ...args } });
+    await client.callTool({ name: 'role_create', arguments: { cwd: TEST_CWD, role: args } });
 
     expect(mockFormioFetch).toHaveBeenCalledWith('role', {}, TEST_CONFIG, {
       method: 'POST',
@@ -66,7 +101,7 @@ describe('role_create tool', () => {
 
     const result = await client.callTool({
       name: 'role_create',
-      arguments: { cwd: TEST_CWD, title: 'Test' },
+      arguments: { cwd: TEST_CWD, role: { title: 'Test' } },
     });
 
     expect(result.isError).toBe(true);

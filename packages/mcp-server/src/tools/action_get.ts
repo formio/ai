@@ -2,9 +2,11 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { FormioConfig } from '../config.js';
 import { formioFetch } from '../formio-client.js';
 import { toMcpStructuredResult, toMcpError } from '../mcp-responses.js';
-import { actionShape } from '../output-schemas.js';
+import { actionDocument } from '../output-schemas.js';
 import { reads } from '../tool-annotations.js';
-import { cwdSchema, resolveProjectConfig } from '../project-resolver.js';
+import { cwdSchema } from '../project-resolver.js';
+import { resolveToolConfig } from './project-resolution.js';
+import { formIdArgument, requireFormId } from './form-id.js';
 import { resourceSegmentArgument } from './path-arguments.js';
 
 export function registerActionGetTool(server: McpServer, config: FormioConfig) {
@@ -15,15 +17,16 @@ export function registerActionGetTool(server: McpServer, config: FormioConfig) {
         'Get a single action by ID from a form, including its handler, method, condition, and type-specific settings. Call action_list first to find the action ID.',
       inputSchema: {
         cwd: cwdSchema,
-        formId: resourceSegmentArgument('formId').describe('The form ID the action belongs to'),
+        formId: formIdArgument(),
         actionId: resourceSegmentArgument('actionId').describe('The action ID to retrieve'),
       },
-      outputSchema: actionShape,
+      outputSchema: actionDocument,
       annotations: reads('Get a form action'),
     },
     async ({ cwd, formId, actionId }) => {
       try {
-        const cfg = resolveProjectConfig(cwd, config);
+        requireFormId(formId);
+        const cfg = await resolveToolConfig({ server, cwd, config });
         const action = (await formioFetch(`form/${formId}/action/${actionId}`, {}, cfg)) as Record<
           string,
           unknown

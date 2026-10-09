@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { createTestClient, TEST_CONFIG, TEST_CWD } from './test-helpers.js';
+import { ERROR_META_KEY } from '../mcp-responses.js';
 
 const mockFormioFetch = vi.fn();
 vi.mock('../formio-client.js', async (importOriginal) => {
@@ -145,8 +146,11 @@ describe('form_get tool', () => {
 
     expect(result.isError).toBe(true);
     expect(result.content).toEqual([
-      expect.objectContaining({ text: expect.stringMatching(/No draft exists/) }),
+      expect.objectContaining({ text: expect.stringMatching(/^\[NO_DRAFT\] No draft exists/) }),
     ]);
+    expect((result._meta as Record<string, { code?: string }>)[ERROR_META_KEY]?.code).toBe(
+      'NO_DRAFT'
+    );
   });
 });
 

@@ -123,7 +123,9 @@ describe('guidance for a stand-alone server', () => {
     const { tools } = await client.listTools();
     const projectSet = tools.find((tool) => tool.name === 'project_set');
 
-    expect(projectSet?.description).toMatch(/login/i);
+    // The rule, not the reason: why the Base URL matters (it builds the portal-login
+    // URL) is the README's, and the description carries only what a caller acts on.
+    expect(projectSet?.description).toMatch(/Base URL is derived/);
     expect(projectSet?.description).toContain('https://api.form.io');
     await client.close();
   });

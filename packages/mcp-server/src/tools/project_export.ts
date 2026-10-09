@@ -2,25 +2,26 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { FormioConfig } from '../config.js';
 import { formioFetch } from '../formio-client.js';
 import { toMcpStructuredResult, toMcpError } from '../mcp-responses.js';
-import { templateShape } from '../output-schemas.js';
+import { templateDocument } from '../output-schemas.js';
 import { reads } from '../tool-annotations.js';
-import { cwdSchema, resolveProjectConfig } from '../project-resolver.js';
+import { cwdSchema } from '../project-resolver.js';
+import { resolveToolConfig } from './project-resolution.js';
 
 export function registerProjectExportTool(server: McpServer, config: FormioConfig) {
   server.registerTool(
     'project_export',
     {
       description:
-        "Export the complete template (roles, resources, forms, actions) of the Form.io project mapped to the user's current working directory as a portable JSON document. Use this to snapshot a project before importing changes.",
+        'Export the project `cwd` resolves to as a template (roles, resources, forms, actions) — the snapshot to take before project_import.',
       inputSchema: {
         cwd: cwdSchema,
       },
-      outputSchema: templateShape,
+      outputSchema: templateDocument,
       annotations: reads('Export the project template'),
     },
     async ({ cwd }) => {
       try {
-        const cfg = resolveProjectConfig(cwd, config);
+        const cfg = await resolveToolConfig({ server, cwd, config });
         const template = (await formioFetch('export', {}, cfg)) as Record<string, unknown>;
         return toMcpStructuredResult(template);
       } catch (error) {

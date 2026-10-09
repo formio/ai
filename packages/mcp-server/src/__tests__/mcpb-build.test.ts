@@ -137,7 +137,7 @@ describe('pnpm build:mcpb', () => {
     const request = [
       '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{},"clientInfo":{"name":"mcpb-test","version":"1"}}}',
       '{"jsonrpc":"2.0","method":"notifications/initialized"}',
-      '{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"hello","arguments":{"name":"MCPB"}}}',
+      '{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"server_status","arguments":{}}}',
       '',
     ].join('\n');
 
@@ -149,7 +149,10 @@ describe('pnpm build:mcpb', () => {
     });
 
     expect(result.stdout).toContain('"serverInfo"');
-    expect(result.stdout).toContain('Hello from formio-mcp, MCPB!');
+    // server_status needs no project and makes no Form.io request, so it answers
+    // from the bundle alone, reporting how the environment's project resolves.
+    expect(result.stdout).toMatch(/"text":"formio-mcp \d+\.\d+\.\d+/);
+    expect(result.stdout).toContain('"status":"ok"');
   }, 90_000);
 
   // Directories that ingest the bundle read this list instead of launching the

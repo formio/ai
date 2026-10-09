@@ -1,21 +1,16 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { createTestClient, TEST_CONFIG, TEST_CWD } from './test-helpers.js';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import {
+  createTestClient,
+  freshProjectUrl,
+  stubRevisionsLicence,
+  TEST_CONFIG,
+  TEST_CWD,
+} from './test-helpers.js';
 
 const mockFormioFetch = vi.fn();
-vi.mock('../formio-client.js', () => ({
+vi.mock('../formio-client.js', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../formio-client.js')>()),
   formioFetch: (...args: unknown[]) => mockFormioFetch(...args),
-}));
-
-// Force the license gate to a no-op pass-through so the revisions consent
-// prompt stays silent in tests.
-vi.mock('../revisions/index.js', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('../revisions/index.js')>()),
-  gateRevisionsLicense: vi
-    .fn()
-    .mockImplementation(async (_s, _c, { form }: { form: Record<string, unknown> }) => ({
-      licensed: true,
-      form,
-    })),
 }));
 
 const { registerFormCreateTool } = await import('../tools/form_create.js');
@@ -23,6 +18,11 @@ const { registerFormCreateTool } = await import('../tools/form_create.js');
 describe('form_create tool', () => {
   beforeEach(() => {
     mockFormioFetch.mockReset();
+    stubRevisionsLicence(true);
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
   });
 
   it('is listed in available tools with skill-referencing description', async () => {
@@ -144,6 +144,31 @@ describe('form_create tool', () => {
     expect(mockFormioFetch).toHaveBeenCalledWith('form', {}, TEST_CONFIG, {
       method: 'POST',
       body: { revisions: 'original', ...form, _vnote: '@formio/mcp: initial' },
+    });
+  });
+
+  // A licence probe that produced no answer establishes nothing, so the body goes as
+  // written: the licensed default is not added, and the caller's setting is not
+  // stripped.
+  it.each([
+    ['without a revisions setting', {}],
+    ['with a revisions setting', { revisions: 'current' as const }],
+  ])('sends the body as written %s when the licence is unknown', async (_label, extra) => {
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new TypeError('fetch failed')));
+    mockFormioFetch.mockResolvedValue({ _id: '123' });
+    const projectUrl = freshProjectUrl();
+    const { client } = await createTestClient(registerFormCreateTool, { projectUrl });
+
+    const form = { title: 'T', name: 't', path: 't', components: [], ...extra };
+    const result = await client.callTool({
+      name: 'form_create',
+      arguments: { cwd: TEST_CWD, form },
+    });
+
+    expect(result.isError ?? false).toBe(false);
+    expect(mockFormioFetch).toHaveBeenCalledWith('form', {}, expect.anything(), {
+      method: 'POST',
+      body: form,
     });
   });
 });

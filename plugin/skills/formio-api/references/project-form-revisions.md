@@ -12,46 +12,47 @@ Every request to these endpoints MUST include an `x-jwt-token` header holding th
 
 ## Key Behaviors
 
-- **Every form created via `form_create` defaults to `revisions: 'original'`** on a licensed deployment. The caller may override by passing `revisions: 'current'` or `revisions: ''` on the form body, but the tool's default is `original` so submission history is preserved out of the box. On unlicensed deployments, `revisions` is stripped from the body entirely.
-- **Every `form_update` call writes a revision note (`note`).** The caller passes one for standard updates, drafts, publishes, and explicit revert notes; for `revert: true` the tool defaults `note` to `Reverted to version {version}` when the caller omits it. The note is prefixed (`@formio/mcp:`) and persisted on the revision document — never skipped.
+- **Every form created via `form_create` defaults to `revisions: 'original'`** on a licensed deployment. The caller may override by passing `revisions: 'current'` on the form body; `revisions: ''` turns history off and needs `acceptNoHistory: true`. On an unlicensed deployment no form keeps history, so `form_create` saves only with `acceptNoHistory: true`, and then strips `revisions` from the body.
+- **Every revision-writing call carries a revision note (`note`).** `form_update`, `form_publish` and `form_revert` require one; `form_create` takes one for the initial revision. The note is prefixed (`@formio/mcp:`) and persisted on the revision document — never skipped.
 
 ## MCP Tool Preference
 
 Prefer the MCP server's first-party tools for every operation on this page; fall back to the raw HTTP endpoints only if the tool cannot satisfy the request.
 
-- **List revisions** (`GET /form/:id/v`) — use `form_revisions_list`. Accepts the form by `_id` or path alias.
-- **Get a single revision** (`GET /form/:id/v/:version`) — use `form_revision_get`. `version` may be the sequential `_vid` or the revision document's `_id`.
-- **Inspect the current draft** (`GET /form/:id/draft`) — use `form_get` with `draft: true`. Accepts the form by `_id` or path alias. The underlying endpoint falls back to the live form when no draft exists; the tool distinguishes by checking `_vid === 'draft'` and throws a clear "no draft exists" error when the fallback fires.
-- **Enable or change revisions setting** (`PUT /form/:id` with `revisions`) — use `form_update` and pass `revisions: "current" | "original" | ""` on the form body. Omitting `revisions` on `form_update` leaves the stored value unchanged; when the stored form has revisions disabled and the caller did NOT opt in via `revisions: 'original' | 'current'`, the tool prompts (elicitation, with a browser fallback) for the per-form mode before applying the update.
-- **Save a draft** (`PUT /form/:id/draft`) — use `form_update` with `draft: true`. Caller `form` fields merge on top of the existing draft (caller wins), preserving prior unpublished edits.
-- **Publish the current draft** (`PUT /form/:id` from `/draft` body) — use `form_update` with `publish: true`. The tool fetches the staged draft and the live form, then PUTs the live form overlaid with a strict revision-field allowlist from the draft: `components`, `settings`, `tags`, `properties`, `controller`, `esign`, `display`. All other fields (`title`, `name`, `path`, `type`, `access`, `submissionAccess`, `submissionRevisions`, `owner`, `project`, `revisions`, identity/server-managed fields) keep their live values. The caller's `form` argument is ignored in this mode; `note` must still describe the actual diff between the live form and the draft (generic placeholders like "publishing changes" are forbidden).
-- **Revert to a prior revision** — use `form_update` with `revert: true` and `version: "<vid>"` (a sequential `_vid` like `"3"`) or `version: "<revisionDocId>"` (the 24-char hex revision document `_id`). The tool fetches that revision and the live form, then PUTs live overlaid with a narrower revert allowlist: `components`, `tags`, `properties`, `display`. All other fields keep their live values; the caller's `form` argument is ignored. Inspect the target revision via `form_revision_get` first so `note` can describe what reverting restores (e.g. `Revert to v3: rollback bad release`); when omitted, the tool defaults `note` to `Reverted to version {version}`. `draft`, `publish`, and `revert` are mutually exclusive — pass at most one (the tool throws when more than one is set).
+- **List revisions** (`GET /form/:id/v`) — use `form_revision_list`. Accepts the form by `_id` or path alias as `formIdOrPath`. It returns compact revision summaries (`_id`, `_vid`, `_vnote`, `_vuser`, `created`, `modified`) newest first, one page at a time: `limit` (default 100), `skip`, `sort` and `select` are its arguments, and the result carries `revisions` beside `total` and `hasMore` — call again with a larger `skip` while `hasMore` is true.
+- **Get a single revision** (`GET /form/:id/v/:version`) — use `form_revision_get`. Accepts the form by `_id` or path alias as `formIdOrPath`; `version` may be the sequential `_vid` or the revision document's `_id`.
+- **Inspect the current draft** (`GET /form/:id/draft`) — use `form_get` with `draft: true`. Accepts the form by `_id` or path alias. The underlying endpoint falls back to the live form when no draft exists; the tool distinguishes by checking `_vid === 'draft'` and fails with `NO_DRAFT` when the fallback fires.
+- **Enable or change revisions setting** (`PUT /form/:id` with `revisions`) — use `form_update` and pass `revisions: "current" | "original"` on the form body. Omitting `revisions` leaves the stored value unchanged; `revisions: ""` turns history off and needs `acceptNoHistory: true` (see "Saving without history" below).
+- **Save a draft** (`PUT /form/:id/draft`) — use `form_update` with `draft: true`. Only the draft fields of `form` are saved — `components`, `settings`, `tags`, `properties`, `controller`, `esign`, `display` — merged on top of the existing draft (caller wins), preserving prior unpublished edits. Every other field, including the server-owned ones `form_get` returns, is ignored, so `form_get`'s output can be edited and passed as is. A body carrying none of the draft fields is refused with `INVALID_ARGUMENT` and nothing is saved.
+- **Publish the current draft** (`PUT /form/:id` from `/draft` body) — use `form_publish` with `formId` and `note`; it takes no form body. The tool fetches the staged draft and the live form, then PUTs the live form overlaid with a strict revision-field allowlist from the draft: `components`, `settings`, `tags`, `properties`, `controller`, `esign`, `display`. All other fields (`title`, `name`, `path`, `type`, `access`, `submissionAccess`, `submissionRevisions`, `owner`, `project`, `revisions`, identity/server-managed fields) keep their live values. A form with no draft fails with `NO_DRAFT` and nothing is written. `note` must describe the actual diff between the live form and the draft (generic placeholders like "publishing changes" are forbidden).
+- **Revert to a prior revision** — use `form_revert` with `formId`, `note`, and `version: "<vid>"` (a sequential `_vid` like `"3"`) or `version: "<revisionDocId>"` (the 24-char hex revision document `_id`). The tool fetches that revision and the live form, then PUTs live overlaid with a narrower revert allowlist: `components`, `tags`, `properties`, `display`. All other fields keep their live values. An unknown `version` fails with `NOT_FOUND`. Inspect the target revision via `form_revision_get` first so `note` can describe what reverting restores (e.g. `Revert to v3: rollback bad release`); when the user gives no other note, use `Reverted to version {version}`.
 
-`note` is required on every `form_update` call EXCEPT `revert: true` (which defaults the note to `Reverted to version {version}` when the caller omits it). The LLM SHALL generate it by diffing the prior state against the new body — no action preambles (`Published draft:`, `Saved draft:`, `Reverted:`).
+`form_update`, `form_publish` and `form_revert` take the form as `formId` — its 24-character `_id`. A form path is refused with `INVALID_ARGUMENT`; read the `_id` with `form_get` first.
+
+`note` is required on every `form_update`, `form_publish` and `form_revert` call. The LLM SHALL generate it by diffing the prior state against the new body — no action preambles (`Published draft:`, `Saved draft:`, `Reverted:`).
 
 ### License gating
 
-`draft`, `publish`, and `revert` require the Security Module on the deployment's license. When the deployment is unlicensed:
+Drafts, publishing and reverting require the Security Module on the deployment's license. When the deployment is unlicensed:
 
-- `draft` / `publish` / `revert` — the tool throws immediately telling the caller to drop the flag and call `form_update` as a standard update.
-- Standard updates — the tool prompts once per deployment for "continue without revision tracking" consent (cached across sessions in `~/.formio/revisions-license-consent.json`). On consent, the `revisions` field is stripped from the body so the API doesn't silently write a value it can't honor.
+- `form_update` with `draft: true`, `form_publish` and `form_revert` — the tool refuses with `LICENSE_REQUIRED` and writes nothing. Change the form with a standard `form_update` instead.
+- Standard `form_create` / `form_update` — the save keeps no revision history, so the tool refuses with `HISTORY_NOT_ACCEPTED` unless the call passes `acceptNoHistory: true`. With it, the `revisions` field is stripped from the body so the API doesn't silently write a value it can't honor.
 
-### Per-form revisions-mode gate
+### Saving without history
 
-Distinct from the deployment-level license gate above, this gate asks "for THIS specific form, how should revisions be tracked." It fires on a standard `form_update` ONLY when ALL of the following hold:
+`acceptNoHistory: true` on `form_create` or `form_update` records that the user agreed to a save that keeps no revision history. Nothing asks the user on the tool's behalf: without that argument, a save that would keep no history is refused with `HISTORY_NOT_ACCEPTED`, nothing is written, and the error text says why. Relay that to the user, then retry with their answer. The refusal applies when ANY of the following holds:
 
-1. The deployment IS licensed for revisions.
-2. The stored form has `revisions` disabled (falsy).
-3. The caller did NOT opt in by passing `revisions: 'original' | 'current'` on the body. Passing `revisions: ''` mirrors the disabled stored state and does NOT bypass the prompt — that loophole would let an LLM silently skip the audit-trail decision on every form by always echoing the disabled value.
-4. The user has not already approved "proceed without history" for this form in the current process (session-scoped cache).
+1. The deployment is not licensed for revisions (above).
+2. The body sets `revisions: ""` — turning history off is a decision the user makes, on a licensed deployment as on any other.
+3. A standard `form_update` on a licensed deployment targets a form whose stored `revisions` is disabled (falsy), and the body does not turn it on with `revisions: 'original' | 'current'`. Echoing the stored `""` back does not count as turning it on — that loophole would let an LLM silently skip the audit-trail decision on every form by always echoing the disabled value.
 
-When all conditions hold, the tool prompts (elicitation, with a browser fallback) with three choices:
+The user's three answers to the third case, and the retry each one means:
 
-- **Enable revisions (original)** — submissions render against the form version active when they were submitted. Tool sets `revisions: 'original'` on the PUT body.
-- **Enable revisions (current)** — submissions always render against the latest form version. Tool sets `revisions: 'current'` on the PUT body.
-- **Proceed without history (not tracked)** — tool strips any caller-supplied `revisions` from the PUT body and remembers the approval for this `formId` for the rest of the process so the user is asked only once per form.
+- **Enable revisions (original)** — submissions render against the form version active when they were submitted. Retry with `revisions: 'original'` on the form body.
+- **Enable revisions (current)** — submissions always render against the latest form version. Retry with `revisions: 'current'` on the form body.
+- **Save without history (not tracked)** — retry with `acceptNoHistory: true`.
 
-On cancel, the tool throws and no update is performed.
+The answer is not remembered between calls: pass `acceptNoHistory: true` only on a save the user agreed to, and again on each later save that needs it.
 
 ## Endpoints
 

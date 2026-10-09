@@ -24,12 +24,14 @@ const PROJECT_SCOPED_CALLS: Array<{ name: string; args: Record<string, unknown> 
   { name: 'form_get', args: { formIdOrPath: 'contact' } },
   { name: 'form_create', args: { form: FORM } },
   { name: 'form_update', args: { formId: OBJECT_ID, note: 'n', form: FORM } },
-  { name: 'form_revisions_list', args: { formIdOrPath: 'contact' } },
+  { name: 'form_publish', args: { formId: OBJECT_ID, note: 'n' } },
+  { name: 'form_revert', args: { formId: OBJECT_ID, version: '1', note: 'n' } },
+  { name: 'form_revision_list', args: { formIdOrPath: 'contact' } },
   { name: 'form_revision_get', args: { formIdOrPath: 'contact', version: '1' } },
   { name: 'role_list', args: {} },
-  { name: 'role_create', args: { title: 'Manager' } },
+  { name: 'role_create', args: { role: { title: 'Manager' } } },
   { name: 'role_update', args: { roleId: OBJECT_ID, role: { title: 'Manager' } } },
-  { name: 'action_types_list', args: { formId: OBJECT_ID } },
+  { name: 'action_type_list', args: { formId: OBJECT_ID } },
   { name: 'action_type_get', args: { formId: OBJECT_ID, actionName: 'save' } },
   { name: 'action_create', args: { formId: OBJECT_ID, action: ACTION } },
   { name: 'action_list', args: { formId: OBJECT_ID } },
@@ -79,10 +81,10 @@ describe('project-scoped tools with no resolvable project', () => {
     }
   );
 
-  it('hello succeeds without any project configuration', async () => {
+  it('server_status succeeds without any project configuration', async () => {
     const client = await connectAllTools();
 
-    const result = await client.callTool({ name: 'hello', arguments: {} });
+    const result = await client.callTool({ name: 'server_status', arguments: {} });
 
     expect(result.isError).toBeFalsy();
   });

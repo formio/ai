@@ -10,51 +10,58 @@ vi.mock('../formio-client.js', async (importOriginal) => {
   };
 });
 
-const { registerActionTypesListTool } = await import('../tools/action_types_list.js');
+const { registerActionTypeListTool } = await import('../tools/action_type_list.js');
 
-describe('action_types_list tool', () => {
+describe('action_type_list tool', () => {
   beforeEach(() => {
     mockFormioFetch.mockReset();
   });
 
-  it('is listed in available tools with formId parameter', async () => {
+  it('is listed with a formId parameter and no paging arguments', async () => {
     mockFormioFetch.mockResolvedValue([]);
-    const { client } = await createTestClient(registerActionTypesListTool);
+    const { client } = await createTestClient(registerActionTypeListTool);
     const { tools } = await client.listTools();
-    const tool = tools.find((t) => t.name === 'action_types_list');
+    const tool = tools.find((t) => t.name === 'action_type_list');
     expect(tool).toBeDefined();
     expect(tool!.inputSchema.properties).toHaveProperty('formId');
     expect(tool!.inputSchema.required).toContain('formId');
+    for (const paging of ['limit', 'skip', 'sort', 'select']) {
+      expect(tool!.inputSchema.properties).not.toHaveProperty(paging);
+    }
   });
 
-  it('sends GET to /form/{formId}/actions and returns catalog array', async () => {
+  // Form.io does not page this route, so the whole catalog is one answer.
+  it('sends GET to /form/{formId}/actions and returns the whole catalog', async () => {
     const formId = '67890abcdef012345678abcd';
     const catalog = [
       { name: 'email', title: 'Email' },
       { name: 'save', title: 'Save Submission' },
     ];
     mockFormioFetch.mockResolvedValue(catalog);
-    const { client } = await createTestClient(registerActionTypesListTool);
+    const { client } = await createTestClient(registerActionTypeListTool);
 
     const result = await client.callTool({
-      name: 'action_types_list',
+      name: 'action_type_list',
       arguments: { cwd: TEST_CWD, formId },
     });
 
     expect(mockFormioFetch).toHaveBeenCalledWith(`form/${formId}/actions`, {}, TEST_CONFIG);
-    expect(result.structuredContent).toEqual({ actionTypes: catalog, count: 2 });
+    expect(result.structuredContent).toEqual({ actionTypes: catalog, total: 2, hasMore: false });
     expect(result.content).toEqual([
-      { type: 'text', text: JSON.stringify({ actionTypes: catalog, count: 2 }, null, 2) },
+      {
+        type: 'text',
+        text: JSON.stringify({ actionTypes: catalog, total: 2, hasMore: false }, null, 2),
+      },
     ]);
   });
 
   it('returns MCP error on API failure', async () => {
     mockFormioFetch.mockRejectedValue(new Error('Form.io API error: 404'));
-    const { client } = await createTestClient(registerActionTypesListTool);
+    const { client } = await createTestClient(registerActionTypeListTool);
 
     const result = await client.callTool({
-      name: 'action_types_list',
-      arguments: { cwd: TEST_CWD, formId: 'nonexistent0000000000000' },
+      name: 'action_type_list',
+      arguments: { cwd: TEST_CWD, formId: '0000000000000000000000ff' },
     });
 
     expect(result.isError).toBe(true);

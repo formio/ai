@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { createTestClient, TEST_CONFIG, TEST_CWD } from './test-helpers.js';
+import { ERROR_META_KEY } from '../mcp-responses.js';
 
 const mockFormioFetch = vi.fn();
 vi.mock('../formio-client.js', async (importOriginal) => {
@@ -129,6 +130,7 @@ describe('action_create tool', () => {
         ),
       }),
     ]);
+    expect(result._meta?.[ERROR_META_KEY]).toEqual({ code: 'UNKNOWN_ACTION_TYPE' });
     // Should NOT have attempted the POST
     expect(mockFormioFetch).toHaveBeenCalledTimes(1);
   });

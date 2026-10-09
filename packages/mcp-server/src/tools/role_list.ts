@@ -1,31 +1,29 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import { z } from 'zod';
 import { FormioConfig } from '../config.js';
-import { formioFetch } from '../formio-client.js';
 import { toMcpStructuredResult, toMcpError } from '../mcp-responses.js';
-import { rolesListShape } from '../output-schemas.js';
+import { rolesListOutput } from '../output-schemas.js';
 import { reads } from '../tool-annotations.js';
-import { cwdSchema, resolveProjectConfig } from '../project-resolver.js';
+import { cwdSchema } from '../project-resolver.js';
+import { resolveToolConfig } from './project-resolution.js';
+import { fetchListPage, listArguments, listResult } from './list-contract.js';
 
 export function registerRoleListTool(server: McpServer, config: FormioConfig) {
   server.registerTool(
     'role_list',
     {
-      description:
-        "List all roles defined in the Form.io project mapped to the user's current working directory.",
+      description: 'List the roles defined in the project `cwd` resolves to, one page at a time.',
       inputSchema: {
         cwd: cwdSchema,
-        select: z.string().optional().describe('Comma-separated fields to return'),
+        ...listArguments(),
       },
-      outputSchema: rolesListShape,
+      outputSchema: rolesListOutput,
       annotations: reads('List roles'),
     },
-    async ({ cwd, select }) => {
+    async ({ cwd, ...query }) => {
       try {
-        const cfg = resolveProjectConfig(cwd, config);
-        const params: Record<string, string | undefined> = { select };
-        const roles = (await formioFetch('role', params, cfg)) as Record<string, unknown>[];
-        return toMcpStructuredResult({ roles, count: roles.length });
+        const cfg = await resolveToolConfig({ server, cwd, config });
+        const page = await fetchListPage({ path: 'role', query, config: cfg });
+        return toMcpStructuredResult(listResult('roles', page));
       } catch (error) {
         return toMcpError(error);
       }

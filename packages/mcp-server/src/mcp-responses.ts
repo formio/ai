@@ -1,3 +1,5 @@
+import { toolErrorDetails } from './tool-errors.js';
+
 export function toMcpTextResult(data: unknown) {
   return {
     content: [{ type: 'text' as const, text: JSON.stringify(data, null, 2) }],
@@ -23,14 +25,37 @@ export function toMcpStructuredResult(structured: Record<string, unknown>, text?
   };
 }
 
-// `notes` lead the message for the same reason a successful answer's do: a note is
-// often the CAUSE of the failure being reported — an ignored formio.json on the walk,
-// an environment variable a host never expanded — and a failure rendered alone hides
-// the first half of the story.
+// Where the structured half of an error travels. Not structuredContent: MCP clients
+// validate structuredContent against the tool's (success) outputSchema even when
+// isError is set, so an error payload there is rejected as a protocol error.
+export const ERROR_META_KEY = 'io.form/error';
+
+// `[CODE]` leads the text so a client that surfaces only text still shows the code.
+// `notes` follow it and lead the message for the same reason a successful answer's
+// do: a note is often the CAUSE of the failure being reported — an ignored
+// formio.json on the walk, an environment variable a host never expanded — and a
+// failure rendered alone hides the first half of the story.
 export function toMcpError(error: unknown, notes: readonly string[] = []) {
   const message = error instanceof Error ? error.message : String(error);
+  const details = toolErrorDetails(error);
+  const text = [...notes, message].filter(Boolean).join('\n');
   return {
-    content: [{ type: 'text' as const, text: [...notes, message].filter(Boolean).join('\n') }],
+    content: [{ type: 'text' as const, text: `[${details.code}] ${text}` }],
+    _meta: { [ERROR_META_KEY]: details },
     isError: true,
+  };
+}
+
+/**
+ * A tool handler whose every throw becomes a coded error result, for a handler too
+ * long to wrap in its own try/catch without obscuring it.
+ */
+export function catchToolErrors<A, R>(handler: (args: A) => Promise<R>) {
+  return async (args: A): Promise<R | ReturnType<typeof toMcpError>> => {
+    try {
+      return await handler(args);
+    } catch (error) {
+      return toMcpError(error);
+    }
   };
 }

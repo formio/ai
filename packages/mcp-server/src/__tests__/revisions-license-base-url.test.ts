@@ -1,16 +1,6 @@
-import { describe, it, expect, vi } from 'vitest';
-import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import { describe, it, expect } from 'vitest';
 import { ResolvedFormioConfig } from '../config.js';
-
-vi.mock('../revisions/browser-prompts.js', () => ({
-  requestRevisionsLicenseConsent: vi.fn(),
-}));
-
-import { gateRevisionsLicense } from '../revisions/license.js';
-import { requestRevisionsLicenseConsent } from '../revisions/browser-prompts.js';
-
-const mockConsent = vi.mocked(requestRevisionsLicenseConsent);
-const server = {} as McpServer;
+import { gateRevisionsLicense, requireRevisionsLicense } from '../revisions/license.js';
 
 // The Security Module flag lives on the deployment, fetched anonymously from
 // ${baseUrl}/config.js. With no base URL there is nothing to ask — and the two
@@ -59,15 +49,7 @@ describe('the revisions license gate with an unresolved base URL', () => {
     ],
   ])('names the write that reaches the record — %s', async (_label, config, expected) => {
     await expect(
-      gateRevisionsLicense(
-        server,
-        { ...config, apiKey: 'secret-key' },
-        {
-          actionLabel: 'publish',
-          requiresRevisions: true,
-          form: { title: 'Contact' },
-        }
-      )
+      requireRevisionsLicense({ ...config, apiKey: 'secret-key' }, 'publish')
     ).rejects.toThrow(expected);
   });
 
@@ -75,8 +57,7 @@ describe('the revisions license gate with an unresolved base URL', () => {
   // that was wrong.
   it('does not name the mapping-only command for a committed project', async () => {
     await expect(
-      gateRevisionsLicense(
-        server,
+      requireRevisionsLicense(
         {
           projectUrl: 'https://myproject.mysite.com',
           cwd: '/w/app',
@@ -84,28 +65,24 @@ describe('the revisions license gate with an unresolved base URL', () => {
           committedFilePath: '/w/app/formio.json',
           apiKey: 'secret-key',
         },
-        { actionLabel: 'publish', requiresRevisions: true, form: { title: 'Contact' } }
+        'publish'
       )
     ).rejects.toThrow(/^(?!.*set --base-url <base_url>)/s);
   });
 
   it('demands the base URL when revisions are explicitly required', async () => {
-    await expect(
-      gateRevisionsLicense(server, unresolved, {
-        actionLabel: 'publish',
-        requiresRevisions: true,
-        form: { title: 'Contact' },
-      })
-    ).rejects.toThrow(/Base URL/i);
+    const attempt = requireRevisionsLicense(unresolved, 'publish');
+    await expect(attempt).rejects.toThrow(/Base URL/i);
+    await expect(attempt).rejects.toMatchObject({ code: 'BASE_URL_UNRESOLVED' });
   });
 
   // Stripping here would discard the user's setting on the strength of a probe
   // that never ran.
   it('demands the base URL rather than stripping a revisions setting', async () => {
     await expect(
-      gateRevisionsLicense(server, unresolved, {
+      gateRevisionsLicense({
+        cfg: unresolved,
         actionLabel: 'create',
-        requiresRevisions: false,
         form: { title: 'Contact', revisions: 'current' },
       })
     ).rejects.toThrow(/Base URL/i);
@@ -117,9 +94,9 @@ describe('the revisions license gate with an unresolved base URL', () => {
   it('passes a form with no revisions setting through untouched', async () => {
     const form = { title: 'Contact', components: [] };
 
-    const result = await gateRevisionsLicense(server, unresolved, {
+    const result = await gateRevisionsLicense({
+      cfg: unresolved,
       actionLabel: 'create',
-      requiresRevisions: false,
       form,
     });
 
@@ -134,11 +111,15 @@ describe('the revisions license gate with an unresolved base URL', () => {
   // with an underivable deployment ever reads.
   const rejectionMessage = async (form: Record<string, unknown>, requiresRevisions: boolean) => {
     try {
-      await gateRevisionsLicense(server, unresolved, {
-        actionLabel: 'create',
-        requiresRevisions,
-        form,
-      });
+      if (requiresRevisions) {
+        await requireRevisionsLicense(unresolved, 'create');
+      } else {
+        await gateRevisionsLicense({
+          cfg: unresolved,
+          actionLabel: 'create',
+          form,
+        });
+      }
     } catch (error) {
       return error instanceof Error ? error.message : String(error);
     }
@@ -165,15 +146,5 @@ describe('the revisions license gate with an unresolved base URL', () => {
 
     expect(message).toMatch(/--base-url|baseUrl/);
     expect(message).toMatch(/do not ask for the Project URL again/i);
-  });
-
-  it('does not claim the deployment is unlicensed by prompting for consent', async () => {
-    await gateRevisionsLicense(server, unresolved, {
-      actionLabel: 'create',
-      requiresRevisions: false,
-      form: { title: 'Contact' },
-    });
-
-    expect(mockConsent).not.toHaveBeenCalled();
   });
 });

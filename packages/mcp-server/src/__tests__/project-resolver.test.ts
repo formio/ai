@@ -631,17 +631,14 @@ describe('cwdSchema', () => {
     expect(cwdSchema.safeParse('/workspace/pkg-a').success).toBe(true);
   });
 
-  // The description is read on every tool call, more reliably than the server's
-  // instructions, so it has to carry the SAME precedence the resolver
-  // implements. It used to say a FORMIO_PROJECT_URL in the environment "takes
-  // precedence over every mapping" and made cwd unnecessary — the pre-reorder
-  // model, and now backwards: the environment is the weakest source, so omitting
-  // cwd cannot be made safe by setting a variable.
-  it('names every source of a project, narrowest scope first', () => {
-    expect(cwdSchema.description).toMatch(/project_set/);
-    expect(cwdSchema.description).toMatch(/FORMIO_PROJECT_URL/);
-    expect(cwdSchema.description).toContain('formio.json');
-    expect(cwdSchema.description).toMatch(/weakest/i);
+  // The description is repeated on every tool, so it says only that cwd is optional
+  // and what an omitted one resolves to. When to pass one, and which RECORD wins for
+  // that directory — the committed file, the mapping, the environment — are the server
+  // instructions' to state, once; a shortened copy here is the one that drifts.
+  it('says cwd is optional and what an omitted cwd defaults to', () => {
+    expect(cwdSchema.description).toMatch(/optional/i);
+    expect(cwdSchema.description).toMatch(/defaults to the client's workspace root/);
+    expect(cwdSchema.description).not.toMatch(/on every call/i);
   });
 
   it('does not claim the environment pins the project or replaces cwd', () => {

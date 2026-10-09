@@ -1,9 +1,5 @@
-import fs from 'fs/promises';
-import path from 'path';
-import os from 'os';
 import { randomUUID } from 'crypto';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { ResolvedFormioConfig } from '../config.js';
 
 const mockFormioFetch = vi.fn();
@@ -15,30 +11,10 @@ vi.mock('../formio-client.js', async (importOriginal) => {
   };
 });
 
-const mockRequestLicenseConsent = vi.fn();
-const mockRequestRevisionsConsent = vi.fn();
-vi.mock('../revisions/browser-prompts.js', () => ({
-  requestRevisionsLicenseConsent: (...args: unknown[]) => mockRequestLicenseConsent(...args),
-  requestRevisionsConsent: (...args: unknown[]) => mockRequestRevisionsConsent(...args),
-}));
-
-const { checkRevisionsLicensed, confirmProceedWithoutRevisions, gateRevisionsLicense } =
+const { checkRevisionsLicensed, gateRevisionsLicense, requireRevisionsLicense } =
   await import('../revisions/license.js');
-const { gateRevisionsTracking } = await import('../revisions/tracking.js');
+const { gateFormHistory } = await import('../revisions/history.js');
 const { prefixVnote, stripRevisions } = await import('../revisions/helpers.js');
-
-// Minimal stand-in for McpServer with controllable elicitation behavior.
-function makeServer(opts: {
-  elicitation?: boolean;
-  elicit?: (req: unknown) => Promise<unknown>;
-}): McpServer {
-  return {
-    server: {
-      getClientCapabilities: () => (opts.elicitation ? { elicitation: {} } : {}),
-      elicitInput: opts.elicit ?? vi.fn(),
-    },
-  } as unknown as McpServer;
-}
 
 const cfgFor = (baseUrl: string): ResolvedFormioConfig => ({
   baseUrl,
@@ -55,14 +31,16 @@ const stubLicensed = (licensed: boolean) =>
     })
   );
 
-const elicitAccept = (choice: string) =>
-  vi.fn().mockResolvedValue({ action: 'accept', content: { choice } });
-const elicitCancel = () => vi.fn().mockResolvedValue({ action: 'cancel' });
-
 const uniqueBaseUrl = () => `https://license-${randomUUID()}.local`;
-const uniqueFormId = () => `form-${randomUUID()}`;
 
-const CONSENT_FILE = path.join(os.homedir(), '.formio', 'revisions-license-consent.json');
+// The shape undici gives a request that never got a response.
+const networkFailure = () =>
+  new TypeError('fetch failed', {
+    cause: Object.assign(new Error('connect ECONNREFUSED 127.0.0.1:443'), {
+      code: 'ECONNREFUSED',
+    }),
+  });
+const FORM_ID = '67890abcdef012345678abcd';
 
 beforeEach(() => {
   vi.resetAllMocks();
@@ -70,22 +48,57 @@ beforeEach(() => {
 });
 
 describe('checkRevisionsLicensed', () => {
-  it('returns true when /config.js contains sac = true', async () => {
+  it('is licensed when /config.js contains sac = true', async () => {
     stubLicensed(true);
-    expect(await checkRevisionsLicensed(cfgFor(uniqueBaseUrl()))).toBe(true);
+    expect(await checkRevisionsLicensed(cfgFor(uniqueBaseUrl()))).toEqual({ state: 'licensed' });
   });
 
-  it('returns false when /config.js reports sac = false', async () => {
+  it('is unlicensed when /config.js reports sac = false', async () => {
     stubLicensed(false);
-    expect(await checkRevisionsLicensed(cfgFor(uniqueBaseUrl()))).toBe(false);
+    expect(await checkRevisionsLicensed(cfgFor(uniqueBaseUrl()))).toEqual({
+      state: 'unlicensed',
+    });
   });
 
-  it('returns false when fetch fails', async () => {
-    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('network down')));
-    expect(await checkRevisionsLicensed(cfgFor(uniqueBaseUrl()))).toBe(false);
+  it('is unlicensed when /config.js answers without the flag', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({ ok: true, text: () => Promise.resolve('var x = 1;') })
+    );
+    expect(await checkRevisionsLicensed(cfgFor(uniqueBaseUrl()))).toEqual({
+      state: 'unlicensed',
+    });
   });
 
-  it('caches per baseUrl — second call does not refetch', async () => {
+  it('is unknown, with NETWORK_ERROR, when the probe gets no response', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(networkFailure()));
+    const baseUrl = uniqueBaseUrl();
+
+    const licence = await checkRevisionsLicensed(cfgFor(baseUrl));
+
+    expect(licence).toMatchObject({ state: 'unknown', failure: { code: 'NETWORK_ERROR' } });
+  });
+
+  it('is unknown, with UPSTREAM_ERROR, when the probe is answered with an error status', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false, status: 502 }));
+
+    const licence = await checkRevisionsLicensed(cfgFor(uniqueBaseUrl()));
+
+    expect(licence).toMatchObject({ state: 'unknown', failure: { code: 'UPSTREAM_ERROR' } });
+  });
+
+  it('bounds the probe with a timeout', async () => {
+    const fetchSpy = vi
+      .fn()
+      .mockResolvedValue({ ok: true, text: () => Promise.resolve('sac = true') });
+    vi.stubGlobal('fetch', fetchSpy);
+
+    await checkRevisionsLicensed(cfgFor(uniqueBaseUrl()));
+
+    expect((fetchSpy.mock.calls[0][1] as RequestInit).signal).toBeInstanceOf(AbortSignal);
+  });
+
+  it('caches a definite answer per baseUrl — second call does not refetch', async () => {
     const baseUrl = uniqueBaseUrl();
     const fetchSpy = vi
       .fn()
@@ -95,97 +108,184 @@ describe('checkRevisionsLicensed', () => {
     await checkRevisionsLicensed(cfgFor(baseUrl));
     expect(fetchSpy).toHaveBeenCalledTimes(1);
   });
+
+  // A failed probe is not an answer, so it is not kept for long: long enough that a
+  // run of writes against an unreachable deployment does not re-probe on every one,
+  // short enough that a deployment which was only briefly unreachable is asked again.
+  it('keeps an unknown answer for 60 seconds, then probes again', async () => {
+    const baseUrl = uniqueBaseUrl();
+    const fetchSpy = vi
+      .fn()
+      .mockRejectedValueOnce(networkFailure())
+      .mockResolvedValueOnce({ ok: false, status: 503 })
+      .mockResolvedValue({ ok: true, text: () => Promise.resolve('sac = true') });
+    vi.stubGlobal('fetch', fetchSpy);
+    const clock = { ms: 1_000_000 };
+    const now = () => clock.ms;
+    const check = () => checkRevisionsLicensed(cfgFor(baseUrl), { now });
+
+    expect(await check()).toMatchObject({ state: 'unknown', failure: { code: 'NETWORK_ERROR' } });
+    clock.ms += 59_999;
+    expect(await check()).toMatchObject({ state: 'unknown', failure: { code: 'NETWORK_ERROR' } });
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
+
+    clock.ms += 1;
+    expect(await check()).toMatchObject({ state: 'unknown', failure: { code: 'UPSTREAM_ERROR' } });
+    expect(fetchSpy).toHaveBeenCalledTimes(2);
+
+    clock.ms += 60_000;
+    expect(await check()).toEqual({ state: 'licensed' });
+    expect(fetchSpy).toHaveBeenCalledTimes(3);
+
+    // A definite answer does not expire.
+    clock.ms += 10 * 60_000;
+    expect(await check()).toEqual({ state: 'licensed' });
+    expect(fetchSpy).toHaveBeenCalledTimes(3);
+  });
 });
 
-describe('confirmProceedWithoutRevisions', () => {
-  it('throws USER CANCELLED when user cancels via elicitation', async () => {
-    const baseUrl = uniqueBaseUrl();
+describe('requireRevisionsLicense', () => {
+  it('refuses with LICENSE_REQUIRED on an unlicensed deployment', async () => {
     stubLicensed(false);
-    const server = makeServer({ elicitation: true, elicit: elicitCancel() });
+
+    const attempt = requireRevisionsLicense(cfgFor(uniqueBaseUrl()), 'save a draft of this form');
+    await expect(attempt).rejects.toMatchObject({ code: 'LICENSE_REQUIRED' });
+    await expect(attempt).rejects.toThrow(/Security Module/);
+  });
+
+  it('passes on a licensed deployment', async () => {
+    stubLicensed(true);
 
     await expect(
-      confirmProceedWithoutRevisions(server, cfgFor(baseUrl), 'create this form')
-    ).rejects.toThrow(/USER CANCELLED/);
+      requireRevisionsLicense(cfgFor(uniqueBaseUrl()), 'publish this form')
+    ).resolves.toBeUndefined();
   });
 
-  it('falls back to browser prompt when elicitation unsupported and persists on continue', async () => {
+  // Unknown is not unlicensed: LICENSE_REQUIRED would tell the user to stop using
+  // drafts on a deployment that may well support them.
+  it('refuses with NETWORK_ERROR naming the probe URL when the probe gets no response', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(networkFailure()));
     const baseUrl = uniqueBaseUrl();
-    stubLicensed(false);
-    mockRequestLicenseConsent.mockResolvedValue('continue');
-    const server = makeServer({ elicitation: false });
 
-    await confirmProceedWithoutRevisions(server, cfgFor(baseUrl), 'create this form');
+    const attempt = requireRevisionsLicense(cfgFor(baseUrl), 'publish this form');
 
-    expect(mockRequestLicenseConsent).toHaveBeenCalledWith(baseUrl, 'create this form');
-    const data = JSON.parse(await fs.readFile(CONSENT_FILE, 'utf-8'));
-    expect(data[baseUrl]).toBe(true);
+    await expect(attempt).rejects.toMatchObject({ code: 'NETWORK_ERROR' });
+    await expect(attempt).rejects.toThrow(/could not be determined/);
+    await expect(attempt).rejects.toThrow(`${baseUrl}/config.js`);
+    await expect(attempt).rejects.toThrow(/ECONNREFUSED/);
   });
 
-  it('throws USER CANCELLED when browser prompt cancels', async () => {
+  it('refuses with UPSTREAM_ERROR naming the probe URL when the probe is answered non-2xx', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false, status: 500 }));
     const baseUrl = uniqueBaseUrl();
-    stubLicensed(false);
-    mockRequestLicenseConsent.mockResolvedValue('cancel');
-    const server = makeServer({ elicitation: false });
 
-    await expect(
-      confirmProceedWithoutRevisions(server, cfgFor(baseUrl), 'create this form')
-    ).rejects.toThrow(/USER CANCELLED/);
-  });
+    const attempt = requireRevisionsLicense(cfgFor(baseUrl), 'revert this form');
 
-  it('persists positive consent to file and skips re-prompt for same baseUrl', async () => {
-    const baseUrl = uniqueBaseUrl();
-    stubLicensed(false);
-    const elicit = elicitAccept('continue');
-    const server = makeServer({ elicitation: true, elicit });
-
-    await confirmProceedWithoutRevisions(server, cfgFor(baseUrl), 'create this form');
-
-    const stat = await fs.stat(CONSENT_FILE);
-    expect(stat.mode & 0o777).toBe(0o600);
-    const data = JSON.parse(await fs.readFile(CONSENT_FILE, 'utf-8'));
-    expect(data[baseUrl]).toBe(true);
-
-    // second call → no re-prompt
-    await confirmProceedWithoutRevisions(server, cfgFor(baseUrl), 'create this form');
-    expect(elicit).toHaveBeenCalledTimes(1);
+    await expect(attempt).rejects.toMatchObject({ code: 'UPSTREAM_ERROR' });
+    await expect(attempt).rejects.toThrow(/could not be determined/);
+    await expect(attempt).rejects.toThrow(`${baseUrl}/config.js`);
+    await expect(attempt).rejects.toThrow(/500/);
   });
 });
 
 describe('gateRevisionsLicense', () => {
-  it('throws when requiresRevisions and unlicensed', async () => {
+  it('refuses with HISTORY_NOT_ACCEPTED when unlicensed and the caller has not accepted', async () => {
     stubLicensed(false);
-    const server = makeServer({ elicitation: true, elicit: vi.fn() });
 
-    await expect(
-      gateRevisionsLicense(server, cfgFor(uniqueBaseUrl()), {
-        actionLabel: 'save a draft of this form',
-        requiresRevisions: true,
-        form: { components: [] },
-      })
-    ).rejects.toThrow(/Security Module is required/);
+    const attempt = gateRevisionsLicense({
+      cfg: cfgFor(uniqueBaseUrl()),
+      actionLabel: 'update this form',
+      form: { components: [] },
+    });
+    await expect(attempt).rejects.toMatchObject({ code: 'HISTORY_NOT_ACCEPTED' });
+    await expect(attempt).rejects.toThrow(/acceptNoHistory: true/);
   });
 
-  it('strips revisions when requiresRevisions is false and unlicensed', async () => {
+  it('strips revisions when unlicensed and the caller accepted saving without history', async () => {
     stubLicensed(false);
-    const server = makeServer({ elicitation: true, elicit: elicitAccept('continue') });
 
-    const result = await gateRevisionsLicense(server, cfgFor(uniqueBaseUrl()), {
+    const result = await gateRevisionsLicense({
+      cfg: cfgFor(uniqueBaseUrl()),
       actionLabel: 'update this form',
-      requiresRevisions: false,
       form: { revisions: 'original', components: [] },
+      acceptNoHistory: true,
     });
     expect(result.licensed).toBe(false);
     expect(result.form).toEqual({ components: [] });
   });
 
+  it('refuses with HISTORY_NOT_ACCEPTED when licensed and the body sets revisions to ""', async () => {
+    stubLicensed(true);
+
+    const attempt = gateRevisionsLicense({
+      cfg: cfgFor(uniqueBaseUrl()),
+      actionLabel: 'update this form',
+      form: { revisions: '', components: [] },
+    });
+    await expect(attempt).rejects.toMatchObject({ code: 'HISTORY_NOT_ACCEPTED' });
+  });
+
+  it('passes a body setting revisions to "" through when licensed and accepted', async () => {
+    stubLicensed(true);
+
+    const form = { revisions: '', components: [] };
+    const result = await gateRevisionsLicense({
+      cfg: cfgFor(uniqueBaseUrl()),
+      actionLabel: 'update this form',
+      form,
+      acceptNoHistory: true,
+    });
+    expect(result).toEqual({ licensed: true, form });
+  });
+
+  // An unknown licence never strips `revisions` and never refuses on the licence's
+  // account: either would act on a probe that produced no answer.
+  it.each([
+    ['no response', () => vi.fn().mockRejectedValue(networkFailure())],
+    ['an error status', () => vi.fn().mockResolvedValue({ ok: false, status: 503 })],
+  ])('leaves the body as-is when the probe got %s', async (_label, probe) => {
+    vi.stubGlobal('fetch', probe());
+
+    const withRevisions = { revisions: 'original', components: [] };
+    const kept = await gateRevisionsLicense({
+      cfg: cfgFor(uniqueBaseUrl()),
+      actionLabel: 'update this form',
+      form: withRevisions,
+    });
+    expect(kept.form).toBe(withRevisions);
+    expect(kept.licensed).toBe(false);
+    expect(kept.licenceUnknown).toBe(true);
+
+    const withoutRevisions = { components: [] };
+    const passed = await gateRevisionsLicense({
+      cfg: cfgFor(uniqueBaseUrl()),
+      actionLabel: 'update this form',
+      form: withoutRevisions,
+    });
+    expect(passed.form).toBe(withoutRevisions);
+  });
+
+  // The body turning history off is the caller's own decision, and it needs the same
+  // acceptance whatever the probe says.
+  it('still refuses a body that turns history off when the licence is unknown', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(networkFailure()));
+
+    const attempt = gateRevisionsLicense({
+      cfg: cfgFor(uniqueBaseUrl()),
+      actionLabel: 'update this form',
+      form: { revisions: '', components: [] },
+    });
+    await expect(attempt).rejects.toMatchObject({ code: 'HISTORY_NOT_ACCEPTED' });
+    await expect(attempt).rejects.toThrow(/sets revisions to ""/);
+  });
+
   it('passes through unchanged when licensed', async () => {
     stubLicensed(true);
-    const server = makeServer({ elicitation: true, elicit: vi.fn() });
 
     const form = { revisions: 'original' as const, components: [] };
-    const result = await gateRevisionsLicense(server, cfgFor(uniqueBaseUrl()), {
+    const result = await gateRevisionsLicense({
+      cfg: cfgFor(uniqueBaseUrl()),
       actionLabel: 'update this form',
-      requiresRevisions: false,
       form,
     });
     expect(result.licensed).toBe(true);
@@ -193,147 +293,54 @@ describe('gateRevisionsLicense', () => {
   });
 });
 
-describe('gateRevisionsTracking', () => {
+describe('gateFormHistory', () => {
   const cfg = cfgFor('https://tracking.local');
 
   it.each(['original', 'current'] as const)(
-    'no prompt when caller opted in via revisions: "%s"',
+    'does not read the stored form when the caller enables revisions: "%s"',
     async (mode) => {
-      const elicit = vi.fn();
-      const server = makeServer({ elicitation: true, elicit });
-
-      const out = await gateRevisionsTracking(server, {
-        formId: uniqueFormId(),
-        form: { revisions: mode, components: [] },
-        licensed: true,
-        cfg,
-      });
-      expect(elicit).not.toHaveBeenCalled();
+      await gateFormHistory({ cfg, formId: FORM_ID, form: { revisions: mode, components: [] } });
       expect(mockFormioFetch).not.toHaveBeenCalled();
-      expect(out.revisions).toBe(mode);
     }
   );
 
-  it('no prompt when licensed is false', async () => {
-    const elicit = vi.fn();
-    const server = makeServer({ elicitation: true, elicit });
-    const out = await gateRevisionsTracking(server, {
-      formId: uniqueFormId(),
+  it('does not read the stored form when the caller accepted saving without history', async () => {
+    await gateFormHistory({
+      cfg,
+      formId: FORM_ID,
       form: { components: [] },
-      licensed: false,
-      cfg,
+      acceptNoHistory: true,
     });
-    expect(elicit).not.toHaveBeenCalled();
-    expect(out).toEqual({ components: [] });
+    expect(mockFormioFetch).not.toHaveBeenCalled();
   });
 
-  it('prompts when stored revisions is falsy and applies enable-original', async () => {
-    const formId = uniqueFormId();
-    mockFormioFetch.mockResolvedValue({ name: 'demo', revisions: '' });
-    const elicit = elicitAccept('enable-original');
-    const server = makeServer({ elicitation: true, elicit });
-
-    const out = await gateRevisionsTracking(server, {
-      formId,
-      form: { components: [] },
-      licensed: true,
-      cfg,
-    });
-    expect(elicit).toHaveBeenCalledTimes(1);
-    expect(out.revisions).toBe('original');
-  });
-
-  it('prompts even when caller passes revisions: "" and applies enable-current', async () => {
-    const formId = uniqueFormId();
-    mockFormioFetch.mockResolvedValue({ name: 'demo', revisions: '' });
-    const elicit = elicitAccept('enable-current');
-    const server = makeServer({ elicitation: true, elicit });
-
-    const out = await gateRevisionsTracking(server, {
-      formId,
-      form: { revisions: '', components: [] },
-      licensed: true,
-      cfg,
-    });
-    expect(elicit).toHaveBeenCalledTimes(1);
-    expect(out.revisions).toBe('current');
-  });
-
-  it('proceed-without-history strips revisions and remembers per-form', async () => {
-    const formId = uniqueFormId();
-    mockFormioFetch.mockResolvedValue({ name: 'demo', revisions: '' });
-    const elicit = elicitAccept('proceed-without-history');
-    const server = makeServer({ elicitation: true, elicit });
-
-    const out = await gateRevisionsTracking(server, {
-      formId,
-      form: { revisions: '', components: [] },
-      licensed: true,
-      cfg,
-    });
-    expect(out).toEqual({ components: [] });
-    expect('revisions' in out).toBe(false);
-
-    // Second call for same formId — no prompt, no API GET re-fetch needed beyond first.
-    mockFormioFetch.mockClear();
-    elicit.mockClear();
-    const out2 = await gateRevisionsTracking(server, {
-      formId,
-      form: { components: [{ type: 'textfield', key: 'x' }] },
-      licensed: true,
-      cfg,
-    });
-    expect(elicit).not.toHaveBeenCalled();
-    expect(out2).toEqual({ components: [{ type: 'textfield', key: 'x' }] });
-  });
-
-  it('throws when user cancels', async () => {
-    const formId = uniqueFormId();
-    mockFormioFetch.mockResolvedValue({ name: 'demo', revisions: '' });
-    const server = makeServer({ elicitation: true, elicit: elicitCancel() });
-
-    await expect(
-      gateRevisionsTracking(server, {
-        formId,
-        form: { components: [] },
-        licensed: true,
-        cfg,
-      })
-    ).rejects.toThrow(/User declined/);
-  });
-
-  it('falls back to browser prompt when elicitation unsupported', async () => {
-    const formId = uniqueFormId();
-    mockFormioFetch.mockResolvedValue({ name: 'demo', revisions: '' });
-    mockRequestRevisionsConsent.mockResolvedValue('enable-original');
-    const server = makeServer({ elicitation: false });
-
-    const out = await gateRevisionsTracking(server, {
-      formId,
-      form: { components: [] },
-      licensed: true,
-      cfg,
-    });
-
-    expect(mockRequestRevisionsConsent).toHaveBeenCalledWith('demo', formId);
-    expect(out.revisions).toBe('original');
-  });
-
-  it('does not prompt when stored.revisions is truthy', async () => {
-    const formId = uniqueFormId();
+  it('passes when the stored form has revisions on', async () => {
     mockFormioFetch.mockResolvedValue({ name: 'demo', revisions: 'original' });
-    const elicit = vi.fn();
-    const server = makeServer({ elicitation: true, elicit });
 
-    const out = await gateRevisionsTracking(server, {
-      formId,
-      form: { components: [] },
-      licensed: true,
-      cfg,
-    });
-    expect(elicit).not.toHaveBeenCalled();
-    expect(out).toEqual({ components: [] });
+    await gateFormHistory({ cfg, formId: FORM_ID, form: { components: [] } });
+    // Only the two fields the gate reads: the whole definition is not needed.
+    expect(mockFormioFetch).toHaveBeenCalledWith(
+      `form/${FORM_ID}`,
+      { select: 'revisions,name' },
+      cfg
+    );
   });
+
+  // Echoing the stored "" back is not a decision about history.
+  it.each([{}, { revisions: '' }])(
+    'refuses with HISTORY_NOT_ACCEPTED when the stored form has revisions off (body %j)',
+    async (extra) => {
+      mockFormioFetch.mockResolvedValue({ name: 'demo', revisions: '' });
+
+      const attempt = gateFormHistory({
+        cfg,
+        formId: FORM_ID,
+        form: { components: [], ...extra },
+      });
+      await expect(attempt).rejects.toMatchObject({ code: 'HISTORY_NOT_ACCEPTED' });
+      await expect(attempt).rejects.toThrow(/"demo"/);
+    }
+  );
 });
 
 describe('helpers', () => {

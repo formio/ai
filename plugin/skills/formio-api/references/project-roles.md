@@ -20,6 +20,8 @@ Prefer the MCP server's first-party tools when they cover the requested operatio
 | Create a role  | `role_create`      | `POST {projectUrl}/role`        |
 | Update a role  | `role_update`      | `PUT {projectUrl}/role/:roleId` |
 
+`role_create` and `role_update` both take the role document as a nested `role` object — `role_create` with `role: { title, description?, default?, admin? }`, the same fields the POST body below carries. `role_list` returns one page at a time: `limit` (default 100), `skip`, `sort` and `select` are its arguments, and the result carries `roles` beside `total` and `hasMore` — call again with a larger `skip` while `hasMore` is true.
+
 ## Endpoints
 
 ### GET {projectUrl}/role
@@ -94,7 +96,7 @@ curl -X POST -H "x-jwt-token: $FORMIO_JWT" -H "Content-Type: application/json" \
 
 ### PUT {projectUrl}/role/:roleId
 
-Update an existing role. This is a full replacement — include every field you want to preserve.
+Update an existing role. Form.io applies the body to the stored document: each top-level field in the body overwrites the stored one, a top-level field left out keeps its stored value, and an array or object in the body replaces the stored one whole rather than merging into it.
 
 | Path parameter | Type   | Description                              |
 | -------------- | ------ | ---------------------------------------- |

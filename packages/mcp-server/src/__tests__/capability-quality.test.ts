@@ -47,13 +47,25 @@ describe('capability quality', () => {
     const tools = await listToolsUnconfigured();
     // The whole surface, project_set included: every client can map a working
     // directory to a project, so nothing is withheld by launch mode.
-    expect(tools.length).toBe(21);
+    expect(tools.length).toBe(23);
     expect(tools.map((t) => t.name)).toContain('form_list');
     expect(tools.map((t) => t.name)).toContain('project_set');
     // The read half of the same surface. Withholding it is what sent every
     // skill's preflight to `npx @formio/mcp project get` — spawning a second
     // server to ask this one a question it can answer over the open transport.
     expect(tools.map((t) => t.name)).toContain('project_get');
+  });
+
+  // Tool names are singular nouns, and the connectivity check reports something a
+  // caller can act on. The old names are gone rather than aliased.
+  it('lists the 1.0 tool names and none of the names they replaced', async () => {
+    const names = (await listToolsUnconfigured()).map((t) => t.name);
+    expect(names).toEqual(
+      expect.arrayContaining(['action_type_list', 'form_revision_list', 'server_status'])
+    );
+    expect(names).not.toContain('action_types_list');
+    expect(names).not.toContain('form_revisions_list');
+    expect(names).not.toContain('hello');
   });
 
   it('still reports a missing project URL clearly when a tool is called', async () => {
@@ -134,7 +146,14 @@ describe('capability quality', () => {
     for (const name of ['form_list', 'form_get', 'role_list', 'action_list', 'project_export']) {
       expect(byName.get(name)!.annotations!.readOnlyHint, `${name} should be read-only`).toBe(true);
     }
-    for (const name of ['form_create', 'form_update', 'role_create', 'project_import']) {
+    for (const name of [
+      'form_create',
+      'form_update',
+      'form_publish',
+      'form_revert',
+      'role_create',
+      'project_import',
+    ]) {
       expect(byName.get(name)!.annotations!.readOnlyHint, `${name} writes`).toBe(false);
     }
   });

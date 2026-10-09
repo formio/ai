@@ -2,9 +2,11 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { FormioConfig } from '../config.js';
 import { formioFetch } from '../formio-client.js';
 import { toMcpError, toMcpStructuredResult } from '../mcp-responses.js';
-import { acknowledgementShape } from '../output-schemas.js';
+import { acknowledgementOutput } from '../output-schemas.js';
 import { removes } from '../tool-annotations.js';
-import { cwdSchema, resolveProjectConfig } from '../project-resolver.js';
+import { cwdSchema } from '../project-resolver.js';
+import { resolveToolConfig } from './project-resolution.js';
+import { formIdArgument, requireFormId } from './form-id.js';
 import { resourceSegmentArgument } from './path-arguments.js';
 
 export function registerActionDeleteTool(server: McpServer, config: FormioConfig) {
@@ -15,15 +17,16 @@ export function registerActionDeleteTool(server: McpServer, config: FormioConfig
         'Delete an action from a form. The action stops running on submissions immediately and is not recoverable — call action_get first if the settings may be needed again.',
       inputSchema: {
         cwd: cwdSchema,
-        formId: resourceSegmentArgument('formId').describe('The form ID the action belongs to'),
+        formId: formIdArgument(),
         actionId: resourceSegmentArgument('actionId').describe('The action ID to delete'),
       },
-      outputSchema: acknowledgementShape,
+      outputSchema: acknowledgementOutput,
       annotations: removes('Delete a form action'),
     },
     async ({ cwd, formId, actionId }) => {
       try {
-        const cfg = resolveProjectConfig(cwd, config);
+        requireFormId(formId);
+        const cfg = await resolveToolConfig({ server, cwd, config });
         // The API answers this DELETE with the plain text body `OK`, so the
         // response is read as text. Left to default to `res.json()` it threw
         // "Unexpected token 'O'" and the delete reported failure after succeeding.

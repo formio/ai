@@ -42,9 +42,9 @@ Every step has an approval gate before any file is written or any MCP call hits 
 
 ## What's in the box
 
-- **MCP server** (`@formio/mcp`) — first-party Form.io operations as MCP tools (`form_*`, `role_*`, `action_*`, `project_*`).
+- **MCP server** (`@formio/mcp`) — first-party Form.io operations as 23 MCP tools (`form_*`, `role_*`, `action_*`, `project_*`, and `server_status`, which reports the server version and project resolution without credentials).
 - **Skills library** — twelve activatable skills (app orchestration, form building, form embedding, planner, Angular and React framework implementors, schema, actions, auth, SDK, API router, MCP setup) plus a reference library under `formio-api/references/` covering every endpoint in the Form.io API Postman collection.
-- **Per-directory project routing** — `project_set` maps a working directory to a Form.io project in `~/.formio/projects.json`, so each directory can target a different project. The server resolves that mapping on every tool call; `npx -y @formio/mcp@0.14.1 project get --cwd .` prints what it resolves and why.
+- **Per-directory project routing** — `project_set` maps a working directory to a Form.io project in `~/.formio/projects.json`, so each directory can target a different project. The server resolves that mapping on every tool call; `npx -y @formio/mcp@0.14.1 project get --cwd "$(pwd)"` prints what it resolves and why.
 
 | Skill | Purpose |
 | --- | --- |

@@ -20,6 +20,9 @@ process.env.USERPROFILE = tmpHome;
 // where it happens to be exported. A case that wants one sets it itself.
 delete process.env.FORMIO_PROJECT_URL;
 delete process.env.FORMIO_BASE_URL;
+// The same for the directory a client launch names: under Claude Code it is set for
+// every spawned process, and a tool given no cwd would resolve against it.
+delete process.env.CLAUDE_PROJECT_DIR;
 
 beforeEach(() => {
   fs.rmSync(path.join(tmpHome, '.formio'), { recursive: true, force: true });

@@ -24,22 +24,18 @@ const PATH_ARGUMENTS = ['formIdOrPath', 'formId', 'actionId', 'actionName', 'ver
 // Valid values for every required argument, so a refusal is about the argument under test alone.
 const VALID_ARGUMENTS: Record<string, Record<string, unknown>> = {
   form_get: { formIdOrPath: 'user/login' },
-  form_revisions_list: { formIdOrPath: 'user/login' },
+  form_revision_list: { formIdOrPath: 'user/login' },
   form_revision_get: { formIdOrPath: 'user/login', version: '3' },
-  form_update: {
-    formId: FORM_ID,
-    form: { components: [] },
-    note: 'Reverted to version 3',
-    revert: true,
-    version: '3',
-  },
+  form_update: { formId: FORM_ID, form: { components: [] }, note: 'n' },
+  form_publish: { formId: FORM_ID, note: 'n' },
+  form_revert: { formId: FORM_ID, version: '3', note: 'Reverted to version 3' },
   role_update: { roleId: FORM_ID, role: { title: 'Admin' } },
   action_list: { formId: FORM_ID },
   action_create: { formId: FORM_ID, action: ACTION },
   action_get: { formId: FORM_ID, actionId: ACTION_ID },
   action_update: { formId: FORM_ID, actionId: ACTION_ID, action: ACTION },
   action_delete: { formId: FORM_ID, actionId: ACTION_ID },
-  action_types_list: { formId: FORM_ID },
+  action_type_list: { formId: FORM_ID },
   action_type_get: { formId: FORM_ID, actionName: 'email' },
 };
 

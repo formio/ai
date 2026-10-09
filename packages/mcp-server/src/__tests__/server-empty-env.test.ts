@@ -48,17 +48,19 @@ describe('createServer with an empty environment', () => {
 
     expect(names).toEqual(
       expect.arrayContaining([
-        'hello',
+        'server_status',
         'form_create',
         'form_get',
         'form_list',
         'form_update',
-        'form_revisions_list',
+        'form_publish',
+        'form_revert',
+        'form_revision_list',
         'form_revision_get',
         'role_create',
         'role_list',
         'role_update',
-        'action_types_list',
+        'action_type_list',
         'action_type_get',
         'action_create',
         'action_list',

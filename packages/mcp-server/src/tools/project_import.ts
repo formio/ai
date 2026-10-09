@@ -3,26 +3,27 @@ import { z } from 'zod';
 import { FormioConfig } from '../config.js';
 import { formioFetch } from '../formio-client.js';
 import { toMcpError, toMcpStructuredResult } from '../mcp-responses.js';
-import { acknowledgementShape } from '../output-schemas.js';
+import { acknowledgementOutput } from '../output-schemas.js';
 import { overwrites } from '../tool-annotations.js';
-import { cwdSchema, resolveProjectConfig } from '../project-resolver.js';
+import { cwdSchema } from '../project-resolver.js';
+import { resolveToolConfig } from './project-resolution.js';
 
 export function registerProjectImportTool(server: McpServer, config: FormioConfig) {
   server.registerTool(
     'project_import',
     {
       description:
-        "Import a template JSON into the existing Form.io project mapped to the user's current working directory, merging roles, resources, forms, and actions in one call. Use the formio-resource-planner skill to construct the template before calling this tool. WARNING: import merges into the existing project — use project_export first to snapshot.",
+        "Merge a template's roles, resources, forms and actions into the existing project `cwd` resolves to, in one call. Build the template with the formio-resource-planner skill, and snapshot first with project_export: the import merges, it does not replace.",
       inputSchema: {
         cwd: cwdSchema,
         template: z.looseObject({}).describe('The template JSON object to import'),
       },
-      outputSchema: acknowledgementShape,
+      outputSchema: acknowledgementOutput,
       annotations: overwrites('Import a project template'),
     },
     async ({ cwd, template }) => {
       try {
-        const cfg = resolveProjectConfig(cwd, config);
+        const cfg = await resolveToolConfig({ server, cwd, config });
         const result = await formioFetch('import', {}, cfg, {
           method: 'POST',
           body: { template },

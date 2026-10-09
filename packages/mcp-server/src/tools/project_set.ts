@@ -19,9 +19,12 @@ import {
 import { projectCommand } from '../cli-launch.js';
 import { cwdSchema } from '../project-resolver.js';
 import { FORCED_PAIR_FACT, ProjectReport, reportProject } from '../project-report.js';
-import { toMcpStructuredResult } from '../mcp-responses.js';
-import { projectMappingShape } from '../output-schemas.js';
+import { catchToolErrors, toMcpStructuredResult } from '../mcp-responses.js';
+import { ToolError, ToolErrorCode } from '../tool-errors.js';
+import { projectMappingOutput } from '../output-schemas.js';
 import { local } from '../tool-annotations.js';
+import { toolDirectory } from './project-resolution.js';
+import { guessedDirectory, isNamedDirectory } from '../workspace-directory.js';
 import {
   readProjectEntryForWrite,
   unusableRecordProjectUrl,
@@ -64,45 +67,56 @@ export function registerProjectSetTool(server: McpServer, options: ProjectSetOpt
   server.registerTool(
     'project_set',
     {
+      // Rules a caller acts on, and nothing else: why the tool works this way is in
+      // the package README ("Why project_set works this way").
       description: [
-        'Set the active Form.io project for the given working directory by recording its URL in ~/.formio/projects.json',
-        'You MUST call this tool whenever the user asks to set, change, or switch the active Form.io project — do not merely acknowledge the request in text. Persisting the choice requires the tool call.',
-        "The chosen URL is persisted to ~/.formio/projects.json keyed by the cwd argument when provided (or the MCP server process cwd otherwise). Pass the `cwd` argument whenever you know the user's current working directory — the server process cwd is fixed at spawn and may not match where the user actually is.",
-        'Every Form.io tool resolves its project on each call, so a mapping written here needs no restart. It takes effect only where the mapping is the record that WINS, though: under a committed formio.json the mapping is the fallback if that file goes away, and this call reports the pair that actually resolves rather than the one it recorded. Read `ok` and `projectUrl` on the result rather than assuming the write governs.',
-        'You normally pass only projectUrl. The base URL — which builds the portal-login URL and keys the cached token — is derived from it — https://api.form.io for a project on a form.io host, and the parent path for a project addressed as a sub-directory — so there is nothing to supply. Pass baseUrl ONLY when the server reports that it cannot be determined, which happens for a project URL that carries no path on a customer domain: there the deployment is a sibling sub-domain and nothing in the project URL names it. Do not ask the user for a base URL before the server says it needs one.',
-        `This tool writes the machine-local mapping, which is keyed by absolute path and therefore does not survive a clone. To record the target with the code instead — versioned, visible in a diff, and shared with everyone who clones the repository — write a committed ${COMMITTED_CONFIG_FILE} yourself, in the application's own folder: a JSON object holding {"projectUrl": "..."}, plus "baseUrl" only when it cannot be derived. This server reads that file and never writes it.`,
-        `Resolution is by scope, narrowest first, and precedence runs: a committed ${COMMITTED_CONFIG_FILE}, then the working-directory mapping, then FORMIO_PROJECT_URL in the environment, which is the weakest of the three. So a mapping written here DOES override an environment value, and a committed file overrides both.`,
+        'Set the active Form.io project for a directory: records its Project URL in ~/.formio/projects.json, keyed by the directory `cwd` resolves to. Call it whenever the user asks to set, change, or switch the project; acknowledging in text persists nothing. No restart is needed.',
+        `Resolution precedence: a committed ${COMMITTED_CONFIG_FILE}, then this mapping, then FORMIO_PROJECT_URL in the environment, the weakest — so a mapping written here DOES override the environment. \`ok\` and \`projectUrl\` on the result report the pair that resolves.`,
+        'Pass projectUrl alone: the Base URL is derived — https://api.form.io for a form.io host, the parent path for a sub-directory project. Pass baseUrl only when the server reports it cannot be derived.',
+        `A committed ${COMMITTED_CONFIG_FILE} ({"projectUrl": "..."}, plus "baseUrl" only when it cannot be derived) is written by hand in the application's folder; this server reads it and never writes it.`,
       ].join(' '),
       // Strict: an argument this tool does not take is REFUSED, not silently dropped.
       // `scope` was removed with the committed-file writer, and the previous release's
       // own documentation still names it — stripped, that call would write the
       // machine-local mapping and report success for a committed write that never
       // happened. The CLI whitelists its flags for exactly this reason.
+      //
+      // The URLs are plain strings here and checked in the handler, so a value that is
+      // not an http(s) URL is refused as INVALID_ARGUMENT: a schema failure is
+      // reported by the SDK as bare text with no code.
       inputSchema: z.strictObject({
         projectUrl: z
-          .url({ protocol: /^https?$/ })
+          .string()
           .optional()
           .describe(
-            'Full URL of the Form.io project to activate. Optional when THIS DIRECTORY\'S OWN MAPPING already holds a project: omitting it then updates that record\'s baseUrl alone, which is how the "Base URL cannot be determined" error is repaired without re-asking for a project URL. Where the project is held by another record, a baseUrl alone is refused rather than split from its project — for a committed formio.json the deployment is added to that file by hand (this server never writes one), and for FORMIO_PROJECT_URL in the environment the call must carry BOTH projectUrl and baseUrl, which records the pair here. Required when nothing configures a project at all. On the Form.io hosted cloud it is the project name as a sub-domain of form.io, e.g. https://examples.form.io — never https://api.form.io, which is the Base URL every hosted project shares. On a customer-hosted deployment it is either a sibling sub-domain of that customer’s domain, e.g. https://myproject.mysite.com, or a sub-directory of the deployment, e.g. https://forms.mysite.com/myproject — whichever that deployment uses.'
+            "Full Project URL, e.g. https://examples.form.io or https://forms.mysite.com/myproject; never https://api.form.io. Omit it only to add a baseUrl to THIS DIRECTORY'S OWN mapping: where a committed formio.json holds the project, add baseUrl to that file by hand; where FORMIO_PROJECT_URL does, pass both."
           ),
         // The SAME schema every reader validates against. A write must not accept
         // what a read cannot key on.
         cwd: cwdSchema.describe(
-          "User's current working directory to key the persisted mapping against, as an absolute path. Pass whenever known (e.g. from UserPromptSubmit hook context). Falls back to the MCP server's process.cwd() when omitted, which is fixed at spawn and may not be where the user is."
+          "Optional. Directory whose mapping to write; defaults to the client's workspace root."
         ),
         baseUrl: z
-          .url({ protocol: /^https?$/ })
+          .string()
           .optional()
           .describe(
-            'Deployment URL for the Form.io Enterprise Server that hosts this project. It builds the portal-login URL and keys the cached token, so a wrong one fails at login rather than on the request. Usually omitted: it is derived from projectUrl wherever it can be. Supply it when the server reports that it cannot be determined — a project URL with no path on a customer domain, whose deployment is a sibling sub-domain. It MAY carry a path of its own when the deployment is mounted at a sub-path. Never pass it for a project on a form.io host: those are served by https://api.form.io and by nothing else, so any other value is refused. Persisted per-cwd alongside the project URL, and bound to the project recorded with it, so each directory can target a different deployment and no deployment answers for another project. When omitted and this call does not change the project, the base URL already mapped for this directory is kept — but a call that re-points the directory to a different project keeps nothing, because that value belonged to the project being replaced.'
+            "The deployment hosting the project; omit it unless the server reports it cannot be derived. May carry a sub-path; refused for a form.io host. Omitted, this directory's mapped value is kept unless the call re-points it to a different project."
           ),
       }),
-      outputSchema: projectMappingShape,
+      outputSchema: projectMappingOutput,
       // Writes only to the local project map — no Form.io request involved.
       annotations: local('Set the active project', false),
     },
-    async ({ projectUrl, cwd, baseUrl: baseUrlArg }) => {
-      const entryCwd = cwd ?? getServerCwd();
+    catchToolErrors(async ({ projectUrl, cwd, baseUrl: baseUrlArg }) => {
+      // The same directory every reader resolves for a call like this one: the
+      // caller's cwd, else the client's workspace root, else CLAUDE_PROJECT_DIR, else
+      // the server's own. A mapping keyed anywhere else is one the next call misses.
+      const directory = await toolDirectory({ server, cwd, serverCwd: getServerCwd });
+      const entryCwd = directory.dir;
+      // A guessed directory — the server's own, or a launch default — is one nobody
+      // chose for this write.
+      const named = isNamedDirectory(directory);
+      const guessed = guessedDirectory(directory);
       const mapped = readProjectEntryForWrite(entryCwd);
       // An entry that EXISTS and cannot be honoured is not an absent one. A record's
       // URLs are validated where that record WINS — inside the resolver — so a mapping
@@ -137,16 +151,34 @@ export function registerProjectSetTool(server: McpServer, options: ProjectSetOpt
       // and the write it invites is one nothing later reads. project_get answers the
       // same state by omitting its remedy; this is that answer in a writer's
       // vocabulary.
-      const recordUnder = cwd ? `cwd ${entryCwd}` : "cwd set to the user's own directory";
-      const fallbackCwdWarning = cwd
+      const recordUnder = named ? `cwd ${entryCwd}` : "cwd set to the user's own directory";
+      const fallbackCwdWarning = named
         ? ''
-        : ` Note: no cwd argument was passed, so ${entryCwd} is the MCP server's own working directory rather than the user's. Call project_set again with cwd set to the user's directory BEFORE recording anything — a record written here would not be found from theirs.`;
+        : ` Note: no cwd argument was passed and the client named no directory, so ${entryCwd} is ${guessed}, which may not be the user's. Call project_set again with cwd set to the user's directory BEFORE recording anything — a record written here would not be found from theirs.`;
       // Annotated on the variable so TypeScript narrows after a call: an arrow
       // returning `never` only terminates control flow for the checker when the
       // binding itself declares that type.
-      const refuse: (message: string) => never = (message) => {
-        throw new Error([...walkNotes, message + fallbackCwdWarning].join('\n'));
+      // A refusal of the caller's arguments is INVALID_ARGUMENT; a failure the reader
+      // raised keeps the code it was raised with.
+      const refuse: (message: string, code?: ToolErrorCode) => never = (
+        message,
+        code = 'INVALID_ARGUMENT'
+      ) => {
+        throw new ToolError({
+          code,
+          message: [...walkNotes, message + fallbackCwdWarning].join('\n'),
+        });
       };
+      // An empty value is a value, not an omission: read as absent, it would keep the
+      // mapped value and report success for a write the caller did not ask for.
+      const emptyArguments = Object.entries({ projectUrl, baseUrl: baseUrlArg })
+        .filter(([, value]) => value !== undefined && value.trim() === '')
+        .map(([name]) => name);
+      if (emptyArguments.length > 0) {
+        refuse(
+          `${emptyArguments.join(' and ')} ${emptyArguments.length === 1 ? 'is' : 'are'} empty. Omit an argument to leave it unchanged, or pass a full http(s) URL.`
+        );
+      }
       const committed = findCommittedConfig(entryCwd, {
         onNote: (message) => walkNotes.push(message),
       });
@@ -259,9 +291,9 @@ export function registerProjectSetTool(server: McpServer, options: ProjectSetOpt
       // not the user's directory. Keying there still beats refusing — some clients have
       // no cwd to pass — but the caller has to be told, or the next call that does pass
       // a cwd misses the mapping and loops.
-      const serverCwdWarning = cwd
+      const serverCwdWarning = named
         ? ''
-        : ` Warning: no cwd argument was passed, so this mapping is keyed to the MCP server's own working directory. If that is not the user's directory, call project_set again with cwd set to it.`;
+        : ` Warning: no cwd argument was passed and the client named no directory, so this mapping is keyed to ${entryCwd}, ${guessed}. If that is not the user's directory, call project_set again with cwd set to it.`;
       // A mapping written under a committed file naming a different project still
       // belongs on disk — it is the fallback if that file goes away — but it does not
       // take effect now.
@@ -311,7 +343,8 @@ export function registerProjectSetTool(server: McpServer, options: ProjectSetOpt
             baseConfig: { projectUrl: getEnvProjectUrl(), baseUrl: getEnvBaseUrl() },
             remedies: TOOL_REMEDIES,
             notes: reportNotes,
-            cwdWasNamed: Boolean(cwd),
+            cwdWasNamed: named,
+            guessedDirectory: guessed,
           });
         } catch (error) {
           // NOT swallowed. A committed file is checked for shape where it is read and
@@ -321,7 +354,10 @@ export function registerProjectSetTool(server: McpServer, options: ProjectSetOpt
           // was written" instead, this returned a success naming a pair the governing
           // file contradicts, and the next call failed with the reason discarded.
           keepNotes();
-          refuse(error instanceof Error ? error.message : String(error));
+          refuse(
+            error instanceof Error ? error.message : String(error),
+            error instanceof ToolError ? error.code : 'INTERNAL'
+          );
         }
         keepNotes();
         return report;
@@ -398,6 +434,6 @@ export function registerProjectSetTool(server: McpServer, options: ProjectSetOpt
         },
         fullMessage
       );
-    }
+    })
   );
 }
