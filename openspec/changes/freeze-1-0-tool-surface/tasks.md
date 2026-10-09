@@ -175,13 +175,13 @@
 
 ### Red
 
-- [ ] 11.1 Confirm `pnpm check:releases` fails until the changeset exists
+- [x] 11.1 Confirm `pnpm check:releases` coverage (it already passed: #88's pending minor changeset releases both packages, so the major changeset is what sets the bump, not what satisfies the check)
 
 ### Green
 
-- [ ] 11.2 Add a `major` changeset for `@formio/mcp` and `@formio/ai` listing every rename, the new tools, the list and error contracts, `acceptNoHistory`, and the removed consent file
-- [ ] 11.3 Run `pnpm test`, `pnpm lint`, `pnpm format`, `pnpm check:releases` and `openspec validate --strict`
+- [x] 11.2 Add a `major` changeset for `@formio/mcp` and `@formio/ai` listing every rename, the new tools, the list and error contracts, `acceptNoHistory`, and the removed consent file
+- [x] 11.3 Run `pnpm test`, `pnpm lint`, `pnpm format`, `pnpm check:releases` and `openspec validate --strict`
 
 ### Refactor
 
-- [ ] 11.4 Review implementation and refactor as needed
+- [x] 11.4 Review implementation and refactor as needed
