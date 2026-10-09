@@ -71,7 +71,7 @@ No client prompts for anything at install time. Both URLs are resolved per direc
 | --- | :-: | --- | --- |
 | `FORMIO_BASE_URL` | no | derived, see note | Full base URL of your Form.io deployment. The WEAKEST source: a committed `formio.json` wins, then the directory's mapping, then this. When nothing supplies one it is derived from the project URL's shape, and a project URL that names no deployment yields an actionable error rather than a guess. |
 | `FORMIO_PROJECT_URL` | no\* | — | Full URL of the Form.io project the MCP server should target. The WEAKEST source: a committed `formio.json` wins, then the directory's mapping, then this. The plugin leaves it unset and routes per-cwd instead. |
-| `FORMIO_API_KEY` | no | `undefined` | Long-lived project API key. When set, the server skips the browser login flow and attaches `x-token`. |
+| `FORMIO_API_KEY` | no | `undefined` | Long-lived project API key, applied only to the project on `FORMIO_PROJECT_URL`'s origin — set `FORMIO_PROJECT_URL` beside it. Where it applies, the server skips the browser login flow and attaches `x-token`. |
 | `FORMIO_LOGIN_FORM` | no | Auto-resolved | Override the portal login form URL. |
 | `FORMIO_FORCE_BROWSER` | no | `0` | Set to `1` to attempt the browser login even where the server detects no browser (CI, a container, SSH with no display). |
 | `FORMIO_INSECURE_TLS` | no | `false` | When `true`, skips TLS certificate verification — for self-hosted deployments behind self-signed certs. Do not use against production. |
@@ -81,7 +81,7 @@ No client prompts for anything at install time. Both URLs are resolved per direc
 ### Authentication modes
 
 - **JWT mode (default).** Leave `FORMIO_API_KEY` unset. The first authenticated tool call opens the portal login form in the browser; subsequent calls reuse the cached JWT.
-- **API-key mode.** Set `FORMIO_API_KEY`. All requests attach `x-token`; no browser login.
+- **API-key mode.** Set the `FORMIO_API_KEY` environment variable beside `FORMIO_PROJECT_URL`. Requests to the project on `FORMIO_PROJECT_URL`'s origin attach `x-token` with no browser login; a project on another origin uses the portal login.
 
 ### Login-form auto-resolution
 

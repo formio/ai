@@ -20,6 +20,7 @@ import {
   ENTERPRISE_ONLY,
   API_ROOT_IS_NOT_YOUR_DEPLOYMENT,
   DEPLOYMENT_IS_DERIVED,
+  DEPLOYMENT_ON_ANOTHER_DOMAIN,
   HOSTED_CLOUD_DEPLOYMENT,
   NOT_A_HOSTED_PROJECT,
   PairValidity,
@@ -407,7 +408,9 @@ function validateWinningRecord({
           ? API_ROOT_IS_NOT_YOUR_DEPLOYMENT
           : validity === 'underivable-mismatch'
             ? DEPLOYMENT_IS_DERIVED
-            : HOSTED_CLOUD_DEPLOYMENT
+            : validity === 'unrelated-deployment'
+              ? DEPLOYMENT_ON_ANOTHER_DOMAIN
+              : HOSTED_CLOUD_DEPLOYMENT
       }${
         derived
           ? ` Resolving ${projectUrl} on ${derived} instead.`
@@ -456,6 +459,23 @@ function validateWinningRecord({
         : `Ignoring FORMIO_PROJECT_URL and FORMIO_BASE_URL: both name ${projectUrl}, which makes the project its own deployment. ${ENTERPRISE_ONLY}`
   );
   return undefined;
+}
+
+// FORMIO_API_KEY is issued by one project, and FORMIO_PROJECT_URL is the only value
+// that names it — so the key travels only to that project's origin. A committed file
+// or a mapping that resolves elsewhere gets the portal login, never the key.
+function apiKeyAppliesTo({
+  apiKeyProjectUrl,
+  projectUrl,
+}: {
+  apiKeyProjectUrl: string | undefined;
+  projectUrl: string;
+}): boolean {
+  // An empty FORMIO_PROJECT_URL names no project, exactly as an unset one does.
+  if (!apiKeyProjectUrl) {
+    return false;
+  }
+  return new URL(apiKeyProjectUrl).origin === new URL(projectUrl).origin;
 }
 
 // What every tool handler needs. `project get` needs the provenance too, and
@@ -620,6 +640,18 @@ export function resolveProject(
     );
   }
 
+  const apiKeyApplies = apiKeyAppliesTo({
+    apiKeyProjectUrl: envProjectUrl,
+    projectUrl: normalizedProjectUrl,
+  });
+  if (baseConfig.apiKey && !apiKeyApplies) {
+    onNote(
+      envProjectUrl
+        ? `FORMIO_API_KEY is set but not applied: it belongs to the project on ${new URL(envProjectUrl).origin} (FORMIO_PROJECT_URL), and this directory resolves to ${normalizedProjectUrl}. Requests for this project authenticate through the portal login instead.`
+        : `FORMIO_API_KEY is set but not applied: FORMIO_PROJECT_URL is unset, so nothing names the project the key belongs to. Set FORMIO_PROJECT_URL to that project to use the key; requests authenticate through the portal login until then.`
+    );
+  }
+
   const baseUrl = winner.baseUrl ?? winner.derived;
   const baseUrlSource: BaseUrlSource = winner.baseUrl
     ? projectUrlSource
@@ -630,6 +662,7 @@ export function resolveProject(
   return {
     config: {
       ...baseConfig,
+      apiKey: apiKeyApplies ? baseConfig.apiKey : undefined,
       baseUrl: baseUrl && stripTrailingSlashes(baseUrl),
       projectUrl: normalizedProjectUrl,
       cwd: mapCwd,

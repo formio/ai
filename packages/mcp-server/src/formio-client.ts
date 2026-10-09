@@ -89,14 +89,23 @@ export async function formioRawFetch(
   return parseResponse(response);
 }
 
+// Whether a built URL addresses the project: the same origin, and a path that IS
+// the project's path or continues it at a segment boundary — so a sibling project
+// sharing a prefix (`/myproject2` beside `/myproject`) is not under it.
+function isUnderProject(url: URL, projectUrl: URL): boolean {
+  const prefix = projectUrl.pathname.replace(/\/+$/, '');
+  return (
+    url.origin === projectUrl.origin &&
+    (url.pathname === prefix || url.pathname.startsWith(`${prefix}/`))
+  );
+}
+
 export async function formioFetch(
   path: string,
   params: Record<string, string | undefined>,
   config: ResolvedFormioConfig,
   options?: FormioFetchOptions
 ): Promise<unknown> {
-  await ensureAuthenticated(config);
-
   const base = config.projectUrl.replace(/\/*$/, '/');
   const url = new URL(path.replace(/^\//, ''), base);
 
@@ -106,6 +115,17 @@ export async function formioFetch(
   for (const [key, value] of entries) {
     url.searchParams.set(key, value);
   }
+
+  // Checked before the auth gate, so a request that would leave the project never
+  // reaches a credential. The tool-argument rule refuses these values first and names
+  // the argument; this holds for every caller, including ones that bypass it.
+  if (!isUnderProject(url, new URL(base))) {
+    throw new Error(
+      `Refusing the Form.io request for path ${JSON.stringify(path)}: it resolves to ${url.origin}${url.pathname}, which is not under the Project URL ${config.projectUrl}. Every request addresses the project this directory resolves to.`
+    );
+  }
+
+  await ensureAuthenticated(config);
 
   return formioRawFetch(url, config, options);
 }

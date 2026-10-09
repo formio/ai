@@ -139,7 +139,8 @@ describe('resolveProjectConfig', () => {
 
       expect(cfg.projectUrl).toBe('https://mapped.form.io');
       expect(cfg.baseUrl).toBe('https://api.form.io');
-      expect(cfg.apiKey).toBe('abc');
+      // The key belongs to the project FORMIO_PROJECT_URL names, and none is set here.
+      expect(cfg.apiKey).toBeUndefined();
     });
 
     // A host that prompts for an optional project URL and gets no answer passes
@@ -529,9 +530,14 @@ describe('resolveProjectConfig', () => {
       });
       const notes: string[] = [];
 
-      resolveProjectConfig('/workspace/pkg-a', baseConfig, {
-        onNote: (message) => notes.push(message),
-      });
+      // No key, so the only note this could produce is about the cwd.
+      resolveProjectConfig(
+        '/workspace/pkg-a',
+        { ...baseConfig, apiKey: undefined },
+        {
+          onNote: (message) => notes.push(message),
+        }
+      );
 
       expect(notes).toEqual([]);
     });

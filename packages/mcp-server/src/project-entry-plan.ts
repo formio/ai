@@ -147,6 +147,7 @@ export type ProjectEntryPlan =
     }
   | { outcome: 'api-root-deployment'; cwd: string; projectUrl: string; baseUrl: string }
   | { outcome: 'underivable-mismatch'; cwd: string; projectUrl: string; baseUrl: string }
+  | { outcome: 'unrelated-deployment'; cwd: string; projectUrl: string; baseUrl: string }
   | PlannedWrite;
 
 export function planProjectEntry({
@@ -410,7 +411,8 @@ export function planProjectEntry({
   if (
     validity === 'hosted-project-foreign-deployment' ||
     validity === 'api-root-deployment' ||
-    validity === 'underivable-mismatch'
+    validity === 'underivable-mismatch' ||
+    validity === 'unrelated-deployment'
   ) {
     return { outcome: validity, cwd, projectUrl, baseUrl };
   }

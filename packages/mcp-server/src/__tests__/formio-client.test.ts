@@ -273,3 +273,58 @@ describe('formioFetch', () => {
     expect(retryOptions.headers).toEqual({ 'x-jwt-token': 'refreshed-jwt' });
   });
 });
+
+describe('formioFetch keeps every request under the Project URL', () => {
+  const mockFetch = vi.fn();
+
+  beforeEach(() => {
+    vi.stubGlobal('fetch', mockFetch);
+    mockEnsureAuth.mockReset();
+    mockFetch.mockReset();
+    mockFetch.mockResolvedValue({ ok: true, json: () => Promise.resolve({}) });
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  const withProject = (projectUrl: string): ResolvedFormioConfig => ({ ...config, projectUrl });
+
+  it('sends a form path under a hosted project', async () => {
+    await formioFetch('user/login', {}, withProject('https://examples.form.io'));
+    expect((mockFetch.mock.calls[0][0] as URL).href).toBe('https://examples.form.io/user/login');
+  });
+
+  it('sends a form ID path under a sub-directory project', async () => {
+    await formioFetch(
+      'form/65a1b2c3d4e5f60718293a4b',
+      {},
+      withProject('https://forms.mysite.com/myproject')
+    );
+    expect((mockFetch.mock.calls[0][0] as URL).href).toBe(
+      'https://forms.mysite.com/myproject/form/65a1b2c3d4e5f60718293a4b'
+    );
+  });
+
+  it.each([
+    ['https://example.com/x', 'https://examples.form.io'],
+    ['//elsewhere/form', 'https://forms.mysite.com/myproject'],
+    ['../otherproject/form', 'https://forms.mysite.com/myproject'],
+    ['../myproject2/form', 'https://forms.mysite.com/myproject'],
+  ])('refuses %j under %s without sending it', async (path, projectUrl) => {
+    const refusal = await formioFetch(path, {}, withProject(projectUrl)).catch(
+      (error: unknown) => error
+    );
+    expect(refusal).toBeInstanceOf(Error);
+    expect((refusal as Error).message).toContain(path);
+    expect((refusal as Error).message).toContain(projectUrl);
+    expect(mockFetch).not.toHaveBeenCalled();
+  });
+
+  it('refuses before the auth gate runs', async () => {
+    await expect(
+      formioFetch('https://example.com/x', {}, withProject('https://examples.form.io'))
+    ).rejects.toThrow();
+    expect(mockEnsureAuth).not.toHaveBeenCalled();
+  });
+});

@@ -173,10 +173,11 @@ describe('a derivable deployment contradicted by a recorded one', () => {
     );
   });
 
-  // The shape that derives nothing is untouched: there the caller's value is the only
-  // one there is.
+  // The shape that derives nothing is untouched by THIS rule: there the caller's value
+  // is the only one there is, on the project's own registrable domain (the
+  // registrable-domain rule itself is covered in related-deployment.test.ts).
   it('says nothing about a project that derives no deployment', () => {
-    expect(classifyPair('https://myproject.mysite.com', 'https://anything.example.com')).toBe('ok');
+    expect(classifyPair('https://myproject.mysite.com', 'https://anything.mysite.com')).toBe('ok');
   });
 });
 

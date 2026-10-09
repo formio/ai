@@ -34,7 +34,7 @@
         },
         {
           "name": "FORMIO_API_KEY",
-          "description": "Form.io project API key. Optional \u2014 when omitted the server uses a browser-based portal login flow to obtain a JWT.",
+          "description": "Form.io project API key. Optional \u2014 applied only to the project on FORMIO_PROJECT_URL's origin, so set FORMIO_PROJECT_URL beside it; any other project, and every project when it is omitted, uses the browser-based portal login flow to obtain a JWT.",
           "isRequired": false,
           "format": "string",
           "isSecret": true

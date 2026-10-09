@@ -1,3 +1,4 @@
+import { getDomain } from 'tldts';
 import { DEFAULT_BASE_URL, stripTrailingSlashes } from './config.js';
 
 /**
@@ -23,7 +24,9 @@ export type PairValidity =
   | 'hosted-project-foreign-deployment'
   /** A project whose deployment is derivable, paired with a different one. */
   | 'underivable-mismatch'
-  | 'api-root-deployment';
+  | 'api-root-deployment'
+  /** A path-less customer project paired with a deployment on another registrable domain. */
+  | 'unrelated-deployment';
 
 /**
  * Which HALF of the pair a verdict is about.
@@ -36,7 +39,8 @@ export type PairValidity =
 export function faultedHalf(validity: Exclude<PairValidity, 'ok'>): 'project' | 'deployment' {
   return validity === 'hosted-project-foreign-deployment' ||
     validity === 'api-root-deployment' ||
-    validity === 'underivable-mismatch'
+    validity === 'underivable-mismatch' ||
+    validity === 'unrelated-deployment'
     ? 'deployment'
     : 'project';
 }
@@ -57,6 +61,9 @@ export const DEPLOYMENT_IS_DERIVED = `A project addressed as a sub-directory is 
 
 /** Said the same way wherever a customer project is paired with the hosted cloud. */
 export const API_ROOT_IS_NOT_YOUR_DEPLOYMENT = `${DEFAULT_BASE_URL} is the Form.io hosted cloud, which serves only the projects on it — the ones addressed as a sub-domain of form.io. A project on any other domain is served by its own deployment, so this value would send the portal login and the cached token to a deployment you do not use. Ask the user for the deployment that hosts this project, or record the project URL alone where its deployment can be derived.`;
+
+/** Said the same way wherever a path-less customer project is paired with a deployment on another domain. */
+export const DEPLOYMENT_ON_ANOTHER_DOMAIN = `A project URL with no path on a customer domain is served by a sibling sub-domain on the same registrable domain — https://myproject.mysite.com by https://api.mysite.com — so a deployment on a different registrable domain is not the one serving this project, and recorded here it would send the portal login and the cached token to a deployment that does not host it. Ask the user for the deployment on this project's own domain.`;
 
 /** Said the same way wherever a hosted project is paired with something else. */
 export const HOSTED_CLOUD_DEPLOYMENT = `A project on a form.io host is served by ${DEFAULT_BASE_URL} and by nothing else — that is what makes the Project URL the whole configuration for a hosted project — and a *.form.io host is never a Base URL. Record the project URL alone; its deployment is derived.`;
@@ -110,6 +117,23 @@ function isHostedCloudProject(projectUrl: URL): boolean {
 // whole hostname, never as a suffix, so a lookalike host is a different deployment.
 function isApiRootHost(url: URL): boolean {
   return hostOf(url) === hostOf(new URL(DEFAULT_BASE_URL));
+}
+
+// Whether a deployment can serve a path-less customer project: both hosts on the
+// same registrable domain, read from the public suffix list with its private section
+// on — so `mysite.co.uk` is a domain while `co.uk` is not, and two tenants of a
+// shared hosting suffix (`a.herokuapp.com`, `b.herokuapp.com`) are not related. A
+// host with no registrable domain (an IP literal, `localhost`) is compared directly:
+// the deployment is the project host itself or its parent.
+function sharesRegistrableDomain(projectUrl: URL, baseUrl: URL): boolean {
+  const projectHost = hostOf(projectUrl);
+  const baseHost = hostOf(baseUrl);
+  const projectDomain = getDomain(projectHost, { allowPrivateDomains: true });
+  const baseDomain = getDomain(baseHost, { allowPrivateDomains: true });
+  if (projectDomain && baseDomain) {
+    return projectDomain === baseDomain;
+  }
+  return baseHost === projectHost || baseHost === projectHost.split('.').slice(1).join('.');
 }
 
 // A sub-directory-routed project URL is its deployment plus exactly ONE
@@ -259,6 +283,13 @@ export function classifyPair(
   const derivable = deriveBaseUrl(projectUrl);
   if (baseUrl && derivable && baseUrl !== derivable) {
     return 'underivable-mismatch';
+  }
+  // The one shape whose deployment nothing derives — a path-less project on a customer
+  // domain — is served by a sibling sub-domain, so the recorded deployment has to be on
+  // the same registrable domain. Anything else would receive this project's portal
+  // login and the token cached for it.
+  if (baseUrl && !derivable && !sharesRegistrableDomain(parsedProject, new URL(baseUrl))) {
+    return 'unrelated-deployment';
   }
   return 'ok';
 }

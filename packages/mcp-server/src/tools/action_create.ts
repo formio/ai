@@ -6,7 +6,7 @@ import { actionShape } from '../output-schemas.js';
 import { creates } from '../tool-annotations.js';
 import { actionDefinitionSchema } from './action-schema.js';
 import { cwdSchema, resolveProjectConfig } from '../project-resolver.js';
-import { z } from 'zod';
+import { resourceSegmentArgument } from './path-arguments.js';
 
 export function registerActionCreateTool(server: McpServer, config: FormioConfig) {
   server.registerTool(
@@ -16,7 +16,7 @@ export function registerActionCreateTool(server: McpServer, config: FormioConfig
         'Create a new action on a form. Call action_type_get first to discover the required settings schema for the action type.',
       inputSchema: {
         cwd: cwdSchema,
-        formId: z.string().describe('The form ID to attach the action to'),
+        formId: resourceSegmentArgument('formId').describe('The form ID to attach the action to'),
         action: actionDefinitionSchema,
       },
       outputSchema: actionShape,
