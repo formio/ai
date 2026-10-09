@@ -2,7 +2,7 @@
 
 ### Requirement: A path-less customer project pairs only with a deployment on its registrable domain
 
-A project URL with no path on a host outside `form.io` names its deployment nowhere: the deployment is a sibling sub-domain of the same parent domain. The pair rule SHALL accept such a project with a deployment only when both hosts have the same registrable domain, computed against the public suffix list so that multi-label suffixes (`co.uk`, `com.au`) are not treated as a shared parent. A host with no registrable domain — an IP address, or a single-label host such as `localhost` — SHALL be compared by requiring the deployment host to equal the project host with its first label removed, or the project host itself.
+A project URL with no path on a host outside `form.io` names its deployment nowhere: the deployment is a sibling sub-domain of the same parent domain. The pair rule SHALL accept such a project with a deployment only when both hosts have the same registrable domain, computed against the public suffix list so that multi-label suffixes (`co.uk`, `com.au`) are not treated as a shared parent. Where neither host's suffix is on the public suffix list — `localhost`, or a private TLD such as `internal` — there is no registrable-domain level, so the hosts SHALL be compared directly: the deployment host is the project host, the project host with its first label removed, or a host under that parent. An IP literal SHALL pair only with itself.
 
 A deployment on another registrable domain SHALL be a deployment-half verdict, handled everywhere the existing "API root is not your deployment" verdict is: every writer (`project_set` and `project set`) SHALL refuse it before anything reaches disk, naming both hosts and the rule; the resolver SHALL set the recorded deployment aside with a note naming the record and the rule, and leave the deployment unresolved so the next call asks for it. A pair recorded by `project set --force` SHALL be honoured unchanged, as every forced pair is. Hosted-cloud projects and sub-directory projects are outside this rule: their deployment is derived, and the existing verdicts already govern a recorded value that differs.
 
@@ -39,6 +39,11 @@ A deployment on another registrable domain SHALL be a deployment-half verdict, h
 #### Scenario: A local single-label host pairs with its sub-domain project
 
 - **WHEN** a write pairs `http://myproject.localhost:3000` with `http://localhost:3000`
+- **THEN** it succeeds
+
+#### Scenario: Sibling hosts under an unlisted suffix are accepted
+
+- **WHEN** a write pairs `http://myproject.localhost:3000` with `http://api.localhost:3000`, or `https://myproject.internal` with `https://api.internal`
 - **THEN** it succeeds
 
 #### Scenario: A forced pair is honoured

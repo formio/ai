@@ -72,4 +72,15 @@ describe('validateToken', () => {
     expect(calledUrl.toString()).toBe('https://formio.invalid/sub/current');
     expect(calledOptions.headers).toEqual(expect.objectContaining({ 'x-token': 'my-api-key' }));
   });
+
+  it('does not follow a redirect with the token attached', async () => {
+    mockFetch.mockResolvedValue({ ok: false, status: 302 });
+    const result = await validateToken({
+      baseUrl: 'https://formio.invalid/sub',
+      projectUrl: 'https://formio.invalid/sub/example',
+      jwt: 'valid-token',
+    });
+    expect((mockFetch.mock.calls.at(-1)?.[1] as RequestInit).redirect).toBe('manual');
+    expect(result).toBe(false);
+  });
 });

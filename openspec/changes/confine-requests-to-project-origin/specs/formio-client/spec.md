@@ -30,3 +30,18 @@
 
 - **WHEN** the built URL is `https://forms.mysite.com/myproject2/form` and the Project URL is `https://forms.mysite.com/myproject`
 - **THEN** it throws and no request is sent
+
+### Requirement: Redirects are reported, not followed
+
+Every request that carries a credential — `formioFetch`, `formioRawFetch`, and token validation — SHALL be sent with redirects not followed, so a 3xx response never re-sends the request, with its `x-jwt-token` or `x-token` header, to the location it names. A 3xx response SHALL be reported as an error naming the status, the request URL, and the location it pointed to.
+
+#### Scenario: A redirect is not followed
+
+- **WHEN** a request under the Project URL receives `302` with `Location: https://other.example/`
+- **THEN** exactly one request is sent
+- **AND** the error names `302` and `https://other.example/`
+
+#### Scenario: Token validation does not follow a redirect
+
+- **WHEN** `validateToken` receives a `302`
+- **THEN** it returns false and sends no second request

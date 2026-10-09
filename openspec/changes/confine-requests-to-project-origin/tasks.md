@@ -109,3 +109,27 @@
 ### Refactor
 
 - [x] 6.4 Review implementation and refactor as needed
+
+## 7. Review fixes (PR #88 code review)
+<!-- depends_on: 1, 2, 3, 4, 5, 6 -->
+
+### Red
+
+- [x] 7.1 Write failing tests: `%2e%2e`, `.%2E`, `%2e`, `?`, `#`, a space and a `.` inside a segment are refused by the path rule
+- [x] 7.2 Rewrite the coverage test to enumerate every registered tool and fail when a tool declaring a path argument has no fixture; it fails on `form_update.version`
+- [x] 7.3 Write failing tests: `formioFetch` and `validateToken` send `redirect: 'manual'`; a 302 is reported naming its location and is not re-sent
+- [x] 7.4 Write failing test: a sibling project on the same sub-directory origin does not receive the key
+- [x] 7.5 Write failing tests: browserless and timeout login errors state the withheld-key reason instead of asking for the key
+- [x] 7.6 Write failing tests: sibling hosts under `localhost` and a private TLD are related; different branches of a private TLD and an IP deployment for a real domain are not
+
+### Green
+
+- [x] 7.7 Replace the denylist with a per-segment allowlist; apply the shared schema to `form_update.version`
+- [x] 7.8 Set `redirect: 'manual'` on credentialed requests and report a 3xx with its location
+- [x] 7.9 Bind the key to the normalized Project URL and carry the reason as `apiKeyNotApplied`; use it in both login remedies
+- [x] 7.10 Compare hosts directly under an unlisted suffix; IP literals pair only with themselves
+- [x] 7.11 Mark the changeset `minor` and update the READMEs, `server.json` and changeset to the project-URL binding
+
+### Refactor
+
+- [x] 7.12 Review implementation and refactor as needed

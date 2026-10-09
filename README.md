@@ -313,7 +313,7 @@ The bundled `@formio/mcp` server exposes these tools. Skills prefer these over r
 The MCP server supports two authentication modes:
 
 - **JWT mode (default).** A short-lived local Express server renders the Form.io portal login form; the user signs in once, the JWT comes back via a `/callback` endpoint, and `formioFetch` attaches `x-jwt-token` on every subsequent request. The flow is implicit — the **first authenticated tool call** triggers it on a cache miss. No explicit `authenticate` tool exists.
-- **API-key mode.** Set the `FORMIO_API_KEY` environment variable beside `FORMIO_PROJECT_URL`. Requests to the project on `FORMIO_PROJECT_URL`'s origin attach `x-token` and skip the browser flow entirely; a project resolved from a committed `formio.json` or a directory mapping on another origin authenticates through the portal login instead, and `project_get` says why.
+- **API-key mode.** Set the `FORMIO_API_KEY` environment variable beside `FORMIO_PROJECT_URL`. Requests to the project `FORMIO_PROJECT_URL` names attach `x-token` and skip the browser flow entirely; any other project a committed `formio.json` or a directory mapping resolves authenticates through the portal login instead, and `project_get` says why.
 
 ### Login-form auto-resolution
 
@@ -333,7 +333,7 @@ The probe runs lazily — only when the local auth page is actually served.
 | --- | :-: | --- | --- | --- | --- |
 | `FORMIO_BASE_URL` | no | derived, see note | Full base URL of your Form.io deployment. The WEAKEST of three sources: a committed `formio.json` wins, then the per-directory mapping, then this. When nothing supplies one it is derived from the project URL's shape, and a project URL that names no deployment raises an actionable error rather than defaulting. | `https://api.form.io` | `https://forms.example.com` |
 | `FORMIO_PROJECT_URL` | yes\* | — | Full URL of your Form.io project. The WEAKEST of the three sources: a committed `formio.json` found by walking up from the working directory wins, then a per-directory mapping written by `project_set`, then this. Self-hosted, it is a sub-directory of the deployment or a sub-domain of your own domain (`https://myproject.example.com`), depending on how that deployment routes projects. | `https://myproject.form.io` | `https://forms.example.com/myproject` |
-| `FORMIO_API_KEY` | no | `undefined` | Long-lived project API key, applied only to the project on `FORMIO_PROJECT_URL`'s origin — set `FORMIO_PROJECT_URL` beside it. Where it applies, the server skips the browser login flow — the only way to authenticate on a host with no browser. | `CHANGEME` | `CHANGEME` |
+| `FORMIO_API_KEY` | no | `undefined` | Long-lived project API key, applied only to the project `FORMIO_PROJECT_URL` names — set `FORMIO_PROJECT_URL` beside it. Where it applies, the server skips the browser login flow — the only way to authenticate on a host with no browser. | `CHANGEME` | `CHANGEME` |
 | `FORMIO_LOGIN_FORM` | no | Auto-resolved | Override the portal login form URL used by the JWT login flow. | `https://formio.form.io/user/login` | `https://forms.example.com/formio/user/login` |
 | `FORMIO_FORCE_BROWSER` | no | `0` | When `1`, attempt the browser login even where the server detects no browser is available (CI, a container, SSH with no display). | — | — |
 | `FORMIO_AUTH_HOST` / `FORMIO_AUTH_PORT` | no | `127.0.0.1` / ephemeral | Bind address and port for the login server. Set both when running in a container so the login page is reachable through a published port. | — | `0.0.0.0` / `43117` |

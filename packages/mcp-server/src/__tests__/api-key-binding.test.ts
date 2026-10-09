@@ -8,8 +8,8 @@ import { writeProjectEntry } from '../project-map.js';
 import { registerProjectGetTool } from '../tools/project_get.js';
 import { connectTools } from './test-helpers.js';
 
-// FORMIO_API_KEY is issued by one project, so it is in effect only for a project on
-// FORMIO_PROJECT_URL's origin. Any other record resolves without it, and the gate
+// FORMIO_API_KEY is issued by one project, so it is in effect only for the project
+// FORMIO_PROJECT_URL names. Any other record resolves without it, and the gate
 // then runs the portal login exactly as it does with no key set.
 describe('FORMIO_API_KEY applies only to the project on FORMIO_PROJECT_URL', () => {
   let cacheDir: string;
@@ -51,6 +51,16 @@ describe('FORMIO_API_KEY applies only to the project on FORMIO_PROJECT_URL', () 
       projectUrl: 'https://forms.mysite.com/myproject',
     });
     expect(config.apiKey).toBe('k');
+  });
+
+  it('is not carried to another sub-directory project on the same origin', () => {
+    commit({ projectUrl: 'https://forms.mysite.com/other' });
+    const { config, notes } = resolve({
+      apiKey: 'k',
+      projectUrl: 'https://forms.mysite.com/myproject',
+    });
+    expect(config.apiKey).toBeUndefined();
+    expect(notes.join('\n')).toMatch(/FORMIO_API_KEY is set but not applied/);
   });
 
   it('is not carried to a committed project on another origin, and says so', () => {

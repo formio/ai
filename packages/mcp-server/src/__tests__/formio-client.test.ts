@@ -328,3 +328,35 @@ describe('formioFetch keeps every request under the Project URL', () => {
     expect(mockEnsureAuth).not.toHaveBeenCalled();
   });
 });
+
+describe('formioFetch does not follow a redirect with credentials attached', () => {
+  const mockFetch = vi.fn();
+
+  beforeEach(() => {
+    vi.stubGlobal('fetch', mockFetch);
+    mockEnsureAuth.mockReset();
+    mockFetch.mockReset();
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('asks fetch not to follow redirects', async () => {
+    mockFetch.mockResolvedValue({ ok: true, json: () => Promise.resolve({}) });
+    await formioFetch('form', {}, config);
+    expect((mockFetch.mock.calls[0][1] as RequestInit).redirect).toBe('manual');
+  });
+
+  it('reports a redirect as an error naming where it pointed', async () => {
+    mockFetch.mockResolvedValue({
+      ok: false,
+      status: 302,
+      headers: new Headers({ location: 'https://other.example/' }),
+    });
+    await expect(formioFetch('form', {}, config)).rejects.toThrow(
+      /302[\s\S]*https:\/\/other\.example\//
+    );
+    expect(mockFetch).toHaveBeenCalledTimes(1);
+  });
+});

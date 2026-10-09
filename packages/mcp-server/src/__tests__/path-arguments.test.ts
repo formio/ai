@@ -17,15 +17,30 @@ const REFUSED_PATHS = [
   './user',
   'user/..',
   'user/../../other',
+  // Percent-encoded dot segments: the URL parser decodes these into `.` and `..`.
+  '%2e%2e',
+  'user/.%2E/other',
+  '%2e',
+  // A query or fragment cuts off the rest of the templated path.
+  '65a1b2c3d4e5f60718293a4b#',
+  '65a1b2c3d4e5f60718293a4b?',
+  'user/login?x=1',
+  // Anything outside the characters Form.io allows in a form path.
+  'user login',
+  'user/lo.gin',
 ];
 
 describe('checkProjectPath', () => {
-  it.each(['user/login', 'form/65a1b2c3d4e5f60718293a4b', 'a/b/c', 'contact'])(
-    'accepts %j',
-    (value) => {
-      expect(checkProjectPath(value)).toBeUndefined();
-    }
-  );
+  it.each([
+    'user/login',
+    'form/65a1b2c3d4e5f60718293a4b',
+    'a/b/c',
+    'contact',
+    'my-form',
+    'my_form',
+  ])('accepts %j', (value) => {
+    expect(checkProjectPath(value)).toBeUndefined();
+  });
 
   it.each(REFUSED_PATHS)('refuses %j', (value) => {
     expect(checkProjectPath(value)).toEqual(expect.any(String));

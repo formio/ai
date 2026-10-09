@@ -4,33 +4,31 @@ import { z } from 'zod';
  * The one rule for a tool argument that becomes part of a request path.
  *
  * Tools join their arguments onto the Project URL, and `new URL` resolves what it is
- * given: a value carrying a scheme or a leading `//` replaces the project's origin,
- * and a `..` segment walks out of the project's path. A form path legitimately holds
- * `/` separators (`user/login`), so the value is checked rather than encoded.
+ * given: a scheme or a leading `//` replaces the project's origin, a `.` or `..`
+ * segment walks up its path — including the percent-encoded `%2e%2e`, which the
+ * parser decodes — and a `?` or `#` cuts off the rest of the templated path. So the
+ * rule is an allowlist rather than a list of shapes to refuse: every segment is the
+ * characters Form.io itself accepts in a form path (letters, digits and `-`;
+ * `formio/src/models/Form.js`), plus `_`. That covers form paths, ObjectIds,
+ * revision numbers and action type names, and nothing the parser reinterprets.
  *
  * Each check returns why a value is refused, or undefined when it is accepted.
  */
-const SCHEME = /^[a-z][a-z0-9+.-]*:/i;
+const SEGMENT = /^[A-Za-z0-9_-]+$/;
 
 export function checkProjectPath(value: string): string | undefined {
   if (value === '') {
     return 'it is empty';
   }
-  if (SCHEME.test(value)) {
-    return 'it carries a URL scheme';
-  }
   if (value.startsWith('/')) {
     return 'it begins with "/"';
-  }
-  if (value.includes('\\')) {
-    return 'it contains a backslash';
   }
   const segments = value.split('/');
   if (segments.some((segment) => segment === '')) {
     return 'it has an empty path segment';
   }
-  if (segments.some((segment) => segment === '.' || segment === '..')) {
-    return 'it has a "." or ".." segment';
+  if (!segments.every((segment) => SEGMENT.test(segment))) {
+    return 'a path segment holds a character other than a letter, digit, "-" or "_"';
   }
   return undefined;
 }
@@ -68,7 +66,7 @@ export function projectPathArgument(name: string) {
     name,
     check: checkProjectPath,
     accepts:
-      'a form ID or a form path relative to the project, such as "user/login" — no scheme, leading "/", backslash, "." or ".." segment',
+      'a form ID or a form path relative to the project, such as "user/login" — segments of letters, digits, "-" and "_" separated by "/"',
   });
 }
 
@@ -77,6 +75,6 @@ export function resourceSegmentArgument(name: string) {
     name,
     check: checkResourceSegment,
     accepts:
-      'a single path segment naming one resource, such as an ID — no "/", scheme, backslash, "." or ".."',
+      'a single path segment naming one resource, such as an ID — letters, digits, "-" and "_" only',
   });
 }

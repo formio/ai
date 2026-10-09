@@ -14,6 +14,7 @@ import {
   revertToRevision,
   saveDraft,
 } from '../revisions/index.js';
+import { resourceSegmentArgument } from './path-arguments.js';
 
 export function registerFormUpdateTool(server: McpServer, config: FormioConfig) {
   server.registerTool(
@@ -73,8 +74,7 @@ export function registerFormUpdateTool(server: McpServer, config: FormioConfig) 
           .describe(
             'When true, revert the live form to a prior revision. Requires `version`. Caller `form` body is ignored; only allowlisted revision fields flow from the revision to live.'
           ),
-        version: z
-          .string()
+        version: resourceSegmentArgument('version')
           .optional()
           .describe(
             'Revision identifier for `revert: true` — either the revision `_vid` (e.g. "3") or the revision document `_id` (24-char hex).'

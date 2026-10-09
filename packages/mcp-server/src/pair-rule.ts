@@ -1,4 +1,4 @@
-import { getDomain } from 'tldts';
+import { parse } from 'tldts';
 import { DEFAULT_BASE_URL, stripTrailingSlashes } from './config.js';
 
 /**
@@ -122,18 +122,29 @@ function isApiRootHost(url: URL): boolean {
 // Whether a deployment can serve a path-less customer project: both hosts on the
 // same registrable domain, read from the public suffix list with its private section
 // on — so `mysite.co.uk` is a domain while `co.uk` is not, and two tenants of a
-// shared hosting suffix (`a.herokuapp.com`, `b.herokuapp.com`) are not related. A
-// host with no registrable domain (an IP literal, `localhost`) is compared directly:
-// the deployment is the project host itself or its parent.
+// shared hosting suffix (`a.herokuapp.com`, `b.herokuapp.com`) are not related.
+//
+// A suffix the list does not carry — `localhost`, or a private TLD such as
+// `internal` — has no registrable-domain level: tldts reads `myproject.localhost`
+// and `api.localhost` as two different domains, though they are the sibling shape
+// itself. There, and for an IP literal, the hosts are compared directly: the
+// deployment is the project host, its parent, or a host under that parent.
 function sharesRegistrableDomain(projectUrl: URL, baseUrl: URL): boolean {
   const projectHost = hostOf(projectUrl);
   const baseHost = hostOf(baseUrl);
-  const projectDomain = getDomain(projectHost, { allowPrivateDomains: true });
-  const baseDomain = getDomain(baseHost, { allowPrivateDomains: true });
-  if (projectDomain && baseDomain) {
-    return projectDomain === baseDomain;
+  const project = parse(projectHost, { allowPrivateDomains: true });
+  const base = parse(baseHost, { allowPrivateDomains: true });
+  if (project.isIcann || project.isPrivate || base.isIcann || base.isPrivate) {
+    return project.domain !== null && project.domain === base.domain;
   }
-  return baseHost === projectHost || baseHost === projectHost.split('.').slice(1).join('.');
+  if (project.isIp || base.isIp) {
+    return projectHost === baseHost;
+  }
+  const parent = projectHost.split('.').slice(1).join('.');
+  return (
+    baseHost === projectHost ||
+    (parent !== '' && (baseHost === parent || baseHost.endsWith(`.${parent}`)))
+  );
 }
 
 // A sub-directory-routed project URL is its deployment plus exactly ONE

@@ -23,6 +23,15 @@ describe('a path-less customer project pairs only with a deployment on its regis
     ['a multi-label public suffix', 'https://myproject.mysite.co.uk', 'https://api.mysite.co.uk'],
     ['a local single-label host', 'http://myproject.localhost:3000', 'http://localhost:3000'],
     ['a local reserved TLD', 'https://myproject.form.test', 'https://api.form.test'],
+    // A suffix the public list does not carry (localhost, a private TLD) has no
+    // registrable-domain level, so sibling hosts directly under it are related.
+    ['siblings under localhost', 'http://myproject.localhost:3000', 'http://api.localhost:3000'],
+    ['siblings under a private TLD', 'https://myproject.internal', 'https://api.internal'],
+    [
+      'a deployment deeper under a private TLD',
+      'https://myproject.corp.internal',
+      'https://api.corp.internal',
+    ],
   ])('accepts %s', (_label, projectUrl, baseUrl) => {
     expect(classifyPair(projectUrl, baseUrl)).toBe('ok');
   });
@@ -38,6 +47,16 @@ describe('a path-less customer project pairs only with a deployment on its regis
       'another tenant of a shared hosting suffix',
       'https://a.herokuapp.com',
       'https://b.herokuapp.com',
+    ],
+    [
+      'hosts on different branches of a private TLD',
+      'https://a.foo.internal',
+      'https://b.bar.internal',
+    ],
+    [
+      'a deployment reached by IP for a project on a real domain',
+      'https://myproject.mysite.com',
+      'https://10.0.0.5',
     ],
   ])('refuses %s', (_label, projectUrl, baseUrl) => {
     expect(classifyPair(projectUrl, baseUrl)).toBe('unrelated-deployment');

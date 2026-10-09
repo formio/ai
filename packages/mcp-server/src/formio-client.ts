@@ -32,8 +32,16 @@ export interface FormioFetchOptions {
   signal?: AbortSignal;
 }
 
-function formatApiError(status: number, url: URL): string {
-  return `Form.io API error: ${status} | URL: ${url.toString()}`;
+// A redirect is reported rather than followed: fetch would re-send the request, with
+// its x-jwt-token or x-token header, to wherever the Location header points.
+function formatApiError(response: Response, url: URL): string {
+  const location =
+    response.status >= 300 && response.status < 400 ? response.headers?.get('location') : null;
+  return `Form.io API error: ${response.status} | URL: ${url.toString()}${
+    location
+      ? ` | Redirected to ${location}, which is not followed: every request addresses the resolved project directly.`
+      : ''
+  }`;
 }
 
 function buildFetchInit(config: FormioConfig, options?: FormioFetchOptions): RequestInit {
@@ -43,7 +51,7 @@ function buildFetchInit(config: FormioConfig, options?: FormioFetchOptions): Req
     ...(hasBody ? { 'Content-Type': 'application/json' } : {}),
   };
 
-  const init: RequestInit = { headers };
+  const init: RequestInit = { headers, redirect: 'manual' };
   if (options?.method) {
     init.method = options.method;
   }
@@ -79,11 +87,11 @@ export async function formioRawFetch(
       await ensureAuthenticated(config);
       const retryResponse = await fetch(url, buildFetchInit(config, options));
       if (!retryResponse.ok) {
-        throw new Error(formatApiError(retryResponse.status, url));
+        throw new Error(formatApiError(retryResponse, url));
       }
       return parseResponse(retryResponse);
     }
-    throw new Error(formatApiError(response.status, url));
+    throw new Error(formatApiError(response, url));
   }
 
   return parseResponse(response);

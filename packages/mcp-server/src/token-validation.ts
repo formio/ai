@@ -12,6 +12,7 @@ export async function validateToken(config: FormioConfig): Promise<boolean> {
     );
   }
   const url = `${config.baseUrl}/current`;
-  const response = await fetch(url, { headers: getAuthHeader(config) });
+  // Not followed: a redirect would carry the token to wherever it points.
+  const response = await fetch(url, { headers: getAuthHeader(config), redirect: 'manual' });
   return response.ok;
 }

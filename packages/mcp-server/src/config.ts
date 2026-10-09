@@ -143,6 +143,9 @@ export interface FormioConfig {
 export interface ResolvedFormioConfig extends FormioConfig {
   baseUrl?: string;
   projectUrl: string;
+  // Why a FORMIO_API_KEY in the environment was not applied to this project — carried
+  // so an authentication failure can say so instead of asking for a key already set.
+  apiKeyNotApplied?: string;
   // The directory this configuration was resolved for — the cwd argument when a
   // caller passed one, and the server's own working directory when it did not.
   //

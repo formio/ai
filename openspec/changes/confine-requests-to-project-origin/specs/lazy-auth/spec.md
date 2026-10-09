@@ -2,9 +2,9 @@
 
 ### Requirement: API key mode bypasses the login flow
 
-`FORMIO_API_KEY` is issued by one project, so it SHALL apply only to that project: the key SHALL be in effect for a tool call when `FORMIO_PROJECT_URL` is set and the resolved Project URL has the same origin as `FORMIO_PROJECT_URL`. When it is in effect, the authentication gate SHALL validate the key on first use and set no JWT, SHALL NOT open a browser or read/write the token cache, and requests SHALL send the `x-token` header.
+`FORMIO_API_KEY` is issued by one project, so it SHALL apply only to that project: the key SHALL be in effect for a tool call when `FORMIO_PROJECT_URL` is set and the resolved Project URL is the same Project URL once both are normalized. Origins are not enough: the projects of a sub-directory deployment share one origin. When it is in effect, the authentication gate SHALL validate the key on first use and set no JWT, SHALL NOT open a browser or read/write the token cache, and requests SHALL send the `x-token` header.
 
-When the key is set but not in effect — `FORMIO_PROJECT_URL` is unset, or the resolved project (from a committed `formio.json` or a directory mapping) is on another origin — the resolved configuration SHALL carry no API key, the `x-token` header SHALL NOT be sent, and the gate SHALL run the portal-login flow exactly as it does when no key is set. The `project_get` report SHALL state that `FORMIO_API_KEY` is set but not applied to the resolved project, and name the origin it applies to (or that `FORMIO_PROJECT_URL` is unset).
+When the key is set but not in effect — `FORMIO_PROJECT_URL` is unset, or the resolved project (from a committed `formio.json` or a directory mapping) is a different project — the resolved configuration SHALL carry no API key, the `x-token` header SHALL NOT be sent, and the gate SHALL run the portal-login flow exactly as it does when no key is set. The `project_get` report SHALL state that `FORMIO_API_KEY` is set but not applied to the resolved project, and name the project it applies to (or that `FORMIO_PROJECT_URL` is unset). A portal-login failure that names the API key as a remedy — no browser on the host, or the login timing out — SHALL state that reason instead of asking the user to set the key.
 
 #### Scenario: Valid API key passes the gate
 
@@ -16,11 +16,24 @@ When the key is set but not in effect — `FORMIO_PROJECT_URL` is unset, or the 
 - **AND** `config.jwt` remains undefined
 - **AND** subsequent requests send the `x-token` header
 
-#### Scenario: A sub-directory project on the key's origin uses the key
+#### Scenario: The key's own sub-directory project uses the key
 
 - **WHEN** `FORMIO_API_KEY` is set and `FORMIO_PROJECT_URL` is `https://forms.mysite.com/myproject`
 - **AND** the resolved Project URL is `https://forms.mysite.com/myproject`
 - **THEN** requests send the `x-token` header and no browser is opened
+
+#### Scenario: Another project on the same sub-directory deployment does not receive the key
+
+- **WHEN** `FORMIO_API_KEY` is set and `FORMIO_PROJECT_URL` is `https://forms.mysite.com/myproject`
+- **AND** a committed `formio.json` resolves the Project URL `https://forms.mysite.com/other`
+- **THEN** no request carries the `x-token` header
+- **AND** the resolution notes state the key is not applied
+
+#### Scenario: A browserless login names the withheld key
+
+- **WHEN** the key is set but not applied and the portal login fails because the host has no browser
+- **THEN** the error states why the key was not applied
+- **AND** it does not ask the user to set `FORMIO_API_KEY`
 
 #### Scenario: A committed project on another origin does not receive the key
 
