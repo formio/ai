@@ -120,11 +120,11 @@ A project URL that resolves while its base URL does not SHALL fail at the point 
 - **WHEN** `FORMIO_API_KEY` is set and the resolved project URL is `https://myproject.mysite.com` with no base URL from any source
 - **THEN** `form_list` proceeds against the project URL and succeeds
 
-#### Scenario: hello needs no project
+#### Scenario: server_status needs no project
 
 - **WHEN** nothing configures a project
-- **AND** `hello` is called
-- **THEN** it succeeds
+- **AND** `server_status` is called
+- **THEN** it succeeds, reporting `status: "not-configured"`
 
 ### Requirement: project_set is registered for every client
 
