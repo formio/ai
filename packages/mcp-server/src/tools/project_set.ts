@@ -23,6 +23,7 @@ import { catchToolErrors, toMcpStructuredResult } from '../mcp-responses.js';
 import { ToolError, ToolErrorCode } from '../tool-errors.js';
 import { projectMappingOutput } from '../output-schemas.js';
 import { local } from '../tool-annotations.js';
+import { toolDirectory } from './project-resolution.js';
 import {
   readProjectEntryForWrite,
   unusableRecordProjectUrl,
@@ -68,7 +69,7 @@ export function registerProjectSetTool(server: McpServer, options: ProjectSetOpt
       // Rules a caller acts on, and nothing else: why the tool works this way is in
       // the package README ("Why project_set works this way").
       description: [
-        "Set the active Form.io project for a working directory by recording its Project URL in ~/.formio/projects.json, keyed by `cwd` (omitted, the server's own spawn directory, which may not be the user's).",
+        'Set the active Form.io project for a working directory by recording its Project URL in ~/.formio/projects.json, keyed by the directory `cwd` resolves to, as every tool resolves it.',
         'Call it whenever the user asks to set, change, or switch the active project; acknowledging in text persists nothing.',
         `It needs no restart, and precedence runs: a committed ${COMMITTED_CONFIG_FILE}, then the working-directory mapping, then FORMIO_PROJECT_URL in the environment, the weakest — so a mapping written here DOES override the environment, and a committed file overrides both. Read \`ok\` and \`projectUrl\` on the result: they report the pair that actually resolves.`,
         'Pass projectUrl alone: the Base URL, which builds the portal-login URL and keys the cached token, is derived — https://api.form.io for a form.io host, the parent path for a sub-directory project. Pass baseUrl only after the server reports it cannot be determined (a path-less project URL on a customer domain).',
@@ -93,7 +94,7 @@ export function registerProjectSetTool(server: McpServer, options: ProjectSetOpt
         // The SAME schema every reader validates against. A write must not accept
         // what a read cannot key on.
         cwd: cwdSchema.describe(
-          "The user's working directory, absolute, that the mapping is keyed against. Omitted, the server's own spawn directory is used. Rules: project_set and the server instructions."
+          'Optional. Directory whose mapping to write; defaults to the client\'s workspace root. Pass it to target another directory or when project_get reports cwdSource "server".'
         ),
         baseUrl: z
           .string()
@@ -107,7 +108,13 @@ export function registerProjectSetTool(server: McpServer, options: ProjectSetOpt
       annotations: local('Set the active project', false),
     },
     catchToolErrors(async ({ projectUrl, cwd, baseUrl: baseUrlArg }) => {
-      const entryCwd = cwd ?? getServerCwd();
+      // The same directory every reader resolves for a call like this one: the
+      // caller's cwd, else the client's workspace root, else CLAUDE_PROJECT_DIR, else
+      // the server's own. A mapping keyed anywhere else is one the next call misses.
+      const directory = await toolDirectory({ server, cwd, serverCwd: getServerCwd });
+      const entryCwd = directory.dir;
+      // Only the server's own directory is one nobody chose for this write.
+      const named = directory.source !== 'server';
       const mapped = readProjectEntryForWrite(entryCwd);
       // An entry that EXISTS and cannot be honoured is not an absent one. A record's
       // URLs are validated where that record WINS — inside the resolver — so a mapping
@@ -142,10 +149,10 @@ export function registerProjectSetTool(server: McpServer, options: ProjectSetOpt
       // and the write it invites is one nothing later reads. project_get answers the
       // same state by omitting its remedy; this is that answer in a writer's
       // vocabulary.
-      const recordUnder = cwd ? `cwd ${entryCwd}` : "cwd set to the user's own directory";
-      const fallbackCwdWarning = cwd
+      const recordUnder = named ? `cwd ${entryCwd}` : "cwd set to the user's own directory";
+      const fallbackCwdWarning = named
         ? ''
-        : ` Note: no cwd argument was passed, so ${entryCwd} is the MCP server's own working directory rather than the user's. Call project_set again with cwd set to the user's directory BEFORE recording anything — a record written here would not be found from theirs.`;
+        : ` Note: no cwd argument was passed and the client named no directory, so ${entryCwd} is the MCP server's own working directory rather than the user's. Call project_set again with cwd set to the user's directory BEFORE recording anything — a record written here would not be found from theirs.`;
       // Annotated on the variable so TypeScript narrows after a call: an arrow
       // returning `never` only terminates control flow for the checker when the
       // binding itself declares that type.
@@ -282,9 +289,9 @@ export function registerProjectSetTool(server: McpServer, options: ProjectSetOpt
       // not the user's directory. Keying there still beats refusing — some clients have
       // no cwd to pass — but the caller has to be told, or the next call that does pass
       // a cwd misses the mapping and loops.
-      const serverCwdWarning = cwd
+      const serverCwdWarning = named
         ? ''
-        : ` Warning: no cwd argument was passed, so this mapping is keyed to the MCP server's own working directory. If that is not the user's directory, call project_set again with cwd set to it.`;
+        : ` Warning: no cwd argument was passed and the client named no directory, so this mapping is keyed to the MCP server's own working directory. If that is not the user's directory, call project_set again with cwd set to it.`;
       // A mapping written under a committed file naming a different project still
       // belongs on disk — it is the fallback if that file goes away — but it does not
       // take effect now.
@@ -334,7 +341,7 @@ export function registerProjectSetTool(server: McpServer, options: ProjectSetOpt
             baseConfig: { projectUrl: getEnvProjectUrl(), baseUrl: getEnvBaseUrl() },
             remedies: TOOL_REMEDIES,
             notes: reportNotes,
-            cwdWasNamed: Boolean(cwd),
+            cwdWasNamed: named,
           });
         } catch (error) {
           // NOT swallowed. A committed file is checked for shape where it is read and

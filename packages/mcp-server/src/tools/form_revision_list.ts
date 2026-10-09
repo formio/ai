@@ -4,7 +4,8 @@ import { isMongoId } from '../formio-client.js';
 import { toMcpStructuredResult, toMcpError } from '../mcp-responses.js';
 import { revisionsListOutput } from '../output-schemas.js';
 import { reads } from '../tool-annotations.js';
-import { cwdSchema, resolveProjectConfig } from '../project-resolver.js';
+import { cwdSchema } from '../project-resolver.js';
+import { resolveToolConfig } from './project-resolution.js';
 import { fetchListPage, listArguments, listResult } from './list-contract.js';
 import { projectPathArgument } from './path-arguments.js';
 
@@ -34,7 +35,7 @@ export function registerFormRevisionListTool(server: McpServer, config: FormioCo
     },
     async ({ cwd, formIdOrPath, ...query }) => {
       try {
-        const cfg = resolveProjectConfig(cwd, config);
+        const cfg = await resolveToolConfig({ server, cwd, config });
         const base = isMongoId(formIdOrPath) ? `form/${formIdOrPath}` : formIdOrPath;
         const page = await fetchListPage({
           path: `${base}/v`,

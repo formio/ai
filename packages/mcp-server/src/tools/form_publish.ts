@@ -4,7 +4,8 @@ import { FormioConfig } from '../config.js';
 import { toMcpStructuredResult, toMcpError } from '../mcp-responses.js';
 import { formDocument } from '../output-schemas.js';
 import { overwrites } from '../tool-annotations.js';
-import { cwdSchema, resolveProjectConfig } from '../project-resolver.js';
+import { cwdSchema } from '../project-resolver.js';
+import { resolveToolConfig } from './project-resolution.js';
 import { formIdArgument, requireFormId } from './form-id.js';
 import { publishDraft, requireRevisionsLicense } from '../revisions/index.js';
 
@@ -29,7 +30,7 @@ export function registerFormPublishTool(server: McpServer, config: FormioConfig)
     async ({ cwd, formId, note }) => {
       try {
         requireFormId(formId);
-        const cfg = resolveProjectConfig(cwd, config);
+        const cfg = await resolveToolConfig({ server, cwd, config });
         await requireRevisionsLicense(cfg, "publish this form's draft");
         return toMcpStructuredResult(
           (await publishDraft({ formId, _vnote: note, cfg })) as Record<string, unknown>

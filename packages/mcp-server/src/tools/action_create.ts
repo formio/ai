@@ -5,7 +5,8 @@ import { toMcpStructuredResult, toMcpError } from '../mcp-responses.js';
 import { actionDocument } from '../output-schemas.js';
 import { creates } from '../tool-annotations.js';
 import { actionDefinitionSchema, unknownActionType } from './action-schema.js';
-import { cwdSchema, resolveProjectConfig } from '../project-resolver.js';
+import { cwdSchema } from '../project-resolver.js';
+import { resolveToolConfig } from './project-resolution.js';
 import { formIdArgument, requireFormId } from './form-id.js';
 
 export function registerActionCreateTool(server: McpServer, config: FormioConfig) {
@@ -25,7 +26,7 @@ export function registerActionCreateTool(server: McpServer, config: FormioConfig
     async ({ cwd, formId, action }) => {
       try {
         requireFormId(formId);
-        const cfg = resolveProjectConfig(cwd, config);
+        const cfg = await resolveToolConfig({ server, cwd, config });
         const catalog = (await formioFetch(`form/${formId}/actions`, {}, cfg)) as Array<{
           name: string;
         }>;

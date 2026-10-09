@@ -4,7 +4,8 @@ import { formioFetch } from '../formio-client.js';
 import { toMcpStructuredResult, toMcpError } from '../mcp-responses.js';
 import { actionDocument } from '../output-schemas.js';
 import { reads } from '../tool-annotations.js';
-import { cwdSchema, resolveProjectConfig } from '../project-resolver.js';
+import { cwdSchema } from '../project-resolver.js';
+import { resolveToolConfig } from './project-resolution.js';
 import { formIdArgument, requireFormId } from './form-id.js';
 import { resourceSegmentArgument } from './path-arguments.js';
 
@@ -25,7 +26,7 @@ export function registerActionGetTool(server: McpServer, config: FormioConfig) {
     async ({ cwd, formId, actionId }) => {
       try {
         requireFormId(formId);
-        const cfg = resolveProjectConfig(cwd, config);
+        const cfg = await resolveToolConfig({ server, cwd, config });
         const action = (await formioFetch(`form/${formId}/action/${actionId}`, {}, cfg)) as Record<
           string,
           unknown

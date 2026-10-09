@@ -4,7 +4,8 @@ import { formioFetch } from '../formio-client.js';
 import { toMcpStructuredResult, toMcpError } from '../mcp-responses.js';
 import { templateDocument } from '../output-schemas.js';
 import { reads } from '../tool-annotations.js';
-import { cwdSchema, resolveProjectConfig } from '../project-resolver.js';
+import { cwdSchema } from '../project-resolver.js';
+import { resolveToolConfig } from './project-resolution.js';
 
 export function registerProjectExportTool(server: McpServer, config: FormioConfig) {
   server.registerTool(
@@ -20,7 +21,7 @@ export function registerProjectExportTool(server: McpServer, config: FormioConfi
     },
     async ({ cwd }) => {
       try {
-        const cfg = resolveProjectConfig(cwd, config);
+        const cfg = await resolveToolConfig({ server, cwd, config });
         const template = (await formioFetch('export', {}, cfg)) as Record<string, unknown>;
         return toMcpStructuredResult(template);
       } catch (error) {

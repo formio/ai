@@ -16,6 +16,7 @@
  */
 
 import { z } from 'zod';
+import { CWD_SOURCES } from './workspace-directory.js';
 
 // Field descriptions are kept only where a caller branches on the value or passes it
 // on; a self-explanatory field (`title`, `created`, …) is typed and left undescribed,
@@ -190,6 +191,9 @@ const resolutionStatus = z.enum(['ok', 'not-configured', 'base-url-unresolved'])
 
 const resolutionFields = {
   cwd: z.string(),
+  cwdSource: z
+    .enum(CWD_SOURCES)
+    .describe('Where cwd came from; "server" means pass cwd on later calls'),
   projectUrl: z.string().optional().describe('Absent when status is not-configured'),
   baseUrl: z.string().optional().describe('Absent unless status is ok'),
   projectUrlSource: z

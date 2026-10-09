@@ -4,7 +4,8 @@ import { formioFetch, isMongoId } from '../formio-client.js';
 import { toMcpStructuredResult, toMcpError } from '../mcp-responses.js';
 import { formDocument } from '../output-schemas.js';
 import { reads } from '../tool-annotations.js';
-import { cwdSchema, resolveProjectConfig } from '../project-resolver.js';
+import { cwdSchema } from '../project-resolver.js';
+import { resolveToolConfig } from './project-resolution.js';
 import { projectPathArgument, resourceSegmentArgument } from './path-arguments.js';
 
 export function registerFormRevisionGetTool(server: McpServer, config: FormioConfig) {
@@ -29,7 +30,7 @@ export function registerFormRevisionGetTool(server: McpServer, config: FormioCon
     },
     async ({ cwd, formIdOrPath, version }) => {
       try {
-        const cfg = resolveProjectConfig(cwd, config);
+        const cfg = await resolveToolConfig({ server, cwd, config });
         const base = isMongoId(formIdOrPath) ? `form/${formIdOrPath}` : formIdOrPath;
         const revision = (await formioFetch(`${base}/v/${version}`, {}, cfg)) as Record<
           string,

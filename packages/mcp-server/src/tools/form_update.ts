@@ -5,7 +5,8 @@ import { formioFetch } from '../formio-client.js';
 import { toMcpStructuredResult, toMcpError } from '../mcp-responses.js';
 import { formDocument } from '../output-schemas.js';
 import { overwrites } from '../tool-annotations.js';
-import { cwdSchema, resolveProjectConfig } from '../project-resolver.js';
+import { cwdSchema } from '../project-resolver.js';
+import { resolveToolConfig } from './project-resolution.js';
 import { formIdArgument, requireFormId } from './form-id.js';
 import {
   gateFormHistory,
@@ -68,7 +69,7 @@ export function registerFormUpdateTool(server: McpServer, config: FormioConfig) 
     async ({ cwd, formId, form: rawForm, note, draft, acceptNoHistory }) => {
       try {
         requireFormId(formId);
-        const cfg = resolveProjectConfig(cwd, config);
+        const cfg = await resolveToolConfig({ server, cwd, config });
 
         if (draft) {
           await requireRevisionsLicense(cfg, 'save a draft of this form');

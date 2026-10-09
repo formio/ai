@@ -21,10 +21,10 @@ Both paths apply the same rules, which are below and are the same rules the serv
 
 ## Path A — ask the server
 
-Call `project_get` with `cwd` set to the user's current working directory, and branch on `status`:
+Call `project_get` without `cwd` — the server takes the directory from the client's workspace root — and read `cwdSource` before `status`. When `cwdSource` is `server`, the answer is about the MCP server's own directory, which is fixed at spawn and may be mapped to a different project, so call `project_get` again with `cwd` set to the user's current working directory and keep passing that `cwd` on the calls after it. Otherwise pass `cwd` only to target another directory; a refusal listing several workspace roots is answered the same way, with `cwd` set to the one the user is working in. Then branch on `status`:
 
 - **`ok`** — both values are in the report. Use them exactly as reported. Do not ask the user to confirm them.
-- **`not-configured`** — nothing is recorded for this directory. Ask the user for the Project URL (one question — see the rules below), record it by calling `project_set` with that `projectUrl` and the same `cwd`, then call `project_get` again. If that Project URL carries no path on the user's own domain it names no deployment, so the call is refused and names the Base URL it still needs: ask for that one value and repeat the call with both.
+- **`not-configured`** — nothing is recorded for this directory. Ask the user for the Project URL (one question — see the rules below), record it by calling `project_set` with that `projectUrl` and the same `cwd`, if the `project_get` call passed one, then call `project_get` again. If that Project URL carries no path on the user's own domain it names no deployment, so the call is refused and names the Base URL it still needs: ask for that one value and repeat the call with both.
 - **`base-url-unresolved`** — the project is recorded and its deployment could not be derived. Ask the user for the Base URL alone, then make the `project_set` call the report names, and call `project_get` again. Do not re-ask the user for the Project URL: the report named it, and the call it prints carries it for you.
 
 If the call fails outright instead of returning a status, relay the error and stop; do not fall through to Path B. A recorded configuration that cannot be read is not an absent one, and interviewing around it writes a second answer that the broken record still shadows.

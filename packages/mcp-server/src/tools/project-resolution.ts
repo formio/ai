@@ -1,12 +1,49 @@
-import { FormioConfig } from '../config.js';
+import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import { FormioConfig, ResolvedFormioConfig } from '../config.js';
 import { ProjectReport, reportProject } from '../project-report.js';
+import { resolveProjectConfig } from '../project-resolver.js';
+import { WorkingDirectory, workspaceDirectory } from '../workspace-directory.js';
 import { TOOL_REMEDIES } from './project-remedies.js';
 
-export interface ToolProjectReportRequest {
+export interface ToolDirectoryRequest {
+  server: McpServer;
   /** The cwd the caller passed, if any. */
   cwd: string | undefined;
-  /** The server's own process directory, used when the caller passed none. */
-  serverCwd: () => string;
+  /** The server's own process directory, the last source tried. */
+  serverCwd?: () => string;
+}
+
+/**
+ * The directory a tool call resolves against: the caller's cwd, else the client's
+ * workspace root, else CLAUDE_PROJECT_DIR, else the server's own directory.
+ */
+export function toolDirectory({
+  server,
+  cwd,
+  serverCwd,
+}: ToolDirectoryRequest): Promise<WorkingDirectory> {
+  return workspaceDirectory(server).resolve({ cwd, serverCwd });
+}
+
+export interface ToolConfigRequest {
+  server: McpServer;
+  cwd: string | undefined;
+  config: FormioConfig;
+}
+
+/** The project a project-scoped tool targets, for the directory its call resolves against. */
+export async function resolveToolConfig({
+  server,
+  cwd,
+  config,
+}: ToolConfigRequest): Promise<ResolvedFormioConfig> {
+  const { dir, source } = await toolDirectory({ server, cwd });
+  return resolveProjectConfig(dir, config, { cwdWasNamed: source !== 'server' });
+}
+
+export interface ToolProjectReportRequest {
+  /** The directory the call resolves against, and which source supplied it. */
+  directory: WorkingDirectory;
   config: FormioConfig;
   /**
    * Caller-owned and appended to in place, so a note survives a report that cannot
@@ -21,31 +58,31 @@ export interface ToolProjectReportRequest {
  * project_get and server_status both give, from the resolver every other tool uses.
  */
 export function reportProjectForTool({
-  cwd,
-  serverCwd,
+  directory,
   config,
   notes,
 }: ToolProjectReportRequest): ProjectReport {
   return reportProject({
     notes,
-    // The server's own process cwd is fixed at spawn and may be mapped to a
-    // different project, which is why cwd is asked for on every call. It is
-    // still the documented fallback: project_set writes under the same key.
-    cwd: cwd ?? serverCwd(),
+    cwd: directory.dir,
     baseConfig: config,
     remedies: TOOL_REMEDIES,
-    // So the unmapped answer can say which directory it actually searched.
-    // Its remedy names a cwd to record the project under, and the server's
-    // own is the one directory recording it under would not help.
-    cwdWasNamed: cwd !== undefined,
+    // Only the server's own directory — fixed at spawn, and often not where the user
+    // is — makes the answer say so and withhold a remedy keyed to it. A directory
+    // the client or its launch named is where the user is working.
+    cwdWasNamed: directory.source !== 'server',
   });
 }
 
 /** The report as a structured payload, omitting the halves it does not have. */
-export function projectReportPayload(report: ProjectReport): Record<string, unknown> {
+export function projectReportPayload(
+  report: ProjectReport,
+  directory: WorkingDirectory
+): Record<string, unknown> {
   return {
     status: report.status,
     cwd: report.cwd,
+    cwdSource: directory.source,
     ...(report.projectUrl ? { projectUrl: report.projectUrl } : {}),
     ...(report.baseUrl ? { baseUrl: report.baseUrl } : {}),
     ...(report.projectUrlSource ? { projectUrlSource: report.projectUrlSource } : {}),

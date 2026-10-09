@@ -185,3 +185,22 @@
 ### Refactor
 
 - [x] 11.4 Review implementation and refactor as needed
+
+## 12. Directory from client roots
+<!-- depends_on: 3, 10 -->
+
+### Red
+
+- [x] 12.1 Write failing tests for the directory-source order (argument; one client root; several roots with exactly one project record; ambiguous several roots → INVALID_ARGUMENT listing them; CLAUDE_PROJECT_DIR; process cwd), including no `roots/list` request when the client did not declare `roots`, a `roots/list` that does not answer within 2 seconds, non-`file://` roots ignored, and a re-read after `notifications/roots/list_changed`
+- [x] 12.2 Write failing tests that `project_get` and `server_status` report `cwdSource`, and that only `server` adds the note telling the agent to pass `cwd`
+- [x] 12.3 Write failing skill-tests checks that the shared preflight tells the agent to call `project_get` without `cwd` and to pass `cwd` afterwards only when `cwdSource` is `server` (or to target another directory), and that no skill still says to pass `cwd` on every call
+
+### Green
+
+- [x] 12.4 Implement the directory provider (roots via the SDK, cache, list_changed, timeout, CLAUDE_PROJECT_DIR, process cwd) and route every project-resolving tool and `project_set` through it
+- [x] 12.5 Add `cwdSource` to the project report and its output schema; update the `cwd` description (≤200 characters) and the server instructions; keep `tools/list` under the budget
+- [x] 12.6 Update the shared preflight paragraph in every skill identically, the other skill passages that say to pass `cwd` on every call, and both READMEs
+
+### Refactor
+
+- [x] 12.7 Review implementation and refactor as needed

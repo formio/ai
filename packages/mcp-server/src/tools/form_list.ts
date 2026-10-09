@@ -4,7 +4,8 @@ import { FormioConfig } from '../config.js';
 import { toMcpStructuredResult, toMcpError } from '../mcp-responses.js';
 import { formsListOutput } from '../output-schemas.js';
 import { reads } from '../tool-annotations.js';
-import { cwdSchema, resolveProjectConfig } from '../project-resolver.js';
+import { cwdSchema } from '../project-resolver.js';
+import { resolveToolConfig } from './project-resolution.js';
 import { fetchListPage, listArguments, listResult } from './list-contract.js';
 import { ToolError } from '../tool-errors.js';
 
@@ -44,7 +45,7 @@ export function registerFormListTool(server: McpServer, config: FormioConfig) {
     async ({ cwd, type, tags, ...query }) => {
       try {
         requireCommaFreeTags(tags);
-        const cfg = resolveProjectConfig(cwd, config);
+        const cfg = await resolveToolConfig({ server, cwd, config });
         // `tags=a,b` matches the literal string "a,b"; `tags__all` is all-of.
         const filters = { type, tags__all: tags?.length ? tags.join(',') : undefined };
         const page = await fetchListPage({

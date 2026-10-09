@@ -3,7 +3,8 @@ import { FormioConfig } from '../config.js';
 import { toMcpStructuredResult, toMcpError } from '../mcp-responses.js';
 import { rolesListOutput } from '../output-schemas.js';
 import { reads } from '../tool-annotations.js';
-import { cwdSchema, resolveProjectConfig } from '../project-resolver.js';
+import { cwdSchema } from '../project-resolver.js';
+import { resolveToolConfig } from './project-resolution.js';
 import { fetchListPage, listArguments, listResult } from './list-contract.js';
 
 export function registerRoleListTool(server: McpServer, config: FormioConfig) {
@@ -20,7 +21,7 @@ export function registerRoleListTool(server: McpServer, config: FormioConfig) {
     },
     async ({ cwd, ...query }) => {
       try {
-        const cfg = resolveProjectConfig(cwd, config);
+        const cfg = await resolveToolConfig({ server, cwd, config });
         const page = await fetchListPage({ path: 'role', query, config: cfg });
         return toMcpStructuredResult(listResult('roles', page));
       } catch (error) {

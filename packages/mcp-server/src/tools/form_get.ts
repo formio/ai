@@ -5,7 +5,8 @@ import { formioFetch, isMongoId } from '../formio-client.js';
 import { toMcpStructuredResult, toMcpError } from '../mcp-responses.js';
 import { formDocument } from '../output-schemas.js';
 import { reads } from '../tool-annotations.js';
-import { cwdSchema, resolveProjectConfig } from '../project-resolver.js';
+import { cwdSchema } from '../project-resolver.js';
+import { resolveToolConfig } from './project-resolution.js';
 import { noDraft } from '../revisions/index.js';
 import { projectPathArgument } from './path-arguments.js';
 
@@ -34,7 +35,7 @@ export function registerFormGetTool(server: McpServer, config: FormioConfig) {
     },
     async ({ cwd, formIdOrPath, select, draft }) => {
       try {
-        const cfg = resolveProjectConfig(cwd, config);
+        const cfg = await resolveToolConfig({ server, cwd, config });
         const params: Record<string, string | undefined> = { select };
         const base = isMongoId(formIdOrPath) ? `form/${formIdOrPath}` : formIdOrPath;
         const path = draft ? `${base}/draft` : base;

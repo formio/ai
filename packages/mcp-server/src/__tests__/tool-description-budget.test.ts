@@ -4,8 +4,8 @@
  * result, the bytes a client actually receives.
  *
  * What repeats is what costs most: the `cwd` description appears on every
- * project-scoped tool, so it says only what to pass and where the full rules are
- * (the server instructions and project_set), which every client receives once.
+ * project-scoped tool, so it says only what it defaults to and when to pass it, and
+ * leaves the full rules to the server instructions, which every client receives once.
  */
 
 import type { Tool } from '@modelcontextprotocol/sdk/types.js';
@@ -46,21 +46,26 @@ describe('tool description budget', () => {
     expect(over.map(({ tool, description }) => `${tool}: ${description.length}`)).toEqual([]);
   });
 
-  it("says that cwd is the user's working directory and where the full rules are", async () => {
+  it('says that cwd defaults to the client workspace root and when to pass it', async () => {
     const missing = cwdDescriptions(await listTools()).filter(
       ({ description }) =>
-        !/user's working directory/i.test(description) ||
-        !description.includes('project_set') ||
-        !/server instructions/i.test(description)
+        !/optional/i.test(description) ||
+        !/defaults to the client's workspace root/i.test(description) ||
+        !/another directory/i.test(description) ||
+        !/cwdSource "server"/.test(description)
     );
     expect(missing.map(({ tool }) => tool)).toEqual([]);
   });
 
-  // The short description points here, so the full rule has to be here.
+  // The short description points here, so the full rule has to be here: the order a
+  // directory is chosen in, and when an agent passes cwd itself.
   it('leaves the full cwd and resolution rules in the server instructions', () => {
-    expect(SERVER_INSTRUCTIONS).toMatch(/Pass cwd[^.]*on every project-scoped call/);
-    expect(SERVER_INSTRUCTIONS).toMatch(/server's own working directory, which is fixed at spawn/);
-    expect(SERVER_INSTRUCTIONS).toMatch(/no environment variable removes the need for it/);
+    expect(SERVER_INSTRUCTIONS).toMatch(
+      /cwd argument[\s\S]*?client's workspace roots[\s\S]*?CLAUDE_PROJECT_DIR[\s\S]*?server's own working directory/
+    );
+    expect(SERVER_INSTRUCTIONS).toMatch(/several roots[^.]*INVALID_ARGUMENT/);
+    expect(SERVER_INSTRUCTIONS).toMatch(/cwdSource is "server"[^.]*pass cwd/);
+    expect(SERVER_INSTRUCTIONS).not.toMatch(/on every project-scoped call/);
     expect(SERVER_INSTRUCTIONS).toMatch(
       /narrowest-scope-first: a committed formio\.json[\s\S]*?then the per-directory mapping project_set writes, then FORMIO_PROJECT_URL[\s\S]*?weakest/
     );

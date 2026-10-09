@@ -3,7 +3,8 @@ import { FormioConfig } from '../config.js';
 import { toMcpStructuredResult, toMcpError } from '../mcp-responses.js';
 import { actionsListOutput } from '../output-schemas.js';
 import { reads } from '../tool-annotations.js';
-import { cwdSchema, resolveProjectConfig } from '../project-resolver.js';
+import { cwdSchema } from '../project-resolver.js';
+import { resolveToolConfig } from './project-resolution.js';
 import { formIdArgument, requireFormId } from './form-id.js';
 import { fetchListPage, listArguments, listResult } from './list-contract.js';
 
@@ -24,7 +25,7 @@ export function registerActionListTool(server: McpServer, config: FormioConfig) 
     async ({ cwd, formId, ...query }) => {
       try {
         requireFormId(formId);
-        const cfg = resolveProjectConfig(cwd, config);
+        const cfg = await resolveToolConfig({ server, cwd, config });
         const page = await fetchListPage({ path: `form/${formId}/action`, query, config: cfg });
         return toMcpStructuredResult(listResult('actions', page));
       } catch (error) {

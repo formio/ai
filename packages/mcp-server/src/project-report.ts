@@ -157,12 +157,13 @@ export interface ProjectReportRequest {
    */
   notes: string[];
   /**
-   * Whether `cwd` above is the directory the CALLER named, or a fallback.
+   * Whether `cwd` above is a directory something NAMED — the caller, the client's
+   * workspace root, CLAUDE_PROJECT_DIR — or the server's own fallback.
    *
    * It changes what the unmapped answer has to say, because that answer's remedy
    * names a directory to record the project under. The CLI's fallback is the shell
    * it runs in, which IS the user's directory, so it defaults to true. The tool's
-   * fallback is the server's own process cwd — fixed at spawn, and for a plugin-
+   * last fallback is the server's own process cwd — fixed at spawn, and for a plugin-
    * or desktop-launched server nowhere near the user — so recording a project
    * there leaves every later call, which does pass a cwd, resolving nothing. Said
    * out loud for the same reason missingProjectError says it.
@@ -326,7 +327,7 @@ export function reportProject({
         ...(cwdWasNamed
           ? []
           : [
-              `That is the MCP server's own working directory, and it is the only directory searched because no cwd argument was passed. If it is not where the user is, call this again with cwd set to their directory BEFORE recording anything — a project recorded here would not be found from theirs.`,
+              `That is the MCP server's own working directory, and it is the only directory searched because no cwd argument was passed and the client named no directory. If it is not where the user is, call this again with cwd set to their directory BEFORE recording anything — a project recorded here would not be found from theirs.`,
             ]),
         // Named only where the caller chose the directory. Otherwise the one next
         // step is the warning above — call again with the user's own cwd — and a
@@ -373,7 +374,7 @@ export function reportProject({
   const baseUrlIsUnresolved = sources.baseUrl === 'unresolved';
   if (!cwdWasNamed && (sources.projectUrl !== 'environment' || baseUrlIsUnresolved)) {
     notes.push(
-      `No cwd argument was passed, so this answer is about ${cwd}, the MCP server's own working directory. Pass cwd on every Form.io tool call to target the user's directory.`
+      `No cwd argument was passed and the client named no directory, so this answer is about ${cwd}, the MCP server's own working directory. Pass cwd, set to the user's directory, on later Form.io tool calls.`
     );
   }
 
@@ -504,7 +505,7 @@ export function reportProject({
         ...(cwdWasNamed
           ? []
           : [
-              `That directory is the MCP server's own working directory, and it is the only directory this answer is about because no cwd argument was passed. If it is not where the user is, call this again with cwd set to their directory BEFORE recording anything — a Base URL recorded here would not be found from theirs.`,
+              `That directory is the MCP server's own working directory, and it is the only directory this answer is about because no cwd argument was passed and the client named no directory. If it is not where the user is, call this again with cwd set to their directory BEFORE recording anything — a Base URL recorded here would not be found from theirs.`,
             ]),
         // Gated for the same reason, and on the same condition, as the structured
         // remedy above: a remedy that records a deployment under a directory the

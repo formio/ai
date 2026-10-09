@@ -22,6 +22,7 @@ Fixing these after 1.0 would each be a breaking change. Fixing them now is one.
 - **BREAKING** — The revisions consent prompts (elicitation and the local browser page) are removed. `form_create` and `form_update` take an optional `acceptNoHistory: boolean`; when a write would save without revision history and it is not `true`, the tool refuses with a message the agent relays to the user, and the agent retries with the user's answer. The persisted consent file is removed.
 - **BREAKING** — Tool errors keep their prose message, led by a `[CODE]` prefix, and add `_meta["io.form/error"]: { code, status?, body? }`, with `code` from a fixed set and Form.io's response body (truncated) included. Error results carry no `structuredContent`.
 - Output schemas are open at every level: fields Form.io returns beyond the documented ones pass through, and documented fields accept the types Form.io actually stores (including `null`).
+- `cwd` stops being something every call must carry. When a call passes no `cwd`, the server resolves the project against the client's workspace root (MCP `roots`), then `CLAUDE_PROJECT_DIR`, then its own working directory, and `project_get` / `server_status` report which source was used (`cwdSource`). `cwd` stays an optional argument for targeting another directory or a client that reports no roots. Skills run their preflight without `cwd` and pass it only when the report says the server fell back to its own directory.
 - Boolean environment variables share one parser (`true` / `1`, case-insensitive, trimmed): `FORMIO_INSECURE_TLS`, `FORMIO_FORCE_BROWSER`.
 - `@formio/mcp`'s `package.json` gains `exports` with no library entry: the package is its `formio-mcp` binary.
 - Tool descriptions are trimmed to a measured budget: the `cwd` description is shortened (its full guidance stays in the server instructions and `project_set`), and `project_set`'s description loses its rationale and history, keeping every rule a caller acts on. A test pins the `tools/list` size.
@@ -40,6 +41,7 @@ Fixing these after 1.0 would each be a breaking change. Fixing them now is one.
 - `tool-error-contract`: the structured error every tool returns, and its `code` set.
 - `tool-output-schemas`: output schemas are open, so a valid Form.io response is never reported as a validation failure.
 - `tool-description-budget`: the measured size budget for `tools/list` and the rules for what a description keeps.
+- `project-directory-resolution`: the order in which a call's directory is chosen when no `cwd` is passed (client roots, `CLAUDE_PROJECT_DIR`, the server's directory) and the `cwdSource` field that reports it.
 - `revisions-history-acceptance`: the `acceptNoHistory` argument that replaces the consent prompts.
 
 ### Modified Capabilities

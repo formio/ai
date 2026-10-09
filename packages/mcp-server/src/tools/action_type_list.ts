@@ -4,7 +4,8 @@ import { formioFetch } from '../formio-client.js';
 import { toMcpStructuredResult, toMcpError } from '../mcp-responses.js';
 import { actionTypesListOutput } from '../output-schemas.js';
 import { reads } from '../tool-annotations.js';
-import { cwdSchema, resolveProjectConfig } from '../project-resolver.js';
+import { cwdSchema } from '../project-resolver.js';
+import { resolveToolConfig } from './project-resolution.js';
 import { formIdArgument, requireFormId } from './form-id.js';
 
 export function registerActionTypeListTool(server: McpServer, config: FormioConfig) {
@@ -23,7 +24,7 @@ export function registerActionTypeListTool(server: McpServer, config: FormioConf
     async ({ cwd, formId }) => {
       try {
         requireFormId(formId);
-        const cfg = resolveProjectConfig(cwd, config);
+        const cfg = await resolveToolConfig({ server, cwd, config });
         // Form.io does not page this route: the body is the whole catalog.
         const catalog = await formioFetch(`form/${formId}/actions`, {}, cfg);
         const items = Array.isArray(catalog) ? (catalog as Record<string, unknown>[]) : [];

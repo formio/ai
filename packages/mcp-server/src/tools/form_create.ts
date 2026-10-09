@@ -5,7 +5,8 @@ import { formioFetch } from '../formio-client.js';
 import { toMcpStructuredResult, toMcpError } from '../mcp-responses.js';
 import { formDocument } from '../output-schemas.js';
 import { creates } from '../tool-annotations.js';
-import { cwdSchema, resolveProjectConfig } from '../project-resolver.js';
+import { cwdSchema } from '../project-resolver.js';
+import { resolveToolConfig } from './project-resolution.js';
 import { gateRevisionsLicense, prefixVnote } from '../revisions/index.js';
 
 export function registerFormCreateTool(server: McpServer, config: FormioConfig) {
@@ -47,7 +48,7 @@ export function registerFormCreateTool(server: McpServer, config: FormioConfig) 
     },
     async ({ cwd, form: rawForm, note, acceptNoHistory }) => {
       try {
-        const cfg = resolveProjectConfig(cwd, config);
+        const cfg = await resolveToolConfig({ server, cwd, config });
         const { licensed, form } = await gateRevisionsLicense({
           cfg,
           actionLabel: 'create this form',

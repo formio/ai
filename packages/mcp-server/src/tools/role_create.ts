@@ -5,7 +5,8 @@ import { toMcpStructuredResult, toMcpError } from '../mcp-responses.js';
 import { roleDocument } from '../output-schemas.js';
 import { creates } from '../tool-annotations.js';
 import { newRoleSchema } from './role-schema.js';
-import { cwdSchema, resolveProjectConfig } from '../project-resolver.js';
+import { cwdSchema } from '../project-resolver.js';
+import { resolveToolConfig } from './project-resolution.js';
 
 export function registerRoleCreateTool(server: McpServer, config: FormioConfig) {
   server.registerTool(
@@ -21,7 +22,7 @@ export function registerRoleCreateTool(server: McpServer, config: FormioConfig) 
     },
     async ({ cwd, role }) => {
       try {
-        const cfg = resolveProjectConfig(cwd, config);
+        const cfg = await resolveToolConfig({ server, cwd, config });
         const created = (await formioFetch('role', {}, cfg, {
           method: 'POST',
           body: role,

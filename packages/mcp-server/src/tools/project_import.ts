@@ -5,7 +5,8 @@ import { formioFetch } from '../formio-client.js';
 import { toMcpError, toMcpStructuredResult } from '../mcp-responses.js';
 import { acknowledgementOutput } from '../output-schemas.js';
 import { overwrites } from '../tool-annotations.js';
-import { cwdSchema, resolveProjectConfig } from '../project-resolver.js';
+import { cwdSchema } from '../project-resolver.js';
+import { resolveToolConfig } from './project-resolution.js';
 
 export function registerProjectImportTool(server: McpServer, config: FormioConfig) {
   server.registerTool(
@@ -22,7 +23,7 @@ export function registerProjectImportTool(server: McpServer, config: FormioConfi
     },
     async ({ cwd, template }) => {
       try {
-        const cfg = resolveProjectConfig(cwd, config);
+        const cfg = await resolveToolConfig({ server, cwd, config });
         const result = await formioFetch('import', {}, cfg, {
           method: 'POST',
           body: { template },

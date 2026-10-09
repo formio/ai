@@ -36,11 +36,11 @@ import {
 } from './committed-config.js';
 import { ToolError } from './tool-errors.js';
 
-// Repeated on every project-scoped tool, so it carries what to pass and the order
-// resolution follows, and leaves the rest to the server instructions and project_set,
-// which every client receives once. A test holds it to 200 characters.
+// Repeated on every project-scoped tool, so it says what it defaults to and when to
+// pass it, and leaves the order and the rest to the server instructions, which every
+// client receives once. A test holds it to 200 characters.
 const CWD_DESCRIPTION =
-  "The user's working directory, absolute; pass it on every call. It selects the project: formio.json, else the project_set mapping, else FORMIO_PROJECT_URL (weakest). Rules: server instructions.";
+  'Optional. Directory whose Form.io project to use; defaults to the client\'s workspace root. Pass it to target another directory or when project_get reports cwdSource "server".';
 
 // One schema for every client. Requiredness cannot live here: whether a cwd is
 // needed depends on the environment the server was launched with, and this
@@ -97,10 +97,10 @@ function missingProjectError({ cwd, mapCwd, unpaired }: MissingProject): Project
   // will not find — and the loop repeats with the cause never named.
   const where = cwd
     ? ` for cwd=${cwd}`
-    : ` for ${mapCwd}, the MCP server's own working directory, which is the only directory searched because no cwd argument was passed`;
+    : ` for ${mapCwd}, the MCP server's own working directory, which is the only directory searched because no cwd argument was passed and the client named no directory`;
   const how = cwd
     ? `project_set with cwd=${cwd} and the project URL`
-    : "project_set with cwd set to the user's current working directory and the project URL — and pass that same cwd on every Form.io tool call";
+    : "project_set with cwd set to the user's current working directory and the project URL — and pass that same cwd on later Form.io tool calls";
   // Names the remedy in BOTH vocabularies, because the same string reaches an
   // agent holding MCP tools and a caller holding a shell, and neither can act on
   // the other's form. Carries the shape guidance for the same reason: no skill
@@ -253,6 +253,13 @@ export interface ProjectResolution {
 export interface ResolveProjectOptions {
   cacheDir?: string;
   onNote?: (message: string) => void;
+  /**
+   * Whether `cwd` is a directory something NAMED — the caller's argument, the client's
+   * workspace root, CLAUDE_PROJECT_DIR — rather than the server process's own, which
+   * is fixed at spawn. Only the latter earns the note and the remedy telling the agent
+   * to pass cwd. Defaults to whether a cwd was given at all.
+   */
+  cwdWasNamed?: boolean;
 }
 
 interface MappedEntryRead {
@@ -524,6 +531,7 @@ export function resolveProject(
   {
     cacheDir,
     onNote = (message) => process.stderr.write(`${message}\n`),
+    cwdWasNamed = Boolean(cwd),
   }: ResolveProjectOptions = {}
 ): ProjectResolution {
   if (cwd && !path.isAbsolute(cwd)) {
@@ -636,7 +644,7 @@ export function resolveProject(
   }
   if (!winner) {
     throw missingProjectError({
-      cwd: cwd || undefined,
+      cwd: cwdWasNamed ? mapCwd : undefined,
       mapCwd,
       // Each value carries its own consequence. A blanket "the write below replaces
       // that entry" was appended to the joined list, which is true of the mapping and
@@ -661,9 +669,9 @@ export function resolveProject(
   // Said out loud for the same reason project_set warns on the write side: the
   // server's process cwd is fixed at spawn and, for a plugin- or desktop-launched
   // server, is not where the user is.
-  if (!cwd && projectUrlSource !== 'environment') {
+  if (!cwdWasNamed && projectUrlSource !== 'environment') {
     onNote(
-      `No cwd argument was passed, so the project was resolved from ${mapCwd}, the MCP server's own working directory. Pass cwd on every Form.io tool call to target the user's directory.`
+      `No cwd argument was passed and the client named no directory, so the project was resolved from ${mapCwd}, the MCP server's own working directory. Pass cwd, set to the user's directory, on later Form.io tool calls.`
     );
   }
 

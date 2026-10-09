@@ -54,7 +54,7 @@ After both blocks, tell the user the filenames that were written to disk (using 
 Wrote ./template.md and ./template.json.
 ```
 
-Then finish with a short "Next steps" section. This is a **menu you print**, not work you do: this skill writes the artifact pair and hands it back, and it does not run any of the calls below. Whoever does — `formio-application` on its own flow, or you in a later turn once the user asks — owns the project gate for them, which means calling `project_get` with `cwd` set to the user's current working directory and naming the resolved Project URL before the first write. Never present the import as something already done.
+Then finish with a short "Next steps" section. This is a **menu you print**, not work you do: this skill writes the artifact pair and hands it back, and it does not run any of the calls below. Whoever does — `formio-application` on its own flow, or you in a later turn once the user asks — owns the project gate for them, which means calling `project_get` — passing `cwd` only when its `cwdSource` reports `server` or the target is another directory — and naming the resolved Project URL before the first write. Never present the import as something already done.
 
 ```
 ### Next steps

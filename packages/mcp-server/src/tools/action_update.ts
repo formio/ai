@@ -5,7 +5,8 @@ import { toMcpStructuredResult, toMcpError } from '../mcp-responses.js';
 import { actionDocument } from '../output-schemas.js';
 import { overwrites } from '../tool-annotations.js';
 import { actionDefinitionSchema } from './action-schema.js';
-import { cwdSchema, resolveProjectConfig } from '../project-resolver.js';
+import { cwdSchema } from '../project-resolver.js';
+import { resolveToolConfig } from './project-resolution.js';
 import { formIdArgument, requireFormId } from './form-id.js';
 import { resourceSegmentArgument } from './path-arguments.js';
 
@@ -27,7 +28,7 @@ export function registerActionUpdateTool(server: McpServer, config: FormioConfig
     async ({ cwd, formId, actionId, action }) => {
       try {
         requireFormId(formId);
-        const cfg = resolveProjectConfig(cwd, config);
+        const cfg = await resolveToolConfig({ server, cwd, config });
         const updated = (await formioFetch(`form/${formId}/action/${actionId}`, {}, cfg, {
           method: 'PUT',
           body: action,

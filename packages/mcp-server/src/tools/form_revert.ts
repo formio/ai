@@ -4,7 +4,8 @@ import { FormioConfig } from '../config.js';
 import { toMcpStructuredResult, toMcpError } from '../mcp-responses.js';
 import { formDocument } from '../output-schemas.js';
 import { overwrites } from '../tool-annotations.js';
-import { cwdSchema, resolveProjectConfig } from '../project-resolver.js';
+import { cwdSchema } from '../project-resolver.js';
+import { resolveToolConfig } from './project-resolution.js';
 import { formIdArgument, requireFormId } from './form-id.js';
 import { requireRevisionsLicense, revertToRevision } from '../revisions/index.js';
 import { resourceSegmentArgument } from './path-arguments.js';
@@ -46,7 +47,7 @@ export function registerFormRevertTool(server: McpServer, config: FormioConfig) 
       try {
         requireFormId(formId);
         refuseDraftVersion(version);
-        const cfg = resolveProjectConfig(cwd, config);
+        const cfg = await resolveToolConfig({ server, cwd, config });
         await requireRevisionsLicense(cfg, 'revert this form');
         return toMcpStructuredResult(
           (await revertToRevision({ formId, version, _vnote: note, cfg })) as Record<

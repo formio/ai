@@ -8,6 +8,7 @@ import {
   projectReportPayload,
   projectReportText,
   reportProjectForTool,
+  toolDirectory,
 } from './project-resolution.js';
 
 export interface ProjectGetOptions {
@@ -35,8 +36,12 @@ export function registerProjectGetTool(
     async ({ cwd }) => {
       const notes: string[] = [];
       try {
-        const report = reportProjectForTool({ cwd, serverCwd: getServerCwd, config, notes });
-        return toMcpStructuredResult(projectReportPayload(report), projectReportText(report));
+        const directory = await toolDirectory({ server, cwd, serverCwd: getServerCwd });
+        const report = reportProjectForTool({ directory, config, notes });
+        return toMcpStructuredResult(
+          projectReportPayload(report, directory),
+          projectReportText(report)
+        );
       } catch (error) {
         // "Could not answer at all" — an unreadable map, a formio.json that will
         // not parse. Deliberately NOT a "not-configured" status: that status

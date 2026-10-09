@@ -5,7 +5,8 @@ import { toMcpStructuredResult, toMcpError } from '../mcp-responses.js';
 import { actionTypeInfoDocument } from '../output-schemas.js';
 import { reads } from '../tool-annotations.js';
 import { unknownActionType } from './action-schema.js';
-import { cwdSchema, resolveProjectConfig } from '../project-resolver.js';
+import { cwdSchema } from '../project-resolver.js';
+import { resolveToolConfig } from './project-resolution.js';
 import { formIdArgument, requireFormId } from './form-id.js';
 import { resourceSegmentArgument } from './path-arguments.js';
 
@@ -28,7 +29,7 @@ export function registerActionTypeGetTool(server: McpServer, config: FormioConfi
     async ({ cwd, formId, actionName }) => {
       try {
         requireFormId(formId);
-        const cfg = resolveProjectConfig(cwd, config);
+        const cfg = await resolveToolConfig({ server, cwd, config });
         try {
           const typeInfo = (await formioFetch(
             `form/${formId}/actions/${actionName}`,

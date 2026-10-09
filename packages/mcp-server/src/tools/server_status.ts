@@ -9,6 +9,7 @@ import {
   projectReportPayload,
   projectReportText,
   reportProjectForTool,
+  toolDirectory,
 } from './project-resolution.js';
 
 export interface ServerStatusOptions {
@@ -34,9 +35,14 @@ export function registerServerStatusTool(
       const notes: string[] = [];
       const heading = `${SERVER_NAME} ${SERVER_VERSION}`;
       try {
-        const report = reportProjectForTool({ cwd, serverCwd: getServerCwd, config, notes });
+        const directory = await toolDirectory({ server, cwd, serverCwd: getServerCwd });
+        const report = reportProjectForTool({ directory, config, notes });
         return toMcpStructuredResult(
-          { name: SERVER_NAME, version: SERVER_VERSION, ...projectReportPayload(report) },
+          {
+            name: SERVER_NAME,
+            version: SERVER_VERSION,
+            ...projectReportPayload(report, directory),
+          },
           [heading, projectReportText(report)].join('\n')
         );
       } catch (error) {

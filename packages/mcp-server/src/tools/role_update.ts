@@ -6,7 +6,8 @@ import { toMcpStructuredResult, toMcpError } from '../mcp-responses.js';
 import { roleDocument } from '../output-schemas.js';
 import { overwrites } from '../tool-annotations.js';
 import { roleSchema } from './role-schema.js';
-import { cwdSchema, resolveProjectConfig } from '../project-resolver.js';
+import { cwdSchema } from '../project-resolver.js';
+import { resolveToolConfig } from './project-resolution.js';
 import { requireObjectId } from './object-id.js';
 
 export function registerRoleUpdateTool(server: McpServer, config: FormioConfig) {
@@ -30,7 +31,7 @@ export function registerRoleUpdateTool(server: McpServer, config: FormioConfig) 
           value: roleId,
           remedy: "roleId takes a role's 24-character ObjectId _id. Read it with role_list.",
         });
-        const cfg = resolveProjectConfig(cwd, config);
+        const cfg = await resolveToolConfig({ server, cwd, config });
         const updated = (await formioFetch(`role/${roleId}`, {}, cfg, {
           method: 'PUT',
           body: role,
