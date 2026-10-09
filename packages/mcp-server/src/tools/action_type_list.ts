@@ -28,7 +28,7 @@ export function registerActionTypeListTool(server: McpServer, config: FormioConf
         // Form.io does not page this route: the body is the whole catalog.
         const catalog = await formioFetch(`form/${formId}/actions`, {}, cfg);
         const items = Array.isArray(catalog) ? (catalog as Record<string, unknown>[]) : [];
-        const page = pageOf({ items, total: items.length, skip: 0 });
+        const page = pageOf({ items, total: items.length, skip: 0, limit: items.length });
         return toMcpStructuredResult(listResult('actionTypes', page));
       } catch (error) {
         return toMcpError(error);

@@ -52,11 +52,13 @@ async function readPage(response: Response, url: URL): Promise<FormioPage> {
   return { data: await response.json(), total };
 }
 
-async function readResponse(
-  response: Response,
-  url: URL,
-  options?: FormioFetchOptions
-): Promise<unknown> {
+interface ReadResponseRequest {
+  response: Response;
+  url: URL;
+  options?: FormioFetchOptions;
+}
+
+async function readResponse({ response, url, options }: ReadResponseRequest): Promise<unknown> {
   if (options?.withMeta) {
     return readPage(response, url);
   }
@@ -89,7 +91,11 @@ async function readBody(response: Response): Promise<string | undefined> {
   }
 }
 
-async function send(url: URL, init: RequestInit): Promise<Response> {
+/**
+ * `fetch`, with a request that received no response raised as a FormioNetworkError
+ * naming the cause and the URL — the one wrapper every Form.io request goes through.
+ */
+export async function send(url: URL, init: RequestInit): Promise<Response> {
   try {
     return await fetch(url, init);
   } catch (cause) {
@@ -135,10 +141,14 @@ export async function formioRawFetch(
     await clearToken(baseUrl);
     config.jwt = undefined;
     await ensureAuthenticated(config);
-    return readResponse(await send(url, buildFetchInit(config, options)), url, options);
+    return readResponse({
+      response: await send(url, buildFetchInit(config, options)),
+      url,
+      options,
+    });
   }
 
-  return readResponse(response, url, options);
+  return readResponse({ response, url, options });
 }
 
 // Whether a built URL addresses the project: the same origin, and a path that IS

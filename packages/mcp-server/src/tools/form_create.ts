@@ -58,7 +58,8 @@ export function registerFormCreateTool(server: McpServer, config: FormioConfig) 
           method: 'POST',
           body: {
             // The gate already stripped `revisions` on unlicensed deployments; on
-            // licensed ones default to 'original' unless the caller overrode.
+            // licensed ones default to 'original' unless the caller overrode. Where the
+            // licence is unknown the body goes as written: no default is claimed.
             ...(licensed ? { revisions: 'original', ...form } : form),
             ...(note && { _vnote: prefixVnote(note) }),
           },

@@ -51,16 +51,18 @@ describe('the list contract', () => {
 
   describe('pageOf', () => {
     it('has more while skip plus the page is short of the total', () => {
-      expect(pageOf({ items: [1, 2], total: 5, skip: 0 })).toEqual({
+      expect(pageOf({ items: [1, 2], total: 5, skip: 0, limit: 2 })).toEqual({
         items: [1, 2],
         total: 5,
         hasMore: true,
       });
-      expect(pageOf({ items: [4, 5], total: 5, skip: 3 })).toMatchObject({ hasMore: false });
+      expect(pageOf({ items: [4, 5], total: 5, skip: 3, limit: 2 })).toMatchObject({
+        hasMore: false,
+      });
     });
 
     it('has no more past the end', () => {
-      expect(pageOf({ items: [], total: 3, skip: 500 })).toEqual({
+      expect(pageOf({ items: [], total: 3, skip: 500, limit: 100 })).toEqual({
         items: [],
         total: 3,
         hasMore: false,
@@ -68,10 +70,20 @@ describe('the list contract', () => {
     });
 
     it('counts what it was given when Form.io reports no total', () => {
-      expect(pageOf({ items: [1, 2], total: undefined, skip: 10 })).toEqual({
+      expect(pageOf({ items: [1, 2], total: undefined, skip: 10, limit: 5 })).toEqual({
         items: [1, 2],
         total: 12,
         hasMore: false,
+      });
+    });
+
+    // A full page with no reported total says nothing about what follows it, so the
+    // caller is told to ask for the next one rather than that the list has ended.
+    it('has more when Form.io reports no total and the page is full', () => {
+      expect(pageOf({ items: [1, 2], total: undefined, skip: 10, limit: 2 })).toEqual({
+        items: [1, 2],
+        total: 12,
+        hasMore: true,
       });
     });
   });

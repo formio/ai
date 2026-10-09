@@ -151,4 +151,18 @@ describe('form_revert tool', () => {
     expect(result._meta?.[ERROR_META_KEY]?.code).toBe('LICENSE_REQUIRED');
     expect(mockFormioFetch).not.toHaveBeenCalled();
   });
+
+  // The draft is stored as a revision whose _vid is "draft", so GET /v/draft answers
+  // with it: a revert to it would publish the draft under the wrong tool's name.
+  it.each(['draft', 'DRAFT'])(
+    'refuses version "%s" with INVALID_ARGUMENT naming form_publish',
+    async (version) => {
+      const result = await revert({ formId: FORM_ID, version, note: 'n' });
+
+      expect(result.isError).toBe(true);
+      expect(result._meta?.[ERROR_META_KEY]?.code).toBe('INVALID_ARGUMENT');
+      expect(result.content[0].text).toContain('form_publish');
+      expect(mockFormioFetch).not.toHaveBeenCalled();
+    }
+  );
 });

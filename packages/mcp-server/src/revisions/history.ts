@@ -66,7 +66,11 @@ export async function gateFormHistory({
   if (enablesHistory || acceptNoHistory) {
     return;
   }
-  const stored = (await formioFetch(`form/${formId}`, {}, cfg)) as Record<string, unknown>;
+  // Only the fields read below: the whole definition is not needed to answer this.
+  const stored = (await formioFetch(`form/${formId}`, { select: 'revisions,name' }, cfg)) as Record<
+    string,
+    unknown
+  >;
   if (stored.revisions) {
     return;
   }

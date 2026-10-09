@@ -3,12 +3,19 @@ import { browserlessReason, currentBrowserEnvironment } from './browser-availabi
 import { openInBrowser } from './browser-launch.js';
 import { ResolvedFormioConfig } from './config.js';
 import { formioRawFetch } from './formio-client.js';
+import { ToolError } from './tool-errors.js';
 
 export interface AuthenticateOptions {
   onReady?: (port: number) => void;
 }
 
 const DEFAULT_AUTH_HOST = '127.0.0.1';
+
+// However the browser login fails, the call is left without a credential, so every
+// such failure is AUTH_REQUIRED; the message is what says which failure and its remedy.
+function loginFailed(message: string, cause?: unknown): ToolError {
+  return new ToolError({ code: 'AUTH_REQUIRED', message, cause });
+}
 // Generous on purpose. The point of the timeout is to stop an unattended hang
 // from lasting forever, not to hurry an interactive login — an SSO redirect, a
 // 2FA prompt or a password-manager detour can all take minutes. Anyone actually
@@ -209,7 +216,7 @@ function assertBrowserAvailable(config: ResolvedFormioConfig): void {
   if (!reason) {
     return;
   }
-  throw new Error(
+  throw loginFailed(
     `Cannot complete the Form.io browser login: ${reason}. ` +
       apiKeyRemedy(config) +
       `If the host running your browser can reach this machine, set both FORMIO_AUTH_HOST=0.0.0.0 and ` +
@@ -241,7 +248,7 @@ export async function authenticate(
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       res.status(500).send(`Login form resolution failed: ${message}`);
-      rejectJwt(err instanceof Error ? err : new Error(message));
+      rejectJwt(loginFailed(message, err));
     }
   });
 
@@ -269,9 +276,10 @@ export async function authenticate(
     // it would leave the caller waiting out the whole login timeout.
     if (err) {
       rejectJwt(
-        new Error(
+        loginFailed(
           `Could not start the Form.io login server on ${host}:${config.authPort ?? 0}: ${err.message}. ` +
-            `Free that port, or set FORMIO_AUTH_PORT to one that is available.`
+            `Free that port, or set FORMIO_AUTH_PORT to one that is available.`,
+          err
         )
       );
       return;
@@ -301,7 +309,7 @@ export async function authenticate(
   const timeoutMs = config.authTimeoutMs ?? DEFAULT_AUTH_TIMEOUT_MS;
   const timer = setTimeout(() => {
     rejectJwt(
-      new Error(
+      loginFailed(
         `Timed out after ${Math.round(timeoutMs / 1000)}s waiting for the Form.io login to complete. ` +
           (loginUrl ? `Open ${loginUrl} to sign in, then retry. ` : '') +
           `If this environment has no browser — a container, a remote shell, or CI: ` +

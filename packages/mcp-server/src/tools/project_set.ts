@@ -19,7 +19,8 @@ import {
 import { projectCommand } from '../cli-launch.js';
 import { cwdSchema } from '../project-resolver.js';
 import { FORCED_PAIR_FACT, ProjectReport, reportProject } from '../project-report.js';
-import { toMcpStructuredResult } from '../mcp-responses.js';
+import { catchToolErrors, toMcpStructuredResult } from '../mcp-responses.js';
+import { ToolError, ToolErrorCode } from '../tool-errors.js';
 import { projectMappingOutput } from '../output-schemas.js';
 import { local } from '../tool-annotations.js';
 import {
@@ -78,9 +79,13 @@ export function registerProjectSetTool(server: McpServer, options: ProjectSetOpt
       // own documentation still names it — stripped, that call would write the
       // machine-local mapping and report success for a committed write that never
       // happened. The CLI whitelists its flags for exactly this reason.
+      //
+      // The URLs are plain strings here and checked in the handler, so a value that is
+      // not an http(s) URL is refused as INVALID_ARGUMENT: a schema failure is
+      // reported by the SDK as bare text with no code.
       inputSchema: z.strictObject({
         projectUrl: z
-          .url({ protocol: /^https?$/ })
+          .string()
           .optional()
           .describe(
             "Full URL of the Form.io project: https://examples.form.io on the hosted cloud (never https://api.form.io), or https://myproject.mysite.com or https://forms.mysite.com/myproject on a customer deployment. Omit it only to add a baseUrl to THIS DIRECTORY'S OWN mapping. Where another record holds the project, a baseUrl alone is refused: add it to a committed formio.json by hand, or, for FORMIO_PROJECT_URL in the environment, pass both."
@@ -91,7 +96,7 @@ export function registerProjectSetTool(server: McpServer, options: ProjectSetOpt
           "The user's working directory, absolute, that the mapping is keyed against. Omitted, the server's own spawn directory is used. Rules: project_set and the server instructions."
         ),
         baseUrl: z
-          .url({ protocol: /^https?$/ })
+          .string()
           .optional()
           .describe(
             'The deployment hosting the project; it builds the portal-login URL and keys the cached token. Usually omitted: it is derived from projectUrl. Pass it when the server reports it cannot be determined; it may carry a sub-path. Refused for a form.io host, which only https://api.form.io serves. Omitted, the value mapped for this directory is kept, unless the call re-points it to a different project.'
@@ -101,7 +106,7 @@ export function registerProjectSetTool(server: McpServer, options: ProjectSetOpt
       // Writes only to the local project map — no Form.io request involved.
       annotations: local('Set the active project', false),
     },
-    async ({ projectUrl, cwd, baseUrl: baseUrlArg }) => {
+    catchToolErrors(async ({ projectUrl, cwd, baseUrl: baseUrlArg }) => {
       const entryCwd = cwd ?? getServerCwd();
       const mapped = readProjectEntryForWrite(entryCwd);
       // An entry that EXISTS and cannot be honoured is not an absent one. A record's
@@ -144,8 +149,16 @@ export function registerProjectSetTool(server: McpServer, options: ProjectSetOpt
       // Annotated on the variable so TypeScript narrows after a call: an arrow
       // returning `never` only terminates control flow for the checker when the
       // binding itself declares that type.
-      const refuse: (message: string) => never = (message) => {
-        throw new Error([...walkNotes, message + fallbackCwdWarning].join('\n'));
+      // A refusal of the caller's arguments is INVALID_ARGUMENT; a failure the reader
+      // raised keeps the code it was raised with.
+      const refuse: (message: string, code?: ToolErrorCode) => never = (
+        message,
+        code = 'INVALID_ARGUMENT'
+      ) => {
+        throw new ToolError({
+          code,
+          message: [...walkNotes, message + fallbackCwdWarning].join('\n'),
+        });
       };
       const committed = findCommittedConfig(entryCwd, {
         onNote: (message) => walkNotes.push(message),
@@ -321,7 +334,10 @@ export function registerProjectSetTool(server: McpServer, options: ProjectSetOpt
           // was written" instead, this returned a success naming a pair the governing
           // file contradicts, and the next call failed with the reason discarded.
           keepNotes();
-          refuse(error instanceof Error ? error.message : String(error));
+          refuse(
+            error instanceof Error ? error.message : String(error),
+            error instanceof ToolError ? error.code : 'INTERNAL'
+          );
         }
         keepNotes();
         return report;
@@ -398,6 +414,6 @@ export function registerProjectSetTool(server: McpServer, options: ProjectSetOpt
         },
         fullMessage
       );
-    }
+    })
   );
 }

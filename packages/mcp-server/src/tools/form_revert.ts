@@ -8,6 +8,18 @@ import { cwdSchema, resolveProjectConfig } from '../project-resolver.js';
 import { formIdArgument, requireFormId } from './form-id.js';
 import { requireRevisionsLicense, revertToRevision } from '../revisions/index.js';
 import { resourceSegmentArgument } from './path-arguments.js';
+import { ToolError } from '../tool-errors.js';
+
+// Form.io stores a form's draft as a revision whose _vid is "draft", so /v/draft
+// answers with it. Restoring it here would publish the draft by another name.
+function refuseDraftVersion(version: string): void {
+  if (version.trim().toLowerCase() === 'draft') {
+    throw new ToolError({
+      code: 'INVALID_ARGUMENT',
+      message: `version ${JSON.stringify(version)} is the form's draft, not a published revision. To make the draft live, call form_publish; to restore a published revision, pass its _vid from form_revision_list.`,
+    });
+  }
+}
 
 export function registerFormRevertTool(server: McpServer, config: FormioConfig) {
   server.registerTool(
@@ -33,6 +45,7 @@ export function registerFormRevertTool(server: McpServer, config: FormioConfig) 
     async ({ cwd, formId, version, note }) => {
       try {
         requireFormId(formId);
+        refuseDraftVersion(version);
         const cfg = resolveProjectConfig(cwd, config);
         await requireRevisionsLicense(cfg, 'revert this form');
         return toMcpStructuredResult(

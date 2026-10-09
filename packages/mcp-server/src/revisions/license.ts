@@ -2,15 +2,55 @@ import { BASE_URL_UNRESOLVED_GUIDANCE, ResolvedFormioConfig } from '../config.js
 import { gateDisabledHistory, historyNotAccepted } from './history.js';
 import { stripRevisions } from './helpers.js';
 import { BaseUrlUnresolvedError, baseUrlWriteCommand } from '../project-resolver.js';
-import { ToolError } from '../tool-errors.js';
+import { FormioNetworkError, ToolError } from '../tool-errors.js';
+import { send } from '../formio-client.js';
 import { COMMITTED_CONFIG_FILE } from '../committed-config.js';
 
 // ─── License detection ──────────────────────────────────────────────────────
 // Resolves the deployment's Security Module flag (`sac`) from the anonymous
-// `/config.js`. Cached per `baseUrl` — license is deployment-wide.
-const revisionsLicensedByBaseUrl = new Map<string, boolean>();
+// `/config.js`. Only a definite answer is cached per `baseUrl` — license is
+// deployment-wide — and a probe that produced none is asked again next time.
+const revisionsLicensedByBaseUrl = new Map<string, DefiniteLicence>();
 
 const SAC_PATTERN = /\bsac\s*=\s*(true|false)\b/i;
+
+// Bounds the probe: an unattended hang here would hold every write behind it.
+const LICENCE_PROBE_TIMEOUT_MS = 10_000;
+
+type DefiniteLicence = { state: 'licensed' } | { state: 'unlicensed' };
+
+/**
+ * What the probe of `{baseUrl}/config.js` established. `unknown` means the probe ran
+ * and produced no answer — no response, or an error status — and carries that failure
+ * (NETWORK_ERROR or UPSTREAM_ERROR) naming the URL.
+ */
+export type RevisionsLicence = DefiniteLicence | { state: 'unknown'; failure: ToolError };
+
+async function probeLicence(url: URL): Promise<RevisionsLicence> {
+  try {
+    const response = await send(url, { signal: AbortSignal.timeout(LICENCE_PROBE_TIMEOUT_MS) });
+    if (!response.ok) {
+      return {
+        state: 'unknown',
+        failure: new ToolError({
+          code: 'UPSTREAM_ERROR',
+          message: `the probe of ${url} was answered with status ${response.status}`,
+        }),
+      };
+    }
+    const body = await response.text();
+    const match = body.match(SAC_PATTERN);
+    return { state: match?.[1]?.toLowerCase() === 'true' ? 'licensed' : 'unlicensed' };
+  } catch (error) {
+    return {
+      state: 'unknown',
+      failure:
+        error instanceof ToolError
+          ? error
+          : new FormioNetworkError({ url: url.toString(), cause: error }),
+    };
+  }
+}
 
 // How to record the deployment, named for the record that holds this project — the
 // same split `requireBaseUrl` makes. A committed file is edited by hand; the mapping
@@ -24,33 +64,33 @@ function baseUrlRemedy(cfg: ResolvedFormioConfig): string {
   return `Set it with project_set (pass baseUrl alongside the cwd${source === 'environment' ? ', with the projectUrl' : ''}), or run: ${baseUrlWriteCommand({ source, cwd, projectUrl: cfg.projectUrl })}`;
 }
 
-// Returns undefined — "cannot be determined" — when no base URL resolved, which
-// is a third answer distinct from licensed and unlicensed. The flag is a property
-// of the deployment and is fetched from it, so with no deployment URL there is
-// nothing to ask; reporting `false` would be a claim about a probe that never ran.
+// Returns undefined when no base URL resolved: the flag is a property of the
+// deployment and is fetched from it, so with no deployment URL there is nothing to
+// ask, and reporting an answer would be a claim about a probe that never ran.
 export async function checkRevisionsLicensed(
   cfg: ResolvedFormioConfig
-): Promise<boolean | undefined> {
+): Promise<RevisionsLicence | undefined> {
   if (!cfg.baseUrl) return undefined;
   const baseUrl = cfg.baseUrl;
   const cached = revisionsLicensedByBaseUrl.get(baseUrl);
   if (cached !== undefined) return cached;
 
-  let revisionsLicensed = false;
-  try {
-    const url = new URL('config.js', `${baseUrl.replace(/\/*$/, '/')}`);
-    const response = await fetch(url);
-    if (response.ok) {
-      const body = await response.text();
-      const match = body.match(SAC_PATTERN);
-      revisionsLicensed = match?.[1]?.toLowerCase() === 'true';
-    }
-  } catch {
-    revisionsLicensed = false;
+  const licence = await probeLicence(new URL('config.js', `${baseUrl.replace(/\/*$/, '/')}`));
+  if (licence.state !== 'unknown') {
+    revisionsLicensedByBaseUrl.set(baseUrl, licence);
   }
+  return licence;
+}
 
-  revisionsLicensedByBaseUrl.set(baseUrl, revisionsLicensed);
-  return revisionsLicensed;
+// The probe ran and produced no answer. Refused with the probe's own code — the
+// deployment was unreachable or answered with an error — and never LICENSE_REQUIRED,
+// which would be a claim about the licence that nothing established.
+function licenceUnknown(failure: ToolError, actionLabel: string): ToolError {
+  return new ToolError({
+    code: failure.code,
+    message: `Cannot ${actionLabel} — whether this Form.io deployment's licence includes form revisions could not be determined: ${failure.message}. Nothing was changed; retry once the deployment answers.`,
+    cause: failure,
+  });
 }
 
 // Why the licence cannot be read: the probe is a GET to the deployment, and no
@@ -76,18 +116,22 @@ function licenceUndetermined(
 
 /**
  * Drafts, publishing and reverting exist only where the deployment is licensed for
- * revisions. Refuses with LICENSE_REQUIRED where it is not, and with the Base URL
- * remedy where the licence cannot be read.
+ * revisions. Refuses with LICENSE_REQUIRED where it is not, with the Base URL remedy
+ * where the licence cannot be read, and with the probe's own failure where the probe
+ * produced no answer.
  */
 export async function requireRevisionsLicense(
   cfg: ResolvedFormioConfig,
   actionLabel: string
 ): Promise<void> {
-  const licensed = await checkRevisionsLicensed(cfg);
-  if (licensed === undefined) {
+  const licence = await checkRevisionsLicensed(cfg);
+  if (licence === undefined) {
     throw licenceUndetermined(cfg, actionLabel);
   }
-  if (!licensed) {
+  if (licence.state === 'unknown') {
+    throw licenceUnknown(licence.failure, actionLabel);
+  }
+  if (licence.state === 'unlicensed') {
     throw new ToolError({
       code: 'LICENSE_REQUIRED',
       message: `Cannot ${actionLabel} — drafts, publishing and reverting need form revisions, which this Form.io deployment's licence does not include (the Security Module is required). To change the form, call form_update without draft: true.`,
@@ -102,35 +146,51 @@ export interface RevisionsLicenseGateOptions {
   acceptNoHistory?: boolean;
 }
 
+export interface RevisionsLicenseGateResult {
+  /** True only when the deployment is definitely licensed. */
+  licensed: boolean;
+  /** True when the probe ran and produced no answer. */
+  licenceUnknown?: boolean;
+  form: Record<string, unknown>;
+}
+
 /**
  * The licence gate for standard creates and updates. On an unlicensed deployment the
  * save keeps no history, so it proceeds only with `acceptNoHistory: true`, and then
  * with `revisions` stripped. On a licensed one, a body that turns history off
- * (`revisions: ""`) needs the same acceptance. Returns the resolved licensed flag and
- * the body to send.
+ * (`revisions: ""`) needs the same acceptance. Where the probe produced no answer the
+ * body is sent as the caller wrote it — never stripped, and never refused on the
+ * licence's account — while a body turning history off still needs acceptance.
  */
 export async function gateRevisionsLicense({
   cfg,
   actionLabel,
   form,
   acceptNoHistory,
-}: RevisionsLicenseGateOptions): Promise<{ licensed: boolean; form: Record<string, unknown> }> {
-  const licensed = await checkRevisionsLicensed(cfg);
+}: RevisionsLicenseGateOptions): Promise<RevisionsLicenseGateResult> {
+  const licence = await checkRevisionsLicensed(cfg);
 
   // Undetermined is not unlicensed. A form carrying a `revisions` setting must not
   // have it stripped on the strength of a probe that never ran. A form with no such
   // setting loses nothing — stripRevisions is a no-op on it — so an API-key write
   // proceeds rather than failing over a capability it never asked about, and is not
   // refused as unlicensed, because that would be a claim we cannot support.
-  if (licensed === undefined) {
+  if (licence === undefined) {
     if ('revisions' in form) {
       throw licenceUndetermined(cfg, actionLabel);
     }
     return { licensed: false, form };
   }
-  if (licensed) {
+  // The probe ran and produced no answer. Stripping or refusing would act on a licence
+  // nothing established, so the body goes as written; only the caller's own choice to
+  // turn history off is gated, exactly as it is where the licence is known.
+  if (licence.state === 'unknown') {
     gateDisabledHistory({ form, acceptNoHistory });
-    return { licensed, form };
+    return { licensed: false, licenceUnknown: true, form };
+  }
+  if (licence.state === 'licensed') {
+    gateDisabledHistory({ form, acceptNoHistory });
+    return { licensed: true, form };
   }
   if (!acceptNoHistory) {
     throw historyNotAccepted({
@@ -139,5 +199,5 @@ export async function gateRevisionsLicense({
       remedy: 'if they agree to save without history, retry with acceptNoHistory: true.',
     });
   }
-  return { licensed, form: stripRevisions(form) };
+  return { licensed: false, form: stripRevisions(form) };
 }

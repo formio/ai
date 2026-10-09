@@ -1,12 +1,13 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 import { FormioConfig } from '../config.js';
-import { formioFetch, MONGO_ID_PATTERN } from '../formio-client.js';
+import { formioFetch } from '../formio-client.js';
 import { toMcpStructuredResult, toMcpError } from '../mcp-responses.js';
 import { roleDocument } from '../output-schemas.js';
 import { overwrites } from '../tool-annotations.js';
 import { roleSchema } from './role-schema.js';
 import { cwdSchema, resolveProjectConfig } from '../project-resolver.js';
+import { requireObjectId } from './object-id.js';
 
 export function registerRoleUpdateTool(server: McpServer, config: FormioConfig) {
   server.registerTool(
@@ -16,10 +17,7 @@ export function registerRoleUpdateTool(server: McpServer, config: FormioConfig) 
         'Update an existing role in the project `cwd` resolves to. This is a full replacement — include all fields you want to preserve.',
       inputSchema: {
         cwd: cwdSchema,
-        roleId: z
-          .string()
-          .regex(MONGO_ID_PATTERN, 'Must be a 24-character MongoDB ObjectId')
-          .describe('The _id of the role to update'),
+        roleId: z.string().describe('The _id of the role to update, a 24-character ObjectId'),
         role: roleSchema.describe('Role document with updated fields'),
       },
       outputSchema: roleDocument,
@@ -27,6 +25,11 @@ export function registerRoleUpdateTool(server: McpServer, config: FormioConfig) 
     },
     async ({ cwd, roleId, role }) => {
       try {
+        requireObjectId({
+          argument: 'roleId',
+          value: roleId,
+          remedy: "roleId takes a role's 24-character ObjectId _id. Read it with role_list.",
+        });
         const cfg = resolveProjectConfig(cwd, config);
         const updated = (await formioFetch(`role/${roleId}`, {}, cfg, {
           method: 'PUT',

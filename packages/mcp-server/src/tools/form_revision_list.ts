@@ -12,6 +12,10 @@ import { projectPathArgument } from './path-arguments.js';
 // whole form definition; newest first and compact metadata is what a caller wants.
 const DEFAULTS = { sort: '-_vid', select: '_id,_vid,_vnote,_vuser,created,modified' };
 
+// Form.io stores a form's draft as a revision with _vid "draft". Excluded in the
+// query rather than from the page, so Form.io's total counts the same rows.
+const PUBLISHED_ONLY = { _vid__ne: 'draft' };
+
 export function registerFormRevisionListTool(server: McpServer, config: FormioConfig) {
   server.registerTool(
     'form_revision_list',
@@ -37,6 +41,7 @@ export function registerFormRevisionListTool(server: McpServer, config: FormioCo
           query,
           config: cfg,
           defaults: DEFAULTS,
+          filters: PUBLISHED_ONLY,
         });
         return toMcpStructuredResult(listResult('revisions', page));
       } catch (error) {

@@ -40,6 +40,13 @@ describe('role_update tool', () => {
     });
 
     expect(result.isError).toBe(true);
+    // Refused in the handler, so the refusal carries its code: a schema failure is
+    // reported by the SDK as bare text.
+    const text = (result.content as Array<{ text: string }>)[0].text;
+    expect(text.startsWith('[INVALID_ARGUMENT] ')).toBe(true);
+    expect(text).toContain('roleId');
+    expect(text).toContain('role_list');
+    expect(mockFormioFetch).not.toHaveBeenCalled();
   });
 
   it('sends PUT /role/:roleId with role body and returns updated role', async () => {

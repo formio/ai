@@ -82,16 +82,26 @@ function stringField(record: Record<string, unknown>, key: string): string | und
   return typeof value === 'string' && value.trim() ? value.trim() : undefined;
 }
 
+// One entry's message: a bare string, or an object carrying `message`.
+function entryMessage(entry: unknown): string | undefined {
+  if (typeof entry === 'string') {
+    return entry.trim() || undefined;
+  }
+  return isRecord(entry) ? stringField(entry, 'message') : undefined;
+}
+
 // Field-level messages: resourcejs reports a validation failure as an `errors` map
-// keyed by field, and the submission validator as a `details` array.
+// keyed by field and a missing document as an `errors` array of strings, and the
+// submission validator reports a `details` array.
 function fieldMessages(record: Record<string, unknown>): string[] {
   const { errors, details } = record;
   const entries = [
     ...(isRecord(errors) ? Object.values(errors) : []),
+    ...(Array.isArray(errors) ? errors : []),
     ...(Array.isArray(details) ? details : []),
   ];
   return entries.flatMap((entry) => {
-    const message = isRecord(entry) ? stringField(entry, 'message') : undefined;
+    const message = entryMessage(entry);
     return message ? [message] : [];
   });
 }

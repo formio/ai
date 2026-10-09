@@ -57,15 +57,21 @@ export interface PageOfRequest<T> {
   /** The total Form.io reported; absent when it reported none. */
   total: number | undefined;
   skip: number;
+  /** The page size requested. */
+  limit: number;
 }
 
 /**
  * A page and where it sits. Without a reported total, the items seen so far are all
- * that is known to exist.
+ * that is known to exist, and a full page may have more behind it — so `hasMore`
+ * then says whether the page came back full.
  */
-export function pageOf<T>({ items, total, skip }: PageOfRequest<T>): ListPage<T> {
-  const known = total ?? skip + items.length;
-  return { items, total: known, hasMore: skip + items.length < known };
+export function pageOf<T>({ items, total, skip, limit }: PageOfRequest<T>): ListPage<T> {
+  const seen = skip + items.length;
+  if (total === undefined) {
+    return { items, total: seen, hasMore: items.length === limit };
+  }
+  return { items, total, hasMore: seen < total };
 }
 
 /** A page as a tool result: the items under the tool's own key, beside `total` and `hasMore`. */
@@ -98,5 +104,5 @@ export async function fetchListPage({
   };
   const { data, total } = await formioFetch(path, params, config, { withMeta: true });
   const items = Array.isArray(data) ? (data as Record<string, unknown>[]) : [];
-  return pageOf({ items, total, skip: query.skip });
+  return pageOf({ items, total, skip: query.skip, limit: query.limit });
 }

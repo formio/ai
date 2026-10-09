@@ -33,7 +33,7 @@ describe('form_revision_list tool', () => {
 
     expect(mockFormioFetch).toHaveBeenCalledWith(
       `form/${id}/v`,
-      { limit: '100', skip: '0', sort: '-_vid', select: COMPACT_SELECT },
+      { _vid__ne: 'draft', limit: '100', skip: '0', sort: '-_vid', select: COMPACT_SELECT },
       TEST_CONFIG,
       { withMeta: true }
     );
@@ -72,7 +72,7 @@ describe('form_revision_list tool', () => {
 
     expect(mockFormioFetch).toHaveBeenCalledWith(
       'contact/v',
-      { limit: '100', skip: '0', sort: '_vid', select: '_vid,title' },
+      { _vid__ne: 'draft', limit: '100', skip: '0', sort: '_vid', select: '_vid,title' },
       TEST_CONFIG,
       { withMeta: true }
     );
@@ -88,5 +88,24 @@ describe('form_revision_list tool', () => {
     });
 
     expect(result.structuredContent).toMatchObject({ total: 15, hasMore: true });
+  });
+
+  // Form.io stores a form's draft as a revision with _vid "draft". Excluded in the
+  // query rather than after it, so the reported total counts the same rows the
+  // pages hold.
+  it('excludes the draft revision in the request', async () => {
+    const { client } = await createTestClient(registerFormRevisionListTool);
+
+    await client.callTool({
+      name: 'form_revision_list',
+      arguments: { cwd: TEST_CWD, formIdOrPath: 'contact' },
+    });
+
+    expect(mockFormioFetch).toHaveBeenCalledWith(
+      'contact/v',
+      expect.objectContaining({ _vid__ne: 'draft' }),
+      TEST_CONFIG,
+      { withMeta: true }
+    );
   });
 });

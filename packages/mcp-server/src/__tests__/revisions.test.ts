@@ -32,6 +32,14 @@ const stubLicensed = (licensed: boolean) =>
   );
 
 const uniqueBaseUrl = () => `https://license-${randomUUID()}.local`;
+
+// The shape undici gives a request that never got a response.
+const networkFailure = () =>
+  new TypeError('fetch failed', {
+    cause: Object.assign(new Error('connect ECONNREFUSED 127.0.0.1:443'), {
+      code: 'ECONNREFUSED',
+    }),
+  });
 const FORM_ID = '67890abcdef012345678abcd';
 
 beforeEach(() => {
@@ -40,22 +48,57 @@ beforeEach(() => {
 });
 
 describe('checkRevisionsLicensed', () => {
-  it('returns true when /config.js contains sac = true', async () => {
+  it('is licensed when /config.js contains sac = true', async () => {
     stubLicensed(true);
-    expect(await checkRevisionsLicensed(cfgFor(uniqueBaseUrl()))).toBe(true);
+    expect(await checkRevisionsLicensed(cfgFor(uniqueBaseUrl()))).toEqual({ state: 'licensed' });
   });
 
-  it('returns false when /config.js reports sac = false', async () => {
+  it('is unlicensed when /config.js reports sac = false', async () => {
     stubLicensed(false);
-    expect(await checkRevisionsLicensed(cfgFor(uniqueBaseUrl()))).toBe(false);
+    expect(await checkRevisionsLicensed(cfgFor(uniqueBaseUrl()))).toEqual({
+      state: 'unlicensed',
+    });
   });
 
-  it('returns false when fetch fails', async () => {
-    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('network down')));
-    expect(await checkRevisionsLicensed(cfgFor(uniqueBaseUrl()))).toBe(false);
+  it('is unlicensed when /config.js answers without the flag', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({ ok: true, text: () => Promise.resolve('var x = 1;') })
+    );
+    expect(await checkRevisionsLicensed(cfgFor(uniqueBaseUrl()))).toEqual({
+      state: 'unlicensed',
+    });
   });
 
-  it('caches per baseUrl — second call does not refetch', async () => {
+  it('is unknown, with NETWORK_ERROR, when the probe gets no response', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(networkFailure()));
+    const baseUrl = uniqueBaseUrl();
+
+    const licence = await checkRevisionsLicensed(cfgFor(baseUrl));
+
+    expect(licence).toMatchObject({ state: 'unknown', failure: { code: 'NETWORK_ERROR' } });
+  });
+
+  it('is unknown, with UPSTREAM_ERROR, when the probe is answered with an error status', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false, status: 502 }));
+
+    const licence = await checkRevisionsLicensed(cfgFor(uniqueBaseUrl()));
+
+    expect(licence).toMatchObject({ state: 'unknown', failure: { code: 'UPSTREAM_ERROR' } });
+  });
+
+  it('bounds the probe with a timeout', async () => {
+    const fetchSpy = vi
+      .fn()
+      .mockResolvedValue({ ok: true, text: () => Promise.resolve('sac = true') });
+    vi.stubGlobal('fetch', fetchSpy);
+
+    await checkRevisionsLicensed(cfgFor(uniqueBaseUrl()));
+
+    expect((fetchSpy.mock.calls[0][1] as RequestInit).signal).toBeInstanceOf(AbortSignal);
+  });
+
+  it('caches a definite answer per baseUrl — second call does not refetch', async () => {
     const baseUrl = uniqueBaseUrl();
     const fetchSpy = vi
       .fn()
@@ -64,6 +107,23 @@ describe('checkRevisionsLicensed', () => {
     await checkRevisionsLicensed(cfgFor(baseUrl));
     await checkRevisionsLicensed(cfgFor(baseUrl));
     expect(fetchSpy).toHaveBeenCalledTimes(1);
+  });
+
+  // A failed probe is not an answer: caching it would pin "unknown" on a deployment
+  // that was only briefly unreachable.
+  it('does not cache an unknown answer — a transient failure then success is licensed', async () => {
+    const baseUrl = uniqueBaseUrl();
+    const fetchSpy = vi
+      .fn()
+      .mockRejectedValueOnce(networkFailure())
+      .mockResolvedValueOnce({ ok: false, status: 503 })
+      .mockResolvedValue({ ok: true, text: () => Promise.resolve('sac = true') });
+    vi.stubGlobal('fetch', fetchSpy);
+
+    expect(await checkRevisionsLicensed(cfgFor(baseUrl))).toMatchObject({ state: 'unknown' });
+    expect(await checkRevisionsLicensed(cfgFor(baseUrl))).toMatchObject({ state: 'unknown' });
+    expect(await checkRevisionsLicensed(cfgFor(baseUrl))).toEqual({ state: 'licensed' });
+    expect(fetchSpy).toHaveBeenCalledTimes(3);
   });
 });
 
@@ -82,6 +142,32 @@ describe('requireRevisionsLicense', () => {
     await expect(
       requireRevisionsLicense(cfgFor(uniqueBaseUrl()), 'publish this form')
     ).resolves.toBeUndefined();
+  });
+
+  // Unknown is not unlicensed: LICENSE_REQUIRED would tell the user to stop using
+  // drafts on a deployment that may well support them.
+  it('refuses with NETWORK_ERROR naming the probe URL when the probe gets no response', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(networkFailure()));
+    const baseUrl = uniqueBaseUrl();
+
+    const attempt = requireRevisionsLicense(cfgFor(baseUrl), 'publish this form');
+
+    await expect(attempt).rejects.toMatchObject({ code: 'NETWORK_ERROR' });
+    await expect(attempt).rejects.toThrow(/could not be determined/);
+    await expect(attempt).rejects.toThrow(`${baseUrl}/config.js`);
+    await expect(attempt).rejects.toThrow(/ECONNREFUSED/);
+  });
+
+  it('refuses with UPSTREAM_ERROR naming the probe URL when the probe is answered non-2xx', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false, status: 500 }));
+    const baseUrl = uniqueBaseUrl();
+
+    const attempt = requireRevisionsLicense(cfgFor(baseUrl), 'revert this form');
+
+    await expect(attempt).rejects.toMatchObject({ code: 'UPSTREAM_ERROR' });
+    await expect(attempt).rejects.toThrow(/could not be determined/);
+    await expect(attempt).rejects.toThrow(`${baseUrl}/config.js`);
+    await expect(attempt).rejects.toThrow(/500/);
   });
 });
 
@@ -135,6 +221,47 @@ describe('gateRevisionsLicense', () => {
     expect(result).toEqual({ licensed: true, form });
   });
 
+  // An unknown licence never strips `revisions` and never refuses on the licence's
+  // account: either would act on a probe that produced no answer.
+  it.each([
+    ['no response', () => vi.fn().mockRejectedValue(networkFailure())],
+    ['an error status', () => vi.fn().mockResolvedValue({ ok: false, status: 503 })],
+  ])('leaves the body as-is when the probe got %s', async (_label, probe) => {
+    vi.stubGlobal('fetch', probe());
+
+    const withRevisions = { revisions: 'original', components: [] };
+    const kept = await gateRevisionsLicense({
+      cfg: cfgFor(uniqueBaseUrl()),
+      actionLabel: 'update this form',
+      form: withRevisions,
+    });
+    expect(kept.form).toBe(withRevisions);
+    expect(kept.licensed).toBe(false);
+    expect(kept.licenceUnknown).toBe(true);
+
+    const withoutRevisions = { components: [] };
+    const passed = await gateRevisionsLicense({
+      cfg: cfgFor(uniqueBaseUrl()),
+      actionLabel: 'update this form',
+      form: withoutRevisions,
+    });
+    expect(passed.form).toBe(withoutRevisions);
+  });
+
+  // The body turning history off is the caller's own decision, and it needs the same
+  // acceptance whatever the probe says.
+  it('still refuses a body that turns history off when the licence is unknown', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(networkFailure()));
+
+    const attempt = gateRevisionsLicense({
+      cfg: cfgFor(uniqueBaseUrl()),
+      actionLabel: 'update this form',
+      form: { revisions: '', components: [] },
+    });
+    await expect(attempt).rejects.toMatchObject({ code: 'HISTORY_NOT_ACCEPTED' });
+    await expect(attempt).rejects.toThrow(/sets revisions to ""/);
+  });
+
   it('passes through unchanged when licensed', async () => {
     stubLicensed(true);
 
@@ -174,7 +301,12 @@ describe('gateFormHistory', () => {
     mockFormioFetch.mockResolvedValue({ name: 'demo', revisions: 'original' });
 
     await gateFormHistory({ cfg, formId: FORM_ID, form: { components: [] } });
-    expect(mockFormioFetch).toHaveBeenCalledWith(`form/${FORM_ID}`, {}, cfg);
+    // Only the two fields the gate reads: the whole definition is not needed.
+    expect(mockFormioFetch).toHaveBeenCalledWith(
+      `form/${FORM_ID}`,
+      { select: 'revisions,name' },
+      cfg
+    );
   });
 
   // Echoing the stored "" back is not a decision about history.

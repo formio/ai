@@ -1,8 +1,15 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { createTestClient, stubRevisionsLicence, TEST_CONFIG, TEST_CWD } from './test-helpers.js';
+import {
+  createTestClient,
+  freshProjectUrl,
+  stubRevisionsLicence,
+  TEST_CONFIG,
+  TEST_CWD,
+} from './test-helpers.js';
 
 const mockFormioFetch = vi.fn();
-vi.mock('../formio-client.js', () => ({
+vi.mock('../formio-client.js', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../formio-client.js')>()),
   formioFetch: (...args: unknown[]) => mockFormioFetch(...args),
 }));
 
@@ -137,6 +144,31 @@ describe('form_create tool', () => {
     expect(mockFormioFetch).toHaveBeenCalledWith('form', {}, TEST_CONFIG, {
       method: 'POST',
       body: { revisions: 'original', ...form, _vnote: '@formio/mcp: initial' },
+    });
+  });
+
+  // A licence probe that produced no answer establishes nothing, so the body goes as
+  // written: the licensed default is not added, and the caller's setting is not
+  // stripped.
+  it.each([
+    ['without a revisions setting', {}],
+    ['with a revisions setting', { revisions: 'current' as const }],
+  ])('sends the body as written %s when the licence is unknown', async (_label, extra) => {
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new TypeError('fetch failed')));
+    mockFormioFetch.mockResolvedValue({ _id: '123' });
+    const projectUrl = freshProjectUrl();
+    const { client } = await createTestClient(registerFormCreateTool, { projectUrl });
+
+    const form = { title: 'T', name: 't', path: 't', components: [], ...extra };
+    const result = await client.callTool({
+      name: 'form_create',
+      arguments: { cwd: TEST_CWD, form },
+    });
+
+    expect(result.isError ?? false).toBe(false);
+    expect(mockFormioFetch).toHaveBeenCalledWith('form', {}, expect.anything(), {
+      method: 'POST',
+      body: form,
     });
   });
 });

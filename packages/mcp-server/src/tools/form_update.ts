@@ -80,13 +80,15 @@ export function registerFormUpdateTool(server: McpServer, config: FormioConfig) 
           );
         }
 
-        const { licensed, form } = await gateRevisionsLicense({
+        const { licensed, licenceUnknown, form } = await gateRevisionsLicense({
           cfg,
           actionLabel: 'update this form',
           form: rawForm,
           acceptNoHistory,
         });
-        if (licensed) {
+        // An unknown licence is checked as a licensed one would be: skipping the check
+        // would let a form with history off be saved without the caller's decision.
+        if (licensed || licenceUnknown) {
           await gateFormHistory({ cfg, formId, form, acceptNoHistory });
         }
 

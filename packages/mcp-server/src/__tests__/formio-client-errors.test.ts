@@ -110,6 +110,30 @@ describe('formioFetch raises a FormioApiError for an error response', () => {
     expect(error.message).toContain('ValidationError');
   });
 
+  // resourcejs answers a missing document with `errors` as an array of strings.
+  it('includes an errors array of strings in the prose', async () => {
+    mockFetch.mockResolvedValue(
+      errorResponse(404, JSON.stringify({ status: 404, errors: ['Resource not found'] }))
+    );
+
+    const error = (await caught(formioFetch('form', {}, config))) as Error;
+
+    expect(error.message).toContain('Resource not found');
+  });
+
+  it('includes an errors array of objects carrying a message in the prose', async () => {
+    mockFetch.mockResolvedValue(
+      errorResponse(
+        400,
+        JSON.stringify({ errors: [{ message: 'First problem' }, { message: 'Second problem' }] })
+      )
+    );
+
+    const error = (await caught(formioFetch('form', {}, config))) as Error;
+
+    expect(error.message).toContain('First problem Second problem');
+  });
+
   it('includes a short plain-text body in the prose', async () => {
     mockFetch.mockResolvedValue(errorResponse(400, 'Invalid alias'));
 

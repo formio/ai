@@ -45,3 +45,17 @@ export function toMcpError(error: unknown, notes: readonly string[] = []) {
     isError: true,
   };
 }
+
+/**
+ * A tool handler whose every throw becomes a coded error result, for a handler too
+ * long to wrap in its own try/catch without obscuring it.
+ */
+export function catchToolErrors<A, R>(handler: (args: A) => Promise<R>) {
+  return async (args: A): Promise<R | ReturnType<typeof toMcpError>> => {
+    try {
+      return await handler(args);
+    } catch (error) {
+      return toMcpError(error);
+    }
+  };
+}

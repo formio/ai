@@ -1,5 +1,6 @@
 import { FormioConfig } from './config.js';
 import { getAuthHeader } from './auth-header.js';
+import { send } from './formio-client.js';
 
 // baseUrl is required here and the type cannot say so: FormioConfig leaves it
 // optional, and template interpolation would happily fetch "undefined/current"
@@ -11,8 +12,10 @@ export async function validateToken(config: FormioConfig): Promise<boolean> {
       'validateToken requires a resolved Base URL; the auth path must call requireBaseUrl before validating a token.'
     );
   }
-  const url = `${config.baseUrl}/current`;
-  // Not followed: a redirect would carry the token to wherever it points.
-  const response = await fetch(url, { headers: getAuthHeader(config), redirect: 'manual' });
+  const url = new URL(`${config.baseUrl}/current`);
+  // Not followed: a redirect would carry the token to wherever it points. A request
+  // that gets no response is a NETWORK_ERROR naming the cause and URL, as every
+  // other Form.io request reports it.
+  const response = await send(url, { headers: getAuthHeader(config), redirect: 'manual' });
   return response.ok;
 }

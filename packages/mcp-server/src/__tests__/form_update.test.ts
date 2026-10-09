@@ -245,4 +245,38 @@ describe('form_update tool', () => {
     );
     expect(mockFormioFetch).not.toHaveBeenCalled();
   });
+
+  // Unknown is treated as licensed for the history checks, never as unlicensed: the
+  // body is not stripped and the save is not refused on the licence's account, but a
+  // stored form with history off still needs the caller's decision.
+  it('checks the stored form and sends the body as written when the licence is unknown', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new TypeError('fetch failed')));
+    const formId = '67890abcdef012345678abcd';
+    mockFormioFetch.mockResolvedValue({ _id: formId, name: 'demo', revisions: 'original' });
+    const { client } = await createTestClient(registerFormUpdateTool, {
+      projectUrl: freshProjectUrl(),
+    });
+
+    const form = { title: 'Updated', components: [], revisions: 'current' };
+    const result = await client.callTool({
+      name: 'form_update',
+      arguments: { cwd: TEST_CWD, formId, form: { title: 'Updated', components: [] }, note: 'n' },
+    });
+    expect(result.isError ?? false).toBe(false);
+    expect(mockFormioFetch).toHaveBeenCalledWith(
+      `form/${formId}`,
+      { select: 'revisions,name' },
+      expect.anything()
+    );
+
+    mockFormioFetch.mockClear();
+    await client.callTool({
+      name: 'form_update',
+      arguments: { cwd: TEST_CWD, formId, form, note: 'n' },
+    });
+    expect(mockFormioFetch).toHaveBeenCalledWith(`form/${formId}`, {}, expect.anything(), {
+      method: 'PUT',
+      body: { ...form, _vnote: '@formio/mcp: n' },
+    });
+  });
 });

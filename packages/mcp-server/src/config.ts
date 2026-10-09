@@ -1,3 +1,4 @@
+import { ToolError } from './tool-errors.js';
 export const DEFAULT_BASE_URL = 'https://api.form.io';
 
 /**
@@ -83,9 +84,9 @@ export function stripTrailingSlashes(url: string): string {
  * refusals on exit 1. A malformed value read from disk is a different thing entirely
  * and stays "could not answer", because no answer from the user fixes a broken record.
  */
-export class InvalidRequestedUrlError extends Error {
+export class InvalidRequestedUrlError extends ToolError {
   constructor(message: string) {
-    super(message);
+    super({ code: 'INVALID_ARGUMENT', message });
     this.name = 'InvalidRequestedUrlError';
   }
 }
