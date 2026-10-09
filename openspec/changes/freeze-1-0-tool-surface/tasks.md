@@ -37,35 +37,35 @@
 
 ### Red
 
-- [ ] 3.1 Write failing tests: the tool list contains `action_type_list`, `form_revision_list`, `server_status`, and not `action_types_list`, `form_revisions_list`, `hello`
-- [ ] 3.2 Write failing `server_status` tests: unconfigured → version + `status: "not-configured"` with no Form.io request; configured → version, status, both URLs and sources
+- [x] 3.1 Write failing tests: the tool list contains `action_type_list`, `form_revision_list`, `server_status`, and not `action_types_list`, `form_revisions_list`, `hello`
+- [x] 3.2 Write failing `server_status` tests: unconfigured → version + `status: "not-configured"` with no Form.io request; configured → version, status, both URLs and sources
 
 ### Green
 
-- [ ] 3.3 Rename the two list tools and their files/tests; replace `hello` with `server_status` built on `reportProject`
-- [ ] 3.4 Update `capability-quality`, `server-empty-env`, `project-resolution-errors` and `mcpb-build` tests and `scripts/build-mcpb.ts`'s smoke call
+- [x] 3.3 Rename the two list tools and their files/tests; replace `hello` with `server_status` built on `reportProject`
+- [x] 3.4 Update `capability-quality`, `server-empty-env`, `project-resolution-errors` and `mcpb-build` tests and `scripts/build-mcpb.ts`'s smoke call
 
 ### Refactor
 
-- [ ] 3.5 Review implementation and refactor as needed
+- [x] 3.5 Review implementation and refactor as needed
 
 ## 4. List contract
 <!-- depends_on: 1, 3 -->
 
 ### Red
 
-- [ ] 4.1 Write failing tests for `formioFetch`'s `withMeta` option: parses `Content-Range` `0-9/42` and `*/0`; a 416 with `*/3` returns no items and `total: 3`
-- [ ] 4.2 Write failing tool tests for `form_list`, `role_list`, `action_list`, `form_revision_list`: default `limit=100&skip=0` always sent; `total` and `hasMore` returned; no `count`; `sort` / `select` forwarded
-- [ ] 4.3 Write failing tests: `form_list` `tags: ["a","b"]` sends `tags__all=a,b`; `form_revision_list` defaults `sort=-_vid` and compact `select`; `action_type_list` returns the whole catalog with `hasMore: false`
+- [x] 4.1 Write failing tests for `formioFetch`'s `withMeta` option: parses `Content-Range` `0-9/42` and `*/0`; a 416 with `*/3` returns no items and `total: 3`
+- [x] 4.2 Write failing tool tests for `form_list`, `role_list`, `action_list`, `form_revision_list`: default `limit=100&skip=0` always sent; `total` and `hasMore` returned; no `count`; `sort` / `select` forwarded
+- [x] 4.3 Write failing tests: `form_list` `tags: ["a","b"]` sends `tags__all=a,b`; `form_revision_list` defaults `sort=-_vid` and compact `select`; `action_type_list` returns the whole catalog with `hasMore: false`
 
 ### Green
 
-- [ ] 4.4 Implement `withMeta` and the 416 handling in `formio-client.ts`
-- [ ] 4.5 Implement the shared list arguments/result (one helper) and apply it to the four paged tools and `action_type_list`; update output schemas
+- [x] 4.4 Implement `withMeta` and the 416 handling in `formio-client.ts`
+- [x] 4.5 Implement the shared list arguments/result (one helper) and apply it to the four paged tools and `action_type_list`; update output schemas
 
 ### Refactor
 
-- [ ] 4.6 Review implementation and refactor as needed
+- [x] 4.6 Review implementation and refactor as needed
 
 ## 5. form_publish, form_revert, form_update draft
 <!-- depends_on: 1 -->

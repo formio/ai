@@ -8,46 +8,63 @@ vi.mock('../formio-client.js', () => ({
 
 const { registerRoleListTool } = await import('../tools/role_list.js');
 
+function roles(count: number) {
+  return Array.from({ length: count }, (_, index) => ({ _id: `${index}`, title: `Role ${index}` }));
+}
+
 describe('role_list tool', () => {
   beforeEach(() => {
     mockFormioFetch.mockReset();
+    mockFormioFetch.mockResolvedValue({ data: [], total: 0 });
   });
 
-  it('is listed in available tools with optional select parameter', async () => {
-    mockFormioFetch.mockResolvedValue([]);
+  it('is listed in available tools', async () => {
     const { client } = await createTestClient(registerRoleListTool);
     const { tools } = await client.listTools();
     expect(tools.map((t) => t.name)).toContain('role_list');
   });
 
-  it('calls GET /role with no query params by default and returns JSON array', async () => {
-    const roles = [
-      { _id: '69d65f4e040fa2cea2572254', title: 'Administrator' },
-      { _id: '69d65f4e040fa2cea2572255', title: 'Authenticated' },
-    ];
-    mockFormioFetch.mockResolvedValue(roles);
+  // Form.io's own default page is 10, so a project with 12 roles used to come back
+  // truncated with nothing saying so.
+  it('sends limit 100 and skip 0 by default and returns every role with the total', async () => {
+    const page = roles(12);
+    mockFormioFetch.mockResolvedValue({ data: page, total: 12 });
     const { client } = await createTestClient(registerRoleListTool);
 
     const result = await client.callTool({ name: 'role_list', arguments: { cwd: TEST_CWD } });
 
-    expect(mockFormioFetch).toHaveBeenCalledWith('role', { select: undefined }, TEST_CONFIG);
-    expect(result.structuredContent).toEqual({ roles, count: 2 });
-    expect(result.content).toEqual([
-      { type: 'text', text: JSON.stringify({ roles, count: 2 }, null, 2) },
-    ]);
+    expect(mockFormioFetch).toHaveBeenCalledWith('role', { limit: '100', skip: '0' }, TEST_CONFIG, {
+      withMeta: true,
+    });
+    expect(result.structuredContent).toEqual({ roles: page, total: 12, hasMore: false });
   });
 
-  it('forwards custom select as query parameter', async () => {
-    mockFormioFetch.mockResolvedValue([]);
+  it('forwards limit, skip, sort and select', async () => {
     const { client } = await createTestClient(registerRoleListTool);
 
-    await client.callTool({ name: 'role_list', arguments: { cwd: TEST_CWD, select: '_id,title' } });
+    await client.callTool({
+      name: 'role_list',
+      arguments: { cwd: TEST_CWD, limit: 5, skip: 5, sort: 'title', select: '_id,title' },
+    });
 
     expect(mockFormioFetch).toHaveBeenCalledWith(
       'role',
-      expect.objectContaining({ select: '_id,title' }),
-      TEST_CONFIG
+      { limit: '5', skip: '5', sort: 'title', select: '_id,title' },
+      TEST_CONFIG,
+      { withMeta: true }
     );
+  });
+
+  it('reports hasMore when Form.io holds more roles than the page', async () => {
+    mockFormioFetch.mockResolvedValue({ data: roles(5), total: 12 });
+    const { client } = await createTestClient(registerRoleListTool);
+
+    const result = await client.callTool({
+      name: 'role_list',
+      arguments: { cwd: TEST_CWD, limit: 5 },
+    });
+
+    expect(result.structuredContent).toMatchObject({ total: 12, hasMore: true });
   });
 
   it('returns isError true on API error', async () => {

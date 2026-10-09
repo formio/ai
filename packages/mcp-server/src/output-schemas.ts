@@ -117,11 +117,9 @@ export const revisionSummaryDocument = z.looseObject({
     .describe('Revision number; pass as `version` to form_revision_get'),
   _id: z.string().optional().describe('Revision document ID'),
   _vnote: z.string().optional().describe('Note recorded with the revision'),
+  _vuser: z.string().nullish().describe('User who published the revision'),
+  created: z.string().optional().describe('ISO 8601 timestamp the revision was created'),
   modified: z.string().optional().describe('ISO 8601 timestamp the revision was published'),
-  user: z
-    .union([z.string(), z.looseObject({})])
-    .nullish()
-    .describe('User who published the revision'),
 });
 
 export const templateDocument = z.looseObject({
@@ -136,36 +134,43 @@ export const templateDocument = z.looseObject({
 });
 
 // List payloads are wrapped in a named field because structuredContent must be an
-// object, and `count` is stated rather than left to be derived so a caller can see
-// at a glance whether a page was truncated by `limit`.
-export const formsListOutput = z.looseObject({
-  forms: z.array(formDocument).describe('Matching forms, in the requested sort order'),
-  count: z.number().describe('Number of forms returned by this call'),
-});
+// object. `total` is the collection size Form.io reports, not the page length, so
+// `hasMore` can say whether another page exists.
+function listOutput(key: string, item: z.ZodType, description: string) {
+  return z.looseObject({
+    [key]: z.array(item).describe(description),
+    total: z.number().describe('Number of items Form.io holds for this query, across all pages'),
+    hasMore: z
+      .boolean()
+      .describe('True when items remain past this page; fetch them with a larger `skip`'),
+  });
+}
 
-export const rolesListOutput = z.looseObject({
-  roles: z.array(roleDocument).describe('Roles defined in the project'),
-  count: z.number().describe('Number of roles returned'),
-});
+export const formsListOutput = listOutput(
+  'forms',
+  formDocument,
+  'Matching forms, in the requested sort order'
+);
 
-export const actionsListOutput = z.looseObject({
-  actions: z.array(actionDocument).describe('Actions configured on the form'),
-  count: z.number().describe('Number of actions returned'),
-});
+export const rolesListOutput = listOutput('roles', roleDocument, 'Roles defined in the project');
 
-export const actionTypesListOutput = z.looseObject({
-  actionTypes: z
-    .array(actionTypeDocument)
-    .describe('Action types this deployment supports for the form'),
-  count: z.number().describe('Number of action types returned'),
-});
+export const actionsListOutput = listOutput(
+  'actions',
+  actionDocument,
+  'Actions configured on the form'
+);
 
-export const revisionsListOutput = z.looseObject({
-  revisions: z
-    .array(revisionSummaryDocument)
-    .describe('Published revision summaries, newest first'),
-  count: z.number().describe('Number of revisions returned'),
-});
+export const actionTypesListOutput = listOutput(
+  'actionTypes',
+  actionTypeDocument,
+  'Every action type this deployment supports for the form'
+);
+
+export const revisionsListOutput = listOutput(
+  'revisions',
+  revisionSummaryDocument,
+  'Revision summaries, newest first unless `sort` says otherwise'
+);
 
 /** For tools whose only meaningful answer is "it worked". */
 const acknowledgementShape = {
@@ -282,4 +287,23 @@ export const projectResolutionOutput = z.looseObject({
     .describe(
       'Anything set aside while resolving — an unreadable mapping a committed formio.json made irrelevant, a stored value that is not a URL, or the directory this answer is about when no cwd was passed. A URL the server dropped as unusable at startup is on its stderr rather than here, because it was never a candidate for this resolution'
     ),
+});
+
+/**
+ * What `server_status` reports: which server is answering, and the same resolution
+ * project_get reports for the caller's directory. Only the fields a caller branches
+ * on are documented here; the rest of project_get's report passes through.
+ */
+export const serverStatusOutput = z.looseObject({
+  name: z.string().describe('Server name'),
+  version: z.string().describe('Server version'),
+  status: z
+    .enum(['ok', 'not-configured', 'base-url-unresolved'])
+    .describe("How the directory resolves, as project_get's `status` reports it"),
+  cwd: z.string().describe('Working directory the resolution was performed for'),
+  projectUrl: z.string().optional().describe('Project URL that resolves for that directory'),
+  baseUrl: z.string().optional().describe('Deployment hosting that project'),
+  projectUrlSource: z.string().optional().describe('Which layer supplied the project URL'),
+  baseUrlSource: z.string().optional().describe('Which layer supplied the base URL'),
+  message: z.string().describe('The resolution report, including what to do next'),
 });

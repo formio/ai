@@ -19,6 +19,9 @@ function readPackageVersion(): string {
 
 export const SERVER_VERSION = readPackageVersion();
 
+// The name this server reports at initialize and in server_status.
+export const SERVER_NAME = 'formio-mcp';
+
 export const SERVER_PACKAGE = '@formio/mcp';
 
 // How every message that names a shell command spells the CLI.

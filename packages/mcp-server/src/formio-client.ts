@@ -21,6 +21,49 @@ export interface FormioFetchOptions {
   body?: unknown;
   responseType?: 'text' | 'json';
   signal?: AbortSignal;
+  /** Return `{ data, total }`, reading the total from an index route's Content-Range. */
+  withMeta?: boolean;
+}
+
+/** One page of an index route: the body, and the collection size Form.io reported. */
+export interface FormioPage {
+  data: unknown;
+  /** Absent when the response reports no total. */
+  total?: number;
+}
+
+// Form.io's index routes report the collection size as `{from}-{to}/{total}`, or
+// `*/{total}` for an empty page; a total of `*` means it is not known.
+function contentRangeTotal(header: string | null | undefined): number | undefined {
+  const match = header?.trim().match(/^(?:items\s+)?(?:\d+-\d+|\*)\/(\d+)$/);
+  return match ? Number(match[1]) : undefined;
+}
+
+// A `skip` at or past the total is answered 416 with `*/{total}`: that is an empty
+// page past the end, not a failure. Any other error status stays an error.
+async function readPage(response: Response, url: URL): Promise<FormioPage> {
+  const total = contentRangeTotal(response.headers?.get('content-range'));
+  if (response.status === 416 && total !== undefined) {
+    return { data: [], total };
+  }
+  if (!response.ok) {
+    throw await apiError(response, url);
+  }
+  return { data: await response.json(), total };
+}
+
+async function readResponse(
+  response: Response,
+  url: URL,
+  options?: FormioFetchOptions
+): Promise<unknown> {
+  if (options?.withMeta) {
+    return readPage(response, url);
+  }
+  if (!response.ok) {
+    throw await apiError(response, url);
+  }
+  return options?.responseType === 'text' ? response.text() : response.json();
 }
 
 // A redirect is reported rather than followed: fetch would re-send the request, with
@@ -80,31 +123,22 @@ export async function formioRawFetch(
   options?: FormioFetchOptions
 ): Promise<unknown> {
   const response = await send(url, buildFetchInit(config, options));
-  const parseResponse = (res: Response) =>
-    options?.responseType === 'text' ? res.text() : res.json();
 
-  if (!response.ok) {
-    if (response.status === 401 && config.jwt) {
-      // A jwt in hand means the auth path already ran, which means it already
-      // demanded a base URL — so this is a re-read of a resolved value, not a
-      // new requirement. Funnelled through the same guard rather than asserted,
-      // so an unreachable state raises the actionable error instead of keying
-      // the cache under "undefined".
-      const baseUrl = requireBaseUrl(config);
-      invalidateJwtCache(baseUrl);
-      await clearToken(baseUrl);
-      config.jwt = undefined;
-      await ensureAuthenticated(config);
-      const retryResponse = await send(url, buildFetchInit(config, options));
-      if (!retryResponse.ok) {
-        throw await apiError(retryResponse, url);
-      }
-      return parseResponse(retryResponse);
-    }
-    throw await apiError(response, url);
+  if (response.status === 401 && config.jwt) {
+    // A jwt in hand means the auth path already ran, which means it already
+    // demanded a base URL — so this is a re-read of a resolved value, not a
+    // new requirement. Funnelled through the same guard rather than asserted,
+    // so an unreachable state raises the actionable error instead of keying
+    // the cache under "undefined".
+    const baseUrl = requireBaseUrl(config);
+    invalidateJwtCache(baseUrl);
+    await clearToken(baseUrl);
+    config.jwt = undefined;
+    await ensureAuthenticated(config);
+    return readResponse(await send(url, buildFetchInit(config, options)), url, options);
   }
 
-  return parseResponse(response);
+  return readResponse(response, url, options);
 }
 
 // Whether a built URL addresses the project: the same origin, and a path that IS
@@ -118,6 +152,18 @@ function isUnderProject(url: URL, projectUrl: URL): boolean {
   );
 }
 
+export function formioFetch(
+  path: string,
+  params: Record<string, string | undefined>,
+  config: ResolvedFormioConfig,
+  options: FormioFetchOptions & { withMeta: true }
+): Promise<FormioPage>;
+export function formioFetch(
+  path: string,
+  params: Record<string, string | undefined>,
+  config: ResolvedFormioConfig,
+  options?: FormioFetchOptions
+): Promise<unknown>;
 export async function formioFetch(
   path: string,
   params: Record<string, string | undefined>,

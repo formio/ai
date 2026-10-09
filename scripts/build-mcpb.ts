@@ -146,7 +146,7 @@ function manifestObject(version: string, tools: object[]) {
       'Gives an assistant first-class tools over a Form.io project, so building a form, ' +
       'wiring its server-side actions, and setting up roles is a conversation rather than a ' +
       'REST session. Covers forms and revisions, roles, actions, and whole-project template ' +
-      'import and export, plus a no-auth `hello` tool for checking the connection.',
+      'import and export, plus a no-auth `server_status` tool for checking the connection.',
     author: { name: 'Form.io', url: 'https://form.io' },
     repository: { type: 'git', url: 'https://github.com/formio/ai.git' },
     homepage: 'https://form.io/ai',
@@ -185,7 +185,7 @@ function manifestObject(version: string, tools: object[]) {
       // route to a project.
       //
       // Not marked required, because it is not: the server starts, lists its tools
-      // and answers `hello` without it, and the tools that do need a project say so
+      // and answers `server_status` without it, and the tools that do need a project say so
       // when called. Declaring it required told hosts to block on a value the
       // server can run without, which makes the server harder to try than it is.
       formio_project_url: {

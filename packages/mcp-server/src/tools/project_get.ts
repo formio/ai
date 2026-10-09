@@ -3,9 +3,12 @@ import { FormioConfig } from '../config.js';
 import { toMcpError, toMcpStructuredResult } from '../mcp-responses.js';
 import { projectResolutionOutput } from '../output-schemas.js';
 import { cwdSchema } from '../project-resolver.js';
-import { reportProject } from '../project-report.js';
 import { local } from '../tool-annotations.js';
-import { TOOL_REMEDIES } from './project-remedies.js';
+import {
+  projectReportPayload,
+  projectReportText,
+  reportProjectForTool,
+} from './project-resolution.js';
 
 export interface ProjectGetOptions {
   cwd?: () => string;
@@ -31,48 +34,10 @@ export function registerProjectGetTool(
       annotations: local('Report the project this directory resolves to', true),
     },
     async ({ cwd }) => {
-      // Owned here so a note survives a report that cannot answer: an "Ignoring
-      // <path>" note emitted while walking is often the first half of the story a
-      // later throw finishes, and the catch below renders both.
       const notes: string[] = [];
       try {
-        const report = reportProject({
-          notes,
-          // The server's own process cwd is fixed at spawn and may be mapped to a
-          // different project, which is why cwd is asked for on every call. It is
-          // still the documented fallback: project_set writes under the same key.
-          cwd: cwd ?? getServerCwd(),
-          baseConfig: config,
-          remedies: TOOL_REMEDIES,
-          // So the unmapped answer can say which directory it actually searched.
-          // Its remedy names a cwd to record the project under, and the server's
-          // own is the one directory recording it under would not help.
-          cwdWasNamed: cwd !== undefined,
-        });
-        return toMcpStructuredResult(
-          {
-            status: report.status,
-            cwd: report.cwd,
-            ...(report.projectUrl ? { projectUrl: report.projectUrl } : {}),
-            ...(report.baseUrl ? { baseUrl: report.baseUrl } : {}),
-            ...(report.projectUrlSource ? { projectUrlSource: report.projectUrlSource } : {}),
-            ...(report.baseUrlSource ? { baseUrlSource: report.baseUrlSource } : {}),
-            ...(report.forced ? { forced: true } : {}),
-            shadowed: report.shadowed,
-            unpaired: report.unpaired,
-            ...(report.remedy ? { remedy: report.remedy } : {}),
-            message: report.message,
-            notes: report.notes,
-          },
-          // Notes lead the message, exactly as the CLI prints them. They are not
-          // colour: an "Ignoring FORMIO_BASE_URL: …" note is the CAUSE of a
-          // base-url-unresolved answer, and the server's-own-directory note is the
-          // reason an `ok` answer may be about the wrong project. Left in
-          // structuredContent alone they vanish in every client that surfaces only
-          // text, which showed the user a bare "could not be determined" about a
-          // variable that had just been discarded unread.
-          [...report.notes, report.message].filter(Boolean).join('\n')
-        );
+        const report = reportProjectForTool({ cwd, serverCwd: getServerCwd, config, notes });
+        return toMcpStructuredResult(projectReportPayload(report), projectReportText(report));
       } catch (error) {
         // "Could not answer at all" — an unreadable map, a formio.json that will
         // not parse. Deliberately NOT a "not-configured" status: that status

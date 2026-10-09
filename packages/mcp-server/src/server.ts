@@ -2,7 +2,7 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { DEFAULT_BASE_URL, FormioConfig, PROJECT_URL_GUIDANCE, getConfig } from './config.js';
 import { COMMITTED_CONFIG_FILE } from './committed-config.js';
 import { registerAllTools } from './tools/index.js';
-import { SERVER_VERSION } from './cli-launch.js';
+import { SERVER_NAME, SERVER_VERSION } from './cli-launch.js';
 
 // Re-exported from cli-launch.ts, which owns it alongside the runnable spelling
 // of the CLI those messages print — one module that knows which published build
@@ -28,7 +28,7 @@ export const SERVER_INSTRUCTIONS = [
 export function createServer(config?: FormioConfig): McpServer {
   const resolvedConfig = config ?? getConfig();
   const server = new McpServer(
-    { name: 'formio-mcp', version: SERVER_VERSION },
+    { name: SERVER_NAME, version: SERVER_VERSION },
     { instructions: SERVER_INSTRUCTIONS }
   );
   registerAllTools(server, resolvedConfig);

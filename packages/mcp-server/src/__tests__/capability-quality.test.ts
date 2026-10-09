@@ -56,6 +56,18 @@ describe('capability quality', () => {
     expect(tools.map((t) => t.name)).toContain('project_get');
   });
 
+  // Tool names are singular nouns, and the connectivity check reports something a
+  // caller can act on. The old names are gone rather than aliased.
+  it('lists the 1.0 tool names and none of the names they replaced', async () => {
+    const names = (await listToolsUnconfigured()).map((t) => t.name);
+    expect(names).toEqual(
+      expect.arrayContaining(['action_type_list', 'form_revision_list', 'server_status'])
+    );
+    expect(names).not.toContain('action_types_list');
+    expect(names).not.toContain('form_revisions_list');
+    expect(names).not.toContain('hello');
+  });
+
   it('still reports a missing project URL clearly when a tool is called', async () => {
     const server = createServer();
     const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();

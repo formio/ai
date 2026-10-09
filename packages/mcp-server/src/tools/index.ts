@@ -5,15 +5,14 @@ import { registerActionDeleteTool } from './action_delete.js';
 import { registerActionGetTool } from './action_get.js';
 import { registerActionListTool } from './action_list.js';
 import { registerActionTypeGetTool } from './action_type_get.js';
-import { registerActionTypesListTool } from './action_types_list.js';
+import { registerActionTypeListTool } from './action_type_list.js';
 import { registerActionUpdateTool } from './action_update.js';
 import { registerFormCreateTool } from './form_create.js';
 import { registerFormGetTool } from './form_get.js';
 import { registerFormListTool } from './form_list.js';
 import { registerFormRevisionGetTool } from './form_revision_get.js';
-import { registerFormRevisionsListTool } from './form_revisions_list.js';
+import { registerFormRevisionListTool } from './form_revision_list.js';
 import { registerFormUpdateTool } from './form_update.js';
-import { registerHelloTool } from './hello.js';
 import { registerProjectExportTool } from './project_export.js';
 import { registerProjectGetTool } from './project_get.js';
 import { registerProjectImportTool } from './project_import.js';
@@ -21,6 +20,7 @@ import { registerProjectSetTool } from './project_set.js';
 import { registerRoleCreateTool } from './role_create.js';
 import { registerRoleListTool } from './role_list.js';
 import { registerRoleUpdateTool } from './role_update.js';
+import { registerServerStatusTool } from './server_status.js';
 
 export interface RegisterAllToolsOptions {
   cwd?: () => string;
@@ -31,12 +31,13 @@ export function registerAllTools(
   config: FormioConfig,
   options: RegisterAllToolsOptions = {}
 ) {
-  registerHelloTool(server);
+  // Reports the same resolution as project_get, so it takes the same cwd fallback.
+  registerServerStatusTool(server, config, { cwd: options.cwd });
   registerFormCreateTool(server, config);
   registerFormGetTool(server, config);
   registerFormListTool(server, config);
   registerFormRevisionGetTool(server, config);
-  registerFormRevisionsListTool(server, config);
+  registerFormRevisionListTool(server, config);
   registerFormUpdateTool(server, config);
   registerProjectExportTool(server, config);
   // Reports what the tools around it will resolve, so it takes the same config
@@ -57,7 +58,7 @@ export function registerAllTools(
   registerRoleCreateTool(server, config);
   registerRoleListTool(server, config);
   registerRoleUpdateTool(server, config);
-  registerActionTypesListTool(server, config);
+  registerActionTypeListTool(server, config);
   registerActionTypeGetTool(server, config);
   registerActionCreateTool(server, config);
   registerActionListTool(server, config);
