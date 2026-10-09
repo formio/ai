@@ -17,13 +17,13 @@ describe('role_update tool', () => {
     mockFormioFetch.mockReset();
   });
 
-  it('is listed in available tools with full-replacement guidance', async () => {
+  it('is listed in available tools with update guidance', async () => {
     mockFormioFetch.mockResolvedValue({});
     const { client } = await createTestClient(registerRoleUpdateTool);
     const { tools } = await client.listTools();
     const tool = tools.find((t) => t.name === 'role_update');
     expect(tool).toBeDefined();
-    expect(tool!.description).toContain('full replacement');
+    expect(tool!.description).toContain('left out keep');
   });
 
   it('returns isError for invalid roleId format', async () => {

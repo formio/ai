@@ -20,7 +20,7 @@ export function registerFormUpdateTool(server: McpServer, config: FormioConfig) 
     'form_update',
     {
       description: [
-        'Replace a form in the project `cwd` resolves to with the complete updated JSON: read it with form_get, apply the change using the formio-schema skill, and send the whole form.',
+        'Update a form in the project `cwd` resolves to: read it with form_get, apply the change using the formio-schema skill, and send the form. Fields sent overwrite the stored ones (an array or object is stored as given, not merged); top-level fields left out keep their stored value.',
         'Pass `draft: true` to save a draft instead of the live form; publish it with form_publish, and restore a prior revision with form_revert.',
       ].join(' '),
       inputSchema: {
@@ -43,7 +43,7 @@ export function registerFormUpdateTool(server: McpServer, config: FormioConfig) 
               ),
           })
           .catchall(z.unknown())
-          .describe('The complete updated form JSON'),
+          .describe('The updated form JSON'),
         note: z
           .string()
           .describe(
@@ -53,7 +53,7 @@ export function registerFormUpdateTool(server: McpServer, config: FormioConfig) 
           .boolean()
           .optional()
           .describe(
-            "When true, save a draft instead of the live form. Only the draft fields of `form` are saved (components, settings, tags, properties, controller, esign, display), over any existing draft; form_get's output can be passed as is."
+            "When true, save a draft instead of the live form. Only the draft fields of `form` are saved (components, settings, tags, properties, controller, esign, display), over any existing draft; form_get's output can be passed as is, and a changed non-draft field (title, path, access, …) is refused."
           ),
         acceptNoHistory: z
           .boolean()
@@ -80,6 +80,9 @@ export function registerFormUpdateTool(server: McpServer, config: FormioConfig) 
           );
         }
 
+        // The stored form is read only after the licence says the history check
+        // applies. The read needs a token and the probe does not, so reading beside the
+        // probe could start a browser login for a call the licence then refuses.
         const { licensed, licenceUnknown, form } = await gateRevisionsLicense({
           cfg,
           actionLabel: 'update this form',
@@ -89,7 +92,7 @@ export function registerFormUpdateTool(server: McpServer, config: FormioConfig) 
         // An unknown licence is checked as a licensed one would be: skipping the check
         // would let a form with history off be saved without the caller's decision.
         if (licensed || licenceUnknown) {
-          await gateFormHistory({ cfg, formId, form, acceptNoHistory });
+          await gateFormHistory({ cfg, formId, form: rawForm, acceptNoHistory });
         }
 
         return toMcpStructuredResult(

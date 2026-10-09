@@ -160,6 +160,16 @@ export function registerProjectSetTool(server: McpServer, options: ProjectSetOpt
           message: [...walkNotes, message + fallbackCwdWarning].join('\n'),
         });
       };
+      // An empty value is a value, not an omission: read as absent, it would keep the
+      // mapped value and report success for a write the caller did not ask for.
+      const emptyArguments = Object.entries({ projectUrl, baseUrl: baseUrlArg })
+        .filter(([, value]) => value !== undefined && value.trim() === '')
+        .map(([name]) => name);
+      if (emptyArguments.length > 0) {
+        refuse(
+          `${emptyArguments.join(' and ')} ${emptyArguments.length === 1 ? 'is' : 'are'} empty. Omit an argument to leave it unchanged, or pass a full http(s) URL.`
+        );
+      }
       const committed = findCommittedConfig(entryCwd, {
         onNote: (message) => walkNotes.push(message),
       });

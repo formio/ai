@@ -96,7 +96,7 @@ curl -X POST -H "x-jwt-token: $FORMIO_JWT" -H "Content-Type: application/json" \
 
 ### PUT {projectUrl}/role/:roleId
 
-Update an existing role. This is a full replacement — include every field you want to preserve.
+Update an existing role. Form.io applies the body to the stored document: each top-level field in the body overwrites the stored one, a top-level field left out keeps its stored value, and an array or object in the body replaces the stored one whole rather than merging into it.
 
 | Path parameter | Type   | Description                              |
 | -------------- | ------ | ---------------------------------------- |

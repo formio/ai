@@ -11,10 +11,24 @@ export interface AuthenticateOptions {
 
 const DEFAULT_AUTH_HOST = '127.0.0.1';
 
-// However the browser login fails, the call is left without a credential, so every
-// such failure is AUTH_REQUIRED; the message is what says which failure and its remedy.
-function loginFailed(message: string, cause?: unknown): ToolError {
-  return new ToolError({ code: 'AUTH_REQUIRED', message, cause });
+// A login that cannot complete — no browser, or none before the timeout — leaves the
+// call without a credential: AUTH_REQUIRED, with the message saying which and its remedy.
+function loginFailed(message: string): ToolError {
+  return new ToolError({ code: 'AUTH_REQUIRED', message });
+}
+
+/**
+ * A login form that could not be resolved keeps the code of what went wrong — a
+ * deployment that did not answer is NETWORK_ERROR, not a missing credential — and
+ * anything that is not a ToolError is INTERNAL.
+ */
+export function loginFormFailed(error: unknown): ToolError {
+  const reason = error instanceof Error ? error.message : String(error);
+  return new ToolError({
+    code: error instanceof ToolError ? error.code : 'INTERNAL',
+    message: `Could not resolve the Form.io login form: ${reason}`,
+    cause: error,
+  });
 }
 // Generous on purpose. The point of the timeout is to stop an unattended hang
 // from lasting forever, not to hurry an interactive login — an SSO redirect, a
@@ -248,7 +262,7 @@ export async function authenticate(
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       res.status(500).send(`Login form resolution failed: ${message}`);
-      rejectJwt(loginFailed(message, err));
+      rejectJwt(loginFormFailed(err));
     }
   });
 
@@ -275,12 +289,15 @@ export async function authenticate(
     // A fixed FORMIO_AUTH_PORT that is already taken is the usual one; ignoring
     // it would leave the caller waiting out the whole login timeout.
     if (err) {
+      // Not a credential problem: the server could not start, so the cause is named.
       rejectJwt(
-        loginFailed(
-          `Could not start the Form.io login server on ${host}:${config.authPort ?? 0}: ${err.message}. ` +
+        new ToolError({
+          code: 'INTERNAL',
+          message:
+            `Could not start the Form.io login server on ${host}:${config.authPort ?? 0}: ${err.message}. ` +
             `Free that port, or set FORMIO_AUTH_PORT to one that is available.`,
-          err
-        )
+          cause: err,
+        })
       );
       return;
     }

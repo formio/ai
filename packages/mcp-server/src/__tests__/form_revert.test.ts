@@ -165,4 +165,30 @@ describe('form_revert tool', () => {
       expect(mockFormioFetch).not.toHaveBeenCalled();
     }
   );
+
+  // Form.io resolves "latest" by sorting on -_vid, and the draft's "draft" sorts above
+  // every number; a 24-character version is looked up as the revision's own id. Either
+  // can land on the draft, so the fetched revision is checked, not just the argument.
+  it.each([
+    ['"latest" while a draft exists', 'latest'],
+    ["the draft revision's own _id", 'abcdef0123456789abcdef01'],
+  ])(
+    'refuses %s with INVALID_ARGUMENT naming form_publish, and sends no PUT',
+    async (_l, version) => {
+      mockFormioFetch.mockImplementation((path: string) =>
+        Promise.resolve(
+          path === `form/${FORM_ID}/v/${version}`
+            ? { _id: 'abcdef0123456789abcdef01', _vid: 'draft', components: [{ type: 'draft' }] }
+            : { _id: FORM_ID, components: [] }
+        )
+      );
+
+      const result = await revert({ formId: FORM_ID, version, note: 'n' });
+
+      expect(result.isError).toBe(true);
+      expect(result._meta?.[ERROR_META_KEY]?.code).toBe('INVALID_ARGUMENT');
+      expect(result.content[0].text).toContain('form_publish');
+      expect(puts()).toEqual([]);
+    }
+  );
 });

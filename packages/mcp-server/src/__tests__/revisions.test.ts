@@ -109,9 +109,10 @@ describe('checkRevisionsLicensed', () => {
     expect(fetchSpy).toHaveBeenCalledTimes(1);
   });
 
-  // A failed probe is not an answer: caching it would pin "unknown" on a deployment
-  // that was only briefly unreachable.
-  it('does not cache an unknown answer — a transient failure then success is licensed', async () => {
+  // A failed probe is not an answer, so it is not kept for long: long enough that a
+  // run of writes against an unreachable deployment does not re-probe on every one,
+  // short enough that a deployment which was only briefly unreachable is asked again.
+  it('keeps an unknown answer for 60 seconds, then probes again', async () => {
     const baseUrl = uniqueBaseUrl();
     const fetchSpy = vi
       .fn()
@@ -119,10 +120,26 @@ describe('checkRevisionsLicensed', () => {
       .mockResolvedValueOnce({ ok: false, status: 503 })
       .mockResolvedValue({ ok: true, text: () => Promise.resolve('sac = true') });
     vi.stubGlobal('fetch', fetchSpy);
+    const clock = { ms: 1_000_000 };
+    const now = () => clock.ms;
+    const check = () => checkRevisionsLicensed(cfgFor(baseUrl), { now });
 
-    expect(await checkRevisionsLicensed(cfgFor(baseUrl))).toMatchObject({ state: 'unknown' });
-    expect(await checkRevisionsLicensed(cfgFor(baseUrl))).toMatchObject({ state: 'unknown' });
-    expect(await checkRevisionsLicensed(cfgFor(baseUrl))).toEqual({ state: 'licensed' });
+    expect(await check()).toMatchObject({ state: 'unknown', failure: { code: 'NETWORK_ERROR' } });
+    clock.ms += 59_999;
+    expect(await check()).toMatchObject({ state: 'unknown', failure: { code: 'NETWORK_ERROR' } });
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
+
+    clock.ms += 1;
+    expect(await check()).toMatchObject({ state: 'unknown', failure: { code: 'UPSTREAM_ERROR' } });
+    expect(fetchSpy).toHaveBeenCalledTimes(2);
+
+    clock.ms += 60_000;
+    expect(await check()).toEqual({ state: 'licensed' });
+    expect(fetchSpy).toHaveBeenCalledTimes(3);
+
+    // A definite answer does not expire.
+    clock.ms += 10 * 60_000;
+    expect(await check()).toEqual({ state: 'licensed' });
     expect(fetchSpy).toHaveBeenCalledTimes(3);
   });
 });

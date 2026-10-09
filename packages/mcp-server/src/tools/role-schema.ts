@@ -10,7 +10,7 @@ const roleFields = {
   admin: z.boolean().optional().describe('When true, holders bypass access checks'),
 };
 
-/** A role document, as role_update replaces it. */
+/** A role document, as role_update sends it. */
 export const roleSchema = z.object(roleFields).catchall(z.unknown());
 
 /** A role document to create: the same shape, with its title required. */

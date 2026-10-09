@@ -116,12 +116,17 @@ export const templateDocument = z.looseObject({
 });
 
 // List payloads are wrapped in a named field because structuredContent must be an
-// object. `total` is the collection size Form.io reports, not the page length, so
-// `hasMore` can say whether another page exists.
+// object. `total` is the collection size Form.io reports, not the page length, and
+// is left out when Form.io reports none rather than guessed from the page.
 function listOutput(key: string, item: z.ZodType) {
   return z.looseObject({
     [key]: z.array(item),
-    total: z.number().describe('Items Form.io holds for this query, across all pages'),
+    total: z
+      .number()
+      .optional()
+      .describe(
+        'Items Form.io holds for this query, across all pages; absent when Form.io does not report one'
+      ),
     hasMore: z.boolean().describe('True when items remain; fetch them with a larger `skip`'),
   });
 }

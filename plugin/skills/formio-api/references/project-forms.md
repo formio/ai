@@ -113,15 +113,15 @@ curl -X POST -H "x-jwt-token: $FORMIO_JWT" -H "Content-Type: application/json" \
 
 ### PUT {projectUrl}/form/:idOrName
 
-Replace an existing form definition. The body SHOULD include the `_id` of the form being updated (Form.io treats this as a full document replacement; omitted fields are reset to defaults).
+Update an existing form definition. The body SHOULD include the `_id` of the form being updated. Form.io applies the body to the stored document: each top-level field in the body overwrites the stored one, a top-level field left out keeps its stored value, and an array or object in the body replaces the stored one whole rather than merging into it.
 
-Request body: same shape as the create body, plus `_id`. Include every field you want to preserve.
+Request body: same shape as the create body, plus `_id`. Send every component the form should keep — `components` is replaced whole.
 
 Response: the updated form document.
 
 Errors: `400` for validation errors; `404` if the form does not exist; `409` if `_vid` version checks fail (when revisions are enabled).
 
-Note: prefer `PATCH` (via `runtime-submissions.md` patterns extended to forms) if partial updates are needed — this endpoint is a full replacement.
+Note: because top-level fields left out keep their stored value, a partial update of top-level fields needs no `PATCH`; a change inside `components`, `settings` or `access` still sends that whole field.
 
 ### PUT {projectUrl}/:formPath
 

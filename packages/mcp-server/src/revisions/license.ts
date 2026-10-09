@@ -8,9 +8,15 @@ import { COMMITTED_CONFIG_FILE } from '../committed-config.js';
 
 // ─── License detection ──────────────────────────────────────────────────────
 // Resolves the deployment's Security Module flag (`sac`) from the anonymous
-// `/config.js`. Only a definite answer is cached per `baseUrl` — license is
-// deployment-wide — and a probe that produced none is asked again next time.
-const revisionsLicensedByBaseUrl = new Map<string, DefiniteLicence>();
+// `/config.js`, cached per `baseUrl` — license is deployment-wide. A definite answer
+// is kept for the life of the process; a probe that produced none is kept for
+// UNKNOWN_LICENCE_TTL_MS, so a run of writes against a deployment that is not
+// answering does not wait out the probe on every one, and is then asked again.
+const UNKNOWN_LICENCE_TTL_MS = 60_000;
+
+type CachedLicence = { licence: RevisionsLicence; expiresAt: number };
+
+const revisionsLicensedByBaseUrl = new Map<string, CachedLicence>();
 
 const SAC_PATTERN = /\bsac\s*=\s*(true|false)\b/i;
 
@@ -64,21 +70,28 @@ function baseUrlRemedy(cfg: ResolvedFormioConfig): string {
   return `Set it with project_set (pass baseUrl alongside the cwd${source === 'environment' ? ', with the projectUrl' : ''}), or run: ${baseUrlWriteCommand({ source, cwd, projectUrl: cfg.projectUrl })}`;
 }
 
+export interface LicenceCheckOptions {
+  /** The clock an unknown answer's expiry is measured on, in milliseconds. */
+  now?: () => number;
+}
+
 // Returns undefined when no base URL resolved: the flag is a property of the
 // deployment and is fetched from it, so with no deployment URL there is nothing to
 // ask, and reporting an answer would be a claim about a probe that never ran.
 export async function checkRevisionsLicensed(
-  cfg: ResolvedFormioConfig
+  cfg: ResolvedFormioConfig,
+  { now = Date.now }: LicenceCheckOptions = {}
 ): Promise<RevisionsLicence | undefined> {
   if (!cfg.baseUrl) return undefined;
   const baseUrl = cfg.baseUrl;
   const cached = revisionsLicensedByBaseUrl.get(baseUrl);
-  if (cached !== undefined) return cached;
+  if (cached !== undefined && now() < cached.expiresAt) return cached.licence;
 
   const licence = await probeLicence(new URL('config.js', `${baseUrl.replace(/\/*$/, '/')}`));
-  if (licence.state !== 'unknown') {
-    revisionsLicensedByBaseUrl.set(baseUrl, licence);
-  }
+  revisionsLicensedByBaseUrl.set(baseUrl, {
+    licence,
+    expiresAt: licence.state === 'unknown' ? now() + UNKNOWN_LICENCE_TTL_MS : Infinity,
+  });
   return licence;
 }
 

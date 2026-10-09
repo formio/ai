@@ -8,7 +8,8 @@ import { formioFetch } from '../formio-client.js';
  * Form.io's index routes default to 10 items and impose no maximum, so `limit` and
  * `skip` are sent on every request: left to Form.io's default, a project with 11
  * roles came back with 10 and nothing said so. The total comes from the response's
- * Content-Range header, so `hasMore` says whether another page exists.
+ * Content-Range header, so `hasMore` says whether another page exists; where Form.io
+ * reports none, `total` is absent and a full page means `hasMore`.
  */
 export const DEFAULT_LIST_LIMIT = 100;
 
@@ -48,7 +49,8 @@ export interface ListQuery {
 
 export interface ListPage<T> {
   items: T[];
-  total: number;
+  /** The total Form.io reported; absent when it reported none. */
+  total?: number;
   hasMore: boolean;
 }
 
@@ -62,21 +64,27 @@ export interface PageOfRequest<T> {
 }
 
 /**
- * A page and where it sits. Without a reported total, the items seen so far are all
- * that is known to exist, and a full page may have more behind it — so `hasMore`
- * then says whether the page came back full.
+ * A page and where it sits. Without a reported total nothing says how many exist, so
+ * `total` is left out rather than guessed, and a full page may have more behind it —
+ * so `hasMore` then says whether the page came back full.
  */
 export function pageOf<T>({ items, total, skip, limit }: PageOfRequest<T>): ListPage<T> {
-  const seen = skip + items.length;
   if (total === undefined) {
-    return { items, total: seen, hasMore: items.length === limit };
+    return { items, hasMore: items.length === limit };
   }
-  return { items, total, hasMore: seen < total };
+  return { items, total, hasMore: skip + items.length < total };
 }
 
-/** A page as a tool result: the items under the tool's own key, beside `total` and `hasMore`. */
+/**
+ * A page as a tool result: the items under the tool's own key, beside `hasMore` and,
+ * when Form.io reported one, `total`.
+ */
 export function listResult<T>(key: string, page: ListPage<T>): Record<string, unknown> {
-  return { [key]: page.items, total: page.total, hasMore: page.hasMore };
+  return {
+    [key]: page.items,
+    ...(page.total === undefined ? {} : { total: page.total }),
+    hasMore: page.hasMore,
+  };
 }
 
 export interface FetchListPageRequest {

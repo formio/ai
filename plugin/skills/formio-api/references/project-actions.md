@@ -182,7 +182,7 @@ curl -H "x-jwt-token: $FORMIO_JWT" \
 
 ### PUT {projectUrl}/form/:formId/action/:actionId
 
-Update a configured action. This is a full replacement of the action's editable fields — include every field you want to preserve.
+Update a configured action. Form.io applies the body to the stored document: each top-level field in the body overwrites the stored one, a top-level field left out keeps its stored value, and an array or object in the body replaces the stored one whole rather than merging into it. Send all of `settings`, `handler` and `method` when changing any part of them.
 
 | Path parameter | Type   | Description                                         |
 | -------------- | ------ | --------------------------------------------------- |

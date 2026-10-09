@@ -37,6 +37,15 @@ describe('project_set refusals carry a code', () => {
       { baseUrl: 'https://forms.mysite.com', cwd: '/w/c' },
       'projectUrl is required for /w/c',
     ],
+    // An empty string is a value, not an omission: treated as absent, it would leave
+    // the mapped value in place and report success for a write the caller did not ask for.
+    ['an empty projectUrl', { projectUrl: '', cwd: '/w/e' }, 'projectUrl is empty'],
+    [
+      'an empty baseUrl',
+      { projectUrl: 'https://next.form.io', baseUrl: '', cwd: '/w/f' },
+      'baseUrl is empty',
+    ],
+    ['a blank projectUrl', { projectUrl: '   ', cwd: '/w/g' }, 'projectUrl is empty'],
   ])('refuses %s with INVALID_ARGUMENT', async (_label, args, expected) => {
     const result = await call(args);
 

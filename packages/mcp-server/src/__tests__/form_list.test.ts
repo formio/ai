@@ -120,6 +120,26 @@ describe('form_list tool', () => {
     expect(params.tags).toBeUndefined();
   });
 
+  // Form.io splits tags__all on commas, so "a,b" would be read as two tags and match
+  // forms carrying both, never the one tag the caller named.
+  it('refuses a tag containing a comma with INVALID_ARGUMENT, without a request', async () => {
+    const { client } = await createTestClient(registerFormListTool);
+
+    const result = (await client.callTool({
+      name: 'form_list',
+      arguments: { cwd: TEST_CWD, tags: ['crm', 'sales,emea'] },
+    })) as {
+      isError?: boolean;
+      content: Array<{ text?: string }>;
+      _meta?: Record<string, { code?: string }>;
+    };
+
+    expect(result.isError).toBe(true);
+    expect(result._meta?.['io.form/error']?.code).toBe('INVALID_ARGUMENT');
+    expect(result.content[0].text).toContain('"sales,emea"');
+    expect(mockFormioFetch).not.toHaveBeenCalled();
+  });
+
   it.each([{ limit: 0 }, { limit: -1 }, { limit: 1.5 }, { skip: -1 }, { skip: 0.5 }])(
     'refuses %o without a request',
     async (args) => {

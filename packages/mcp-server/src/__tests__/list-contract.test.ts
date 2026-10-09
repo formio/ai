@@ -5,7 +5,7 @@
 
 import { describe, expect, it } from 'vitest';
 import { registerAllTools } from '../tools/index.js';
-import { pageOf } from '../tools/list-contract.js';
+import { listResult, pageOf } from '../tools/list-contract.js';
 import { connectTools } from './test-helpers.js';
 
 const PAGED = {
@@ -44,8 +44,23 @@ describe('the list contract', () => {
     async (name, key) => {
       const tool = (await listedTools()).get(name);
       const output = tool?.outputSchema as JsonSchemaObject;
-      expect(output.required).toEqual(expect.arrayContaining([key, 'total', 'hasMore']));
+      expect(output.required).toEqual(expect.arrayContaining([key, 'hasMore']));
+      expect(output.properties).toHaveProperty('total');
       expect(output.properties).not.toHaveProperty('count');
+    }
+  );
+
+  // Form.io does not always report a Content-Range total. A count of the items seen
+  // would read as the size of the collection, so the field is left out instead.
+  it.each([...Object.keys(PAGED), 'action_type_list'])(
+    '%s declares total optional, saying it is absent when Form.io reports none',
+    async (name) => {
+      const tool = (await listedTools()).get(name);
+      const output = tool?.outputSchema as JsonSchemaObject & {
+        properties?: Record<string, { description?: string }>;
+      };
+      expect(output.required ?? []).not.toContain('total');
+      expect(output.properties?.total?.description).toMatch(/absent when Form\.io/i);
     }
   );
 
@@ -69,12 +84,10 @@ describe('the list contract', () => {
       });
     });
 
-    it('counts what it was given when Form.io reports no total', () => {
-      expect(pageOf({ items: [1, 2], total: undefined, skip: 10, limit: 5 })).toEqual({
-        items: [1, 2],
-        total: 12,
-        hasMore: false,
-      });
+    it('leaves total out when Form.io reports none', () => {
+      const page = pageOf({ items: [1, 2], total: undefined, skip: 10, limit: 5 });
+      expect(page).toEqual({ items: [1, 2], hasMore: false });
+      expect(page).not.toHaveProperty('total');
     });
 
     // A full page with no reported total says nothing about what follows it, so the
@@ -82,9 +95,24 @@ describe('the list contract', () => {
     it('has more when Form.io reports no total and the page is full', () => {
       expect(pageOf({ items: [1, 2], total: undefined, skip: 10, limit: 2 })).toEqual({
         items: [1, 2],
-        total: 12,
         hasMore: true,
       });
+    });
+  });
+
+  describe('listResult', () => {
+    it('carries total when the page has one', () => {
+      expect(listResult('roles', { items: [1], total: 1, hasMore: false })).toEqual({
+        roles: [1],
+        total: 1,
+        hasMore: false,
+      });
+    });
+
+    it('leaves total out when the page has none', () => {
+      const result = listResult('roles', { items: [1], hasMore: true });
+      expect(result).toEqual({ roles: [1], hasMore: true });
+      expect(result).not.toHaveProperty('total');
     });
   });
 });
