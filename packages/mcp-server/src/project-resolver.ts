@@ -35,12 +35,13 @@ import {
   findCommittedConfig,
 } from './committed-config.js';
 import { ToolError } from './tool-errors.js';
+import { SERVER_DIRECTORY } from './workspace-directory.js';
 
 // Repeated on every project-scoped tool, so it says what it defaults to and when to
 // pass it, and leaves the order and the rest to the server instructions, which every
 // client receives once. A test holds it to 200 characters.
 const CWD_DESCRIPTION =
-  'Optional. Directory whose Form.io project to use; defaults to the client\'s workspace root. Pass it to target another directory or when project_get reports cwdSource "server".';
+  'Optional. Directory whose Form.io project to use; defaults to the client\'s workspace root. Pass it to target another directory or when project_get reports cwdSource "server" or "claude-project-dir".';
 
 // One schema for every client. Requiredness cannot live here: whether a cwd is
 // needed depends on the environment the server was launched with, and this
@@ -62,6 +63,8 @@ export const cwdSchema = z
 interface MissingProject {
   cwd: string | undefined;
   mapCwd: string;
+  /** How to name `mapCwd` when nobody named it: the server's own directory, or a launch default. */
+  guessedDirectory: string;
   /** Deployments found with no project beside them, named so nothing is overwritten unseen. */
   unpaired: string[];
 }
@@ -90,14 +93,19 @@ export class ProjectNotConfiguredError extends ToolError {
   }
 }
 
-function missingProjectError({ cwd, mapCwd, unpaired }: MissingProject): ProjectNotConfiguredError {
+function missingProjectError({
+  cwd,
+  mapCwd,
+  guessedDirectory,
+  unpaired,
+}: MissingProject): ProjectNotConfiguredError {
   // Which directory was searched is the whole answer when no cwd was passed: the
   // server's own is not the user's, so "nothing is configured" without it sends
   // the caller to project_set, which writes a mapping the next cwd-passing call
   // will not find — and the loop repeats with the cause never named.
   const where = cwd
     ? ` for cwd=${cwd}`
-    : ` for ${mapCwd}, the MCP server's own working directory, which is the only directory searched because no cwd argument was passed and the client named no directory`;
+    : ` for ${mapCwd}, ${guessedDirectory}, which is the only directory searched because no cwd argument was passed and the client named no directory`;
   const how = cwd
     ? `project_set with cwd=${cwd} and the project URL`
     : "project_set with cwd set to the user's current working directory and the project URL — and pass that same cwd on later Form.io tool calls";
@@ -260,6 +268,8 @@ export interface ResolveProjectOptions {
    * to pass cwd. Defaults to whether a cwd was given at all.
    */
   cwdWasNamed?: boolean;
+  /** How the answer names an unnamed `cwd`; the MCP server's own working directory by default. */
+  guessedDirectory?: string;
 }
 
 interface MappedEntryRead {
@@ -532,6 +542,7 @@ export function resolveProject(
     cacheDir,
     onNote = (message) => process.stderr.write(`${message}\n`),
     cwdWasNamed = Boolean(cwd),
+    guessedDirectory = SERVER_DIRECTORY,
   }: ResolveProjectOptions = {}
 ): ProjectResolution {
   if (cwd && !path.isAbsolute(cwd)) {
@@ -646,6 +657,7 @@ export function resolveProject(
     throw missingProjectError({
       cwd: cwdWasNamed ? mapCwd : undefined,
       mapCwd,
+      guessedDirectory,
       // Each value carries its own consequence. A blanket "the write below replaces
       // that entry" was appended to the joined list, which is true of the mapping and
       // false of the environment — a variable no write can touch, reported as
@@ -671,7 +683,7 @@ export function resolveProject(
   // server, is not where the user is.
   if (!cwdWasNamed && projectUrlSource !== 'environment') {
     onNote(
-      `No cwd argument was passed and the client named no directory, so the project was resolved from ${mapCwd}, the MCP server's own working directory. Pass cwd, set to the user's directory, on later Form.io tool calls.`
+      `No cwd argument was passed and the client named no directory, so the project was resolved from ${mapCwd}, ${guessedDirectory}. Pass cwd, set to the user's directory, on later Form.io tool calls.`
     );
   }
 

@@ -197,7 +197,7 @@
 
 ### Green
 
-- [x] 12.4 Implement the directory provider (roots via the SDK, cache, list_changed, timeout, CLAUDE_PROJECT_DIR, process cwd) and route every project-resolving tool and `project_set` through it
+- [x] 12.4 Implement the directory provider (roots via a lenient `roots/list` request, cache that keeps the last good list, list_changed, timeout, CLAUDE_PROJECT_DIR, process cwd) and route every project-resolving tool and `project_set` through it
 - [x] 12.5 Add `cwdSource` to the project report and its output schema; update the `cwd` description (≤200 characters) and the server instructions; keep `tools/list` under the budget
 - [x] 12.6 Update the shared preflight paragraph in every skill identically, the other skill passages that say to pass `cwd` on every call, and both READMEs
 

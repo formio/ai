@@ -2,7 +2,12 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { FormioConfig, ResolvedFormioConfig } from '../config.js';
 import { ProjectReport, reportProject } from '../project-report.js';
 import { resolveProjectConfig } from '../project-resolver.js';
-import { WorkingDirectory, workspaceDirectory } from '../workspace-directory.js';
+import {
+  WorkingDirectory,
+  guessedDirectory,
+  isNamedDirectory,
+  workspaceDirectory,
+} from '../workspace-directory.js';
 import { TOOL_REMEDIES } from './project-remedies.js';
 
 export interface ToolDirectoryRequest {
@@ -37,8 +42,11 @@ export async function resolveToolConfig({
   cwd,
   config,
 }: ToolConfigRequest): Promise<ResolvedFormioConfig> {
-  const { dir, source } = await toolDirectory({ server, cwd });
-  return resolveProjectConfig(dir, config, { cwdWasNamed: source !== 'server' });
+  const directory = await toolDirectory({ server, cwd });
+  return resolveProjectConfig(directory.dir, config, {
+    cwdWasNamed: isNamedDirectory(directory),
+    guessedDirectory: guessedDirectory(directory),
+  });
 }
 
 export interface ToolProjectReportRequest {
@@ -67,10 +75,11 @@ export function reportProjectForTool({
     cwd: directory.dir,
     baseConfig: config,
     remedies: TOOL_REMEDIES,
-    // Only the server's own directory — fixed at spawn, and often not where the user
-    // is — makes the answer say so and withhold a remedy keyed to it. A directory
-    // the client or its launch named is where the user is working.
-    cwdWasNamed: directory.source !== 'server',
+    // A guessed directory — the server's own, fixed at spawn, or a launch default —
+    // makes the answer say so and withhold a remedy keyed to it. A directory the
+    // caller or the client named is where the user is working.
+    cwdWasNamed: isNamedDirectory(directory),
+    guessedDirectory: guessedDirectory(directory),
   });
 }
 

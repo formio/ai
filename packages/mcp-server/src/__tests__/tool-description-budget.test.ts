@@ -52,7 +52,7 @@ describe('tool description budget', () => {
         !/optional/i.test(description) ||
         !/defaults to the client's workspace root/i.test(description) ||
         !/another directory/i.test(description) ||
-        !/cwdSource "server"/.test(description)
+        !/cwdSource "server" or "claude-project-dir"/.test(description)
     );
     expect(missing.map(({ tool }) => tool)).toEqual([]);
   });
@@ -64,7 +64,9 @@ describe('tool description budget', () => {
       /cwd argument[\s\S]*?client's workspace roots[\s\S]*?CLAUDE_PROJECT_DIR[\s\S]*?server's own working directory/
     );
     expect(SERVER_INSTRUCTIONS).toMatch(/several roots[^.]*INVALID_ARGUMENT/);
-    expect(SERVER_INSTRUCTIONS).toMatch(/cwdSource is "server"[^.]*pass cwd/);
+    expect(SERVER_INSTRUCTIONS).toMatch(
+      /cwdSource is "server" or "claude-project-dir"[^.]*pass cwd/
+    );
     expect(SERVER_INSTRUCTIONS).not.toMatch(/on every project-scoped call/);
     expect(SERVER_INSTRUCTIONS).toMatch(
       /narrowest-scope-first: a committed formio\.json[\s\S]*?then the per-directory mapping project_set writes, then FORMIO_PROJECT_URL[\s\S]*?weakest/

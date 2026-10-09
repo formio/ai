@@ -58,7 +58,7 @@ describe('the shared preflight lets the client supply the directory', () => {
 
       expect(preflight, `${path} has no shared preflight paragraph`).toBeDefined();
       expect(preflight).toMatch(/`project_get`[^.]*without `cwd`/);
-      expect(preflight).toMatch(/`cwdSource`[^.]*`server`[^.]*pass `cwd`/);
+      expect(preflight).toMatch(/`cwdSource`[^.]*`server` or `claude-project-dir`[^.]*pass `cwd`/);
       expect(preflight).toMatch(/only[^.]*another directory|another directory[^.]*only/);
     }
   );

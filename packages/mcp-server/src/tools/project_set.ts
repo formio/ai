@@ -24,6 +24,7 @@ import { ToolError, ToolErrorCode } from '../tool-errors.js';
 import { projectMappingOutput } from '../output-schemas.js';
 import { local } from '../tool-annotations.js';
 import { toolDirectory } from './project-resolution.js';
+import { guessedDirectory, isNamedDirectory } from '../workspace-directory.js';
 import {
   readProjectEntryForWrite,
   unusableRecordProjectUrl,
@@ -94,7 +95,7 @@ export function registerProjectSetTool(server: McpServer, options: ProjectSetOpt
         // The SAME schema every reader validates against. A write must not accept
         // what a read cannot key on.
         cwd: cwdSchema.describe(
-          'Optional. Directory whose mapping to write; defaults to the client\'s workspace root. Pass it to target another directory or when project_get reports cwdSource "server".'
+          'Optional. Directory whose mapping to write; defaults to the client\'s workspace root. Pass it to target another directory or when project_get reports cwdSource "server" or "claude-project-dir".'
         ),
         baseUrl: z
           .string()
@@ -113,8 +114,10 @@ export function registerProjectSetTool(server: McpServer, options: ProjectSetOpt
       // the server's own. A mapping keyed anywhere else is one the next call misses.
       const directory = await toolDirectory({ server, cwd, serverCwd: getServerCwd });
       const entryCwd = directory.dir;
-      // Only the server's own directory is one nobody chose for this write.
-      const named = directory.source !== 'server';
+      // A guessed directory — the server's own, or a launch default — is one nobody
+      // chose for this write.
+      const named = isNamedDirectory(directory);
+      const guessed = guessedDirectory(directory);
       const mapped = readProjectEntryForWrite(entryCwd);
       // An entry that EXISTS and cannot be honoured is not an absent one. A record's
       // URLs are validated where that record WINS — inside the resolver — so a mapping
@@ -152,7 +155,7 @@ export function registerProjectSetTool(server: McpServer, options: ProjectSetOpt
       const recordUnder = named ? `cwd ${entryCwd}` : "cwd set to the user's own directory";
       const fallbackCwdWarning = named
         ? ''
-        : ` Note: no cwd argument was passed and the client named no directory, so ${entryCwd} is the MCP server's own working directory rather than the user's. Call project_set again with cwd set to the user's directory BEFORE recording anything — a record written here would not be found from theirs.`;
+        : ` Note: no cwd argument was passed and the client named no directory, so ${entryCwd} is ${guessed}, which may not be the user's. Call project_set again with cwd set to the user's directory BEFORE recording anything — a record written here would not be found from theirs.`;
       // Annotated on the variable so TypeScript narrows after a call: an arrow
       // returning `never` only terminates control flow for the checker when the
       // binding itself declares that type.
@@ -291,7 +294,7 @@ export function registerProjectSetTool(server: McpServer, options: ProjectSetOpt
       // a cwd misses the mapping and loops.
       const serverCwdWarning = named
         ? ''
-        : ` Warning: no cwd argument was passed and the client named no directory, so this mapping is keyed to the MCP server's own working directory. If that is not the user's directory, call project_set again with cwd set to it.`;
+        : ` Warning: no cwd argument was passed and the client named no directory, so this mapping is keyed to ${entryCwd}, ${guessed}. If that is not the user's directory, call project_set again with cwd set to it.`;
       // A mapping written under a committed file naming a different project still
       // belongs on disk — it is the fallback if that file goes away — but it does not
       // take effect now.
@@ -342,6 +345,7 @@ export function registerProjectSetTool(server: McpServer, options: ProjectSetOpt
             remedies: TOOL_REMEDIES,
             notes: reportNotes,
             cwdWasNamed: named,
+            guessedDirectory: guessed,
           });
         } catch (error) {
           // NOT swallowed. A committed file is checked for shape where it is read and

@@ -4,8 +4,12 @@ import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { RootsListChangedNotificationSchema } from '@modelcontextprotocol/sdk/types.js';
 import { z } from 'zod';
-import { findCommittedConfig } from './committed-config.js';
-import { readProjectEntry } from './project-map.js';
+import {
+  COMMITTED_CONFIG_FILE,
+  CommittedConfigUnusableError,
+  findCommittedConfig,
+} from './committed-config.js';
+import { readProjectEntryForWrite } from './project-map.js';
 import { ToolError } from './tool-errors.js';
 
 /**
@@ -37,7 +41,9 @@ const RootsAnswer = z.looseObject({
 /**
  * The directories behind a client's roots. Only a `file://` URI names a directory; any
  * other root, or one `fileURLToPath` cannot convert, is not one this server can
- * resolve a project for, so it is left out rather than refused.
+ * resolve a project for, so it is left out rather than refused. Each path is
+ * normalised before duplicates are dropped, so `/work/app/` and `/work/app` are one
+ * root, as they are one key in the project map.
  */
 export function rootDirectories(roots: ReadonlyArray<{ uri: string }>): string[] {
   const dirs = roots.flatMap(({ uri }) => {
@@ -45,7 +51,7 @@ export function rootDirectories(roots: ReadonlyArray<{ uri: string }>): string[]
       return [];
     }
     try {
-      return [fileURLToPath(uri)];
+      return [path.resolve(fileURLToPath(uri))];
     } catch {
       return [];
     }
@@ -54,54 +60,117 @@ export function rootDirectories(roots: ReadonlyArray<{ uri: string }>): string[]
 }
 
 /**
- * Whether a directory resolves a project record of its own: a committed formio.json
- * naming a project found by the upward walk, or a directory mapping naming one. The
- * environment is not asked — it answers for every directory alike, so it cannot tell
- * one root from another.
+ * The record a directory resolves its project from, when it has one of its own.
  *
- * A committed file that cannot be read counts: it is a record the user wrote for
- * that directory, and choosing that root lets the call fail naming the file rather
- * than refusing for an ambiguity that is not there. An unreadable project map answers
- * for no directory in particular, so it counts for none.
+ * `key` is the record's identity: two directories with the same key resolve the same
+ * record — two roots inside one repository both walk up to its formio.json — and so
+ * the same project. Records are compared rather than project URLs because a record
+ * carries its own deployment too: two files naming one project URL can name different
+ * Base URLs.
  */
-export function hasProjectRecord(dir: string): boolean {
+export interface ProjectRecord {
+  key: string;
+  /** How a refusal names the record. */
+  description: string;
+}
+
+/**
+ * The record a directory's project comes from: a committed formio.json found by the
+ * upward walk, else that directory's own mapping. The environment is not asked — it
+ * answers for every directory alike, so it cannot tell one root from another.
+ *
+ * A broken record counts: a formio.json that cannot be read, or a mapping entry that
+ * is malformed or holds no usable URL, is still the record the user wrote for that
+ * directory, and choosing that root lets resolution fail naming it rather than
+ * silently targeting another root. A project map that cannot be read at all answers
+ * for no directory in particular, so it counts for none; a deployment mapped with no
+ * project beside it is not a project record either.
+ */
+export function projectRecordOf(dir: string): ProjectRecord | undefined {
+  const committedAt = (filePath: string): ProjectRecord => ({
+    key: `committed:${filePath}`,
+    description: filePath,
+  });
   try {
-    if (findCommittedConfig(dir)?.projectUrl) {
-      return true;
+    const committed = findCommittedConfig(dir);
+    if (committed) {
+      return committedAt(committed.filePath);
     }
-  } catch {
-    return true;
+  } catch (error) {
+    return committedAt(
+      error instanceof CommittedConfigUnusableError
+        ? error.filePath
+        : path.join(dir, COMMITTED_CONFIG_FILE)
+    );
   }
+  const mapping: ProjectRecord = {
+    key: `mapping:${path.resolve(dir)}`,
+    description: `the project mapping for ${dir}`,
+  };
   try {
-    return Boolean(readProjectEntry(dir)?.env.FORMIO_PROJECT_URL);
+    const entry = readProjectEntryForWrite(dir);
+    if (entry.status === 'unusable') {
+      return mapping;
+    }
+    return entry.status === 'usable' && entry.entry.env.FORMIO_PROJECT_URL ? mapping : undefined;
   } catch {
-    return false;
+    return undefined;
   }
 }
 
 export interface ChooseRootRequest {
   roots: string[];
-  hasProjectRecord: (dir: string) => boolean;
+  recordOf: (dir: string) => ProjectRecord | undefined;
 }
 
 /**
- * The root a call with no `cwd` resolves against. One root is used as is. Of several,
- * the one that resolves a project record is used; none or more than one is refused,
- * because no client but one documents what order its roots come in, and picking one
- * by position targets a project nobody chose.
+ * The root a call with no `cwd` resolves against, or undefined to try the next source.
+ *
+ * One root is used as is. Of several, the roots that resolve a project record decide:
+ * when they all resolve the same record, the first of them in the client's order is
+ * used; when none does, the roots decide nothing and the next source is tried, so a
+ * launch configured only by environment resolves as it always did. Roots resolving
+ * different records are refused, because no client but one documents what order its
+ * roots come in, and picking one by position targets a project nobody chose.
  */
-export function chooseRoot({ roots, hasProjectRecord }: ChooseRootRequest): string | undefined {
+export function chooseRoot({ roots, recordOf }: ChooseRootRequest): string | undefined {
   if (roots.length <= 1) {
     return roots[0];
   }
-  const recorded = roots.filter(hasProjectRecord);
-  if (recorded.length === 1) {
-    return recorded[0];
+  const recorded = roots.flatMap((root) => {
+    const record = recordOf(root);
+    return record ? [{ root, record }] : [];
+  });
+  if (recorded.length === 0) {
+    return undefined;
+  }
+  if (new Set(recorded.map(({ record }) => record.key)).size === 1) {
+    return recorded[0].root;
   }
   throw new ToolError({
     code: 'INVALID_ARGUMENT',
-    message: `The client reports ${roots.length} workspace roots and ${recorded.length === 0 ? 'none' : 'more than one'} of them resolves a Form.io project record: ${roots.join(', ')}. Pass cwd set to the directory to use.`,
+    message: `The client reports ${roots.length} workspace roots that resolve different Form.io project records: ${recorded.map(({ root, record }) => `${root} (${record.description})`).join(', ')}. Pass cwd set to the directory to use.`,
   });
+}
+
+/**
+ * Whether a directory was NAMED for this call — by the caller's cwd or the client's
+ * workspace root. CLAUDE_PROJECT_DIR is a launch default and the server's own
+ * directory a spawn accident: both are guesses about where the user is, so an answer
+ * about either says so and asks for cwd.
+ */
+export function isNamedDirectory({ source }: WorkingDirectory): boolean {
+  return source === 'argument' || source === 'client-root';
+}
+
+/** How an answer names the server's own working directory. */
+export const SERVER_DIRECTORY = "the MCP server's own working directory";
+
+/** How an answer names a directory that was guessed rather than named. */
+export function guessedDirectory({ source }: WorkingDirectory): string {
+  return source === 'claude-project-dir'
+    ? 'the directory CLAUDE_PROJECT_DIR names'
+    : SERVER_DIRECTORY;
 }
 
 /** CLAUDE_PROJECT_DIR when it names an absolute path; anything else names no directory. */
@@ -114,7 +183,7 @@ export interface WorkspaceDirectoryOptions {
   rootsTimeoutMs?: number;
   /** Reads CLAUDE_PROJECT_DIR; the process environment, at call time, by default. */
   claudeProjectDir?: () => string | undefined;
-  hasProjectRecord?: (dir: string) => boolean;
+  recordOf?: (dir: string) => ProjectRecord | undefined;
 }
 
 export interface ResolveDirectoryRequest {
@@ -133,9 +202,11 @@ export interface WorkspaceDirectory {
  *
  * Roots are asked of the client only when it declared the `roots` capability, and
  * the answer is kept until the client sends `notifications/roots/list_changed`. A
- * request that fails or outlives the timeout counts as no roots and is kept the same
- * way: asking again on every call would add the timeout to every call of a client
- * that never answers.
+ * request that fails or outlives the timeout does not discard what an earlier read
+ * returned: the last good list keeps serving, and only a client that has never
+ * answered counts as having no roots. That outcome is kept until the next
+ * `list_changed` too — asking again on every call would add the timeout to every
+ * call of a client that never answers.
  */
 export function createWorkspaceDirectory(
   server: Server,
@@ -143,19 +214,20 @@ export function createWorkspaceDirectory(
 ): WorkspaceDirectory {
   const timeout = options.rootsTimeoutMs ?? ROOTS_TIMEOUT_MS;
   const readClaudeProjectDir = options.claudeProjectDir ?? (() => process.env.CLAUDE_PROJECT_DIR);
-  const recorded = options.hasProjectRecord ?? hasProjectRecord;
-  const cache: { roots?: Promise<string[]> } = {};
+  const recordOf = options.recordOf ?? projectRecordOf;
+  const cache: { read?: Promise<string[]>; lastGood?: string[] } = {};
 
   server.setNotificationHandler(RootsListChangedNotificationSchema, () => {
-    delete cache.roots;
+    delete cache.read;
   });
 
-  const listRoots = async (): Promise<string[]> => {
+  const readRoots = async (): Promise<string[]> => {
     try {
       const { roots } = await server.request({ method: 'roots/list' }, RootsAnswer, { timeout });
-      return rootDirectories(roots);
+      cache.lastGood = rootDirectories(roots);
+      return cache.lastGood;
     } catch {
-      return [];
+      return cache.lastGood ?? [];
     }
   };
 
@@ -163,8 +235,8 @@ export function createWorkspaceDirectory(
     if (!server.getClientCapabilities()?.roots) {
       return Promise.resolve([]);
     }
-    cache.roots ??= listRoots();
-    return cache.roots;
+    cache.read ??= readRoots();
+    return cache.read;
   };
 
   return {
@@ -172,7 +244,7 @@ export function createWorkspaceDirectory(
       if (cwd !== undefined) {
         return { dir: cwd, source: 'argument' };
       }
-      const root = chooseRoot({ roots: await clientRoots(), hasProjectRecord: recorded });
+      const root = chooseRoot({ roots: await clientRoots(), recordOf });
       if (root !== undefined) {
         return { dir: root, source: 'client-root' };
       }

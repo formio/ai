@@ -16,6 +16,7 @@ import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { ListRootsRequestSchema } from '@modelcontextprotocol/sdk/types.js';
+import { FormioConfig } from '../config.js';
 import { ERROR_META_KEY } from '../mcp-responses.js';
 import { readProjectEntry, writeProjectEntry } from '../project-map.js';
 import { registerAllTools } from '../tools/index.js';
@@ -36,6 +37,8 @@ interface ConnectOptions {
   /** Replaces the client's `roots/list` handler. */
   listRoots?: () => Promise<{ roots: Array<{ uri: string }> }>;
   rootsTimeoutMs?: number;
+  /** The launch environment's configuration; none by default. */
+  config?: FormioConfig;
 }
 
 interface Connected {
@@ -51,7 +54,7 @@ async function connect(options: ConnectOptions = {}): Promise<Connected> {
   if (options.rootsTimeoutMs !== undefined) {
     workspaceDirectory(server, { rootsTimeoutMs: options.rootsTimeoutMs });
   }
-  registerAllTools(server, {}, { cwd: () => SERVER_CWD });
+  registerAllTools(server, options.config ?? {}, { cwd: () => SERVER_CWD });
 
   const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
   const sentToClient: string[] = [];
@@ -177,25 +180,138 @@ describe('the directory a call resolves against', () => {
   });
 
   it.each([
-    ['both', ['https://one.form.io', 'https://two.form.io']],
-    ['neither', [undefined, undefined]],
-  ])(
-    'refuses with INVALID_ARGUMENT when %s of two roots resolves a project',
-    async (_case, urls) => {
-      const one = workspace('one', urls[0]);
-      const two = workspace('two', urls[1]);
-      const { client } = await connect({ roots: () => [one, two] });
+    ['different projects', ['https://one.form.io', 'https://two.form.io']],
+    // Two records are two records, even naming one URL: each carries its own deployment.
+    ['the same project URL from two files', ['https://same.form.io', 'https://same.form.io']],
+  ])('refuses with INVALID_ARGUMENT when two roots resolve %s', async (_case, urls) => {
+    const one = workspace('one', urls[0]);
+    const two = workspace('two', urls[1]);
+    const { client } = await connect({ roots: () => [one, two] });
 
-      const result = await call(client, 'project_get');
+    const result = await call(client, 'project_get');
 
-      expect(result.isError).toBe(true);
-      expect(result._meta?.[ERROR_META_KEY]?.code).toBe('INVALID_ARGUMENT');
-      expect(text(result)).toMatch(/^\[INVALID_ARGUMENT\]/);
-      expect(text(result)).toContain(one);
-      expect(text(result)).toContain(two);
-      expect(text(result)).toMatch(/pass cwd/i);
-    }
-  );
+    expect(result.isError).toBe(true);
+    expect(result._meta?.[ERROR_META_KEY]?.code).toBe('INVALID_ARGUMENT');
+    expect(text(result)).toMatch(/^\[INVALID_ARGUMENT\]/);
+    expect(text(result)).toContain(one);
+    expect(text(result)).toContain(two);
+    expect(text(result)).toMatch(/pass cwd/i);
+  });
+
+  it('refuses a committed record in one root and a mapping in another', async () => {
+    const one = workspace('one', 'https://one.form.io');
+    const two = workspace('two');
+    writeProjectEntry({ cwd: two, env: { FORMIO_PROJECT_URL: 'https://two.form.io' } });
+    const { client } = await connect({ roots: () => [one, two] });
+
+    const result = await call(client, 'project_get');
+
+    expect(result._meta?.[ERROR_META_KEY]?.code).toBe('INVALID_ARGUMENT');
+  });
+
+  // Two roots inside one repository walk up to the same formio.json: one project.
+  it('uses the first of several roots that all resolve the same record', async () => {
+    const repo = workspace('repo', 'https://monorepo.form.io');
+    const a = path.join(repo, 'packages', 'a');
+    const b = path.join(repo, 'packages', 'b');
+    fs.mkdirSync(a, { recursive: true });
+    fs.mkdirSync(b, { recursive: true });
+    const lib = workspace('lib');
+    const { client } = await connect({ roots: () => [lib, b, a] });
+
+    const result = report(await call(client, 'project_get'));
+
+    expect(result.cwd).toBe(b);
+    expect(result.cwdSource).toBe('client-root');
+    expect(result.projectUrl).toBe('https://monorepo.form.io');
+  });
+
+  // An environment-only launch resolves the same project for every directory, so
+  // roots that name no record of their own decide nothing and must not refuse.
+  it('falls through when none of several roots resolves a project record', async () => {
+    const one = workspace('one');
+    const two = workspace('two');
+    const { client } = await connect({
+      roots: () => [one, two],
+      config: { projectUrl: 'https://environment.form.io' },
+    });
+
+    const result = report(await call(client, 'project_get'));
+
+    expect(result.status).toBe('ok');
+    expect(result.cwdSource).toBe('server');
+    expect(result.cwd).toBe(SERVER_CWD);
+    expect(result.projectUrl).toBe('https://environment.form.io');
+  });
+
+  it('falls through to CLAUDE_PROJECT_DIR when none of several roots has a record', async () => {
+    const one = workspace('one');
+    const two = workspace('two');
+    const app = workspace('app');
+    vi.stubEnv('CLAUDE_PROJECT_DIR', app);
+    const { client } = await connect({ roots: () => [one, two] });
+
+    const result = report(await call(client, 'project_get'));
+
+    expect(result.cwd).toBe(app);
+    expect(result.cwdSource).toBe('claude-project-dir');
+  });
+
+  // A broken record is still the record the user wrote for that root: choosing the
+  // other root silently would target a project nobody picked for this directory.
+  it('counts an unreadable formio.json as a record', async () => {
+    const broken = workspace('broken');
+    fs.writeFileSync(path.join(broken, 'formio.json'), '{ not json');
+    const other = workspace('other', 'https://other.form.io');
+    const { client } = await connect({ roots: () => [broken, other] });
+
+    const result = await call(client, 'project_get');
+
+    expect(result._meta?.[ERROR_META_KEY]?.code).toBe('INVALID_ARGUMENT');
+  });
+
+  it('chooses the root whose formio.json is unreadable and surfaces its error', async () => {
+    const broken = workspace('broken');
+    fs.writeFileSync(path.join(broken, 'formio.json'), '{ not json');
+    const plain = workspace('plain');
+    const { client } = await connect({ roots: () => [plain, broken] });
+
+    const result = await call(client, 'project_get');
+
+    expect(result._meta?.[ERROR_META_KEY]?.code).toBe('CONFIG_UNREADABLE');
+    expect(text(result)).toContain(path.join(broken, 'formio.json'));
+  });
+
+  it('counts a malformed mapping entry as a record and surfaces its error', async () => {
+    const malformed = workspace('malformed');
+    const plain = workspace('plain');
+    fs.mkdirSync(path.join(os.homedir(), '.formio'), { recursive: true });
+    fs.writeFileSync(
+      path.join(os.homedir(), '.formio', 'projects.json'),
+      JSON.stringify({ [malformed]: { env: 'not an object' } })
+    );
+    const { client } = await connect({ roots: () => [plain, malformed] });
+
+    const result = await call(client, 'project_get');
+
+    expect(result.isError).toBe(true);
+    expect(result._meta?.[ERROR_META_KEY]?.code).toBe('CONFIG_UNREADABLE');
+    expect(text(result)).toContain(malformed);
+  });
+
+  it('treats two spellings of one directory as one root', async () => {
+    const app = workspace('app');
+    const { client } = await connect({
+      listRoots: async () => ({
+        roots: [{ uri: `${pathToFileURL(app).href}/` }, { uri: pathToFileURL(app).href }],
+      }),
+    });
+
+    const result = report(await call(client, 'project_get'));
+
+    expect(result.cwd).toBe(app);
+    expect(result.cwdSource).toBe('client-root');
+  });
 
   it('ignores a root that is not a file:// URI', async () => {
     const app = workspace('app');
@@ -279,6 +395,52 @@ describe('the directory a call resolves against', () => {
     expect(result.cwdSource).toBe('server');
   });
 
+  it('keeps the last good roots when a later read fails or times out', async () => {
+    const first = workspace('first');
+    const answers: Array<() => Promise<{ roots: Array<{ uri: string }> }>> = [
+      async () => ({ roots: [{ uri: pathToFileURL(first).href }] }),
+      async () => {
+        throw new Error('roots unavailable');
+      },
+      () => new Promise(() => {}),
+    ];
+    let calls = 0;
+    const { client } = await connect({
+      listRoots: () => answers[Math.min(calls++, answers.length - 1)](),
+      rootsTimeoutMs: 50,
+    });
+
+    expect(report(await call(client, 'project_get')).cwd).toBe(first);
+
+    await client.sendRootsListChanged();
+    expect(report(await call(client, 'project_get')).cwd).toBe(first);
+
+    await client.sendRootsListChanged();
+    const afterTimeout = report(await call(client, 'project_get'));
+    expect(afterTimeout.cwd).toBe(first);
+    expect(afterTimeout.cwdSource).toBe('client-root');
+    expect(calls).toBe(3);
+  });
+
+  it('reads again after list_changed when an earlier read failed', async () => {
+    const later = workspace('later');
+    let calls = 0;
+    const { client } = await connect({
+      listRoots: async () => {
+        calls += 1;
+        if (calls === 1) {
+          throw new Error('not yet');
+        }
+        return { roots: [{ uri: pathToFileURL(later).href }] };
+      },
+    });
+
+    expect(report(await call(client, 'project_get')).cwdSource).toBe('server');
+
+    await client.sendRootsListChanged();
+    expect(report(await call(client, 'project_get')).cwd).toBe(later);
+  });
+
   it('reads the roots once and again after notifications/roots/list_changed', async () => {
     const first = workspace('first');
     const second = workspace('second');
@@ -331,21 +493,48 @@ describe('cwdSource in the project reports', () => {
     }
   );
 
-  it.each(['argument', 'claude-project-dir'] as const)(
-    'adds no server-directory note for %s',
-    async (source) => {
+  it('adds no note for a cwd argument', async () => {
+    const app = workspace('app', 'https://app.form.io');
+    const { client } = await connect();
+
+    const result = await call(client, 'project_get', { cwd: app });
+
+    expect(report(result).cwdSource).toBe('argument');
+    expect(text(result)).not.toMatch(/pass cwd/i);
+  });
+
+  // CLAUDE_PROJECT_DIR is a launch default, not a directory the caller or the client
+  // named for this call, so it earns the same note — naming the variable, not the
+  // server's directory.
+  it.each(['project_get', 'server_status'])(
+    '%s reports claude-project-dir with the note to pass cwd',
+    async (tool) => {
       const app = workspace('app', 'https://app.form.io');
-      if (source === 'claude-project-dir') {
-        vi.stubEnv('CLAUDE_PROJECT_DIR', app);
-      }
+      vi.stubEnv('CLAUDE_PROJECT_DIR', app);
       const { client } = await connect();
 
-      const result = await call(client, 'project_get', source === 'argument' ? { cwd: app } : {});
+      const result = await call(client, tool);
+      const payload = report(result);
 
-      expect(report(result).cwdSource).toBe(source);
-      expect(text(result)).not.toMatch(/own working directory/i);
+      expect(payload.cwdSource).toBe('claude-project-dir');
+      const notes = (payload.notes as string[]).join('\n');
+      expect(notes).toContain(app);
+      expect(notes).toMatch(/CLAUDE_PROJECT_DIR[\s\S]*pass cwd/i);
+      expect(notes).not.toMatch(/server's own working directory/i);
     }
   );
+
+  it('names CLAUDE_PROJECT_DIR, without a remedy, when nothing is configured there', async () => {
+    const app = workspace('app');
+    vi.stubEnv('CLAUDE_PROJECT_DIR', app);
+    const { client } = await connect();
+
+    const payload = report(await call(client, 'project_get'));
+
+    expect(payload.status).toBe('not-configured');
+    expect(payload.remedy).toBeUndefined();
+    expect(payload.message).toMatch(/CLAUDE_PROJECT_DIR/);
+  });
 });
 
 // Every tool that resolves a project takes the same order — not only the two that
@@ -412,8 +601,8 @@ describe('every project-resolving tool takes the same order', () => {
   it.each(Object.entries(PROJECT_SCOPED))(
     '%s refuses with INVALID_ARGUMENT when several roots are ambiguous',
     async (tool, args) => {
-      const one = workspace('one');
-      const two = workspace('two');
+      const one = workspace('one', 'https://one.form.io');
+      const two = workspace('two', 'https://two.form.io');
       const { client } = await connect({ roots: () => [one, two] });
 
       const result = await call(client, tool, args);
@@ -439,14 +628,27 @@ describe('every project-resolving tool takes the same order', () => {
   });
 
   it('project_set refuses the ambiguous roots rather than writing under the server directory', async () => {
-    const one = workspace('one');
-    const two = workspace('two');
+    const one = workspace('one', 'https://one.form.io');
+    const two = workspace('two', 'https://two.form.io');
     const { client } = await connect({ roots: () => [one, two] });
 
     const result = await call(client, 'project_set', { projectUrl: 'https://rooted.form.io' });
 
     expect(result._meta?.[ERROR_META_KEY]?.code).toBe('INVALID_ARGUMENT');
     expect(readProjectEntry(SERVER_CWD)).toBeNull();
+  });
+
+  it('project_set warns when CLAUDE_PROJECT_DIR supplied the directory', async () => {
+    const app = workspace('app');
+    vi.stubEnv('CLAUDE_PROJECT_DIR', app);
+    const { client } = await connect();
+
+    const result = await call(client, 'project_set', { projectUrl: 'https://launched.form.io' });
+
+    expect(report(result).cwd).toBe(app);
+    expect(text(result)).toMatch(/warning/i);
+    expect(text(result)).toContain('CLAUDE_PROJECT_DIR');
+    expect(readProjectEntry(app)?.env.FORMIO_PROJECT_URL).toBe('https://launched.form.io');
   });
 
   it('project_set keeps warning when it falls back to the server directory', async () => {

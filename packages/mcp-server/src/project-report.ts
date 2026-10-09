@@ -1,3 +1,4 @@
+import { SERVER_DIRECTORY } from './workspace-directory.js';
 import { COMMITTED_CONFIG_FILE } from './committed-config.js';
 import {
   BASE_URL_UNDERIVABLE,
@@ -169,6 +170,8 @@ export interface ProjectReportRequest {
    * out loud for the same reason missingProjectError says it.
    */
   cwdWasNamed?: boolean;
+  /** How the answer names an unnamed `cwd`; the MCP server's own working directory by default. */
+  guessedDirectory?: string;
 }
 
 /**
@@ -289,6 +292,7 @@ export function reportProject({
   remedies,
   notes,
   cwdWasNamed = true,
+  guessedDirectory = SERVER_DIRECTORY,
 }: ProjectReportRequest): ProjectReport {
   // The caller's own array, appended to in place. A note is often the CAUSE of the
   // failure it accompanies, and resolution can THROW after emitting one — an ignored
@@ -327,7 +331,7 @@ export function reportProject({
         ...(cwdWasNamed
           ? []
           : [
-              `That is the MCP server's own working directory, and it is the only directory searched because no cwd argument was passed and the client named no directory. If it is not where the user is, call this again with cwd set to their directory BEFORE recording anything — a project recorded here would not be found from theirs.`,
+              `That is ${guessedDirectory}, and it is the only directory searched because no cwd argument was passed and the client named no directory. If it is not where the user is, call this again with cwd set to their directory BEFORE recording anything — a project recorded here would not be found from theirs.`,
             ]),
         // Named only where the caller chose the directory. Otherwise the one next
         // step is the warning above — call again with the user's own cwd — and a
@@ -374,7 +378,7 @@ export function reportProject({
   const baseUrlIsUnresolved = sources.baseUrl === 'unresolved';
   if (!cwdWasNamed && (sources.projectUrl !== 'environment' || baseUrlIsUnresolved)) {
     notes.push(
-      `No cwd argument was passed and the client named no directory, so this answer is about ${cwd}, the MCP server's own working directory. Pass cwd, set to the user's directory, on later Form.io tool calls.`
+      `No cwd argument was passed and the client named no directory, so this answer is about ${cwd}, ${guessedDirectory}. Pass cwd, set to the user's directory, on later Form.io tool calls.`
     );
   }
 
@@ -505,7 +509,7 @@ export function reportProject({
         ...(cwdWasNamed
           ? []
           : [
-              `That directory is the MCP server's own working directory, and it is the only directory this answer is about because no cwd argument was passed and the client named no directory. If it is not where the user is, call this again with cwd set to their directory BEFORE recording anything — a Base URL recorded here would not be found from theirs.`,
+              `That directory is ${guessedDirectory}, and it is the only directory this answer is about because no cwd argument was passed and the client named no directory. If it is not where the user is, call this again with cwd set to their directory BEFORE recording anything — a Base URL recorded here would not be found from theirs.`,
             ]),
         // Gated for the same reason, and on the same condition, as the structured
         // remedy above: a remedy that records a deployment under a directory the
