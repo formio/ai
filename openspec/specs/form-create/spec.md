@@ -1,9 +1,7 @@
 ## Purpose
 
 Defines the `form_create` MCP tool: the form definition it accepts, the `POST /form` call it makes, how it defaults revisions on a licensed deployment, and how it persists the caller's note.
-
 ## Requirements
-
 ### Requirement: form_create tool is registered with skill-referencing description
 
 The `form_create` tool SHALL be registered on the MCP server with a description that instructs the LLM to use the `formio-schema` skill to construct the form JSON definition before calling this tool. The description SHALL reference the skill by name so the LLM knows to invoke it for schema guidance. The description SHALL NOT reference `formio-form`.
@@ -45,7 +43,7 @@ The `form_create` tool SHALL call `POST {projectUrl}/form` with the `x-token` he
 
 ### Requirement: form_create defaults revisions to 'original' on licensed deployments
 
-On a licensed deployment, `form_create` SHALL default the POST body to `revisions: 'original'` when the caller does not specify `revisions`. A caller-supplied `revisions` value SHALL override the default. On an unlicensed deployment, `revisions` SHALL be stripped from the body and the license gate SHALL prompt once per `baseUrl`.
+On a licensed deployment, `form_create` SHALL default the POST body to `revisions: 'original'` when the caller does not specify `revisions`. A caller-supplied `revisions` value SHALL override the default. On an unlicensed deployment, `revisions` SHALL be stripped from the body, and the create SHALL proceed only when the caller passes `acceptNoHistory: true`; otherwise it SHALL refuse with code `HISTORY_NOT_ACCEPTED` as the `revisions-history-acceptance` capability describes.
 
 #### Scenario: Licensed default
 
@@ -59,7 +57,7 @@ On a licensed deployment, `form_create` SHALL default the POST body to `revision
 
 #### Scenario: Unlicensed strips revisions
 
-- **WHEN** `form_create` is called on an unlicensed deployment after the user consents to continue
+- **WHEN** `form_create` is called on an unlicensed deployment with `acceptNoHistory: true`
 - **THEN** the POST body does not include `revisions`
 
 ### Requirement: form_create persists the note as _vnote
@@ -70,3 +68,4 @@ When `note` is provided, `form_create` SHALL include `_vnote` in the POST body p
 
 - **WHEN** `form_create` is called with `note: "initial"`
 - **THEN** the POST body's `_vnote` equals `@formio/mcp: initial`
+
