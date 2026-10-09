@@ -230,7 +230,7 @@ The bundled `@formio/mcp` server exposes these tools. Skills prefer these over r
 The MCP server supports two authentication modes:
 
 - **JWT mode (default).** A short-lived local Express server renders the Form.io portal login form; the user signs in once, the JWT comes back via a `/callback` endpoint, and `formioFetch` attaches `x-jwt-token` on every subsequent request. The flow is implicit — the **first authenticated tool call** triggers it on a cache miss. No explicit `authenticate` tool exists.
-- **API-key mode.** Set `FORMIO_API_KEY`. All requests attach `x-token`; the browser flow is skipped entirely.
+- **API-key mode.** Set the `FORMIO_API_KEY` environment variable beside `FORMIO_PROJECT_URL`. Requests to the project `FORMIO_PROJECT_URL` names attach `x-token` and skip the browser flow entirely; any other project a committed `formio.json` or a directory mapping resolves authenticates through the portal login instead, and `project_get` says why.
 
 The JWT is cached in `~/.formio/mcp-tokens.json` (mode `0600`), keyed by the resolved Base URL — one token covers every project on the same deployment. Tokens are valid for roughly seven days; on a cache hit the server checks expiry locally, then revalidates against the server, and falls back to a fresh login if either check fails.
 
@@ -242,7 +242,7 @@ By default the login page is served on an ephemeral port bound to `127.0.0.1` an
 
 Where that assumption doesn't hold — a container, an SSH session, CI — you have three options:
 
-1. **Set `FORMIO_API_KEY`** and skip the browser entirely. Simplest for unattended use.
+1. **Set the `FORMIO_API_KEY` environment variable beside `FORMIO_PROJECT_URL`** and skip the browser entirely. Simplest for unattended use.
 2. **Complete the login manually.** The login URL is written to stderr on **every** login attempt, before any browser launch is tried — not only when something fails. If the launch does fail, that is reported as an additional line rather than swallowed. The URL also appears in the timeout error, which the client surfaces as tool output, so it reaches you even if you never see the server's logs.
 
    stderr is used because with stdio transport **stdout carries the MCP protocol itself** — writing anything else there corrupts the stream.
@@ -279,7 +279,7 @@ The probe runs lazily — only when the local auth page is actually served.
 | --- | :-: | --- | --- | --- | --- |
 | `FORMIO_PROJECT_URL` | yes\* | — | Full URL of your Form.io project. The WEAKEST of the three sources: a committed `formio.json` found by walking up from the working directory wins, then a per-directory mapping written by `project_set`, then this. Self-hosted, it is a sub-directory of the deployment or a sub-domain of your own domain (`https://myproject.example.com`), depending on how that deployment routes projects. | `https://myproject.form.io` | `https://forms.example.com/myproject` |
 | `FORMIO_BASE_URL` | no | derived, see note | Full base URL of your Form.io deployment. Normally DERIVED from the project URL rather than set — `https://api.form.io` for a project on a `form.io` host, the parent path for a project addressed as a sub-directory. Supply it only for a project URL with no path on your own domain, whose deployment cannot be derived. The weakest of three sources: a committed `formio.json` wins, then the per-directory mapping, then this. On the hosted cloud it is always `https://api.form.io`, never a project's `*.form.io` sub-domain. | `https://api.form.io` | `https://forms.example.com` |
-| `FORMIO_API_KEY` | no | `undefined` | Long-lived project API key. When set, the server skips the browser login flow — the only way to authenticate on a host with no browser. | `CHANGEME` | `CHANGEME` |
+| `FORMIO_API_KEY` | no | `undefined` | Long-lived project API key, applied only to the project `FORMIO_PROJECT_URL` names — set `FORMIO_PROJECT_URL` beside it. Where it applies, the server skips the browser login flow — the only way to authenticate on a host with no browser. | `CHANGEME` | `CHANGEME` |
 | `FORMIO_LOGIN_FORM` | no | Auto-resolved | Override the portal login form URL used by the JWT login flow. | `https://formio.form.io/user/login` | `https://forms.example.com/formio/user/login` |
 | `FORMIO_AUTH_HOST` | no | `127.0.0.1` | Bind address for the browser-login page. `0.0.0.0` makes it reachable from outside a container. |  |  |
 | `FORMIO_AUTH_PORT` | no | ephemeral | Fixed port for the browser-login page, so a container can publish it. | `43117` | `43117` |
@@ -308,9 +308,9 @@ What the server itself does with data, which is the part the policy above cannot
 
 Form data and submissions are never written to disk — they pass through in memory to answer a tool call.
 
-**Credentials.** `FORMIO_API_KEY`, when set, is read from the environment and sent to your deployment as an authentication header; it is never written to disk. The cached JWT is valid for roughly seven days, after which the server re-authenticates. Delete `~/.formio/mcp-tokens.json` to sign out immediately.
+**Credentials.** The `FORMIO_API_KEY` environment variable, when set, is read from the environment and sent as an authentication header only with requests to the project `FORMIO_PROJECT_URL` names; it is never written to disk. The cached JWT is valid for roughly seven days, after which the server re-authenticates. Delete `~/.formio/mcp-tokens.json` to sign out immediately.
 
-**Third parties.** The server contacts no third-party service. One exception is worth naming: the browser sign-in page is served locally, and the page it renders loads the Form.io renderer and its stylesheets from `cdn.jsdelivr.net`, a webfont from `fonts.googleapis.com`, and the Form.io logo from `portal.form.io`, so those hosts see your browser's IP address while that page is open. Everything else on the page comes from your own deployment. Set `FORMIO_API_KEY` to skip the browser flow entirely and avoid it.
+**Third parties.** The server contacts no third-party service. One exception is worth naming: the browser sign-in page is served locally, and the page it renders loads the Form.io renderer and its stylesheets from `cdn.jsdelivr.net`, a webfont from `fonts.googleapis.com`, and the Form.io logo from `portal.form.io`, so those hosts see your browser's IP address while that page is open. Everything else on the page comes from your own deployment. Set the `FORMIO_API_KEY` environment variable beside `FORMIO_PROJECT_URL` to skip the browser flow entirely and avoid it.
 
 **Retention.** The files above persist until you delete them. Data held in your Form.io project is governed by your own deployment's retention rules, and by the policy linked above for Form.io-hosted projects.
 

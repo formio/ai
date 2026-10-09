@@ -32,8 +32,16 @@ export interface FormioFetchOptions {
   signal?: AbortSignal;
 }
 
-function formatApiError(status: number, url: URL): string {
-  return `Form.io API error: ${status} | URL: ${url.toString()}`;
+// A redirect is reported rather than followed: fetch would re-send the request, with
+// its x-jwt-token or x-token header, to wherever the Location header points.
+function formatApiError(response: Response, url: URL): string {
+  const location =
+    response.status >= 300 && response.status < 400 ? response.headers?.get('location') : null;
+  return `Form.io API error: ${response.status} | URL: ${url.toString()}${
+    location
+      ? ` | Redirected to ${location}, which is not followed: every request addresses the resolved project directly.`
+      : ''
+  }`;
 }
 
 function buildFetchInit(config: FormioConfig, options?: FormioFetchOptions): RequestInit {
@@ -43,7 +51,7 @@ function buildFetchInit(config: FormioConfig, options?: FormioFetchOptions): Req
     ...(hasBody ? { 'Content-Type': 'application/json' } : {}),
   };
 
-  const init: RequestInit = { headers };
+  const init: RequestInit = { headers, redirect: 'manual' };
   if (options?.method) {
     init.method = options.method;
   }
@@ -79,14 +87,25 @@ export async function formioRawFetch(
       await ensureAuthenticated(config);
       const retryResponse = await fetch(url, buildFetchInit(config, options));
       if (!retryResponse.ok) {
-        throw new Error(formatApiError(retryResponse.status, url));
+        throw new Error(formatApiError(retryResponse, url));
       }
       return parseResponse(retryResponse);
     }
-    throw new Error(formatApiError(response.status, url));
+    throw new Error(formatApiError(response, url));
   }
 
   return parseResponse(response);
+}
+
+// Whether a built URL addresses the project: the same origin, and a path that IS
+// the project's path or continues it at a segment boundary — so a sibling project
+// sharing a prefix (`/myproject2` beside `/myproject`) is not under it.
+function isUnderProject(url: URL, projectUrl: URL): boolean {
+  const prefix = projectUrl.pathname.replace(/\/+$/, '');
+  return (
+    url.origin === projectUrl.origin &&
+    (url.pathname === prefix || url.pathname.startsWith(`${prefix}/`))
+  );
 }
 
 export async function formioFetch(
@@ -95,8 +114,6 @@ export async function formioFetch(
   config: ResolvedFormioConfig,
   options?: FormioFetchOptions
 ): Promise<unknown> {
-  await ensureAuthenticated(config);
-
   const base = config.projectUrl.replace(/\/*$/, '/');
   const url = new URL(path.replace(/^\//, ''), base);
 
@@ -106,6 +123,17 @@ export async function formioFetch(
   for (const [key, value] of entries) {
     url.searchParams.set(key, value);
   }
+
+  // Checked before the auth gate, so a request that would leave the project never
+  // reaches a credential. The tool-argument rule refuses these values first and names
+  // the argument; this holds for every caller, including ones that bypass it.
+  if (!isUnderProject(url, new URL(base))) {
+    throw new Error(
+      `Refusing the Form.io request for path ${JSON.stringify(path)}: it resolves to ${url.origin}${url.pathname}, which is not under the Project URL ${config.projectUrl}. Every request addresses the project this directory resolves to.`
+    );
+  }
+
+  await ensureAuthenticated(config);
 
   return formioRawFetch(url, config, options);
 }

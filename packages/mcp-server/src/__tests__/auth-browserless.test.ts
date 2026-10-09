@@ -45,6 +45,24 @@ describe('authenticate on a browserless host', () => {
     await expect(authenticate(CONFIG)).rejects.toThrow(/FORMIO_FORCE_BROWSER/);
   });
 
+  it('asks for the key beside FORMIO_PROJECT_URL when none is set', async () => {
+    await expect(authenticate(CONFIG)).rejects.toThrow(
+      /FORMIO_API_KEY[^.]*beside FORMIO_PROJECT_URL/
+    );
+  });
+
+  // A key that is set but withheld for this project is not "missing": asking for it
+  // again sends the user after a value they already have.
+  it('says why a set key was not applied instead of asking for one', async () => {
+    const reason = 'FORMIO_API_KEY is set but not applied: FORMIO_PROJECT_URL is unset.';
+    const failure = await authenticate({ ...CONFIG, apiKeyNotApplied: reason }).then(
+      () => undefined,
+      (error: unknown) => error as Error
+    );
+    expect(failure?.message).toContain(reason);
+    expect(failure?.message).not.toMatch(/Set FORMIO_API_KEY/);
+  });
+
   it('never launches a browser', async () => {
     await expect(authenticate(CONFIG)).rejects.toThrow();
 

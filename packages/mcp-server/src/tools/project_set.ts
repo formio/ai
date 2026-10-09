@@ -5,6 +5,7 @@ import { planProjectEntry } from '../project-entry-plan.js';
 import {
   API_ROOT_IS_NOT_YOUR_DEPLOYMENT,
   DEPLOYMENT_IS_DERIVED,
+  DEPLOYMENT_ON_ANOTHER_DOMAIN,
   NOT_A_HOSTED_PROJECT,
   API_ROOT_NOT_A_PROJECT,
   ENTERPRISE_ONLY,
@@ -241,6 +242,11 @@ export function registerProjectSetTool(server: McpServer, options: ProjectSetOpt
       if (plan.outcome === 'api-root-deployment') {
         refuse(
           `${plan.baseUrl} is not the deployment for ${plan.projectUrl}. ${API_ROOT_IS_NOT_YOUR_DEPLOYMENT}`
+        );
+      }
+      if (plan.outcome === 'unrelated-deployment') {
+        refuse(
+          `${plan.baseUrl} is not the deployment for ${plan.projectUrl}. ${DEPLOYMENT_ON_ANOTHER_DOMAIN}`
         );
       }
       if (plan.outcome === 'hosted-project-foreign-deployment') {

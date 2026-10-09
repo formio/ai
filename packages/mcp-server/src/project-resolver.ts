@@ -20,6 +20,7 @@ import {
   ENTERPRISE_ONLY,
   API_ROOT_IS_NOT_YOUR_DEPLOYMENT,
   DEPLOYMENT_IS_DERIVED,
+  DEPLOYMENT_ON_ANOTHER_DOMAIN,
   HOSTED_CLOUD_DEPLOYMENT,
   NOT_A_HOSTED_PROJECT,
   PairValidity,
@@ -407,7 +408,9 @@ function validateWinningRecord({
           ? API_ROOT_IS_NOT_YOUR_DEPLOYMENT
           : validity === 'underivable-mismatch'
             ? DEPLOYMENT_IS_DERIVED
-            : HOSTED_CLOUD_DEPLOYMENT
+            : validity === 'unrelated-deployment'
+              ? DEPLOYMENT_ON_ANOTHER_DOMAIN
+              : HOSTED_CLOUD_DEPLOYMENT
       }${
         derived
           ? ` Resolving ${projectUrl} on ${derived} instead.`
@@ -456,6 +459,34 @@ function validateWinningRecord({
         : `Ignoring FORMIO_PROJECT_URL and FORMIO_BASE_URL: both name ${projectUrl}, which makes the project its own deployment. ${ENTERPRISE_ONLY}`
   );
   return undefined;
+}
+
+// FORMIO_API_KEY is issued by one project, and FORMIO_PROJECT_URL is the only value
+// that names it — so the key travels only to that project. Compared as whole Project
+// URLs rather than origins: the projects of a sub-directory deployment share one
+// origin, and a sibling project would otherwise receive a key it rejects instead of
+// the portal login. Returns why the key is withheld, or undefined when it applies or
+// no key is set.
+function apiKeyWithheldReason({
+  apiKey,
+  apiKeyProjectUrl,
+  projectUrl,
+}: {
+  apiKey: string | undefined;
+  apiKeyProjectUrl: string | undefined;
+  projectUrl: string;
+}): string | undefined {
+  if (!apiKey) {
+    return undefined;
+  }
+  // An empty FORMIO_PROJECT_URL names no project, exactly as an unset one does.
+  if (!apiKeyProjectUrl) {
+    return 'FORMIO_API_KEY is set but not applied: FORMIO_PROJECT_URL is unset, so nothing names the project the key belongs to. Set FORMIO_PROJECT_URL to that project to use the key; requests authenticate through the portal login until then.';
+  }
+  const keyProject = normalizeHttpUrl(apiKeyProjectUrl, 'FORMIO_PROJECT_URL');
+  return keyProject === projectUrl
+    ? undefined
+    : `FORMIO_API_KEY is set but not applied: it belongs to ${keyProject} (FORMIO_PROJECT_URL), and this directory resolves to ${projectUrl}. Requests for this project authenticate through the portal login instead.`;
 }
 
 // What every tool handler needs. `project get` needs the provenance too, and
@@ -620,6 +651,15 @@ export function resolveProject(
     );
   }
 
+  const apiKeyNotApplied = apiKeyWithheldReason({
+    apiKey: baseConfig.apiKey,
+    apiKeyProjectUrl: envProjectUrl,
+    projectUrl: normalizedProjectUrl,
+  });
+  if (apiKeyNotApplied) {
+    onNote(apiKeyNotApplied);
+  }
+
   const baseUrl = winner.baseUrl ?? winner.derived;
   const baseUrlSource: BaseUrlSource = winner.baseUrl
     ? projectUrlSource
@@ -630,6 +670,8 @@ export function resolveProject(
   return {
     config: {
       ...baseConfig,
+      apiKey: apiKeyNotApplied ? undefined : baseConfig.apiKey,
+      ...(apiKeyNotApplied ? { apiKeyNotApplied } : {}),
       baseUrl: baseUrl && stripTrailingSlashes(baseUrl),
       projectUrl: normalizedProjectUrl,
       cwd: mapCwd,

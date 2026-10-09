@@ -187,6 +187,15 @@ export async function resolveDefaultLoginFormUrl(config: ResolvedFormioConfig): 
 // Checked before anything is bound or launched: on a host with no browser the
 // login can never complete, and the whole login timeout would be spent
 // discovering that.
+// The API-key half of every "no browser" remedy. A key the resolver withheld for this
+// project is not missing, so asking for one would send the user after a value they
+// already have; the reason it was withheld is the remedy instead.
+function apiKeyRemedy(config: ResolvedFormioConfig): string {
+  return config.apiKeyNotApplied
+    ? `${config.apiKeyNotApplied} `
+    : `Set FORMIO_API_KEY beside FORMIO_PROJECT_URL to authenticate without a browser. `;
+}
+
 function assertBrowserAvailable(config: ResolvedFormioConfig): void {
   if (config.forceBrowser) {
     return;
@@ -202,7 +211,7 @@ function assertBrowserAvailable(config: ResolvedFormioConfig): void {
   }
   throw new Error(
     `Cannot complete the Form.io browser login: ${reason}. ` +
-      `Set FORMIO_API_KEY to authenticate without a browser. ` +
+      apiKeyRemedy(config) +
       `If the host running your browser can reach this machine, set both FORMIO_AUTH_HOST=0.0.0.0 and ` +
       `FORMIO_AUTH_PORT to a published port so the login page is reachable from it. ` +
       `Set FORMIO_FORCE_BROWSER=1 to attempt the browser login anyway.`
@@ -295,8 +304,9 @@ export async function authenticate(
       new Error(
         `Timed out after ${Math.round(timeoutMs / 1000)}s waiting for the Form.io login to complete. ` +
           (loginUrl ? `Open ${loginUrl} to sign in, then retry. ` : '') +
-          `If this environment has no browser — a container, a remote shell, or CI — set FORMIO_API_KEY ` +
-          `instead, or set FORMIO_AUTH_HOST=0.0.0.0 and FORMIO_AUTH_PORT to a published port so the login ` +
+          `If this environment has no browser — a container, a remote shell, or CI: ` +
+          apiKeyRemedy(config) +
+          `Or set FORMIO_AUTH_HOST=0.0.0.0 and FORMIO_AUTH_PORT to a published port so the login ` +
           `page is reachable from your machine.`
       )
     );

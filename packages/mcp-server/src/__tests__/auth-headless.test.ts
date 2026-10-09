@@ -122,6 +122,20 @@ describe('authenticate in headless environments', () => {
     );
   });
 
+  it('says why a set key was not applied when the login times out', async () => {
+    const reason = 'FORMIO_API_KEY is set but not applied: FORMIO_PROJECT_URL is unset.';
+    const failure = await authenticate({
+      ...DEFAULT_CONFIG,
+      authTimeoutMs: 50,
+      apiKeyNotApplied: reason,
+    }).then(
+      () => undefined,
+      (error: unknown) => error as Error
+    );
+    expect(failure?.message).toContain(reason);
+    expect(failure?.message).not.toMatch(/set FORMIO_API_KEY/i);
+  });
+
   // The error is returned to the MCP client as tool output, so it reaches the
   // user directly. Relying on stderr alone assumes they know to go read logs.
   it('includes the login URL in the timeout error', async () => {

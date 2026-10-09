@@ -1,11 +1,11 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import { z } from 'zod';
 import { FormioConfig } from '../config.js';
 import { formioFetch } from '../formio-client.js';
 import { toMcpError, toMcpStructuredResult } from '../mcp-responses.js';
 import { acknowledgementShape } from '../output-schemas.js';
 import { removes } from '../tool-annotations.js';
 import { cwdSchema, resolveProjectConfig } from '../project-resolver.js';
+import { resourceSegmentArgument } from './path-arguments.js';
 
 export function registerActionDeleteTool(server: McpServer, config: FormioConfig) {
   server.registerTool(
@@ -15,8 +15,8 @@ export function registerActionDeleteTool(server: McpServer, config: FormioConfig
         'Delete an action from a form. The action stops running on submissions immediately and is not recoverable — call action_get first if the settings may be needed again.',
       inputSchema: {
         cwd: cwdSchema,
-        formId: z.string().describe('The form ID the action belongs to'),
-        actionId: z.string().describe('The action ID to delete'),
+        formId: resourceSegmentArgument('formId').describe('The form ID the action belongs to'),
+        actionId: resourceSegmentArgument('actionId').describe('The action ID to delete'),
       },
       outputSchema: acknowledgementShape,
       annotations: removes('Delete a form action'),

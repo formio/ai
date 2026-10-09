@@ -6,6 +6,7 @@ import { toMcpStructuredResult, toMcpError } from '../mcp-responses.js';
 import { formShape } from '../output-schemas.js';
 import { reads } from '../tool-annotations.js';
 import { cwdSchema, resolveProjectConfig } from '../project-resolver.js';
+import { projectPathArgument } from './path-arguments.js';
 
 export function registerFormGetTool(server: McpServer, config: FormioConfig) {
   server.registerTool(
@@ -15,7 +16,9 @@ export function registerFormGetTool(server: McpServer, config: FormioConfig) {
         "Fetch a single form definition from the Form.io project mapped to the user's current working directory, by form ID or path. Pass `draft: true` to fetch the form's current in-flight draft instead of the published form.",
       inputSchema: {
         cwd: cwdSchema,
-        formIdOrPath: z.string().describe('Form ID (_id) or path (e.g. "user/login")'),
+        formIdOrPath: projectPathArgument('formIdOrPath').describe(
+          'Form ID (_id) or path (e.g. "user/login")'
+        ),
         select: z
           .string()
           .optional()

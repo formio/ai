@@ -11,6 +11,7 @@ import { planProjectEntry } from '../project-entry-plan.js';
 import {
   API_ROOT_IS_NOT_YOUR_DEPLOYMENT,
   DEPLOYMENT_IS_DERIVED,
+  DEPLOYMENT_ON_ANOTHER_DOMAIN,
   NOT_A_HOSTED_PROJECT,
   API_ROOT_NOT_A_PROJECT,
   ENTERPRISE_ONLY,
@@ -461,6 +462,21 @@ function runSet(flags: Record<string, string>, context: CommandContext): Project
   if (plan.outcome === 'api-root-deployment') {
     return notConfigured(
       `${plan.baseUrl} is not the deployment for ${plan.projectUrl}. ${API_ROOT_IS_NOT_YOUR_DEPLOYMENT}\n\n${USAGE}`,
+      notes
+    );
+  }
+  if (plan.outcome === 'unrelated-deployment') {
+    // Like the hosted-project refusal below, a correct configuration can hit this — an
+    // on-prem deployment serving sub-domain projects from a different registrable
+    // domain — so the override is named for the developer at this shell, and only
+    // where the mapping it writes would govern the directory.
+    const forceIsAvailable = !committed?.projectUrl;
+    return notConfigured(
+      `${plan.baseUrl} is not the deployment for ${plan.projectUrl}. ${DEPLOYMENT_ON_ANOTHER_DOMAIN}\n\n${
+        forceIsAvailable
+          ? `If that deployment really does serve this project from another domain, re-run this command with --force and both URLs to record the pair as given.`
+          : `A pair like that can be recorded as given with --force, but only into this directory's own mapping — and the committed ${COMMITTED_CONFIG_FILE} at ${committed?.filePath} governs this directory, so a mapping written under it would not take effect. Remove that file, or ask the user which record should hold the project.`
+      }\n\n${USAGE}`,
       notes
     );
   }

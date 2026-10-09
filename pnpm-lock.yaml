@@ -53,6 +53,9 @@ importers:
       express:
         specifier: ^5.2.1
         version: 5.2.1
+      tldts:
+        specifier: ^7.4.9
+        version: 7.4.9
       zod:
         specifier: ^4.6.5
         version: 4.6.5
