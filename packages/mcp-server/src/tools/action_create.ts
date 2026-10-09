@@ -4,9 +4,9 @@ import { formioFetch } from '../formio-client.js';
 import { toMcpStructuredResult, toMcpError } from '../mcp-responses.js';
 import { actionDocument } from '../output-schemas.js';
 import { creates } from '../tool-annotations.js';
-import { actionDefinitionSchema } from './action-schema.js';
+import { actionDefinitionSchema, unknownActionType } from './action-schema.js';
 import { cwdSchema, resolveProjectConfig } from '../project-resolver.js';
-import { resourceSegmentArgument } from './path-arguments.js';
+import { formIdArgument, requireFormId } from './form-id.js';
 
 export function registerActionCreateTool(server: McpServer, config: FormioConfig) {
   server.registerTool(
@@ -16,7 +16,7 @@ export function registerActionCreateTool(server: McpServer, config: FormioConfig
         'Create a new action on a form. Call action_type_get first to discover the required settings schema for the action type.',
       inputSchema: {
         cwd: cwdSchema,
-        formId: resourceSegmentArgument('formId').describe('The form ID to attach the action to'),
+        formId: formIdArgument(),
         action: actionDefinitionSchema,
       },
       outputSchema: actionDocument,
@@ -24,21 +24,14 @@ export function registerActionCreateTool(server: McpServer, config: FormioConfig
     },
     async ({ cwd, formId, action }) => {
       try {
+        requireFormId(formId);
         const cfg = resolveProjectConfig(cwd, config);
         const catalog = (await formioFetch(`form/${formId}/actions`, {}, cfg)) as Array<{
           name: string;
         }>;
         const availableNames = catalog.map((t) => t.name);
         if (!availableNames.includes(action.name)) {
-          return {
-            content: [
-              {
-                type: 'text' as const,
-                text: `Action type '${action.name}' is not available on this server. Available types: ${availableNames.join(', ')}`,
-              },
-            ],
-            isError: true,
-          };
+          throw unknownActionType({ name: action.name, available: availableNames });
         }
 
         const created = (await formioFetch(`form/${formId}/action`, {}, cfg, {

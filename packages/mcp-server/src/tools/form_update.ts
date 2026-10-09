@@ -1,11 +1,12 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 import { FormioConfig } from '../config.js';
-import { formioFetch, MONGO_ID_PATTERN } from '../formio-client.js';
+import { formioFetch } from '../formio-client.js';
 import { toMcpStructuredResult, toMcpError } from '../mcp-responses.js';
 import { formDocument } from '../output-schemas.js';
 import { overwrites } from '../tool-annotations.js';
 import { cwdSchema, resolveProjectConfig } from '../project-resolver.js';
+import { formIdArgument, requireFormId } from './form-id.js';
 import {
   gateFormHistory,
   gateRevisionsLicense,
@@ -19,26 +20,21 @@ export function registerFormUpdateTool(server: McpServer, config: FormioConfig) 
     'form_update',
     {
       description: [
-        "Update an existing form in the Form.io project mapped to the user's current working directory. IMPORTANT: Before calling this tool, first use form_get to fetch the current form definition, then use the formio-schema skill to understand the schema so that you can apply the requested modifications (add, remove, or modify fields and settings), and finally call this tool with the complete updated form JSON.",
-        'Pass `draft: true` to save the change as a draft instead of the live form; publish it with form_publish, and restore a prior revision with form_revert.',
+        'Replace a form in the project `cwd` resolves to with the complete updated JSON: read it with form_get, apply the change using the formio-schema skill, and send the whole form.',
+        'Pass `draft: true` to save a draft instead of the live form; publish it with form_publish, and restore a prior revision with form_revert.',
       ].join(' '),
       inputSchema: {
         cwd: cwdSchema,
-        formId: z
-          .string()
-          .regex(MONGO_ID_PATTERN, 'Must be a 24-character MongoDB ObjectId')
-          .describe('The _id of the form to update'),
+        formId: formIdArgument(),
         form: z
           .looseObject({
-            title: z.string().optional().describe('Human-readable form title'),
-            name: z.string().optional().describe('Machine name for API references'),
-            path: z.string().optional().describe('URL path segment for the form'),
-            components: z
-              .array(z.record(z.string(), z.unknown()))
-              .describe('Array of form components'),
-            type: z.enum(['form', 'resource']).optional().describe('Form type'),
-            display: z.enum(['form', 'wizard', 'pdf']).optional().describe('Display mode'),
-            tags: z.array(z.string()).optional().describe('Tags for categorization'),
+            title: z.string().optional(),
+            name: z.string().optional(),
+            path: z.string().optional().describe('URL path, relative to the project'),
+            components: z.array(z.record(z.string(), z.unknown())),
+            type: z.enum(['form', 'resource']).optional(),
+            display: z.enum(['form', 'wizard', 'pdf']).optional(),
+            tags: z.array(z.string()).optional(),
             revisions: z
               .enum(['current', 'original', ''])
               .optional()
@@ -47,23 +43,23 @@ export function registerFormUpdateTool(server: McpServer, config: FormioConfig) 
               ),
           })
           .catchall(z.unknown())
-          .describe('Complete updated Form.io form JSON definition'),
+          .describe('The complete updated form JSON'),
         note: z
           .string()
           .describe(
-            'Required note describing the diff (live form vs updated body) — no action preambles ("Saved draft:", "Updated:").'
+            'What changed against the live form, with no preamble ("Saved draft:", "Updated:")'
           ),
         draft: z
           .boolean()
           .optional()
           .describe(
-            "When true, save a draft (PUT /form/{formId}/draft) instead of the live form. Only the draft fields of `form` are saved (components, settings, tags, properties, controller, esign, display), merged over any existing draft; every other field is ignored, so form_get's output can be passed as is."
+            "When true, save a draft instead of the live form. Only the draft fields of `form` are saved (components, settings, tags, properties, controller, esign, display), over any existing draft; form_get's output can be passed as is."
           ),
         acceptNoHistory: z
           .boolean()
           .optional()
           .describe(
-            'Set to true only after the user agrees to save without revision history. Without it, a save that would keep no history (a deployment without the revisions licence, or a form whose revisions are off) is refused with HISTORY_NOT_ACCEPTED and nothing is written.'
+            'Set true only after the user agrees to save without revision history. Without it, such a save (no revisions licence, or the form has revisions off) is refused with HISTORY_NOT_ACCEPTED and nothing is written.'
           ),
       },
       outputSchema: formDocument,
@@ -71,6 +67,7 @@ export function registerFormUpdateTool(server: McpServer, config: FormioConfig) 
     },
     async ({ cwd, formId, form: rawForm, note, draft, acceptNoHistory }) => {
       try {
+        requireFormId(formId);
         const cfg = resolveProjectConfig(cwd, config);
 
         if (draft) {

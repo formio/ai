@@ -217,6 +217,18 @@ The bundled `@formio/mcp` server exposes these tools. Skills prefer these over r
 | `project_get` | Report which project a directory resolves to, which deployment hosts it, and which layer supplied each. The preflight to run before the first call that reads or writes — it answers from inside the server, with the same resolver every other tool uses, so no shell command is needed to ask it. Returns a `status` of `ok`, `not-configured`, or `base-url-unresolved`. |
 | `project_set` | Persist a Project URL for a directory, in `~/.formio/projects.json`. To record the target with the code instead, write a committed `formio.json` in the application's own folder — the server reads that file and never writes it. One server can serve several workspaces. Registered in every client. A mapping written here overrides `FORMIO_PROJECT_URL` in the server environment, which is the weakest source. |
 
+#### Why `project_set` works this way
+
+The tool's description carries only the rules a caller acts on. The reasons behind them:
+
+- **The call is the persistence.** An agent that answers "switch to project X" in text has changed nothing; only the tool call writes the mapping.
+- **`cwd` keys the mapping.** Without it the mapping is keyed by the server process's own working directory, which is fixed when the client spawns the server and is often not where the user is working.
+- **No restart, but not always in effect.** Every tool resolves its project on each call, so a new mapping is read by the next call. It governs only where the mapping is the record that wins: under a committed `formio.json` it is the fallback for when that file goes away. That is why the result reports the pair that actually resolves (`projectUrl`, `ok`) rather than the one just recorded.
+- **The Base URL is derived, not asked for.** It builds the portal-login URL and keys the cached token, so a wrong one fails at login rather than on a request, and a guessed one sends the login to a deployment the user does not use. It can be derived for a `form.io` host (`https://api.form.io`, the Base URL every hosted project shares) and for a sub-directory project (the parent path). A path-less project URL on a customer domain is the exception: its deployment is a sibling sub-domain, and nothing in the project URL names it.
+- **A deployment is bound to its project.** The Base URL is stored per directory beside the project recorded with it, so each directory can target a different deployment and no deployment answers for another project. A call that re-points a directory to a different project therefore keeps no Base URL: the old value belonged to the project being replaced.
+- **The mapping is machine-local.** It is keyed by absolute path, so it does not survive a clone. A committed `formio.json` is versioned, visible in a diff and shared with everyone who clones the repository, which is why it is preferred when the target belongs to the application.
+- **Unknown arguments are refused.** The input schema is strict: an argument the tool does not take (such as the removed `scope`) is rejected rather than dropped, so a call written against older documentation cannot report a write that never happened.
+
 ### Diagnostic
 
 | Tool | Purpose |

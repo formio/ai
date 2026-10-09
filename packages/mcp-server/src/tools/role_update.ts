@@ -5,7 +5,7 @@ import { formioFetch, MONGO_ID_PATTERN } from '../formio-client.js';
 import { toMcpStructuredResult, toMcpError } from '../mcp-responses.js';
 import { roleDocument } from '../output-schemas.js';
 import { overwrites } from '../tool-annotations.js';
-import { roleFields } from './role-schema.js';
+import { roleSchema } from './role-schema.js';
 import { cwdSchema, resolveProjectConfig } from '../project-resolver.js';
 
 export function registerRoleUpdateTool(server: McpServer, config: FormioConfig) {
@@ -13,17 +13,14 @@ export function registerRoleUpdateTool(server: McpServer, config: FormioConfig) 
     'role_update',
     {
       description:
-        "Update an existing role in the Form.io project mapped to the user's current working directory. This is a full replacement — include all fields you want to preserve.",
+        'Update an existing role in the project `cwd` resolves to. This is a full replacement — include all fields you want to preserve.',
       inputSchema: {
         cwd: cwdSchema,
         roleId: z
           .string()
           .regex(MONGO_ID_PATTERN, 'Must be a 24-character MongoDB ObjectId')
           .describe('The _id of the role to update'),
-        role: z
-          .object(roleFields)
-          .catchall(z.unknown())
-          .describe('Role document with updated fields'),
+        role: roleSchema.describe('Role document with updated fields'),
       },
       outputSchema: roleDocument,
       annotations: overwrites('Update a role'),

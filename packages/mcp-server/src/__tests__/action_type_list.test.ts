@@ -61,7 +61,7 @@ describe('action_type_list tool', () => {
 
     const result = await client.callTool({
       name: 'action_type_list',
-      arguments: { cwd: TEST_CWD, formId: 'nonexistent0000000000000' },
+      arguments: { cwd: TEST_CWD, formId: '0000000000000000000000ff' },
     });
 
     expect(result.isError).toBe(true);

@@ -14,7 +14,7 @@ export function registerFormGetTool(server: McpServer, config: FormioConfig) {
     'form_get',
     {
       description:
-        "Fetch a single form definition from the Form.io project mapped to the user's current working directory, by form ID or path. Pass `draft: true` to fetch the form's current in-flight draft instead of the published form.",
+        'Fetch a form definition, by _id or path, from the project `cwd` resolves to. `draft: true` fetches its in-flight draft instead of the published form.',
       inputSchema: {
         cwd: cwdSchema,
         formIdOrPath: projectPathArgument('formIdOrPath').describe(

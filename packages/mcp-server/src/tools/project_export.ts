@@ -11,7 +11,7 @@ export function registerProjectExportTool(server: McpServer, config: FormioConfi
     'project_export',
     {
       description:
-        "Export the complete template (roles, resources, forms, actions) of the Form.io project mapped to the user's current working directory as a portable JSON document. Use this to snapshot a project before importing changes.",
+        'Export the project `cwd` resolves to as a template (roles, resources, forms, actions) — the snapshot to take before project_import.',
       inputSchema: {
         cwd: cwdSchema,
       },

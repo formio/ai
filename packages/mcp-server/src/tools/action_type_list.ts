@@ -5,8 +5,8 @@ import { toMcpStructuredResult, toMcpError } from '../mcp-responses.js';
 import { actionTypesListOutput } from '../output-schemas.js';
 import { reads } from '../tool-annotations.js';
 import { cwdSchema, resolveProjectConfig } from '../project-resolver.js';
+import { formIdArgument, requireFormId } from './form-id.js';
 import { listResult, pageOf } from './list-contract.js';
-import { resourceSegmentArgument } from './path-arguments.js';
 
 export function registerActionTypeListTool(server: McpServer, config: FormioConfig) {
   server.registerTool(
@@ -16,15 +16,14 @@ export function registerActionTypeListTool(server: McpServer, config: FormioConf
         'List the action types available for a form. Returns the whole catalog the server supports in one result.',
       inputSchema: {
         cwd: cwdSchema,
-        formId: resourceSegmentArgument('formId').describe(
-          'The form ID to list available action types for'
-        ),
+        formId: formIdArgument(),
       },
       outputSchema: actionTypesListOutput,
       annotations: reads('List action types'),
     },
     async ({ cwd, formId }) => {
       try {
+        requireFormId(formId);
         const cfg = resolveProjectConfig(cwd, config);
         // Form.io does not page this route: the body is the whole catalog.
         const catalog = await formioFetch(`form/${formId}/actions`, {}, cfg);

@@ -12,7 +12,7 @@ export function registerProjectImportTool(server: McpServer, config: FormioConfi
     'project_import',
     {
       description:
-        "Import a template JSON into the existing Form.io project mapped to the user's current working directory, merging roles, resources, forms, and actions in one call. Use the formio-resource-planner skill to construct the template before calling this tool. WARNING: import merges into the existing project — use project_export first to snapshot.",
+        "Merge a template's roles, resources, forms and actions into the existing project `cwd` resolves to, in one call. Build the template with the formio-resource-planner skill, and snapshot first with project_export: the import merges, it does not replace.",
       inputSchema: {
         cwd: cwdSchema,
         template: z.looseObject({}).describe('The template JSON object to import'),

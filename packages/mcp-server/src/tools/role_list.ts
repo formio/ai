@@ -10,8 +10,7 @@ export function registerRoleListTool(server: McpServer, config: FormioConfig) {
   server.registerTool(
     'role_list',
     {
-      description:
-        "List the roles defined in the Form.io project mapped to the user's current working directory, one page at a time.",
+      description: 'List the roles defined in the project `cwd` resolves to, one page at a time.',
       inputSchema: {
         cwd: cwdSchema,
         ...listArguments(),

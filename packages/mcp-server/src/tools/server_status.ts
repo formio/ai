@@ -25,7 +25,7 @@ export function registerServerStatusTool(
     'server_status',
     {
       description:
-        "Report this server's name and version and how the given working directory resolves to a Form.io project (the same answer project_get gives). Makes no Form.io request and needs no project or credentials, so it is the first thing to call when other tools fail.",
+        "Report this server's name and version and how `cwd` resolves to a project, as project_get does. It makes no Form.io request and needs no credentials: call it first when other tools fail.",
       inputSchema: { cwd: cwdSchema },
       outputSchema: serverStatusOutput,
       annotations: local('Report server status', true),

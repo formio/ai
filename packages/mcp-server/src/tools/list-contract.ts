@@ -22,18 +22,8 @@ export interface ListArgumentDefaults {
 /** The paging arguments, described with the defaults this tool applies. */
 export function listArguments(defaults: ListArgumentDefaults = {}) {
   return {
-    limit: z
-      .number()
-      .int()
-      .positive()
-      .default(DEFAULT_LIST_LIMIT)
-      .describe('Maximum number of items to return'),
-    skip: z
-      .number()
-      .int()
-      .nonnegative()
-      .default(0)
-      .describe("Number of items to skip; page with the result's `hasMore`"),
+    limit: z.number().int().positive().default(DEFAULT_LIST_LIMIT).describe('Page size'),
+    skip: z.number().int().nonnegative().default(0).describe('Items to skip; page while `hasMore`'),
     sort: z
       .string()
       .optional()

@@ -29,7 +29,7 @@ const PROJECT_SCOPED_CALLS: Array<{ name: string; args: Record<string, unknown> 
   { name: 'form_revision_list', args: { formIdOrPath: 'contact' } },
   { name: 'form_revision_get', args: { formIdOrPath: 'contact', version: '1' } },
   { name: 'role_list', args: {} },
-  { name: 'role_create', args: { title: 'Manager' } },
+  { name: 'role_create', args: { role: { title: 'Manager' } } },
   { name: 'role_update', args: { roleId: OBJECT_ID, role: { title: 'Manager' } } },
   { name: 'action_type_list', args: { formId: OBJECT_ID } },
   { name: 'action_type_get', args: { formId: OBJECT_ID, actionName: 'save' } },

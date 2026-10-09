@@ -108,17 +108,17 @@
 
 ### Red
 
-- [ ] 7.1 Write failing tests: `role_create` takes `role: { title, description?, default?, admin? }` and POSTs it; flat `title` is rejected
-- [ ] 7.2 Write failing tests: every action tool refuses a non-ObjectId `formId` with a message pointing to `form_get` for the `_id`
+- [x] 7.1 Write failing tests: `role_create` takes `role: { title, description?, default?, admin? }` and POSTs it; flat `title` is rejected
+- [x] 7.2 Write failing tests: every action tool (and `form_update`, `form_publish`, `form_revert`) refuses a non-ObjectId `formId` with `INVALID_ARGUMENT` and a message pointing to `form_get` for the `_id`; `action_create` and `action_type_get` refuse a type missing from the catalog with `UNKNOWN_ACTION_TYPE`
 
 ### Green
 
-- [ ] 7.3 Change `role_create`'s input to the shared role schema used by `role_update`
-- [ ] 7.4 Give every action tool's `formId` the ObjectId schema with the remedy message
+- [x] 7.3 Change `role_create`'s input to the shared role schema used by `role_update`
+- [x] 7.4 Give every action tool's `formId` (and `form_update`'s, `form_publish`'s, `form_revert`'s) the shared ObjectId argument with the remedy message, checked in the handler so the refusal carries its code; wire `UNKNOWN_ACTION_TYPE`
 
 ### Refactor
 
-- [ ] 7.5 Review implementation and refactor as needed
+- [x] 7.5 Review implementation and refactor as needed
 
 ## 8. Environment booleans and package exports
 <!-- depends_on: none -->
@@ -142,16 +142,16 @@
 
 ### Red
 
-- [ ] 9.1 Write a failing test that the serialized `tools/list` is at most 50,000 characters and every `cwd` description is at most 200 characters and names the user's working directory
+- [x] 9.1 Write a failing test that the serialized `tools/list` is at most 50,000 characters and every `cwd` description is at most 200 characters and names the user's working directory
 
 ### Green
 
-- [ ] 9.2 Shorten the `cwd` description; move `project_set`'s rationale to the README keeping every rule it enforces; trim output-schema field descriptions to what a caller branches on
-- [ ] 9.3 Confirm the server instructions still carry the full `cwd` and resolution guidance; run the planner and both resources eval harnesses before and after and record that scores did not drop
+- [x] 9.2 Shorten the `cwd` description; move `project_set`'s rationale to the README keeping every rule it enforces; trim output-schema field descriptions to what a caller branches on
+- [x] 9.3 Confirm the server instructions still carry the full `cwd` and resolution guidance (pinned by a test), and grep `plugin/skills/` for any sentence that relies on wording removed from a tool description. The eval harnesses are not run for this: the planner calls no MCP tool and the resources harnesses grade generated code, so neither exercises a tool description
 
 ### Refactor
 
-- [ ] 9.4 Review implementation and refactor as needed
+- [x] 9.4 Review implementation and refactor as needed
 
 ## 10. Skills and docs follow the surface
 <!-- depends_on: 3, 4, 5, 6, 7 -->

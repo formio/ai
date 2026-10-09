@@ -5,6 +5,7 @@ import { toMcpError, toMcpStructuredResult } from '../mcp-responses.js';
 import { acknowledgementOutput } from '../output-schemas.js';
 import { removes } from '../tool-annotations.js';
 import { cwdSchema, resolveProjectConfig } from '../project-resolver.js';
+import { formIdArgument, requireFormId } from './form-id.js';
 import { resourceSegmentArgument } from './path-arguments.js';
 
 export function registerActionDeleteTool(server: McpServer, config: FormioConfig) {
@@ -15,7 +16,7 @@ export function registerActionDeleteTool(server: McpServer, config: FormioConfig
         'Delete an action from a form. The action stops running on submissions immediately and is not recoverable — call action_get first if the settings may be needed again.',
       inputSchema: {
         cwd: cwdSchema,
-        formId: resourceSegmentArgument('formId').describe('The form ID the action belongs to'),
+        formId: formIdArgument(),
         actionId: resourceSegmentArgument('actionId').describe('The action ID to delete'),
       },
       outputSchema: acknowledgementOutput,
@@ -23,6 +24,7 @@ export function registerActionDeleteTool(server: McpServer, config: FormioConfig
     },
     async ({ cwd, formId, actionId }) => {
       try {
+        requireFormId(formId);
         const cfg = resolveProjectConfig(cwd, config);
         // The API answers this DELETE with the plain text body `OK`, so the
         // response is read as text. Left to default to `res.json()` it threw

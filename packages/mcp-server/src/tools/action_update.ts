@@ -6,6 +6,7 @@ import { actionDocument } from '../output-schemas.js';
 import { overwrites } from '../tool-annotations.js';
 import { actionDefinitionSchema } from './action-schema.js';
 import { cwdSchema, resolveProjectConfig } from '../project-resolver.js';
+import { formIdArgument, requireFormId } from './form-id.js';
 import { resourceSegmentArgument } from './path-arguments.js';
 
 export function registerActionUpdateTool(server: McpServer, config: FormioConfig) {
@@ -16,7 +17,7 @@ export function registerActionUpdateTool(server: McpServer, config: FormioConfig
         'Update an existing action on a form. This is a full replacement of the action document — include every field you want to keep, and call action_get first if you do not already have it.',
       inputSchema: {
         cwd: cwdSchema,
-        formId: resourceSegmentArgument('formId').describe('The form ID the action belongs to'),
+        formId: formIdArgument(),
         actionId: resourceSegmentArgument('actionId').describe('The action ID to update'),
         action: actionDefinitionSchema,
       },
@@ -25,6 +26,7 @@ export function registerActionUpdateTool(server: McpServer, config: FormioConfig
     },
     async ({ cwd, formId, actionId, action }) => {
       try {
+        requireFormId(formId);
         const cfg = resolveProjectConfig(cwd, config);
         const updated = (await formioFetch(`form/${formId}/action/${actionId}`, {}, cfg, {
           method: 'PUT',

@@ -15,7 +15,7 @@ export function registerFormListTool(server: McpServer, config: FormioConfig) {
     'form_list',
     {
       description:
-        "List forms from the Form.io project mapped to the user's current working directory, one page at a time, optionally filtered by type and tags.",
+        'List forms from the project `cwd` resolves to, one page at a time, optionally filtered by type and tags.',
       inputSchema: {
         cwd: cwdSchema,
         type: z.enum(['form', 'resource']).optional().describe('Filter by form type'),

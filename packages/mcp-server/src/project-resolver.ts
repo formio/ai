@@ -36,8 +36,11 @@ import {
 } from './committed-config.js';
 import { ToolError } from './tool-errors.js';
 
+// Repeated on every project-scoped tool, so it carries what to pass and the order
+// resolution follows, and leaves the rest to the server instructions and project_set,
+// which every client receives once. A test holds it to 200 characters.
 const CWD_DESCRIPTION =
-  "User's current working directory as an absolute path. Selects the Form.io project that directory resolves to, by scope, narrowest first: a committed formio.json found by walking up from it, then the working-directory mapping project_set writes, then FORMIO_PROJECT_URL in the environment, which is the weakest of the three. Pass it on EVERY call whenever you know it: omitting it resolves against the MCP server's own working directory, which is fixed at spawn and may resolve to a different project. No environment variable removes the need for it — the environment is the source a file or a mapping overrides, not the one that overrides them.";
+  "The user's working directory, absolute; pass it on every call. It selects the project: formio.json, else the project_set mapping, else FORMIO_PROJECT_URL (weakest). Rules: server instructions.";
 
 // One schema for every client. Requiredness cannot live here: whether a cwd is
 // needed depends on the environment the server was launched with, and this

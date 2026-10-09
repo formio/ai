@@ -5,6 +5,7 @@ import { toMcpStructuredResult, toMcpError } from '../mcp-responses.js';
 import { actionDocument } from '../output-schemas.js';
 import { reads } from '../tool-annotations.js';
 import { cwdSchema, resolveProjectConfig } from '../project-resolver.js';
+import { formIdArgument, requireFormId } from './form-id.js';
 import { resourceSegmentArgument } from './path-arguments.js';
 
 export function registerActionGetTool(server: McpServer, config: FormioConfig) {
@@ -15,7 +16,7 @@ export function registerActionGetTool(server: McpServer, config: FormioConfig) {
         'Get a single action by ID from a form, including its handler, method, condition, and type-specific settings. Call action_list first to find the action ID.',
       inputSchema: {
         cwd: cwdSchema,
-        formId: resourceSegmentArgument('formId').describe('The form ID the action belongs to'),
+        formId: formIdArgument(),
         actionId: resourceSegmentArgument('actionId').describe('The action ID to retrieve'),
       },
       outputSchema: actionDocument,
@@ -23,6 +24,7 @@ export function registerActionGetTool(server: McpServer, config: FormioConfig) {
     },
     async ({ cwd, formId, actionId }) => {
       try {
+        requireFormId(formId);
         const cfg = resolveProjectConfig(cwd, config);
         const action = (await formioFetch(`form/${formId}/action/${actionId}`, {}, cfg)) as Record<
           string,

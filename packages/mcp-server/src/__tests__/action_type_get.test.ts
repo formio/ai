@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { createTestClient, TEST_CONFIG, TEST_CWD } from './test-helpers.js';
+import { ERROR_META_KEY } from '../mcp-responses.js';
 
 const mockFormioFetch = vi.fn();
 vi.mock('../formio-client.js', async (importOriginal) => {
@@ -80,6 +81,25 @@ describe('action_type_get tool', () => {
         ),
       }),
     ]);
+    expect(result._meta?.[ERROR_META_KEY]).toEqual({ code: 'UNKNOWN_ACTION_TYPE' });
+  });
+
+  it('keeps the original error when the type is in the catalog', async () => {
+    const formId = '67890abcdef012345678abcd';
+    mockFormioFetch.mockRejectedValueOnce(new Error('Form.io API error: 500'));
+    mockFormioFetch.mockResolvedValueOnce([{ name: 'email', title: 'Email' }]);
+    const { client } = await createTestClient(registerActionTypeGetTool);
+
+    const result = await client.callTool({
+      name: 'action_type_get',
+      arguments: { cwd: TEST_CWD, formId, actionName: 'email' },
+    });
+
+    expect(result.isError).toBe(true);
+    expect(result.content).toEqual([
+      expect.objectContaining({ type: 'text', text: expect.stringContaining('500') }),
+    ]);
+    expect(result._meta?.[ERROR_META_KEY]).not.toEqual({ code: 'UNKNOWN_ACTION_TYPE' });
   });
 
   it('returns original error when both type fetch and catalog fetch fail', async () => {

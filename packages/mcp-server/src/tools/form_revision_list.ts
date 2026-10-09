@@ -17,7 +17,7 @@ export function registerFormRevisionListTool(server: McpServer, config: FormioCo
     'form_revision_list',
     {
       description:
-        'List published revision summaries for a single form in the Form.io project mapped to the current working directory, newest first, one page at a time. To inspect a specific revision body, call `form_revision_get` with the desired `_vid`. To revert the live form to a prior revision, call `form_revert` with its `_vid`.',
+        "List a form's published revision summaries in the project `cwd` resolves to, newest first, one page at a time. Read one with form_revision_get, or restore one with form_revert, passing its `_vid`.",
       inputSchema: {
         cwd: cwdSchema,
         formIdOrPath: projectPathArgument('formIdOrPath').describe(

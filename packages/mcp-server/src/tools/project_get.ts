@@ -24,10 +24,9 @@ export function registerProjectGetTool(
     'project_get',
     {
       description: [
-        'Report which Form.io project the given working directory resolves to, which deployment hosts it, and which layer supplied each — the preflight to run before the first tool call that reads from or writes to a deployment.',
-        'Answers from inside this server, using the same resolver every other tool uses, so what it reports is what the next call targets. There is no need to run any shell command to ask this.',
-        'Branch on `status`. "ok" means both URLs resolved and you may proceed. "not-configured" means nothing is mapped for this directory: relay the message, ask the user for the single value it names, record it with project_set, and call this again. "base-url-unresolved" means the project IS recorded and only its deployment is missing — ask for the Base URL alone and do NOT re-ask for the Project URL.',
-        'Reads only. It resolves and reports; project_set is what records a choice.',
+        'Report which Form.io project the working directory resolves to, which deployment hosts it, and which layer supplied each — the preflight before the first call that reads from or writes to a deployment. It uses the resolver every tool uses, so no shell command is needed.',
+        'Branch on `status`: "ok" — proceed. "not-configured" — relay the message, ask the user for the one value it names, record it with project_set, and call this again. "base-url-unresolved" — the project IS recorded: ask for the Base URL alone, never the Project URL again.',
+        'Reads only; project_set records a choice.',
       ].join(' '),
       inputSchema: { cwd: cwdSchema },
       outputSchema: projectResolutionOutput,

@@ -64,14 +64,14 @@ export function registerProjectSetTool(server: McpServer, options: ProjectSetOpt
   server.registerTool(
     'project_set',
     {
+      // Rules a caller acts on, and nothing else: why the tool works this way is in
+      // the package README ("Why project_set works this way").
       description: [
-        'Set the active Form.io project for the given working directory by recording its URL in ~/.formio/projects.json',
-        'You MUST call this tool whenever the user asks to set, change, or switch the active Form.io project — do not merely acknowledge the request in text. Persisting the choice requires the tool call.',
-        "The chosen URL is persisted to ~/.formio/projects.json keyed by the cwd argument when provided (or the MCP server process cwd otherwise). Pass the `cwd` argument whenever you know the user's current working directory — the server process cwd is fixed at spawn and may not match where the user actually is.",
-        'Every Form.io tool resolves its project on each call, so a mapping written here needs no restart. It takes effect only where the mapping is the record that WINS, though: under a committed formio.json the mapping is the fallback if that file goes away, and this call reports the pair that actually resolves rather than the one it recorded. Read `ok` and `projectUrl` on the result rather than assuming the write governs.',
-        'You normally pass only projectUrl. The base URL — which builds the portal-login URL and keys the cached token — is derived from it — https://api.form.io for a project on a form.io host, and the parent path for a project addressed as a sub-directory — so there is nothing to supply. Pass baseUrl ONLY when the server reports that it cannot be determined, which happens for a project URL that carries no path on a customer domain: there the deployment is a sibling sub-domain and nothing in the project URL names it. Do not ask the user for a base URL before the server says it needs one.',
-        `This tool writes the machine-local mapping, which is keyed by absolute path and therefore does not survive a clone. To record the target with the code instead — versioned, visible in a diff, and shared with everyone who clones the repository — write a committed ${COMMITTED_CONFIG_FILE} yourself, in the application's own folder: a JSON object holding {"projectUrl": "..."}, plus "baseUrl" only when it cannot be derived. This server reads that file and never writes it.`,
-        `Resolution is by scope, narrowest first, and precedence runs: a committed ${COMMITTED_CONFIG_FILE}, then the working-directory mapping, then FORMIO_PROJECT_URL in the environment, which is the weakest of the three. So a mapping written here DOES override an environment value, and a committed file overrides both.`,
+        "Set the active Form.io project for a working directory by recording its Project URL in ~/.formio/projects.json, keyed by `cwd` (omitted, the server's own spawn directory, which may not be the user's).",
+        'Call it whenever the user asks to set, change, or switch the active project; acknowledging in text persists nothing.',
+        `It needs no restart, and precedence runs: a committed ${COMMITTED_CONFIG_FILE}, then the working-directory mapping, then FORMIO_PROJECT_URL in the environment, the weakest — so a mapping written here DOES override the environment, and a committed file overrides both. Read \`ok\` and \`projectUrl\` on the result: they report the pair that actually resolves.`,
+        'Pass projectUrl alone: the Base URL, which builds the portal-login URL and keys the cached token, is derived — https://api.form.io for a form.io host, the parent path for a sub-directory project. Pass baseUrl only after the server reports it cannot be determined (a path-less project URL on a customer domain).',
+        `To record the target with the code instead, write a committed ${COMMITTED_CONFIG_FILE} yourself in the application's folder: {"projectUrl": "..."}, plus "baseUrl" only when it cannot be derived. This server reads that file and never writes it.`,
       ].join(' '),
       // Strict: an argument this tool does not take is REFUSED, not silently dropped.
       // `scope` was removed with the committed-file writer, and the previous release's
@@ -83,18 +83,18 @@ export function registerProjectSetTool(server: McpServer, options: ProjectSetOpt
           .url({ protocol: /^https?$/ })
           .optional()
           .describe(
-            'Full URL of the Form.io project to activate. Optional when THIS DIRECTORY\'S OWN MAPPING already holds a project: omitting it then updates that record\'s baseUrl alone, which is how the "Base URL cannot be determined" error is repaired without re-asking for a project URL. Where the project is held by another record, a baseUrl alone is refused rather than split from its project — for a committed formio.json the deployment is added to that file by hand (this server never writes one), and for FORMIO_PROJECT_URL in the environment the call must carry BOTH projectUrl and baseUrl, which records the pair here. Required when nothing configures a project at all. On the Form.io hosted cloud it is the project name as a sub-domain of form.io, e.g. https://examples.form.io — never https://api.form.io, which is the Base URL every hosted project shares. On a customer-hosted deployment it is either a sibling sub-domain of that customer’s domain, e.g. https://myproject.mysite.com, or a sub-directory of the deployment, e.g. https://forms.mysite.com/myproject — whichever that deployment uses.'
+            "Full URL of the Form.io project: https://examples.form.io on the hosted cloud (never https://api.form.io), or https://myproject.mysite.com or https://forms.mysite.com/myproject on a customer deployment. Omit it only to add a baseUrl to THIS DIRECTORY'S OWN mapping. Where another record holds the project, a baseUrl alone is refused: add it to a committed formio.json by hand, or, for FORMIO_PROJECT_URL in the environment, pass both."
           ),
         // The SAME schema every reader validates against. A write must not accept
         // what a read cannot key on.
         cwd: cwdSchema.describe(
-          "User's current working directory to key the persisted mapping against, as an absolute path. Pass whenever known (e.g. from UserPromptSubmit hook context). Falls back to the MCP server's process.cwd() when omitted, which is fixed at spawn and may not be where the user is."
+          "The user's working directory, absolute, that the mapping is keyed against. Omitted, the server's own spawn directory is used. Rules: project_set and the server instructions."
         ),
         baseUrl: z
           .url({ protocol: /^https?$/ })
           .optional()
           .describe(
-            'Deployment URL for the Form.io Enterprise Server that hosts this project. It builds the portal-login URL and keys the cached token, so a wrong one fails at login rather than on the request. Usually omitted: it is derived from projectUrl wherever it can be. Supply it when the server reports that it cannot be determined — a project URL with no path on a customer domain, whose deployment is a sibling sub-domain. It MAY carry a path of its own when the deployment is mounted at a sub-path. Never pass it for a project on a form.io host: those are served by https://api.form.io and by nothing else, so any other value is refused. Persisted per-cwd alongside the project URL, and bound to the project recorded with it, so each directory can target a different deployment and no deployment answers for another project. When omitted and this call does not change the project, the base URL already mapped for this directory is kept — but a call that re-points the directory to a different project keeps nothing, because that value belonged to the project being replaced.'
+            'The deployment hosting the project; it builds the portal-login URL and keys the cached token. Usually omitted: it is derived from projectUrl. Pass it when the server reports it cannot be determined; it may carry a sub-path. Refused for a form.io host, which only https://api.form.io serves. Omitted, the value mapped for this directory is kept, unless the call re-points it to a different project.'
           ),
       }),
       outputSchema: projectMappingOutput,
