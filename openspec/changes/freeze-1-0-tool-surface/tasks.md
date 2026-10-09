@@ -3,18 +3,18 @@
 
 ### Red
 
-- [ ] 1.1 Write failing tests for `FormioApiError` / `FormioNetworkError` thrown by `formioFetch`: status, URL, body text truncated to 2,000 characters; Form.io's JSON `message` included in the prose
-- [ ] 1.2 Write failing tests for `toMcpError`: each known error class maps to its `code` (`NOT_CONFIGURED`, `BASE_URL_UNRESOLVED`, `CONFIG_UNREADABLE`, `INVALID_ARGUMENT`, `AUTH_REQUIRED`, `FORBIDDEN`, `NOT_FOUND`, `VALIDATION_FAILED`, `REDIRECTED`, `UPSTREAM_ERROR`, `NETWORK_ERROR`, unknown → `INTERNAL`) with `status` / `body` where present
-- [ ] 1.3 Write failing tool-level tests: a Form.io 400 on `form_create` yields `VALIDATION_FAILED` with body; `ECONNREFUSED` yields `NETWORK_ERROR` naming the cause and URL; an unconfigured directory yields `NOT_CONFIGURED`; an error result passes through an output-validating client
+- [x] 1.1 Write failing tests for `FormioApiError` / `FormioNetworkError` thrown by `formioFetch`: status, URL, body text truncated to 2,000 characters; Form.io's JSON `message` included in the prose
+- [x] 1.2 Write failing tests for `toMcpError`: each known error class maps to its `code` (`NOT_CONFIGURED`, `BASE_URL_UNRESOLVED`, `CONFIG_UNREADABLE`, `INVALID_ARGUMENT`, `AUTH_REQUIRED`, `FORBIDDEN`, `NOT_FOUND`, `VALIDATION_FAILED`, `REDIRECTED`, `UPSTREAM_ERROR`, `NETWORK_ERROR`, unknown → `INTERNAL`) with `status` / `body` where present
+- [x] 1.3 Write failing tool-level tests: a Form.io 400 on `form_create` yields `VALIDATION_FAILED` with body; `ECONNREFUSED` yields `NETWORK_ERROR` naming the cause and URL; an unconfigured directory yields `NOT_CONFIGURED`; an error result passes through an output-validating client
 
 ### Green
 
-- [ ] 1.4 Implement the typed errors in `formio-client.ts` and give the resolution error classes a `code`
-- [ ] 1.5 Implement the mapper in `mcp-responses.ts` (`structuredContent: { code, status?, body? }`)
+- [x] 1.4 Implement the typed errors in `formio-client.ts` and give the resolution error classes a `code`
+- [x] 1.5 Implement the mapper in `mcp-responses.ts` (`_meta["io.form/error"]: { code, status?, body? }`, text led by `[CODE] `, no `structuredContent`)
 
 ### Refactor
 
-- [ ] 1.6 Review implementation and refactor as needed
+- [x] 1.6 Review implementation and refactor as needed
 
 ## 2. Open output schemas
 <!-- depends_on: none -->

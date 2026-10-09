@@ -3,6 +3,7 @@ import path from 'path';
 import os from 'os';
 import { projectCommand } from './cli-launch.js';
 import { readHttpUrlEnv } from './config.js';
+import { ToolError } from './tool-errors.js';
 
 const DEFAULT_CACHE_DIR = path.join(os.homedir(), '.formio');
 const PROJECTS_FILE = 'projects.json';
@@ -31,7 +32,7 @@ type ProjectMap = Record<string, ProjectEntry>;
 // made every directory look unmapped, and the documented recovery — interview,
 // then project_set — wrote a fresh single-entry file over every other mapping.
 // Callers get a distinguishable failure so the file survives for repair.
-export class ProjectMapUnreadableError extends Error {
+export class ProjectMapUnreadableError extends ToolError {
   /** The file and cause, so a caller on a path with a DIFFERENT remedy can say its own. */
   readonly filePath: string;
   readonly reason: string;
@@ -56,7 +57,10 @@ export class ProjectMapUnreadableError extends Error {
         ? `Only this directory's entry is affected and the rest of the file is intact, so do NOT delete it — that would discard every other directory's mapping. Replace the entry instead: ${remap}.`
         : `Repair or delete that file FIRST — no command can write it while it cannot be read, so nothing below will run until it is. Then ${remap}.`;
     const reason = cause instanceof Error ? cause.message : String(cause);
-    super(`Cannot read the Form.io project map at ${filePath}: ${reason}. ` + how);
+    super({
+      code: 'CONFIG_UNREADABLE',
+      message: `Cannot read the Form.io project map at ${filePath}: ${reason}. ` + how,
+    });
     this.name = 'ProjectMapUnreadableError';
     this.filePath = filePath;
     this.reason = reason;

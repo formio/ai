@@ -3,6 +3,7 @@ import { getAuthHeader } from './auth-header.js';
 import { ensureAuthenticated, invalidateJwtCache } from './ensure-auth.js';
 import { clearToken } from './token-cache.js';
 import { requireBaseUrl } from './project-resolver.js';
+import { FormioApiError, FormioNetworkError, ToolError } from './tool-errors.js';
 
 // Accept the common truthy spellings ("true", "TRUE", "1") so a self-signed
 // deployment (e.g. a local Form.io Enterprise server) is not rejected over a
@@ -34,14 +35,33 @@ export interface FormioFetchOptions {
 
 // A redirect is reported rather than followed: fetch would re-send the request, with
 // its x-jwt-token or x-token header, to wherever the Location header points.
-function formatApiError(response: Response, url: URL): string {
+async function apiError(response: Response, url: URL): Promise<FormioApiError> {
   const location =
     response.status >= 300 && response.status < 400 ? response.headers?.get('location') : null;
-  return `Form.io API error: ${response.status} | URL: ${url.toString()}${
-    location
-      ? ` | Redirected to ${location}, which is not followed: every request addresses the resolved project directly.`
-      : ''
-  }`;
+  return new FormioApiError({
+    status: response.status,
+    url: url.toString(),
+    body: await readBody(response),
+    location: location ?? undefined,
+  });
+}
+
+// The body explains the failure, but reading it can fail too (a dropped connection,
+// a stream already consumed); the status alone is still worth reporting then.
+async function readBody(response: Response): Promise<string | undefined> {
+  try {
+    return await response.text();
+  } catch {
+    return undefined;
+  }
+}
+
+async function send(url: URL, init: RequestInit): Promise<Response> {
+  try {
+    return await fetch(url, init);
+  } catch (cause) {
+    throw new FormioNetworkError({ url: url.toString(), cause });
+  }
 }
 
 function buildFetchInit(config: FormioConfig, options?: FormioFetchOptions): RequestInit {
@@ -69,7 +89,7 @@ export async function formioRawFetch(
   config: ResolvedFormioConfig,
   options?: FormioFetchOptions
 ): Promise<unknown> {
-  const response = await fetch(url, buildFetchInit(config, options));
+  const response = await send(url, buildFetchInit(config, options));
   const parseResponse = (res: Response) =>
     options?.responseType === 'text' ? res.text() : res.json();
 
@@ -85,13 +105,13 @@ export async function formioRawFetch(
       await clearToken(baseUrl);
       config.jwt = undefined;
       await ensureAuthenticated(config);
-      const retryResponse = await fetch(url, buildFetchInit(config, options));
+      const retryResponse = await send(url, buildFetchInit(config, options));
       if (!retryResponse.ok) {
-        throw new Error(formatApiError(retryResponse, url));
+        throw await apiError(retryResponse, url);
       }
       return parseResponse(retryResponse);
     }
-    throw new Error(formatApiError(response, url));
+    throw await apiError(response, url);
   }
 
   return parseResponse(response);
@@ -128,9 +148,10 @@ export async function formioFetch(
   // reaches a credential. The tool-argument rule refuses these values first and names
   // the argument; this holds for every caller, including ones that bypass it.
   if (!isUnderProject(url, new URL(base))) {
-    throw new Error(
-      `Refusing the Form.io request for path ${JSON.stringify(path)}: it resolves to ${url.origin}${url.pathname}, which is not under the Project URL ${config.projectUrl}. Every request addresses the project this directory resolves to.`
-    );
+    throw new ToolError({
+      code: 'INVALID_ARGUMENT',
+      message: `Refusing the Form.io request for path ${JSON.stringify(path)}: it resolves to ${url.origin}${url.pathname}, which is not under the Project URL ${config.projectUrl}. Every request addresses the project this directory resolves to.`,
+    });
   }
 
   await ensureAuthenticated(config);

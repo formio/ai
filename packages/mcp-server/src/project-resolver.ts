@@ -34,6 +34,7 @@ import {
   CommittedProjectConfig,
   findCommittedConfig,
 } from './committed-config.js';
+import { ToolError } from './tool-errors.js';
 
 const CWD_DESCRIPTION =
   "User's current working directory as an absolute path. Selects the Form.io project that directory resolves to, by scope, narrowest first: a committed formio.json found by walking up from it, then the working-directory mapping project_set writes, then FORMIO_PROJECT_URL in the environment, which is the weakest of the three. Pass it on EVERY call whenever you know it: omitting it resolves against the MCP server's own working directory, which is fixed at spawn and may resolve to a different project. No environment variable removes the need for it — the environment is the source a file or a mapping overrides, not the one that overrides them.";
@@ -67,7 +68,7 @@ interface MissingProject {
 // exclusion turned every OTHER error — including ones added later — into a false
 // "nothing configured", whose remedy is an interview that writes a record the real
 // problem still shadows.
-export class ProjectNotConfiguredError extends Error {
+export class ProjectNotConfiguredError extends ToolError {
   /**
    * Values the resolver set aside on the way to "nothing is configured".
    *
@@ -80,7 +81,7 @@ export class ProjectNotConfiguredError extends Error {
   readonly unpaired: string[];
 
   constructor(message: string, unpaired: string[] = []) {
-    super(message);
+    super({ code: 'NOT_CONFIGURED', message });
     this.name = 'ProjectNotConfiguredError';
     this.unpaired = unpaired;
   }
@@ -161,6 +162,15 @@ export function baseUrlWriteCommand({
   return projectCommand(`set --project-url ${projectUrl} --base-url <base_url> --cwd ${cwd}`);
 }
 
+// The project is configured and only its deployment is missing — a different remedy
+// from "nothing configured", so a different code.
+export class BaseUrlUnresolvedError extends ToolError {
+  constructor(message: string) {
+    super({ code: 'BASE_URL_UNRESOLVED', message });
+    this.name = 'BaseUrlUnresolvedError';
+  }
+}
+
 export function requireBaseUrl(config: ResolvedFormioConfig): string {
   if (config.baseUrl) {
     return config.baseUrl;
@@ -176,7 +186,7 @@ export function requireBaseUrl(config: ResolvedFormioConfig): string {
       : source === 'committed'
         ? `Record it beside the project, in the committed ${COMMITTED_CONFIG_FILE} that holds it: add "baseUrl": "<base_url>" beside "projectUrl" in ${config.committedFilePath ?? `that file`} — edit it directly; this server reads a committed file and never writes one, and a mapping written under it does not take effect`
         : `${config.projectUrl} comes from FORMIO_PROJECT_URL in the environment, which project_set cannot write, so record the pair for this directory: call project_set with cwd ${cwd}, projectUrl ${config.projectUrl} and that baseUrl, or run: ${baseUrlWriteCommand({ source, cwd, projectUrl: config.projectUrl })}`;
-  throw new Error(
+  throw new BaseUrlUnresolvedError(
     `The Base URL for ${config.projectUrl} cannot be determined, so JWT authentication cannot proceed. ` +
       `${BASE_URL_UNRESOLVED_GUIDANCE} ` +
       `Guessing one would build the portal-login URL and key the cached token against a deployment you do not use. ` +
@@ -514,7 +524,10 @@ export function resolveProject(
   }: ResolveProjectOptions = {}
 ): ProjectResolution {
   if (cwd && !path.isAbsolute(cwd)) {
-    throw new Error(`cwd must be an absolute path (received: ${cwd}).`);
+    throw new ToolError({
+      code: 'INVALID_ARGUMENT',
+      message: `cwd must be an absolute path (received: ${cwd}).`,
+    });
   }
 
   const envProjectUrl = baseConfig.projectUrl;

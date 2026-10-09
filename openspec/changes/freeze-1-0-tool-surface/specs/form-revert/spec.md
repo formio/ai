@@ -12,5 +12,5 @@ The server SHALL register a `form_revert` tool taking `cwd`, `formId` (a 24-char
 #### Scenario: An unknown revision is reported
 
 - **WHEN** `form_revert` is called with a `version` the form does not have
-- **THEN** the tool returns `isError: true` with `structuredContent.code` `NOT_FOUND`
+- **THEN** the tool returns `isError: true` with `_meta["io.form/error"].code` `NOT_FOUND`
 - **AND** no PUT is sent

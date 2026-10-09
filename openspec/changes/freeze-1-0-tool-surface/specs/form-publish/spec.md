@@ -13,7 +13,7 @@ The server SHALL register a `form_publish` tool taking `cwd`, `formId` (a 24-cha
 #### Scenario: No draft to publish
 
 - **WHEN** `form_publish` is called for a form with no draft
-- **THEN** the tool returns `isError: true` with `structuredContent.code` `NO_DRAFT`
+- **THEN** the tool returns `isError: true` with `_meta["io.form/error"].code` `NO_DRAFT`
 - **AND** no PUT is sent
 
 #### Scenario: No form body is accepted
