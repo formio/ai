@@ -37,11 +37,12 @@ import {
 import { ToolError } from './tool-errors.js';
 import { SERVER_DIRECTORY } from './workspace-directory.js';
 
-// Repeated on every project-scoped tool, so it says what it defaults to and when to
-// pass it, and leaves the order and the rest to the server instructions, which every
-// client receives once. A test holds it to 200 characters.
+// Repeated on every project-scoped tool, so it says only that it is optional and what
+// it defaults to; when to pass it, and the order a directory is chosen in, are the
+// server instructions', which every client receives once. A test holds it to 100
+// characters.
 const CWD_DESCRIPTION =
-  'Optional. Directory whose Form.io project to use; defaults to the client\'s workspace root. Pass it to target another directory or when project_get reports cwdSource "server" or "claude-project-dir".';
+  "Optional. Directory whose project to use; defaults to the client's workspace root.";
 
 // One schema for every client. Requiredness cannot live here: whether a cwd is
 // needed depends on the environment the server was launched with, and this

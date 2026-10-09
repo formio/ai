@@ -33,19 +33,18 @@ const actionCondition = z
       })
     ),
   })
-  .optional()
-  .describe('When the action runs');
+  .optional();
 
+// Form.io's own fields, documented by the formio-actions skill, so they carry no
+// description here: `name` comes from action_type_list, and the keys valid in
+// `settings` from action_type_get's settingsForm.
 export const actionDefinitionSchema = z
   .object({
-    name: z.string().describe('Action type name, from action_type_list'),
+    name: z.string(),
     title: z.string(),
-    handler: z.array(z.string()).describe('"before" and/or "after"'),
-    method: z.array(z.string()).describe('e.g. "create", "update"'),
-    settings: z
-      .record(z.string(), z.unknown())
-      .optional()
-      .describe("Keys from action_type_get's settingsForm"),
+    handler: z.array(z.string()),
+    method: z.array(z.string()),
+    settings: z.record(z.string(), z.unknown()).optional(),
     condition: actionCondition,
     priority: z.number().optional(),
   })

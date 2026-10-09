@@ -631,13 +631,13 @@ describe('cwdSchema', () => {
     expect(cwdSchema.safeParse('/workspace/pkg-a').success).toBe(true);
   });
 
-  // The description is repeated on every tool, so it says what an omitted cwd
-  // resolves to and when to pass one. Which RECORD wins for that directory — the
-  // committed file, the mapping, the environment — is the server instructions'
-  // to state, once; a shortened copy here is the one that drifts.
-  it('says what an omitted cwd defaults to and when to pass one', () => {
+  // The description is repeated on every tool, so it says only that cwd is optional
+  // and what an omitted one resolves to. When to pass one, and which RECORD wins for
+  // that directory — the committed file, the mapping, the environment — are the server
+  // instructions' to state, once; a shortened copy here is the one that drifts.
+  it('says cwd is optional and what an omitted cwd defaults to', () => {
+    expect(cwdSchema.description).toMatch(/optional/i);
     expect(cwdSchema.description).toMatch(/defaults to the client's workspace root/);
-    expect(cwdSchema.description).toMatch(/cwdSource "server"/);
     expect(cwdSchema.description).not.toMatch(/on every call/i);
   });
 

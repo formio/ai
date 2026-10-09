@@ -31,7 +31,7 @@ export function registerProjectGetTool(
       ].join(' '),
       inputSchema: { cwd: cwdSchema },
       outputSchema: projectResolutionOutput,
-      annotations: local('Report the project this directory resolves to', true),
+      annotations: local('Report the active project', true),
     },
     async ({ cwd }) => {
       const notes: string[] = [];

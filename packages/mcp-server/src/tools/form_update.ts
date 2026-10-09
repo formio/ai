@@ -31,7 +31,7 @@ export function registerFormUpdateTool(server: McpServer, config: FormioConfig) 
           .looseObject({
             title: z.string().optional(),
             name: z.string().optional(),
-            path: z.string().optional().describe('URL path, relative to the project'),
+            path: z.string().optional(),
             components: z.array(z.record(z.string(), z.unknown())),
             type: z.enum(['form', 'resource']).optional(),
             display: z.enum(['form', 'wizard', 'pdf']).optional(),

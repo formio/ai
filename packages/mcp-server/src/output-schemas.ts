@@ -18,98 +18,82 @@
 import { z } from 'zod';
 import { CWD_SOURCES } from './workspace-directory.js';
 
-// Field descriptions are kept only where a caller branches on the value or passes it
-// on; a self-explanatory field (`title`, `created`, …) is typed and left undescribed,
-// because every description here is repeated on every tool that returns the document.
-const identity = {
-  _id: z.string().optional(),
-  created: z.string().optional(),
-  modified: z.string().optional(),
-  machineName: z.string().optional(),
-};
+// Field descriptions are kept only on the fields a caller branches on — `ok`, `status`,
+// `total`, `hasMore` and `remedy` — because every description here is repeated on every
+// tool that returns the document. Every other field is typed and left undescribed: what
+// a Form.io field means is the formio-schema skill's to document, and what a project
+// report field means is in the server instructions and the report's own `message`.
+//
+// A Form.io document's schema declares only the fields a caller acts on — the ones the
+// skills and the tools read. Every schema is open, so the fields Form.io stores beside
+// them (`created`, `owner`, `settings`, `machineName`, …) still pass through untouched;
+// declaring them would only lengthen every tool that returns the document.
 
 const looseList = z.array(z.looseObject({}));
 // A Mongoose Mixed field: any value, `null` included.
 const mixed = z.unknown().optional();
 
+// `access` and `submissionAccess` are declared because the auth skills read them from
+// form_get before editing them. They are typed as Mixed rather than as the array (or
+// `null`) Form.io stores: the full shape cost more than the rest of the document, on
+// every tool that returns a form, and the formio-schema skill documents it.
 export const formDocument = z.looseObject({
-  ...identity,
+  _id: z.string().optional(),
   title: z.string().optional(),
   name: z.string().optional(),
   path: z.string().optional(),
-  type: z.string().optional().describe('"form" or "resource"'),
-  display: z.string().optional().describe('"form", "wizard" or "pdf"'),
+  type: z.string().optional(),
+  display: z.string().optional(),
   components: looseList.optional(),
-  tags: z.array(z.string()).optional(),
-  access: looseList.nullish(),
-  submissionAccess: looseList.nullish(),
-  revisions: z
-    .union([z.string(), z.boolean()])
-    .optional()
-    .describe('"original", "current", or empty/false when history is off'),
-  settings: mixed,
-  properties: mixed,
-  project: z.string().optional(),
-  owner: z.string().nullish(),
+  access: mixed,
+  submissionAccess: mixed,
+  // "original", "current", or empty/false when history is off.
+  revisions: z.union([z.string(), z.boolean()]).optional(),
 });
 
 export const roleDocument = z.looseObject({
-  ...identity,
+  _id: z.string().optional(),
   title: z.string().optional(),
-  description: z.string().optional(),
   admin: z.boolean().optional(),
   default: z.boolean().optional(),
-  project: z.string().optional(),
 });
 
 export const actionDocument = z.looseObject({
-  ...identity,
-  name: z.string().optional().describe('Action type name'),
+  _id: z.string().optional(),
+  name: z.string().optional(),
   title: z.string().optional(),
   form: z.string().optional(),
   handler: z.array(z.string()).optional(),
   method: z.array(z.string()).optional(),
   priority: z.number().optional(),
   condition: mixed,
-  settings: mixed.describe('Type-specific settings; action_type_get gives the schema'),
+  settings: mixed,
 });
 
+// `name` is what action_create and action_type_get take.
 const actionTypeFields = {
-  name: z.string().optional().describe('Pass as `name` to action_create'),
+  name: z.string().optional(),
   title: z.string().optional(),
-  description: z.string().optional(),
-  priority: z.number().optional(),
-  defaults: z.looseObject({}).optional(),
 };
 
 export const actionTypeDocument = z.looseObject(actionTypeFields);
 
 export const actionTypeInfoDocument = z.looseObject({
   ...actionTypeFields,
-  settingsForm: z
-    .looseObject({})
-    .optional()
-    .describe('Its components are the keys valid in `settings` on action_create'),
-  access: mixed,
+  // Its components are the keys valid in `settings` on action_create.
+  settingsForm: z.looseObject({}).optional(),
 });
 
 export const revisionSummaryDocument = z.looseObject({
-  _vid: z
-    .union([z.string(), z.number()])
-    .optional()
-    .describe('Revision number; pass as `version` to form_revision_get or form_revert'),
+  // The revision number: what form_revision_get and form_revert take as `version`.
+  _vid: z.union([z.string(), z.number()]).optional(),
   _id: z.string().optional(),
   _vnote: z.string().optional(),
   _vuser: z.string().nullish(),
   created: z.string().optional(),
-  modified: z.string().optional(),
 });
 
 export const templateDocument = z.looseObject({
-  title: z.string().optional(),
-  name: z.string().optional(),
-  version: z.string().optional(),
-  description: z.string().optional(),
   roles: z.looseObject({}).optional(),
   resources: z.looseObject({}).optional(),
   forms: z.looseObject({}).optional(),
@@ -152,30 +136,21 @@ export const acknowledgementOutput = z.looseObject(acknowledgementShape);
 
 export const projectMappingOutput = z.looseObject({
   ...acknowledgementShape,
-  // Overridden: for a writer, "it worked" is not "the write reached disk" — a record
-  // can land and leave the directory no more usable than before, which is the answer
-  // the caller has to act on.
+  // For a writer, "it worked" is not "the write reached disk": a record can land and
+  // leave the directory no more usable than before, which is the answer the caller acts
+  // on. `projectUrl` is the one the next call targets, which under a committed
+  // formio.json is the one that file names; `changed` is false when the mapping was
+  // already in place; `forced` marks a pair recorded with `project set --force`.
   ok: z
     .boolean()
     .describe(
-      'True when the directory is ready for a deployment call. False: the record WAS written, but a committed formio.json governs and supplies no Base URL — make the edit `message` names; do not retry'
+      'False: the record WAS written but the directory still needs attention; do what `message` names, and do not retry this call'
     ),
   cwd: z.string(),
-  projectUrl: z
-    .string()
-    .describe(
-      'Project URL the next call targets; under a committed formio.json, the one that file names, not the one recorded here'
-    ),
-  baseUrl: z.string().optional().describe('The deployment serving `projectUrl`, from its record'),
-  changed: z
-    .boolean()
-    .describe('False when the mapping was already in place; true means the record changed'),
-  forced: z
-    .boolean()
-    .optional()
-    .describe(
-      'True when the pair was recorded with `project set --force`; not a reason to re-record it'
-    ),
+  projectUrl: z.string(),
+  baseUrl: z.string().optional(),
+  changed: z.boolean(),
+  forced: z.boolean().optional(),
 });
 
 /**
@@ -189,22 +164,18 @@ export const projectMappingOutput = z.looseObject({
  */
 const resolutionStatus = z.enum(['ok', 'not-configured', 'base-url-unresolved']);
 
+// `cwdSource` is where the directory came from, and when to pass cwd on later calls
+// because of it is the server instructions' rule. `projectUrl` is absent when status is
+// not-configured and `baseUrl` unless it is ok; `message` is the full report, including
+// what to do next.
 const resolutionFields = {
   cwd: z.string(),
-  cwdSource: z
-    .enum(CWD_SOURCES)
-    .describe('Where cwd came from; "server" means pass cwd on later calls'),
-  projectUrl: z.string().optional().describe('Absent when status is not-configured'),
-  baseUrl: z.string().optional().describe('Absent unless status is ok'),
-  projectUrlSource: z
-    .string()
-    .optional()
-    .describe('committed, mapping, or environment (the weakest)'),
-  baseUrlSource: z
-    .string()
-    .optional()
-    .describe('committed, mapping, environment, derived, or unresolved'),
-  message: z.string().describe('The full report, including what to do next'),
+  cwdSource: z.enum(CWD_SOURCES),
+  projectUrl: z.string().optional(),
+  baseUrl: z.string().optional(),
+  projectUrlSource: z.string().optional(),
+  baseUrlSource: z.string().optional(),
+  message: z.string(),
 };
 
 export const projectResolutionOutput = z.looseObject({
@@ -212,16 +183,12 @@ export const projectResolutionOutput = z.looseObject({
     '"ok": proceed. "not-configured": ask the user for a Project URL and record it with project_set. "base-url-unresolved": ask for the Base URL alone and do what the report names. Anything but "ok" blocks.'
   ),
   ...resolutionFields,
-  forced: z
-    .boolean()
-    .optional()
-    .describe(
-      'True when the pair was recorded with `project set --force`; not a reason to distrust it'
-    ),
-  shadowed: z.array(z.string()).describe('Layers overridden by a narrower one'),
-  unpaired: z
-    .array(z.string())
-    .describe('Deployments recorded with no project beside them, so unreadable'),
+  // `forced` marks a pair recorded with `project set --force`, not a reason to distrust
+  // it; `shadowed` lists layers a narrower one overrode; `unpaired` lists deployments
+  // recorded with no project beside them; `notes` holds anything set aside.
+  forced: z.boolean().optional(),
+  shadowed: z.array(z.string()),
+  unpaired: z.array(z.string()),
   remedy: z
     .looseObject({
       tool: z.string(),
@@ -232,7 +199,7 @@ export const projectResolutionOutput = z.looseObject({
     .describe(
       'The fix as a call: ask the user for `supply`, add it to `arguments`, call `tool`. Absent when status is "ok" or the fix is an edit to a committed formio.json'
     ),
-  notes: z.array(z.string()).describe('Anything set aside while resolving'),
+  notes: z.array(z.string()),
 });
 
 /**

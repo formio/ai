@@ -21,10 +21,10 @@ export function registerFormCreateTool(server: McpServer, config: FormioConfig) 
           .looseObject({
             title: z.string(),
             name: z.string(),
-            path: z.string().describe('URL path, relative to the project'),
+            path: z.string(),
             components: z.array(z.record(z.string(), z.unknown())),
-            type: z.enum(['form', 'resource']).optional().describe('Default "form"'),
-            display: z.enum(['form', 'wizard', 'pdf']).optional().describe('Default "form"'),
+            type: z.enum(['form', 'resource']).optional(),
+            display: z.enum(['form', 'wizard', 'pdf']).optional(),
             tags: z.array(z.string()).optional(),
             revisions: z
               .enum(['current', 'original', ''])

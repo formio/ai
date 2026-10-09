@@ -70,11 +70,10 @@ export function registerProjectSetTool(server: McpServer, options: ProjectSetOpt
       // Rules a caller acts on, and nothing else: why the tool works this way is in
       // the package README ("Why project_set works this way").
       description: [
-        'Set the active Form.io project for a working directory by recording its Project URL in ~/.formio/projects.json, keyed by the directory `cwd` resolves to, as every tool resolves it.',
-        'Call it whenever the user asks to set, change, or switch the active project; acknowledging in text persists nothing.',
-        `It needs no restart, and precedence runs: a committed ${COMMITTED_CONFIG_FILE}, then the working-directory mapping, then FORMIO_PROJECT_URL in the environment, the weakest — so a mapping written here DOES override the environment, and a committed file overrides both. Read \`ok\` and \`projectUrl\` on the result: they report the pair that actually resolves.`,
-        'Pass projectUrl alone: the Base URL, which builds the portal-login URL and keys the cached token, is derived — https://api.form.io for a form.io host, the parent path for a sub-directory project. Pass baseUrl only after the server reports it cannot be determined (a path-less project URL on a customer domain).',
-        `To record the target with the code instead, write a committed ${COMMITTED_CONFIG_FILE} yourself in the application's folder: {"projectUrl": "..."}, plus "baseUrl" only when it cannot be derived. This server reads that file and never writes it.`,
+        'Set the active Form.io project for a directory: records its Project URL in ~/.formio/projects.json, keyed by the directory `cwd` resolves to. Call it whenever the user asks to set, change, or switch the project; acknowledging in text persists nothing. No restart is needed.',
+        `Resolution precedence: a committed ${COMMITTED_CONFIG_FILE}, then this mapping, then FORMIO_PROJECT_URL in the environment, the weakest — so a mapping written here DOES override the environment. \`ok\` and \`projectUrl\` on the result report the pair that resolves.`,
+        'Pass projectUrl alone: the Base URL is derived — https://api.form.io for a form.io host, the parent path for a sub-directory project. Pass baseUrl only when the server reports it cannot be derived.',
+        `A committed ${COMMITTED_CONFIG_FILE} ({"projectUrl": "..."}, plus "baseUrl" only when it cannot be derived) is written by hand in the application's folder; this server reads it and never writes it.`,
       ].join(' '),
       // Strict: an argument this tool does not take is REFUSED, not silently dropped.
       // `scope` was removed with the committed-file writer, and the previous release's
@@ -90,18 +89,18 @@ export function registerProjectSetTool(server: McpServer, options: ProjectSetOpt
           .string()
           .optional()
           .describe(
-            "Full URL of the Form.io project: https://examples.form.io on the hosted cloud (never https://api.form.io), or https://myproject.mysite.com or https://forms.mysite.com/myproject on a customer deployment. Omit it only to add a baseUrl to THIS DIRECTORY'S OWN mapping. Where another record holds the project, a baseUrl alone is refused: add it to a committed formio.json by hand, or, for FORMIO_PROJECT_URL in the environment, pass both."
+            "Full Project URL, e.g. https://examples.form.io or https://forms.mysite.com/myproject; never https://api.form.io. Omit it only to add a baseUrl to THIS DIRECTORY'S OWN mapping: where a committed formio.json holds the project, add baseUrl to that file by hand; where FORMIO_PROJECT_URL does, pass both."
           ),
         // The SAME schema every reader validates against. A write must not accept
         // what a read cannot key on.
         cwd: cwdSchema.describe(
-          'Optional. Directory whose mapping to write; defaults to the client\'s workspace root. Pass it to target another directory or when project_get reports cwdSource "server" or "claude-project-dir".'
+          "Optional. Directory whose mapping to write; defaults to the client's workspace root."
         ),
         baseUrl: z
           .string()
           .optional()
           .describe(
-            'The deployment hosting the project; it builds the portal-login URL and keys the cached token. Usually omitted: it is derived from projectUrl. Pass it when the server reports it cannot be determined; it may carry a sub-path. Refused for a form.io host, which only https://api.form.io serves. Omitted, the value mapped for this directory is kept, unless the call re-points it to a different project.'
+            "The deployment hosting the project; omit it unless the server reports it cannot be derived. May carry a sub-path; refused for a form.io host. Omitted, this directory's mapped value is kept unless the call re-points it to a different project."
           ),
       }),
       outputSchema: projectMappingOutput,
