@@ -258,37 +258,39 @@ One caveat: without the skills, the agent authors Form.io JSON (form schemas, ac
 
 ## MCP server tools
 
-The bundled `@formio/mcp` server exposes these tools. Skills prefer these over raw HTTP whenever an operation is covered.
+The bundled `@formio/mcp` server exposes these 23 tools. Skills prefer these over raw HTTP whenever an operation is covered.
 
 ### Forms
 
 | Tool | Purpose |
 | --- | --- |
-| `form_create` | Create a new form. Use the `formio-schema` skill first to build the JSON definition. |
-| `form_get` | Fetch a single form definition by ID or path. |
-| `form_list` | List forms with optional filtering and pagination. |
-| `form_update` | Update an existing form. Call `form_get` first, edit with `formio-schema`, then update. |
-| `form_revisions_list` | List the immutable published revision summaries for a form (`_vid`, `_id`, `modified`, `user`, `_vnote`). Requires form revisions to be enabled. |
+| `form_create` | Create a new form. Use the `formio-schema` skill first to build the JSON definition. On a deployment licensed for revisions, `revisions` defaults to `"original"`. |
+| `form_get` | Fetch a single form definition by `_id` or path (`formIdOrPath`). `draft: true` fetches its draft instead. |
+| `form_list` | List forms, one page at a time, filtered by `type` and by `tags` (forms carrying every tag given). Returns summary fields unless `select` asks for others. |
+| `form_update` | Replace a form with its complete updated JSON. Call `form_get` first, edit with `formio-schema`, then update. `draft: true` saves a draft instead of the live form. |
+| `form_publish` | Publish a form's draft as its live version (`formId`, `note`). Fails with `NO_DRAFT` when the form has no draft. Needs the revisions licence (Security Module). |
+| `form_revert` | Restore a prior revision's components, tags, properties and display onto the live form (`formId`, `version`, `note`). Needs the revisions licence (Security Module). |
+| `form_revision_list` | List a form's revision summaries (`_id`, `_vid`, `_vnote`, `_vuser`, `created`, `modified`), newest first. Requires form revisions to be enabled. |
 | `form_revision_get` | Fetch a single immutable form revision by `_vid` or revision document `_id`. |
 
 ### Roles
 
 | Tool | Purpose |
 | --- | --- |
-| `role_create` | Create a new project role. |
-| `role_list` | List all project roles. |
-| `role_update` | Full-replacement update of a role. Include all fields you want preserved. |
+| `role_create` | Create a new project role, passed as `role: { title, description?, default?, admin? }`. |
+| `role_list` | List the project's roles, one page at a time. |
+| `role_update` | Full-replacement update of a role (`roleId`, `role`). Include all fields you want preserved. |
 
 ### Actions
 
 | Tool | Purpose |
 | --- | --- |
-| `action_types_list` | List all action types available on the server. |
-| `action_type_get` | Get an action type's settings schema. |
+| `action_type_list` | List every action type available on the server — the whole catalog, which Form.io does not page. |
+| `action_type_get` | Get an action type's settings schema. Fails with `UNKNOWN_ACTION_TYPE` for a type the catalog does not list. |
 | `action_create` | Attach a new action to a form. |
-| `action_list` | List actions on a form. |
+| `action_list` | List the actions on a form, one page at a time. |
 | `action_get` | Get a single action by ID. |
-| `action_update` | Update an action. |
+| `action_update` | Full-replacement update of an action. |
 | `action_delete` | Detach an action from a form. |
 
 ### Project
@@ -304,7 +306,16 @@ The bundled `@formio/mcp` server exposes these tools. Skills prefer these over r
 
 | Tool | Purpose |
 | --- | --- |
-| `hello` | Smoke-test tool. Returns a static greeting; useful for verifying MCP wiring before any authenticated call. |
+| `server_status` | Report the server's name and version and how `cwd` resolves to a project, as `project_get` does. It makes no Form.io request and needs no credentials, so it separates a transport problem from an authentication or configuration one — call it first when other tools fail. |
+
+### Conventions every tool follows
+
+- **`cwd`.** Every tool takes `cwd`, the user's working directory as an absolute path, and resolves the project from it on each call.
+- **`formId` and `formIdOrPath`.** `formId` is always a form's 24-character ObjectId `_id`. `formIdOrPath` takes the `_id` or the form's path, and only the reads Form.io serves by path take it: `form_get`, `form_revision_list` and `form_revision_get`. A path passed as `formId` is refused with `INVALID_ARGUMENT`; read the form's `_id` with `form_get`.
+- **Lists.** `form_list`, `role_list`, `action_list` and `form_revision_list` take `limit` (default 100), `skip`, `sort` and `select`. Each returns its items under its own key (`forms`, `roles`, `actions`, `revisions`) beside `total`, the number of items the whole query matches, and `hasMore`, which is true while another page exists: call again with a larger `skip` until it is false. `action_type_list` returns its `actionTypes` the same way, always with `hasMore: false`.
+- **Updates replace.** `form_update`, `role_update` and `action_update` send the full document (PUT); a field left out is not kept.
+- **Revision history.** A `form_create` or `form_update` that would save without revision history — the deployment is not licensed for revisions, the body sets `revisions: ""`, or an update targets a form whose revisions are off — is refused with `HISTORY_NOT_ACCEPTED` and writes nothing, unless the call passes `acceptNoHistory: true`. The server never prompts the user itself: the agent relays the refusal, and retries with the user's answer. Drafts, `form_publish` and `form_revert` need the revisions licence and are refused with `LICENSE_REQUIRED` without it.
+- **Errors.** A failed call returns `isError: true`, with text that starts with the error's code in brackets — `[NOT_FOUND] …` — followed by the message, and `_meta["io.form/error"]: { code, status?, body? }`, where `status` is Form.io's HTTP status and `body` its response body, truncated to 2,000 characters. An error result carries no `structuredContent`. The codes are `NOT_CONFIGURED`, `BASE_URL_UNRESOLVED`, `CONFIG_UNREADABLE`, `INVALID_ARGUMENT`, `AUTH_REQUIRED`, `FORBIDDEN`, `NOT_FOUND`, `VALIDATION_FAILED`, `LICENSE_REQUIRED`, `HISTORY_NOT_ACCEPTED`, `NO_DRAFT`, `UNKNOWN_ACTION_TYPE`, `REDIRECTED`, `UPSTREAM_ERROR`, `NETWORK_ERROR` and `INTERNAL`. An argument that fails the tool's input schema is reported by the MCP SDK as plain text, without a code.
 
 ---
 

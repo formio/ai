@@ -102,4 +102,6 @@ Inside this workspace, prefer the first-party MCP tools:
 | List roles    | `role_list`   | `new Formio(rolesUrl).loadRoles()`    |
 | Update a role | `role_update` | `new Formio(roleUrl).saveRole(role)`  |
 
+`role_create` takes the role as a nested `role` object — `role: { title, description }` — the same document `saveRole(role)` posts; `role_update` takes it the same way.
+
 There is no first-party `role_delete` MCP tool today — use the SDK or `DELETE ${roleUrl}` for deletion.

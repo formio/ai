@@ -20,6 +20,8 @@ Prefer the MCP server's first-party tools when they cover the requested operatio
 | Create a role  | `role_create`      | `POST {projectUrl}/role`        |
 | Update a role  | `role_update`      | `PUT {projectUrl}/role/:roleId` |
 
+`role_create` and `role_update` both take the role document as a nested `role` object — `role_create` with `role: { title, description?, default?, admin? }`, the same fields the POST body below carries. `role_list` returns one page at a time: `limit` (default 100), `skip`, `sort` and `select` are its arguments, and the result carries `roles` beside `total` and `hasMore` — call again with a larger `skip` while `hasMore` is true.
+
 ## Endpoints
 
 ### GET {projectUrl}/role

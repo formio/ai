@@ -158,17 +158,17 @@
 
 ### Red
 
-- [ ] 10.1 Write a failing skill-tests check that no markdown under `plugin/skills/`, nor the three READMEs, names `action_types_list`, `form_revisions_list`, the `hello` tool, `form_update`'s `publish` / `revert`, flat `role_create` fields, a list `count`, or the revisions consent prompt
-- [ ] 10.2 Write a failing check that every copy of the shared preflight paragraph lists `form_publish`, `form_revert`, `role_update`, `action_update` and `action_delete` among the writing tools
+- [x] 10.1 Write a failing skill-tests check that no markdown under `plugin/skills/`, nor the three READMEs, names `action_types_list`, `form_revisions_list`, the `hello` tool, `form_update`'s `publish` / `revert`, flat `role_create` fields, a list `count`, or the revisions consent prompt
+- [x] 10.2 Write a failing check that every copy of the shared preflight paragraph lists `form_publish`, `form_revert`, `role_update`, `action_update` and `action_delete` among the writing tools
 
 ### Green
 
-- [ ] 10.3 Update the preflight paragraph in all 15 skills together (`shared-prose-stays-identical.test.ts`), `formio-actions` (`action_type_list`), `formio-api` (`project-form-revisions.md` rewritten for the new tools and `acceptNoHistory`; `project-roles.md`), `formio-auth`, planner and `formio-sdk` references naming `role_create`
-- [ ] 10.4 Update the root `README.md`, `packages/mcp-server/README.md` (tool table, CLI flags and exit codes as the 1.0 reference, `project_set` rationale moved in), `plugin/README.md` and `server.json`
+- [x] 10.3 Update the preflight paragraph in all 15 skills together (`shared-prose-stays-identical.test.ts`), `formio-actions` (`action_type_list`), `formio-api` (`project-form-revisions.md` rewritten for the new tools and `acceptNoHistory`; `project-roles.md`), `formio-auth`, planner and `formio-sdk` references naming `role_create`
+- [x] 10.4 Update the root `README.md`, `packages/mcp-server/README.md` (tool table, CLI flags and exit codes as the 1.0 reference, `project_set` rationale moved in), `plugin/README.md` and `server.json`
 
 ### Refactor
 
-- [ ] 10.5 Review implementation and refactor as needed
+- [x] 10.5 Review implementation and refactor as needed
 
 ## 11. Release notes and Definition of Done
 <!-- depends_on: 1, 2, 3, 4, 5, 6, 7, 8, 9, 10 -->

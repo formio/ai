@@ -21,6 +21,8 @@ Prefer the MCP server's first-party tools when they cover the requested operatio
 | List forms               | `form_list`        | `GET {projectUrl}/form`           |
 | Update a form            | `form_update`      | `PUT {projectUrl}/form/:idOrName` |
 
+`form_list` returns one page at a time: `limit` (default 100), `skip`, `sort` and `select` are its arguments, `type` and `tags` filter it (`tags` matches forms carrying every tag given), and the result carries `forms` beside `total` and `hasMore` — call again with a larger `skip` while `hasMore` is true. `form_update` takes the form as `formId`, its 24-character `_id`, where `form_get` also accepts a path; read the `_id` with `form_get` first when the user names the form by path. Saving without revision history is refused unless the call passes `acceptNoHistory: true` — see [project-form-revisions](./project-form-revisions.md).
+
 ## Endpoints
 
 ### GET {projectUrl}/form

@@ -43,7 +43,7 @@ The same stdio entry works everywhere, but the file it goes in **and the key it 
 
 Every tool that reaches Form.io needs a project. It can come from a committed `formio.json`, from a per-directory mapping written by the `project_set` tool, or from `FORMIO_PROJECT_URL` in the environment — in that order, narrowest scope first, so a mapping overrides the environment and a committed file overrides both. `FORMIO_BASE_URL` is optional and usually unnecessary: the base URL is derived from the project URL's shape — `https://api.form.io` for a project on a `form.io` host, the parent path for a sub-directory-routed one — and is asked for only when it cannot be derived. No plugin manifest prompts for either value; every client records them per directory with `project_set` or a committed `formio.json`, and the `.mcpb` desktop bundle is the one exception because a desktop host has no working directory to interview in.
 
-The server starts without either one, so a client can connect and list the tools before anything is configured — the project URL is only demanded at the point a tool needs it, and `hello` works regardless.
+The server starts without either one, so a client can connect and list the tools before anything is configured — the project URL is only demanded at the point a tool needs it, and `server_status` works regardless.
 
 ### Run in Docker
 
@@ -161,11 +161,11 @@ The same run, step by step:
 
 ![Server card for formio-mcp showing Connected and the docker command it runs](https://raw.githubusercontent.com/formio/ai/main/packages/mcp-server/docs/images/inspector-4-connected.jpg)
 
-**5. Open the Tools tab** for the tools this server exposes. Every server lists all 21 — including `project_set` and `project_get`, which are registered for every client.
+**5. Open the Tools tab** for the tools this server exposes. Every server lists all 23 — including `project_set` and `project_get`, which are registered for every client.
 
-![Tools tab listing hello, form_create, form_get, form_list and the rest](https://raw.githubusercontent.com/formio/ai/main/packages/mcp-server/docs/images/inspector-5-tools.jpg)
+![Tools tab listing the server's Form.io tools](https://raw.githubusercontent.com/formio/ai/main/packages/mcp-server/docs/images/inspector-5-tools.jpg)
 
-**6. Pick a tool, fill in its arguments, and press "Execute Tool".** The result appears in the middle pane and the JSON-RPC exchange in the right-hand Protocol panel. `hello` is the one tool that touches no credentials, so it isolates transport problems from auth problems; `form_list` below is a real call against a project.
+**6. Pick a tool, fill in its arguments, and press "Execute Tool".** The result appears in the middle pane and the JSON-RPC exchange in the right-hand Protocol panel. `server_status` touches no credentials and makes no Form.io request, so it isolates transport problems from auth problems; `form_list` below is a real call against a project.
 
 ![form_list results showing form definitions returned from a Form.io project](https://raw.githubusercontent.com/formio/ai/main/packages/mcp-server/docs/images/inspector-6-tool-result.jpg)
 
@@ -175,37 +175,39 @@ Importing writes the server into the inspector's own catalog at `~/.mcp-inspecto
 
 ## MCP server tools
 
-The bundled `@formio/mcp` server exposes these tools. Skills prefer these over raw HTTP whenever an operation is covered.
+The bundled `@formio/mcp` server exposes these 23 tools. Skills prefer these over raw HTTP whenever an operation is covered.
 
 ### Forms
 
 | Tool | Purpose |
 | --- | --- |
-| `form_create` | Create a new form. Use the `formio-form` skill first to build the JSON definition. |
-| `form_get` | Fetch a single form definition by ID or path. |
-| `form_list` | List forms with optional filtering and pagination. |
-| `form_update` | Update an existing form. Call `form_get` first, edit with `formio-form`, then update. |
-| `form_revisions_list` | List a form's saved revisions. |
-| `form_revision_get` | Fetch one revision of a form by revision id. |
+| `form_create` | Create a new form. Use the `formio-schema` skill first to build the JSON definition. On a deployment licensed for revisions, `revisions` defaults to `"original"`. |
+| `form_get` | Fetch a single form definition by `_id` or path (`formIdOrPath`). `draft: true` fetches its draft instead. |
+| `form_list` | List forms, one page at a time, filtered by `type` and by `tags` (forms carrying every tag given). Returns summary fields unless `select` asks for others. |
+| `form_update` | Replace a form with its complete updated JSON. Call `form_get` first, edit with `formio-schema`, then update. `draft: true` saves a draft instead of the live form. |
+| `form_publish` | Publish a form's draft as its live version (`formId`, `note`). Fails with `NO_DRAFT` when the form has no draft. Needs the revisions licence (Security Module). |
+| `form_revert` | Restore a prior revision's components, tags, properties and display onto the live form (`formId`, `version`, `note`). Needs the revisions licence (Security Module). |
+| `form_revision_list` | List a form's revision summaries (`_id`, `_vid`, `_vnote`, `_vuser`, `created`, `modified`), newest first. Requires form revisions to be enabled. |
+| `form_revision_get` | Fetch a single immutable form revision by `_vid` or revision document `_id`. |
 
 ### Roles
 
 | Tool | Purpose |
 | --- | --- |
-| `role_create` | Create a new project role. |
-| `role_list` | List all project roles. |
-| `role_update` | Full-replacement update of a role. Include all fields you want preserved. |
+| `role_create` | Create a new project role, passed as `role: { title, description?, default?, admin? }`. |
+| `role_list` | List the project's roles, one page at a time. |
+| `role_update` | Full-replacement update of a role (`roleId`, `role`). Include all fields you want preserved. |
 
 ### Actions
 
 | Tool | Purpose |
 | --- | --- |
-| `action_types_list` | List all action types available on the server. |
-| `action_type_get` | Get an action type's settings schema. |
+| `action_type_list` | List every action type available on the server — the whole catalog, which Form.io does not page. |
+| `action_type_get` | Get an action type's settings schema. Fails with `UNKNOWN_ACTION_TYPE` for a type the catalog does not list. |
 | `action_create` | Attach a new action to a form. |
-| `action_list` | List actions on a form. |
+| `action_list` | List the actions on a form, one page at a time. |
 | `action_get` | Get a single action by ID. |
-| `action_update` | Update an action. |
+| `action_update` | Full-replacement update of an action. |
 | `action_delete` | Detach an action from a form. |
 
 ### Project
@@ -233,7 +235,16 @@ The tool's description carries only the rules a caller acts on. The reasons behi
 
 | Tool | Purpose |
 | --- | --- |
-| `hello` | Smoke-test tool. Returns a static greeting; useful for verifying MCP wiring before any authenticated call. |
+| `server_status` | Report the server's name and version and how `cwd` resolves to a project, as `project_get` does. It makes no Form.io request and needs no credentials, so it separates a transport problem from an authentication or configuration one — call it first when other tools fail. |
+
+### Conventions every tool follows
+
+- **`cwd`.** Every tool takes `cwd`, the user's working directory as an absolute path, and resolves the project from it on each call.
+- **`formId` and `formIdOrPath`.** `formId` is always a form's 24-character ObjectId `_id`. `formIdOrPath` takes the `_id` or the form's path, and only the reads Form.io serves by path take it: `form_get`, `form_revision_list` and `form_revision_get`. A path passed as `formId` is refused with `INVALID_ARGUMENT`; read the form's `_id` with `form_get`.
+- **Lists.** `form_list`, `role_list`, `action_list` and `form_revision_list` take `limit` (default 100), `skip`, `sort` and `select`. Each returns its items under its own key (`forms`, `roles`, `actions`, `revisions`) beside `total`, the number of items the whole query matches, and `hasMore`, which is true while another page exists: call again with a larger `skip` until it is false. `action_type_list` returns its `actionTypes` the same way, always with `hasMore: false`.
+- **Updates replace.** `form_update`, `role_update` and `action_update` send the full document (PUT); a field left out is not kept.
+- **Revision history.** A `form_create` or `form_update` that would save without revision history — the deployment is not licensed for revisions, the body sets `revisions: ""`, or an update targets a form whose revisions are off — is refused with `HISTORY_NOT_ACCEPTED` and writes nothing, unless the call passes `acceptNoHistory: true`. The server never prompts the user itself: the agent relays the refusal, and retries with the user's answer. Drafts, `form_publish` and `form_revert` need the revisions licence and are refused with `LICENSE_REQUIRED` without it.
+- **Errors.** A failed call returns `isError: true`, with text that starts with the error's code in brackets — `[NOT_FOUND] …` — followed by the message, and `_meta["io.form/error"]: { code, status?, body? }`, where `status` is Form.io's HTTP status and `body` its response body, truncated to 2,000 characters. An error result carries no `structuredContent`. The codes are `NOT_CONFIGURED`, `BASE_URL_UNRESOLVED`, `CONFIG_UNREADABLE`, `INVALID_ARGUMENT`, `AUTH_REQUIRED`, `FORBIDDEN`, `NOT_FOUND`, `VALIDATION_FAILED`, `LICENSE_REQUIRED`, `HISTORY_NOT_ACCEPTED`, `NO_DRAFT`, `UNKNOWN_ACTION_TYPE`, `REDIRECTED`, `UPSTREAM_ERROR`, `NETWORK_ERROR` and `INTERNAL`. An argument that fails the tool's input schema is reported by the MCP SDK as plain text, without a code.
 
 ---
 
@@ -299,7 +310,28 @@ The probe runs lazily — only when the local auth page is actually served.
 | `FORMIO_INSECURE_TLS` | no | `undefined` | Set to `1` to skip TLS verification. Local development only — never against production. |  |  |
 | `FORMIO_FORCE_BROWSER` | no | `0` | Set to `1` to attempt the browser login even where the server detects no browser (CI, a container, SSH with no display). |  |  |
 
-<sub>\* Not at startup — the server starts, lists every tool, and answers `hello` without it; only the tools that read or write Form.io data error, naming `project_set` and this variable. The alternative is the `project_set` tool, which maps a working directory to a project in `~/.formio/projects.json`. Resolution runs by scope, narrowest first: a committed `formio.json` found by walking up from the caller's `cwd`, then the mapping for that `cwd`, then `FORMIO_PROJECT_URL` in the environment as the weakest source, then the error. Map a directory before any client connects with `npx -y @formio/mcp@0.14.1 project set --project-url <url> --cwd <path>` — the deployment is derived from the project URL wherever it can be, so add `--base-url <url>` only when the server says it cannot be determined. Add `--force` beside both URLs to record a pair the domain rules refuse — the one shape they cannot tell from a mistake is an internal deployment served from a `*.form.io` domain; it takes both URLs in the same call, is honoured on every later read, and is a shell-only flag the `project_set` tool does not have. `project set --reset --cwd <path>` clears a directory's entry, which is how a forced pair is un-forced: a write that leaves both halves untouched keeps the override, so there is nothing for an unforced re-record to change. `project get --cwd <path>` prints what resolves and which source won. It exits `0` when it resolved, `1` when nothing is mapped for that directory, `2` when the command could not answer (a usage error, a malformed URL, an unreadable `~/.formio/projects.json`), and `3` when a project resolved but its Base URL could not be determined — so a caller can tell "nothing here yet" from "this failed" from "half configured, and here is the one value missing". `project set --cwd <path>` exits `0` when the directory is ready to serve a call, `1` when a named value is still missing, `2` when the command could not answer, and `3` when the record WAS written and the directory still resolves no Base URL — a committed `formio.json` governs it and supplies none, so the remedy is an edit to that file rather than another write.</sub>
+<sub>\* Not at startup — the server starts, lists every tool, and answers `server_status` without it; only the tools that read or write Form.io data error, naming `project_set` and this variable. The alternative is the `project_set` tool, which maps a working directory to a project in `~/.formio/projects.json`. Resolution runs by scope, narrowest first: a committed `formio.json` found by walking up from the caller's `cwd`, then the mapping for that `cwd`, then `FORMIO_PROJECT_URL` in the environment as the weakest source, then the error. Map a directory before any client connects with `npx -y @formio/mcp@0.14.1 project set --project-url <url> --cwd <path>` — the deployment is derived from the project URL wherever it can be, so add `--base-url <url>` only when the server says it cannot be determined. Add `--force` beside both URLs to record a pair the domain rules refuse — the one shape they cannot tell from a mistake is an internal deployment served from a `*.form.io` domain; it takes both URLs in the same call, is honoured on every later read, and is a shell-only flag the `project_set` tool does not have. `project set --reset --cwd <path>` clears a directory's entry, which is how a forced pair is un-forced: a write that leaves both halves untouched keeps the override, so there is nothing for an unforced re-record to change. `project get --cwd <path>` prints what resolves and which source won. It exits `0` when it resolved, `1` when nothing is mapped for that directory, `2` when the command could not answer (a usage error, a malformed URL, an unreadable `~/.formio/projects.json`), and `3` when a project resolved but its Base URL could not be determined — so a caller can tell "nothing here yet" from "this failed" from "half configured, and here is the one value missing". `project set --cwd <path>` exits `0` when the directory is ready to serve a call, `1` when a named value is still missing, `2` when the command could not answer, and `3` when the record WAS written and the directory still resolves no Base URL — a committed `formio.json` governs it and supplies none, so the remedy is an edit to that file rather than another write.</sub>
+
+---
+
+## CLI reference: `project get` and `project set`
+
+The `formio-mcp` binary (`npx -y @formio/mcp@0.14.1 project …`) reports what a directory resolves to and records a project for it before any client connects. These flags and exit codes are part of the 1.0 surface.
+
+| Flag | Command | Meaning |
+| --- | --- | --- |
+| `--cwd <absolute path>` | both | The directory to report on or record for. Defaults to the current directory; a relative path is refused. |
+| `--project-url <url>` | `project set` | The Project URL to record. |
+| `--base-url <url>` | `project set` | The deployment hosting the project. Pass it only when the server says it cannot be derived from the Project URL. |
+| `--force` | `project set` | Record the pair exactly as given, skipping the domain checks. Requires both `--project-url` and `--base-url` in the same call. The `project_set` tool has no equivalent. |
+| `--reset` | `project set` | Clear this directory's entry in `~/.formio/projects.json`. Takes no URLs. |
+
+| Exit code | `project get` | `project set` |
+| --- | --- | --- |
+| `0` | The directory resolved a project and its Base URL. | The directory is ready to serve a call. |
+| `1` | Nothing is mapped for that directory. | A named value is still missing. |
+| `2` | The command could not answer: a usage error, a malformed URL, an unreadable `~/.formio/projects.json`. | The command could not answer. |
+| `3` | A project resolved, but its Base URL could not be determined. | The record was written, and the directory still resolves no Base URL: a committed `formio.json` governs it and supplies none, so the remedy is an edit to that file. |
 
 ---
 

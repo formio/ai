@@ -12,7 +12,19 @@ Every request to these endpoints MUST include an `x-jwt-token` header holding th
 
 ## MCP Tool Preference
 
-No MCP tool covers this operation — use the HTTP endpoint directly.
+Prefer the MCP server's first-party tools when they cover the requested operation. Call the HTTP endpoint directly only when no MCP tool applies.
+
+| Operation                     | Preferred MCP tool | Fallback endpoint                                   |
+| ----------------------------- | ------------------ | --------------------------------------------------- |
+| List available action types   | `action_type_list` | `GET {projectUrl}/form/:formId/actions`             |
+| Get an action type's settings | `action_type_get`  | `GET {projectUrl}/form/:formId/actions/:actionName` |
+| Attach an action to a form    | `action_create`    | `POST {projectUrl}/form/:formId/action`             |
+| List the actions on a form    | `action_list`      | `GET {projectUrl}/form/:formId/action`              |
+| Get one action                | `action_get`       | `GET {projectUrl}/form/:formId/action/:actionId`    |
+| Update an action              | `action_update`    | `PUT {projectUrl}/form/:formId/action/:actionId`    |
+| Remove an action from a form  | `action_delete`    | `DELETE {projectUrl}/form/:formId/action/:actionId` |
+
+Every action tool takes the form as `formId`, its 24-character `_id`; a form path is refused, so read the `_id` with `form_get` first. `action_list` returns one page at a time — `limit` (default 100), `skip`, `sort` and `select`, with `actions` beside `total` and `hasMore` in the result — and `action_type_list` returns the whole catalog, which Form.io does not page.
 
 ## Endpoints
 
