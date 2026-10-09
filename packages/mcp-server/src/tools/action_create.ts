@@ -2,7 +2,7 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { FormioConfig } from '../config.js';
 import { formioFetch } from '../formio-client.js';
 import { toMcpStructuredResult, toMcpError } from '../mcp-responses.js';
-import { actionShape } from '../output-schemas.js';
+import { actionDocument } from '../output-schemas.js';
 import { creates } from '../tool-annotations.js';
 import { actionDefinitionSchema } from './action-schema.js';
 import { cwdSchema, resolveProjectConfig } from '../project-resolver.js';
@@ -19,7 +19,7 @@ export function registerActionCreateTool(server: McpServer, config: FormioConfig
         formId: resourceSegmentArgument('formId').describe('The form ID to attach the action to'),
         action: actionDefinitionSchema,
       },
-      outputSchema: actionShape,
+      outputSchema: actionDocument,
       annotations: creates('Create a form action'),
     },
     async ({ cwd, formId, action }) => {

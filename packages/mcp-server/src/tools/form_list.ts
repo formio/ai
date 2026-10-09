@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { FormioConfig } from '../config.js';
 import { formioFetch } from '../formio-client.js';
 import { toMcpStructuredResult, toMcpError } from '../mcp-responses.js';
-import { formsListShape } from '../output-schemas.js';
+import { formsListOutput } from '../output-schemas.js';
 import { reads } from '../tool-annotations.js';
 import { cwdSchema, resolveProjectConfig } from '../project-resolver.js';
 
@@ -28,7 +28,7 @@ export function registerFormListTool(server: McpServer, config: FormioConfig) {
           .describe('Comma-separated fields to return (default: _id,title,name,path,type,tags)'),
         tags: z.array(z.string()).optional().describe('Filter by tags'),
       },
-      outputSchema: formsListShape,
+      outputSchema: formsListOutput,
       annotations: reads('List forms'),
     },
     async ({ cwd, type, limit, skip, sort, select, tags }) => {

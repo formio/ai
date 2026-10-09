@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { FormioConfig } from '../config.js';
 import { formioFetch, MONGO_ID_PATTERN } from '../formio-client.js';
 import { toMcpStructuredResult, toMcpError } from '../mcp-responses.js';
-import { formShape } from '../output-schemas.js';
+import { formDocument } from '../output-schemas.js';
 import { overwrites } from '../tool-annotations.js';
 import { cwdSchema, resolveProjectConfig } from '../project-resolver.js';
 import {
@@ -80,7 +80,7 @@ export function registerFormUpdateTool(server: McpServer, config: FormioConfig) 
             'Revision identifier for `revert: true` — either the revision `_vid` (e.g. "3") or the revision document `_id` (24-char hex).'
           ),
       },
-      outputSchema: formShape,
+      outputSchema: formDocument,
       annotations: overwrites('Update a form'),
     },
     async ({ cwd, formId, form: rawForm, note, draft, publish, revert, version }) => {

@@ -2,7 +2,7 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { FormioConfig } from '../config.js';
 import { formioFetch } from '../formio-client.js';
 import { toMcpStructuredResult, toMcpError } from '../mcp-responses.js';
-import { actionTypeInfoShape } from '../output-schemas.js';
+import { actionTypeInfoDocument } from '../output-schemas.js';
 import { reads } from '../tool-annotations.js';
 import { cwdSchema, resolveProjectConfig } from '../project-resolver.js';
 import { resourceSegmentArgument } from './path-arguments.js';
@@ -22,7 +22,7 @@ export function registerActionTypeGetTool(server: McpServer, config: FormioConfi
           'The action type name (e.g. "email", "save", "login")'
         ),
       },
-      outputSchema: actionTypeInfoShape,
+      outputSchema: actionTypeInfoDocument,
       annotations: reads('Get an action type'),
     },
     async ({ cwd, formId, actionName }) => {

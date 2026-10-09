@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { FormioConfig } from '../config.js';
 import { formioFetch, MONGO_ID_PATTERN } from '../formio-client.js';
 import { toMcpStructuredResult, toMcpError } from '../mcp-responses.js';
-import { roleShape } from '../output-schemas.js';
+import { roleDocument } from '../output-schemas.js';
 import { overwrites } from '../tool-annotations.js';
 import { roleFields } from './role-schema.js';
 import { cwdSchema, resolveProjectConfig } from '../project-resolver.js';
@@ -25,7 +25,7 @@ export function registerRoleUpdateTool(server: McpServer, config: FormioConfig) 
           .catchall(z.unknown())
           .describe('Role document with updated fields'),
       },
-      outputSchema: roleShape,
+      outputSchema: roleDocument,
       annotations: overwrites('Update a role'),
     },
     async ({ cwd, roleId, role }) => {

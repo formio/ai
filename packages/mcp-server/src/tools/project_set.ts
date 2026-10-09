@@ -20,7 +20,7 @@ import { projectCommand } from '../cli-launch.js';
 import { cwdSchema } from '../project-resolver.js';
 import { FORCED_PAIR_FACT, ProjectReport, reportProject } from '../project-report.js';
 import { toMcpStructuredResult } from '../mcp-responses.js';
-import { projectMappingShape } from '../output-schemas.js';
+import { projectMappingOutput } from '../output-schemas.js';
 import { local } from '../tool-annotations.js';
 import {
   readProjectEntryForWrite,
@@ -97,7 +97,7 @@ export function registerProjectSetTool(server: McpServer, options: ProjectSetOpt
             'Deployment URL for the Form.io Enterprise Server that hosts this project. It builds the portal-login URL and keys the cached token, so a wrong one fails at login rather than on the request. Usually omitted: it is derived from projectUrl wherever it can be. Supply it when the server reports that it cannot be determined — a project URL with no path on a customer domain, whose deployment is a sibling sub-domain. It MAY carry a path of its own when the deployment is mounted at a sub-path. Never pass it for a project on a form.io host: those are served by https://api.form.io and by nothing else, so any other value is refused. Persisted per-cwd alongside the project URL, and bound to the project recorded with it, so each directory can target a different deployment and no deployment answers for another project. When omitted and this call does not change the project, the base URL already mapped for this directory is kept — but a call that re-points the directory to a different project keeps nothing, because that value belonged to the project being replaced.'
           ),
       }),
-      outputSchema: projectMappingShape,
+      outputSchema: projectMappingOutput,
       // Writes only to the local project map — no Form.io request involved.
       annotations: local('Set the active project', false),
     },

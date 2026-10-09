@@ -2,7 +2,7 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { FormioConfig } from '../config.js';
 import { formioFetch, isMongoId } from '../formio-client.js';
 import { toMcpStructuredResult, toMcpError } from '../mcp-responses.js';
-import { revisionsListShape } from '../output-schemas.js';
+import { revisionsListOutput } from '../output-schemas.js';
 import { reads } from '../tool-annotations.js';
 import { cwdSchema, resolveProjectConfig } from '../project-resolver.js';
 import { projectPathArgument } from './path-arguments.js';
@@ -19,7 +19,7 @@ export function registerFormRevisionsListTool(server: McpServer, config: FormioC
           'Form ID (_id) or path alias (e.g. "user/login")'
         ),
       },
-      outputSchema: revisionsListShape,
+      outputSchema: revisionsListOutput,
       annotations: reads('List form revisions'),
     },
     async ({ cwd, formIdOrPath }) => {

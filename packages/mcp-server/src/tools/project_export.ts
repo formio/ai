@@ -2,7 +2,7 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { FormioConfig } from '../config.js';
 import { formioFetch } from '../formio-client.js';
 import { toMcpStructuredResult, toMcpError } from '../mcp-responses.js';
-import { templateShape } from '../output-schemas.js';
+import { templateDocument } from '../output-schemas.js';
 import { reads } from '../tool-annotations.js';
 import { cwdSchema, resolveProjectConfig } from '../project-resolver.js';
 
@@ -15,7 +15,7 @@ export function registerProjectExportTool(server: McpServer, config: FormioConfi
       inputSchema: {
         cwd: cwdSchema,
       },
-      outputSchema: templateShape,
+      outputSchema: templateDocument,
       annotations: reads('Export the project template'),
     },
     async ({ cwd }) => {

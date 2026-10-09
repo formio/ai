@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { FormioConfig } from '../config.js';
 import { formioFetch } from '../formio-client.js';
 import { toMcpError, toMcpStructuredResult } from '../mcp-responses.js';
-import { acknowledgementShape } from '../output-schemas.js';
+import { acknowledgementOutput } from '../output-schemas.js';
 import { overwrites } from '../tool-annotations.js';
 import { cwdSchema, resolveProjectConfig } from '../project-resolver.js';
 
@@ -17,7 +17,7 @@ export function registerProjectImportTool(server: McpServer, config: FormioConfi
         cwd: cwdSchema,
         template: z.looseObject({}).describe('The template JSON object to import'),
       },
-      outputSchema: acknowledgementShape,
+      outputSchema: acknowledgementOutput,
       annotations: overwrites('Import a project template'),
     },
     async ({ cwd, template }) => {

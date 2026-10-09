@@ -10,7 +10,9 @@ export function registerHelloTool(server: McpServer) {
       description:
         'Say hello — a connectivity check that confirms the server is running and reachable. Needs no Form.io project or credentials, so it is the first thing to try when other tools fail.',
       inputSchema: { name: z.string().optional().describe('Name to greet') },
-      outputSchema: { greeting: z.string().describe('The greeting this server produced') },
+      outputSchema: z.looseObject({
+        greeting: z.string().describe('The greeting this server produced'),
+      }),
       annotations: local('Check the server is reachable', true),
     },
     async ({ name }) => {

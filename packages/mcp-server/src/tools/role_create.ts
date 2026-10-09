@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { FormioConfig } from '../config.js';
 import { formioFetch } from '../formio-client.js';
 import { toMcpStructuredResult, toMcpError } from '../mcp-responses.js';
-import { roleShape } from '../output-schemas.js';
+import { roleDocument } from '../output-schemas.js';
 import { creates } from '../tool-annotations.js';
 import { roleFields } from './role-schema.js';
 import { cwdSchema, resolveProjectConfig } from '../project-resolver.js';
@@ -19,7 +19,7 @@ export function registerRoleCreateTool(server: McpServer, config: FormioConfig) 
         ...roleFields,
         title: z.string().describe('Role title'),
       },
-      outputSchema: roleShape,
+      outputSchema: roleDocument,
       annotations: creates('Create a role'),
     },
     async ({ cwd, ...role }) => {

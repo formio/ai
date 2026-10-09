@@ -2,7 +2,7 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { FormioConfig } from '../config.js';
 import { formioFetch, isMongoId } from '../formio-client.js';
 import { toMcpStructuredResult, toMcpError } from '../mcp-responses.js';
-import { formShape } from '../output-schemas.js';
+import { formDocument } from '../output-schemas.js';
 import { reads } from '../tool-annotations.js';
 import { cwdSchema, resolveProjectConfig } from '../project-resolver.js';
 import { projectPathArgument, resourceSegmentArgument } from './path-arguments.js';
@@ -24,7 +24,7 @@ export function registerFormRevisionGetTool(server: McpServer, config: FormioCon
       },
       // A revision body is a form definition, plus the revision fields the schema
       // passes through.
-      outputSchema: formShape,
+      outputSchema: formDocument,
       annotations: reads('Get a form revision'),
     },
     async ({ cwd, formIdOrPath, version }) => {

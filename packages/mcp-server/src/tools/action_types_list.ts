@@ -2,7 +2,7 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { FormioConfig } from '../config.js';
 import { formioFetch } from '../formio-client.js';
 import { toMcpStructuredResult, toMcpError } from '../mcp-responses.js';
-import { actionTypesListShape } from '../output-schemas.js';
+import { actionTypesListOutput } from '../output-schemas.js';
 import { reads } from '../tool-annotations.js';
 import { cwdSchema, resolveProjectConfig } from '../project-resolver.js';
 import { resourceSegmentArgument } from './path-arguments.js';
@@ -19,7 +19,7 @@ export function registerActionTypesListTool(server: McpServer, config: FormioCon
           'The form ID to list available action types for'
         ),
       },
-      outputSchema: actionTypesListShape,
+      outputSchema: actionTypesListOutput,
       annotations: reads('List action types'),
     },
     async ({ cwd, formId }) => {

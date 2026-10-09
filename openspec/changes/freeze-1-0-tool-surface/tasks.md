@@ -21,16 +21,16 @@
 
 ### Red
 
-- [ ] 2.1 Write a failing test that lists every tool and asserts no `outputSchema` contains `additionalProperties: false` at any level
-- [ ] 2.2 Write failing tests replaying recorded Form.io documents (form with `_vid`, `pdfComponents`, `controller`, `esign`, `settings: null`; revision with `_rid`, `_vnote`, `_vuser`; action with `condition: null`) through `form_get`, `form_revision_get`, `form_update`, `action_get` via a validating client
+- [x] 2.1 Write a failing test that lists every tool and asserts no `outputSchema` contains `additionalProperties: false` at any level
+- [x] 2.2 Write failing tests replaying recorded Form.io documents (form with `_vid`, `pdfComponents`, `controller`, `esign`, `settings: null`; revision with `_rid`, `_vnote`, `_vuser`; action with `condition: null`) through `form_get`, `form_revision_get`, `form_update`, `action_get` via a validating client
 
 ### Green
 
-- [ ] 2.3 Pass each `outputSchema` as `z.looseObject(...)` and let Mixed fields accept `null` in `output-schemas.ts`
+- [x] 2.3 Pass each `outputSchema` as `z.looseObject(...)` and let Mixed fields accept `null` in `output-schemas.ts`
 
 ### Refactor
 
-- [ ] 2.4 Review implementation and refactor as needed
+- [x] 2.4 Review implementation and refactor as needed
 
 ## 3. Renames and server_status
 <!-- depends_on: 1 -->
@@ -125,17 +125,17 @@
 
 ### Red
 
-- [ ] 8.1 Write failing tests: `FORMIO_FORCE_BROWSER` and `FORMIO_INSECURE_TLS` read `true`, `TRUE`, ` 1 ` as true and `0`, `false`, `yes`, unset as false
-- [ ] 8.2 Write a failing test that `packages/mcp-server/package.json` declares `exports` exposing only `./package.json` and still declares the `formio-mcp` bin
+- [x] 8.1 Write failing tests: `FORMIO_FORCE_BROWSER` and `FORMIO_INSECURE_TLS` read `true`, `TRUE`, ` 1 ` as true and `0`, `false`, `yes`, unset as false
+- [x] 8.2 Write a failing test that `packages/mcp-server/package.json` declares `exports` exposing only `./package.json` and still declares the `formio-mcp` bin
 
 ### Green
 
-- [ ] 8.3 Implement `readBooleanEnv` in `config.ts` and use it for both variables
-- [ ] 8.4 Add `exports` to `package.json`
+- [x] 8.3 Implement `readBooleanEnv` in `config.ts` and use it for both variables
+- [x] 8.4 Add `exports` to `package.json`
 
 ### Refactor
 
-- [ ] 8.5 Review implementation and refactor as needed
+- [x] 8.5 Review implementation and refactor as needed
 
 ## 9. Description budget
 <!-- depends_on: 3, 4, 5, 6, 7 -->

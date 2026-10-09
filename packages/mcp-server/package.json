@@ -25,9 +25,11 @@
     "url": "git+https://github.com/formio/ai.git",
     "directory": "packages/mcp-server"
   },
-  "main": "./dist/server.js",
   "bin": {
     "formio-mcp": "./dist/stdio.js"
+  },
+  "exports": {
+    "./package.json": "./package.json"
   },
   "files": [
     "dist",

@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { FormioConfig } from '../config.js';
 import { formioFetch } from '../formio-client.js';
 import { toMcpStructuredResult, toMcpError } from '../mcp-responses.js';
-import { formShape } from '../output-schemas.js';
+import { formDocument } from '../output-schemas.js';
 import { creates } from '../tool-annotations.js';
 import { cwdSchema, resolveProjectConfig } from '../project-resolver.js';
 import { gateRevisionsLicense, prefixVnote } from '../revisions/index.js';
@@ -39,7 +39,7 @@ export function registerFormCreateTool(server: McpServer, config: FormioConfig) 
           .describe('Form.io form JSON definition'),
         note: z.string().optional().describe('Note describing the initial revision'),
       },
-      outputSchema: formShape,
+      outputSchema: formDocument,
       annotations: creates('Create a form'),
     },
     async ({ cwd, form: rawForm, note }) => {

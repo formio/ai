@@ -1,7 +1,7 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { FormioConfig } from '../config.js';
 import { toMcpError, toMcpStructuredResult } from '../mcp-responses.js';
-import { projectResolutionShape } from '../output-schemas.js';
+import { projectResolutionOutput } from '../output-schemas.js';
 import { cwdSchema } from '../project-resolver.js';
 import { reportProject } from '../project-report.js';
 import { local } from '../tool-annotations.js';
@@ -27,7 +27,7 @@ export function registerProjectGetTool(
         'Reads only. It resolves and reports; project_set is what records a choice.',
       ].join(' '),
       inputSchema: { cwd: cwdSchema },
-      outputSchema: projectResolutionShape,
+      outputSchema: projectResolutionOutput,
       annotations: local('Report the project this directory resolves to', true),
     },
     async ({ cwd }) => {

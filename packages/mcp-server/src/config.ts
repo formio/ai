@@ -208,7 +208,7 @@ export function getConfig(): FormioConfig {
     authHost: process.env.FORMIO_AUTH_HOST || undefined,
     authPort: parsePositiveInt(process.env.FORMIO_AUTH_PORT),
     authTimeoutMs: toMilliseconds(parsePositiveInt(process.env.FORMIO_AUTH_TIMEOUT)),
-    forceBrowser: process.env.FORMIO_FORCE_BROWSER === '1',
+    forceBrowser: readBooleanEnv(process.env.FORMIO_FORCE_BROWSER),
   };
 }
 
@@ -249,6 +249,17 @@ export function readHttpUrlEnv({
     onIgnored(`Ignoring ${name}: ${message}`);
     return undefined;
   }
+}
+
+/**
+ * The one reading of a boolean environment variable: after trimming, `true` or `1`
+ * in any case is true, and every other value — unset included — is false. Shared
+ * so that every such variable accepts the same spellings; a value that works for
+ * one and is silently ignored by another is a setting nobody can rely on.
+ */
+export function readBooleanEnv(raw: string | undefined): boolean {
+  const normalized = (raw ?? '').trim().toLowerCase();
+  return normalized === 'true' || normalized === '1';
 }
 
 function parsePositiveInt(raw: string | undefined): number | undefined {

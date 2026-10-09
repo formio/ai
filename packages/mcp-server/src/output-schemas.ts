@@ -8,9 +8,11 @@
  * an exhaustiveness the API does not have and would start rejecting valid
  * responses the day a field is added upstream.
  *
- * Shapes (plain objects of zod types) are what `registerTool` accepts for
- * `outputSchema`; `*Document` values are the same content as a schema, for
- * nesting inside arrays.
+ * Openness holds at EVERY level, the top level included. Handed a raw shape,
+ * the SDK wraps it in a closed object and publishes `additionalProperties: false`,
+ * so each tool's `outputSchema` is passed as a `z.looseObject` instead — never a
+ * raw shape, and never a `z.object` anywhere inside one. Fields Form.io stores as
+ * Mixed accept `null`, because that is a value Form.io returns for them.
  */
 
 import { z } from 'zod';
@@ -22,7 +24,7 @@ const identity = {
   machineName: z.string().optional().describe('Machine-readable unique name within the project'),
 };
 
-export const formShape = {
+export const formDocument = z.looseObject({
   ...identity,
   title: z.string().optional().describe('Human-readable form title'),
   name: z.string().optional().describe('API name of the form'),
@@ -36,25 +38,23 @@ export const formShape = {
   tags: z.array(z.string()).optional().describe('Tags applied to the form'),
   access: z
     .array(z.looseObject({}))
-    .optional()
+    .nullish()
     .describe('Role-based access to the form definition itself'),
   submissionAccess: z
     .array(z.looseObject({}))
-    .optional()
+    .nullish()
     .describe('Role-based access to the submissions of this form'),
   revisions: z
     .union([z.string(), z.boolean()])
     .optional()
     .describe('Revision mode: "original", "current", or false when disabled'),
-  settings: z.looseObject({}).optional().describe('Form-level settings'),
-  properties: z.looseObject({}).optional().describe('Custom key/value properties'),
+  settings: z.looseObject({}).nullish().describe('Form-level settings'),
+  properties: z.looseObject({}).nullish().describe('Custom key/value properties'),
   project: z.string().optional().describe('ID of the project owning the form'),
   owner: z.string().nullish().describe('ID of the submission owner, when set'),
-};
+});
 
-export const formDocument = z.looseObject(formShape);
-
-export const roleShape = {
+export const roleDocument = z.looseObject({
   ...identity,
   title: z.string().optional().describe('Human-readable role title'),
   description: z.string().optional().describe('What the role is for'),
@@ -64,11 +64,9 @@ export const roleShape = {
     .optional()
     .describe('Whether the role is assigned to anonymous or newly registered users'),
   project: z.string().optional().describe('ID of the project owning the role'),
-};
+});
 
-export const roleDocument = z.looseObject(roleShape);
-
-export const actionShape = {
+export const actionDocument = z.looseObject({
   ...identity,
   name: z.string().optional().describe('Action type name, e.g. "save", "login", "email"'),
   title: z.string().optional().describe('Human-readable action title'),
@@ -82,14 +80,12 @@ export const actionShape = {
     .optional()
     .describe('Submission methods the action responds to, e.g. "create", "update"'),
   priority: z.number().optional().describe('Execution order; higher runs first'),
-  condition: z.looseObject({}).optional().describe('Condition gating whether the action runs'),
+  condition: z.looseObject({}).nullish().describe('Condition gating whether the action runs'),
   settings: z
     .looseObject({})
-    .optional()
+    .nullish()
     .describe('Action-type-specific settings; see action_type_get for the schema'),
-};
-
-export const actionDocument = z.looseObject(actionShape);
+});
 
 export const actionTypeDocument = z.looseObject({
   name: z.string().optional().describe('Action type name to pass as `name` to action_create'),
@@ -99,7 +95,7 @@ export const actionTypeDocument = z.looseObject({
   defaults: z.looseObject({}).optional().describe('Default settings applied on creation'),
 });
 
-export const actionTypeInfoShape = {
+export const actionTypeInfoDocument = z.looseObject({
   name: z.string().optional().describe('Action type name to pass as `name` to action_create'),
   title: z.string().optional().describe('Human-readable action type title'),
   description: z.string().optional().describe('What the action type does'),
@@ -111,8 +107,8 @@ export const actionTypeInfoShape = {
     .describe(
       'Form definition describing the settings this action type accepts; its components are the keys valid in `settings` on action_create'
     ),
-  access: z.looseObject({}).optional().describe('Access requirements for configuring the action'),
-};
+  access: z.looseObject({}).nullish().describe('Access requirements for configuring the action'),
+});
 
 export const revisionSummaryDocument = z.looseObject({
   _vid: z
@@ -128,7 +124,7 @@ export const revisionSummaryDocument = z.looseObject({
     .describe('User who published the revision'),
 });
 
-export const templateShape = {
+export const templateDocument = z.looseObject({
   title: z.string().optional().describe('Project title'),
   name: z.string().optional().describe('Project machine name'),
   version: z.string().optional().describe('Template schema version'),
@@ -137,47 +133,49 @@ export const templateShape = {
   resources: z.looseObject({}).optional().describe('Resource forms, keyed by machine name'),
   forms: z.looseObject({}).optional().describe('Forms, keyed by machine name'),
   actions: z.looseObject({}).optional().describe('Actions, keyed by machine name'),
-};
+});
 
 // List payloads are wrapped in a named field because structuredContent must be an
 // object, and `count` is stated rather than left to be derived so a caller can see
 // at a glance whether a page was truncated by `limit`.
-export const formsListShape = {
+export const formsListOutput = z.looseObject({
   forms: z.array(formDocument).describe('Matching forms, in the requested sort order'),
   count: z.number().describe('Number of forms returned by this call'),
-};
+});
 
-export const rolesListShape = {
+export const rolesListOutput = z.looseObject({
   roles: z.array(roleDocument).describe('Roles defined in the project'),
   count: z.number().describe('Number of roles returned'),
-};
+});
 
-export const actionsListShape = {
+export const actionsListOutput = z.looseObject({
   actions: z.array(actionDocument).describe('Actions configured on the form'),
   count: z.number().describe('Number of actions returned'),
-};
+});
 
-export const actionTypesListShape = {
+export const actionTypesListOutput = z.looseObject({
   actionTypes: z
     .array(actionTypeDocument)
     .describe('Action types this deployment supports for the form'),
   count: z.number().describe('Number of action types returned'),
-};
+});
 
-export const revisionsListShape = {
+export const revisionsListOutput = z.looseObject({
   revisions: z
     .array(revisionSummaryDocument)
     .describe('Published revision summaries, newest first'),
   count: z.number().describe('Number of revisions returned'),
-};
+});
 
 /** For tools whose only meaningful answer is "it worked". */
-export const acknowledgementShape = {
+const acknowledgementShape = {
   ok: z.boolean().describe('True when the operation completed'),
   message: z.string().describe('Human-readable result detail'),
 };
 
-export const projectMappingShape = {
+export const acknowledgementOutput = z.looseObject(acknowledgementShape);
+
+export const projectMappingOutput = z.looseObject({
   ...acknowledgementShape,
   // Overridden: for a writer, "it worked" is not "the write reached disk" — a record
   // can land and leave the directory no more usable than before, which is the answer
@@ -210,7 +208,7 @@ export const projectMappingShape = {
     .describe(
       'True when the pair that now resolves was recorded with `project set --force`, which waives the rules tying a Project URL to the deployment that serves it. Set only by that shell command — this tool cannot force a pair, and an unforced call that leaves both halves untouched keeps an existing override rather than silently dropping it. It explains a pair the rules would refuse; it is not a reason to re-record it'
     ),
-};
+});
 
 /**
  * What `project_get` reports: the resolved configuration, where each half came
@@ -221,7 +219,7 @@ export const projectMappingShape = {
  * contract. `ok` is the only status with both URLs; `base-url-unresolved` has a
  * project and no deployment; `not-configured` has neither.
  */
-export const projectResolutionShape = {
+export const projectResolutionOutput = z.looseObject({
   status: z
     .enum(['ok', 'not-configured', 'base-url-unresolved'])
     .describe(
@@ -264,7 +262,7 @@ export const projectResolutionShape = {
     ),
   message: z.string().describe('The full human-readable report, including what to do next'),
   remedy: z
-    .object({
+    .looseObject({
       tool: z.string().describe('The tool to call — always project_set'),
       arguments: z
         .record(z.string(), z.string())
@@ -284,4 +282,4 @@ export const projectResolutionShape = {
     .describe(
       'Anything set aside while resolving — an unreadable mapping a committed formio.json made irrelevant, a stored value that is not a URL, or the directory this answer is about when no cwd was passed. A URL the server dropped as unusable at startup is on its stderr rather than here, because it was never a candidate for this resolution'
     ),
-};
+});

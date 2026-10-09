@@ -2,7 +2,7 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { FormioConfig } from '../config.js';
 import { formioFetch } from '../formio-client.js';
 import { toMcpStructuredResult, toMcpError } from '../mcp-responses.js';
-import { actionShape } from '../output-schemas.js';
+import { actionDocument } from '../output-schemas.js';
 import { reads } from '../tool-annotations.js';
 import { cwdSchema, resolveProjectConfig } from '../project-resolver.js';
 import { resourceSegmentArgument } from './path-arguments.js';
@@ -18,7 +18,7 @@ export function registerActionGetTool(server: McpServer, config: FormioConfig) {
         formId: resourceSegmentArgument('formId').describe('The form ID the action belongs to'),
         actionId: resourceSegmentArgument('actionId').describe('The action ID to retrieve'),
       },
-      outputSchema: actionShape,
+      outputSchema: actionDocument,
       annotations: reads('Get a form action'),
     },
     async ({ cwd, formId, actionId }) => {

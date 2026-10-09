@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { FormioConfig } from '../config.js';
 import { formioFetch, isMongoId } from '../formio-client.js';
 import { toMcpStructuredResult, toMcpError } from '../mcp-responses.js';
-import { formShape } from '../output-schemas.js';
+import { formDocument } from '../output-schemas.js';
 import { reads } from '../tool-annotations.js';
 import { cwdSchema, resolveProjectConfig } from '../project-resolver.js';
 import { projectPathArgument } from './path-arguments.js';
@@ -28,7 +28,7 @@ export function registerFormGetTool(server: McpServer, config: FormioConfig) {
           .optional()
           .describe("When true, fetch the form's current draft (GET /<form>/draft)"),
       },
-      outputSchema: formShape,
+      outputSchema: formDocument,
       annotations: reads('Get a form'),
     },
     async ({ cwd, formIdOrPath, select, draft }) => {

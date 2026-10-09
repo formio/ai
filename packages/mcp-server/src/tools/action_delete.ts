@@ -2,7 +2,7 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { FormioConfig } from '../config.js';
 import { formioFetch } from '../formio-client.js';
 import { toMcpError, toMcpStructuredResult } from '../mcp-responses.js';
-import { acknowledgementShape } from '../output-schemas.js';
+import { acknowledgementOutput } from '../output-schemas.js';
 import { removes } from '../tool-annotations.js';
 import { cwdSchema, resolveProjectConfig } from '../project-resolver.js';
 import { resourceSegmentArgument } from './path-arguments.js';
@@ -18,7 +18,7 @@ export function registerActionDeleteTool(server: McpServer, config: FormioConfig
         formId: resourceSegmentArgument('formId').describe('The form ID the action belongs to'),
         actionId: resourceSegmentArgument('actionId').describe('The action ID to delete'),
       },
-      outputSchema: acknowledgementShape,
+      outputSchema: acknowledgementOutput,
       annotations: removes('Delete a form action'),
     },
     async ({ cwd, formId, actionId }) => {

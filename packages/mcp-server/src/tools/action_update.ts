@@ -2,7 +2,7 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { FormioConfig } from '../config.js';
 import { formioFetch } from '../formio-client.js';
 import { toMcpStructuredResult, toMcpError } from '../mcp-responses.js';
-import { actionShape } from '../output-schemas.js';
+import { actionDocument } from '../output-schemas.js';
 import { overwrites } from '../tool-annotations.js';
 import { actionDefinitionSchema } from './action-schema.js';
 import { cwdSchema, resolveProjectConfig } from '../project-resolver.js';
@@ -20,7 +20,7 @@ export function registerActionUpdateTool(server: McpServer, config: FormioConfig
         actionId: resourceSegmentArgument('actionId').describe('The action ID to update'),
         action: actionDefinitionSchema,
       },
-      outputSchema: actionShape,
+      outputSchema: actionDocument,
       annotations: overwrites('Update a form action'),
     },
     async ({ cwd, formId, actionId, action }) => {

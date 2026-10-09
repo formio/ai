@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { FormioConfig } from '../config.js';
 import { formioFetch } from '../formio-client.js';
 import { toMcpStructuredResult, toMcpError } from '../mcp-responses.js';
-import { rolesListShape } from '../output-schemas.js';
+import { rolesListOutput } from '../output-schemas.js';
 import { reads } from '../tool-annotations.js';
 import { cwdSchema, resolveProjectConfig } from '../project-resolver.js';
 
@@ -17,7 +17,7 @@ export function registerRoleListTool(server: McpServer, config: FormioConfig) {
         cwd: cwdSchema,
         select: z.string().optional().describe('Comma-separated fields to return'),
       },
-      outputSchema: rolesListShape,
+      outputSchema: rolesListOutput,
       annotations: reads('List roles'),
     },
     async ({ cwd, select }) => {
