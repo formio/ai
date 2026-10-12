@@ -161,10 +161,68 @@ describe('ensureAuthenticated', () => {
     };
     await ensureAuthenticated(second);
 
-    expect(mockReadToken).not.toHaveBeenCalled();
+    // The on-disk entry is read — it still holds the same token — and nothing else runs.
+    expect(mockReadToken).toHaveBeenCalledWith('https://formio.invalid/sub');
     expect(mockValidateToken).not.toHaveBeenCalled();
     expect(mockAuthenticate).not.toHaveBeenCalled();
     expect(second.jwt).toBe('cached-jwt');
+  });
+
+  // `project logout` removes the on-disk entry from another process; the running
+  // server checks it before reusing the token it holds in memory.
+  it('discards an in-memory token whose cache entry was removed, and runs the gate', async () => {
+    const config: ResolvedFormioConfig = {
+      baseUrl: 'https://formio.invalid/sub',
+      projectUrl: 'https://formio.invalid/sub/example',
+    };
+    mockReadToken.mockResolvedValue('cached-jwt');
+    mockValidateToken.mockResolvedValue(true);
+    await ensureAuthenticated(config);
+
+    mockReadToken.mockResolvedValue(null);
+    mockAuthenticate.mockResolvedValue('signed-in-again');
+    const next: ResolvedFormioConfig = {
+      baseUrl: 'https://formio.invalid/sub',
+      projectUrl: 'https://formio.invalid/sub/example',
+    };
+    await ensureAuthenticated(next);
+
+    expect(mockAuthenticate).toHaveBeenCalledOnce();
+    expect(next.jwt).toBe('signed-in-again');
+    expect(mockSaveToken).toHaveBeenCalledWith('https://formio.invalid/sub', 'signed-in-again');
+  });
+
+  it('discards an in-memory token whose cache entry changed, and validates the new entry', async () => {
+    const config: ResolvedFormioConfig = {
+      baseUrl: 'https://formio.invalid/sub',
+      projectUrl: 'https://formio.invalid/sub/example',
+    };
+    mockReadToken.mockResolvedValue('first-account');
+    mockValidateToken.mockResolvedValue(true);
+    await ensureAuthenticated(config);
+    mockValidateToken.mockClear();
+
+    // Signed in under another account from elsewhere: the file now holds its token.
+    mockReadToken.mockResolvedValue('second-account');
+    const next: ResolvedFormioConfig = {
+      baseUrl: 'https://formio.invalid/sub',
+      projectUrl: 'https://formio.invalid/sub/example',
+    };
+    await ensureAuthenticated(next);
+
+    expect(mockValidateToken).toHaveBeenCalledOnce();
+    expect(mockAuthenticate).not.toHaveBeenCalled();
+    expect(next.jwt).toBe('second-account');
+
+    // And the new token is the one reused from memory afterwards.
+    mockValidateToken.mockClear();
+    const after: ResolvedFormioConfig = {
+      baseUrl: 'https://formio.invalid/sub',
+      projectUrl: 'https://formio.invalid/sub/example',
+    };
+    await ensureAuthenticated(after);
+    expect(mockValidateToken).not.toHaveBeenCalled();
+    expect(after.jwt).toBe('second-account');
   });
 
   it('concurrent calls resolve via a single login flow', async () => {

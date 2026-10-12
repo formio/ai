@@ -550,7 +550,7 @@ const PROJECT_SCOPED: Record<string, Record<string, unknown>> = {
   form_publish: { formId: '67890abcdef012345678abcd', note: 'n' },
   form_revert: { formId: '67890abcdef012345678abcd', version: '1', note: 'n' },
   project_export: {},
-  project_import: { template: {} },
+  project_import: { template: { forms: {}, resources: {} } },
   role_create: { role: { title: 'R' } },
   role_list: {},
   role_update: { roleId: '69d68310040fa2cea2572945', role: { title: 'R' } },

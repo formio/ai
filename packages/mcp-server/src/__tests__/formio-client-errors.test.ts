@@ -320,3 +320,76 @@ describe('formioFetch times out a request that receives no response', () => {
     expect(error.message).not.toMatch(/timed out/);
   });
 });
+
+// Headers can arrive in time and the body not: the timeout then aborts the body
+// read, which rejects with the timeout's own reason — a TimeoutError DOMException.
+describe('formioFetch times out a response whose body never finishes', () => {
+  const mockFetch = vi.fn();
+
+  // A 200 whose headers arrived but whose body read the timeout aborted.
+  function stalledBody(): Response {
+    const response = new Response('{}', { status: 200 });
+    const timedOut = () =>
+      Promise.reject(new DOMException('The operation was aborted due to timeout', 'TimeoutError'));
+    vi.spyOn(response, 'json').mockImplementation(timedOut);
+    vi.spyOn(response, 'text').mockImplementation(timedOut);
+    return response;
+  }
+
+  beforeEach(() => {
+    vi.stubGlobal('fetch', mockFetch);
+    mockEnsureAuth.mockReset();
+    mockFetch.mockReset();
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('reports a JSON body read cut off by the timeout as NETWORK_ERROR naming the wait and the URL', async () => {
+    mockFetch.mockResolvedValue(stalledBody());
+
+    const error = (await caught(formioFetch('form', {}, config))) as FormioNetworkError;
+
+    expect(error).toBeInstanceOf(FormioNetworkError);
+    expect(error.code).toBe('NETWORK_ERROR');
+    expect(error.message).toContain('timed out after 60 seconds');
+    expect(error.message).toContain(`${TEST_PROJECT_URL}/form`);
+  });
+
+  it('reports a text body read cut off by the timeout the same way, with the per-call wait', async () => {
+    mockFetch.mockResolvedValue(stalledBody());
+
+    const error = (await caught(
+      formioFetch('export', {}, config, { responseType: 'text', timeoutMs: 300_000 })
+    )) as FormioNetworkError;
+
+    expect(error).toBeInstanceOf(FormioNetworkError);
+    expect(error.message).toContain('timed out after 300 seconds');
+    expect(error.message).toContain(`${TEST_PROJECT_URL}/export`);
+  });
+
+  it('reports a page body read cut off by the timeout the same way', async () => {
+    mockFetch.mockResolvedValue(stalledBody());
+
+    const error = (await caught(
+      formioFetch('form', {}, { ...config, requestTimeoutMs: 5_000 }, { withMeta: true })
+    )) as FormioNetworkError;
+
+    expect(error).toBeInstanceOf(FormioNetworkError);
+    expect(error.message).toContain('timed out after 5 seconds');
+  });
+
+  it('leaves a body read the caller aborted with its own reason', async () => {
+    const controller = new AbortController();
+    const reason = new DOMException('caller gave up', 'TimeoutError');
+    controller.abort(reason);
+    const response = new Response('{}', { status: 200 });
+    vi.spyOn(response, 'json').mockRejectedValue(reason);
+    mockFetch.mockResolvedValue(response);
+
+    const error = await caught(formioFetch('form', {}, config, { signal: controller.signal }));
+
+    expect(error).toBe(reason);
+  });
+});

@@ -31,6 +31,10 @@
 
 - [x] 2.4 Review implementation and refactor as needed
 
+### Follow-up
+
+- [x] 2.5 Body-read timeout maps to NETWORK_ERROR: a response whose headers arrive in time but whose body read the timeout aborts (a `TimeoutError` from `json()` / `text()`) fails with the same `NETWORK_ERROR` "timed out after N seconds" naming the URL, not `INTERNAL`; a caller's own abort keeps its reason
+
 ## 3. Detached browser launch and the login-form cache
 <!-- depends_on: none -->
 
@@ -53,44 +57,44 @@
 
 ### Red
 
-- [ ] 4.1 Write failing CLI tests for `project logout`: `--cwd` resolves the deployment and removes its entry (others kept), `--base-url` names it directly, no entry → exit 0 saying so, unresolved deployment → exit 3, unreadable cache → exit 2
-- [ ] 4.2 Write failing `ensure-auth` tests: an in-memory token whose cache entry was removed or changed is discarded and the gate runs; an unchanged entry is reused without validation
+- [x] 4.1 Write failing CLI tests for `project logout`: `--cwd` resolves the deployment and removes its entry (others kept), `--base-url` names it directly, no entry → exit 0 saying so, no project → exit 1 (as `project get`), project without a resolvable deployment → exit 3, unreadable cache → exit 2
+- [x] 4.2 Write failing `ensure-auth` tests: an in-memory token whose cache entry was removed or changed is discarded and the gate runs; an unchanged entry is reused without validation
 
 ### Green
 
-- [ ] 4.3 Implement `project logout` beside `project get` / `project set` and the cache check in `ensureAuthenticated`
+- [x] 4.3 Implement `project logout` beside `project get` / `project set` and the cache check in `ensureAuthenticated`
 
 ### Refactor
 
-- [ ] 4.4 Review implementation and refactor as needed
+- [x] 4.4 Review implementation and refactor as needed
 
 ## 5. project_import template shape
 <!-- depends_on: none -->
 
 ### Red
 
-- [ ] 5.1 Write failing tests: missing `resources` or `forms` → `INVALID_ARGUMENT` naming the key, no request; `forms: []` → `INVALID_ARGUMENT` naming `forms`; `roles: []` / `actions: []` → refused; empty objects and extra keys (`reports`) → sent
+- [x] 5.1 Write failing tests: missing `resources` or `forms` → `INVALID_ARGUMENT` naming the key, no request; `forms: []` → `INVALID_ARGUMENT` naming `forms`; `roles: []` / `actions: []` → refused; empty objects and extra keys (`reports`) → sent
 
 ### Green
 
-- [ ] 5.2 Implement the shape check in `tools/project_import.ts`
+- [x] 5.2 Implement the shape check in `tools/project_import.ts`
 
 ### Refactor
 
-- [ ] 5.3 Review implementation and refactor as needed
+- [x] 5.3 Review implementation and refactor as needed
 
 ## 6. Docs and release notes
 <!-- depends_on: 2, 4 -->
 
 ### Red
 
-- [ ] 6.1 Write a failing docs test: `plugin/README.md` does not say a mapping entry falls back to environment values for an omitted half; both server READMEs document `project logout` and `FORMIO_REQUEST_TIMEOUT`; `server.json` lists `FORMIO_REQUEST_TIMEOUT`
+- [x] 6.1 Write a failing docs test: `plugin/README.md` does not say a mapping entry falls back to environment values for an omitted half; both server READMEs document `project logout` and `FORMIO_REQUEST_TIMEOUT`; `server.json` lists `FORMIO_REQUEST_TIMEOUT`
 
 ### Green
 
-- [ ] 6.2 Update the READMEs (CLI table, env var table, logout), `plugin/README.md`, `server.json`; add a changeset (`@formio/mcp` minor, `@formio/ai` patch)
-- [ ] 6.3 Run `pnpm test`, `pnpm lint`, `pnpm format`, `pnpm check:releases`, `openspec validate --strict`
+- [x] 6.2 Update the READMEs (CLI table, env var table, logout), `plugin/README.md`, `server.json`; add a changeset (`@formio/mcp` minor, `@formio/ai` patch)
+- [x] 6.3 Run `pnpm test`, `pnpm lint`, `pnpm format`, `pnpm check:releases`, `openspec validate --strict`
 
 ### Refactor
 
-- [ ] 6.4 Review implementation and refactor as needed
+- [x] 6.4 Review implementation and refactor as needed

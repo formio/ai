@@ -65,14 +65,18 @@ export async function ensureAuthenticated(config: ResolvedFormioConfig): Promise
 
   // Short-circuit: already authenticated in this process. Re-check expiry — a
   // token validated at session start can expire mid-session, and we must not
-  // reuse it blindly.
+  // reuse it blindly — and re-read the on-disk entry: `project logout` removes it
+  // from another process, and a sign-in elsewhere replaces it, so a token the file
+  // no longer holds is not reused. An unchanged entry needs no validation.
   const cached = jwtCache.get(baseUrl);
   if (cached) {
-    if (!isJwtExpired(cached)) {
+    const onDisk = await readToken(baseUrl);
+    if (onDisk === cached && !isJwtExpired(cached)) {
       config.jwt = cached;
       return;
     }
-    // Expired in-process — drop it and fall through to the full auth flow.
+    // Expired, signed out, or replaced — drop it and fall through to the full auth
+    // flow, which reads the cache again and validates whatever it now holds.
     jwtCache.delete(baseUrl);
     config.jwt = undefined;
   }

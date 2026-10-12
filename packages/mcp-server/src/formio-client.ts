@@ -85,6 +85,35 @@ async function readResponse({ response, url, options }: ReadResponseRequest): Pr
   return options?.responseType === 'text' ? response.text() : response.json();
 }
 
+interface ReadInTimeRequest extends ReadResponseRequest {
+  timeoutMs: number;
+}
+
+// Whether a body read was cut off by the request's own timeout: the abort rejects the
+// read with the timeout's TimeoutError. A caller's signal can carry a TimeoutError of
+// its own, and that abort keeps it.
+function isTimeoutAbort(error: unknown, signal: AbortSignal | undefined): boolean {
+  const callerAborted = signal?.aborted === true && signal.reason === error;
+  return error instanceof DOMException && error.name === 'TimeoutError' && !callerAborted;
+}
+
+// The timeout keeps running once the headers arrive, so it can cut off the body read
+// as well; that is reported exactly like a request that received no response.
+async function readInTime(request: ReadInTimeRequest): Promise<unknown> {
+  try {
+    return await readResponse(request);
+  } catch (error) {
+    if (isTimeoutAbort(error, request.options?.signal)) {
+      throw new FormioNetworkError({
+        url: request.url.toString(),
+        cause: error,
+        timeoutMs: request.timeoutMs,
+      });
+    }
+    throw error;
+  }
+}
+
 // A redirect is reported rather than followed: fetch would re-send the request, with
 // its x-jwt-token or x-token header, to wherever the Location header points.
 async function apiError(response: Response, url: URL): Promise<FormioApiError> {
@@ -138,6 +167,10 @@ export async function send(
   }
 }
 
+function requestTimeoutMs(config: FormioConfig, options?: FormioFetchOptions): number {
+  return options?.timeoutMs ?? config.requestTimeoutMs ?? DEFAULT_REQUEST_TIMEOUT_MS;
+}
+
 function buildFetchInit(config: FormioConfig, options?: FormioFetchOptions): SendInit {
   const hasBody = options?.body !== undefined;
   const headers: Record<string, string> = {
@@ -148,7 +181,7 @@ function buildFetchInit(config: FormioConfig, options?: FormioFetchOptions): Sen
   const init: SendInit = {
     headers,
     redirect: 'manual',
-    timeoutMs: options?.timeoutMs ?? config.requestTimeoutMs ?? DEFAULT_REQUEST_TIMEOUT_MS,
+    timeoutMs: requestTimeoutMs(config, options),
   };
   if (options?.method) {
     init.method = options.method;
@@ -167,6 +200,7 @@ export async function formioRawFetch(
   config: ResolvedFormioConfig,
   options?: FormioFetchOptions
 ): Promise<unknown> {
+  const timeoutMs = requestTimeoutMs(config, options);
   const response = await send(url, buildFetchInit(config, options));
 
   if (response.status === 401 && config.jwt) {
@@ -191,14 +225,15 @@ export async function formioRawFetch(
     await clearToken(baseUrl);
     config.jwt = undefined;
     await ensureAuthenticated(config);
-    return readResponse({
+    return readInTime({
       response: await send(url, buildFetchInit(config, options)),
       url,
       options,
+      timeoutMs,
     });
   }
 
-  return readResponse({ response, url, options });
+  return readInTime({ response, url, options, timeoutMs });
 }
 
 // Whether a built URL addresses the project: the same origin, and a path that IS

@@ -1,5 +1,6 @@
 import path from 'path';
-import { InvalidRequestedUrlError, readHttpUrlEnv } from '../config.js';
+import { InvalidRequestedUrlError, normalizeHttpUrl, readHttpUrlEnv } from '../config.js';
+import { signOut } from '../token-cache.js';
 import { COMMITTED_CONFIG_FILE, findCommittedConfig } from '../committed-config.js';
 import {
   readProjectEntryForWrite,
@@ -26,6 +27,7 @@ import {
   BASE_URL_NOT_DETERMINED,
   FORCED_PAIR_FACT,
   ProjectRemedies,
+  type ProjectReport,
   environmentRecordName,
   reportProject,
 } from '../project-report.js';
@@ -75,6 +77,11 @@ const USAGE = [
   'Usage:',
   `  ${PROJECT_CLI} set [--project-url <url>] [--base-url <url>] [--force] [--reset] [--cwd <absolute path>]`,
   `  ${PROJECT_CLI} get [--cwd <absolute path>]`,
+  `  ${PROJECT_CLI} logout [--base-url <url>] [--cwd <absolute path>]`,
+  '',
+  `logout signs out of one deployment: it removes that deployment's cached token from`,
+  `~/.formio/mcp-tokens.json — the one --base-url names, or else the one the directory`,
+  `resolves to — and a running server signs in again on its next call there.`,
   '',
   `set writes the machine-local mapping in ~/.formio/projects.json. To record the project`,
   `with the code instead — versioned, and shared with everyone who clones it — write a`,
@@ -666,26 +673,38 @@ const CLI_REMEDIES: ProjectRemedies = {
   environmentLocation: ENVIRONMENT_LOCATION,
 };
 
-function runGet(flags: Record<string, string>, context: CommandContext): ProjectCommandResult {
-  const cwd = resolveCwd(flags.cwd, context.cwd);
-  // Read exactly as getConfig reads it, or this command answers a question about
-  // a server that does not exist: the server drops an unusable FORMIO_PROJECT_URL
-  // and resolves from the mapping, so printing the literal here and naming the
-  // environment as the winning source contradicts what the next tool call does.
-  // The whole point of `project get` is to report what resolves and which source
-  // won, so the two readings must not diverge.
+// What the directory resolves to, read exactly as getConfig reads the environment, or
+// this command answers a question about a server that does not exist: the server drops
+// an unusable FORMIO_PROJECT_URL and resolves from the mapping, so printing the literal
+// here and naming the environment as the winning source contradicts what the next tool
+// call does. `project get` reports it and `project logout` signs out of its deployment,
+// so the readings must not diverge.
+function reportDirectory(cwd: string, context: CommandContext): ProjectReport {
   const notes = context.notes;
   const onIgnored = (message: string) => notes.push(message);
-  const envProjectUrl = readHttpUrlEnv({
-    raw: context.env.FORMIO_PROJECT_URL,
-    name: 'FORMIO_PROJECT_URL',
-    onIgnored,
+  return reportProject({
+    cwd,
+    baseConfig: {
+      baseUrl: readHttpUrlEnv({
+        raw: context.env.FORMIO_BASE_URL,
+        name: 'FORMIO_BASE_URL',
+        onIgnored,
+      }),
+      projectUrl: readHttpUrlEnv({
+        raw: context.env.FORMIO_PROJECT_URL,
+        name: 'FORMIO_PROJECT_URL',
+        onIgnored,
+      }),
+    },
+    cacheDir: context.cacheDir,
+    remedies: CLI_REMEDIES,
+    notes,
   });
-  const envBaseUrl = readHttpUrlEnv({
-    raw: context.env.FORMIO_BASE_URL,
-    name: 'FORMIO_BASE_URL',
-    onIgnored,
-  });
+}
+
+function runGet(flags: Record<string, string>, context: CommandContext): ProjectCommandResult {
+  const cwd = resolveCwd(flags.cwd, context.cwd);
+  const notes = context.notes;
 
   // Caught here rather than in runProjectCommand's catch, which cannot see the notes
   // this function collected. A could-not-answer failure keeps them for the same
@@ -695,13 +714,7 @@ function runGet(flags: Record<string, string>, context: CommandContext): Project
   // problem hid the first.
   let report;
   try {
-    report = reportProject({
-      cwd,
-      baseConfig: { baseUrl: envBaseUrl, projectUrl: envProjectUrl },
-      cacheDir: context.cacheDir,
-      remedies: CLI_REMEDIES,
-      notes,
-    });
+    report = reportDirectory(cwd, context);
   } catch (error) {
     return fail(error instanceof Error ? error.message : String(error), notes);
   }
@@ -713,6 +726,50 @@ function runGet(flags: Record<string, string>, context: CommandContext): Project
     return baseUrlUnresolved(report.message, report.notes);
   }
   return ok(report.message, report.notes);
+}
+
+// The deployment to sign out of, resolved exactly as `project get` resolves it: the
+// same reader, the same environment, the same records — and the same exit codes. A
+// directory with no project is exit 1, as `project get` reports it; one whose project
+// resolved without a deployment is exit 3. Either way --base-url names the deployment
+// directly. A reader that throws (an unreadable map) reaches runProjectCommand's catch,
+// notes intact.
+function logoutDeployment(
+  flags: Record<string, string>,
+  context: CommandContext
+): { baseUrl: string } | { unresolved: ProjectCommandResult } {
+  if (flags['base-url'] !== undefined) {
+    return { baseUrl: normalizeHttpUrl(flags['base-url'], '--base-url') };
+  }
+  const cwd = resolveCwd(flags.cwd, context.cwd);
+  const report = reportDirectory(cwd, context);
+  if (report.status === 'ok' && report.baseUrl) {
+    return { baseUrl: report.baseUrl };
+  }
+  const message = `No deployment resolves for ${cwd}, so there is no cached token to sign out of. Name the deployment with --base-url instead: ${projectCommand(`logout --base-url <base_url>`)}\n\n${report.message}`;
+  return {
+    unresolved:
+      report.status === 'not-configured'
+        ? notConfigured(message, report.notes)
+        : baseUrlUnresolved(message, report.notes),
+  };
+}
+
+function runLogout(flags: Record<string, string>, context: CommandContext): ProjectCommandResult {
+  const deployment = logoutDeployment(flags, context);
+  if ('unresolved' in deployment) {
+    return deployment.unresolved;
+  }
+  const { baseUrl } = deployment;
+  // Thrown failures — an unreadable or unwritable cache — reach runProjectCommand's
+  // catch and exit 2, which is what they are: this command could not answer.
+  const outcome = signOut({ baseUrl, cacheDir: context.cacheDir });
+  return ok(
+    outcome === 'removed'
+      ? `Signed out of ${baseUrl}: its cached token was removed. The next Form.io tool call on that deployment signs in again.`
+      : `No token was cached for ${baseUrl}, so there was nothing to sign out of.`,
+    context.notes
+  );
 }
 
 export function runProjectCommand(
@@ -741,6 +798,9 @@ export function runProjectCommand(
     }
     if (subcommand === 'get') {
       return runGet(parseFlags(args.slice(2), ['cwd']), context);
+    }
+    if (subcommand === 'logout') {
+      return runLogout(parseFlags(args.slice(2), ['base-url', 'cwd']), context);
     }
     return fail(`Unknown project subcommand: ${subcommand ?? '(none)'}\n\n${USAGE}`);
   } catch (error) {
