@@ -1,7 +1,19 @@
 import fs from 'fs';
 import path from 'path';
 import os from 'os';
-import { randomUUID } from 'crypto';
+import {
+  BLOCKING_SLEEP,
+  BlockingSleep,
+  FingerprintState,
+  SleepStrategy,
+  TIMER_SLEEP,
+  TimerSleep,
+  errorCode,
+  fingerprintOf,
+  sameFingerprint,
+  updateFileLocked,
+  writeFileAtomically,
+} from './atomic-file.js';
 import { isRecord } from './tool-errors.js';
 
 const DEFAULT_CACHE_DIR = path.join(os.homedir(), '.formio');
@@ -14,9 +26,6 @@ const cachePath = (cacheDir: string): string => path.join(cacheDir, CACHE_FILE);
 
 const reason = (error: unknown): string => (error instanceof Error ? error.message : String(error));
 
-const isMissing = (error: unknown): boolean =>
-  error instanceof Error && (error as NodeJS.ErrnoException).code === 'ENOENT';
-
 // The one reader. Undefined means the file does not exist, which is a cache holding no
 // tokens; a file that exists and cannot be read or parsed throws, because it says
 // nothing about any token — treating it as empty would discard tokens it may well hold.
@@ -25,7 +34,7 @@ function readCacheStrictly(filePath: string): TokenFile | undefined {
   try {
     contents = fs.readFileSync(filePath, 'utf-8');
   } catch (error) {
-    if (isMissing(error)) {
+    if (errorCode(error) === 'ENOENT') {
       return undefined;
     }
     throw new Error(`Cannot read the token cache at ${filePath}: ${reason(error)}`, {
@@ -56,23 +65,51 @@ function readCache(cacheDir: string): TokenFile {
   }
 }
 
-// The one writer. Written to a temporary file in the same directory, created 0600, and
-// renamed over the cache: a rename within a directory replaces the file in one step, so
-// a concurrent reader — another server, or the CLI — sees the old file or the new one,
-// never a partial one.
+// The one writer, through the shared atomic replacement: a concurrent reader — another
+// server, or the CLI — sees the old file or the new one, never a partial one.
 function writeCache(cacheDir: string, tokens: TokenFile): void {
   const filePath = cachePath(cacheDir);
-  const temporary = path.join(cacheDir, `.${CACHE_FILE}.${process.pid}.${randomUUID()}.tmp`);
   try {
-    fs.mkdirSync(cacheDir, { recursive: true });
-    fs.writeFileSync(temporary, JSON.stringify(tokens), { mode: 0o600, flag: 'wx' });
-    fs.renameSync(temporary, filePath);
+    writeFileAtomically({ filePath, contents: JSON.stringify(tokens) });
   } catch (error) {
-    fs.rmSync(temporary, { force: true });
     throw new Error(`Cannot write the token cache at ${filePath}: ${reason(error)}`, {
       cause: error,
     });
   }
+}
+
+interface CacheUpdate<T> {
+  cacheDir: string;
+  read: (cacheDir: string) => TokenFile | undefined;
+  /** The change, applied to the file as it is on disk under the lock; undefined when absent. */
+  change: (tokens: TokenFile | undefined) => { next?: TokenFile; result: T };
+}
+
+/**
+ * Every write is a locked read-modify-write (see updateFileLocked): the cache is shared
+ * by every server process and the CLI on this machine, so a write that read the file
+ * before another process's write landed would drop that process's token.
+ */
+function updateCache<T>(request: CacheUpdate<T> & { sleep: BlockingSleep }): T;
+function updateCache<T>(request: CacheUpdate<T> & { sleep: TimerSleep }): Promise<T>;
+function updateCache<T>({
+  cacheDir,
+  read,
+  change,
+  sleep,
+}: CacheUpdate<T> & { sleep: SleepStrategy }): T | Promise<T> {
+  const filePath = cachePath(cacheDir);
+  return updateFileLocked({
+    filePath,
+    read: () => read(cacheDir),
+    update: change,
+    write: (next: TokenFile | undefined) => writeCache(cacheDir, next ?? {}),
+    lockFailure: ({ lockPath, cause }) =>
+      new Error(`Cannot take the token cache's lock file ${lockPath}: ${reason(cause)}`, {
+        cause,
+      }),
+    sleep,
+  });
 }
 
 const tokenIn = (tokens: TokenFile, baseUrl: string): string | null => {
@@ -88,7 +125,12 @@ export async function saveToken(
   jwt: string,
   cacheDir: string = DEFAULT_CACHE_DIR
 ): Promise<void> {
-  writeCache(cacheDir, { ...readCache(cacheDir), [baseUrl]: jwt });
+  await updateCache({
+    cacheDir,
+    read: readCache,
+    change: (tokens) => ({ next: { ...tokens, [baseUrl]: jwt }, result: undefined }),
+    sleep: TIMER_SLEEP,
+  });
 }
 
 export async function readToken(
@@ -102,14 +144,12 @@ export async function clearToken(
   baseUrl: string,
   cacheDir: string = DEFAULT_CACHE_DIR
 ): Promise<void> {
-  writeCache(cacheDir, without(readCache(cacheDir), baseUrl));
-}
-
-/** What identifies one version of the cache file without reading it. */
-interface CacheFingerprint {
-  mtimeMs: number;
-  size: number;
-  ino: number;
+  await updateCache({
+    cacheDir,
+    read: readCache,
+    change: (tokens = {}) => ({ next: without(tokens, baseUrl), result: undefined }),
+    sleep: TIMER_SLEEP,
+  });
 }
 
 /**
@@ -119,7 +159,7 @@ interface CacheFingerprint {
  */
 export interface CacheSnapshot {
   /** 'missing' when there was no file; absent when it could not even be stat'd. */
-  readonly fingerprint?: CacheFingerprint | 'missing';
+  readonly fingerprint?: FingerprintState;
   readonly tokens?: TokenFile;
 }
 
@@ -128,23 +168,6 @@ export interface CacheSnapshotRequest {
   previous?: CacheSnapshot;
   cacheDir?: string;
 }
-
-function fingerprintOf(filePath: string): CacheFingerprint | 'missing' | undefined {
-  try {
-    const { mtimeMs, size, ino } = fs.statSync(filePath);
-    return { mtimeMs, size, ino };
-  } catch (error) {
-    return isMissing(error) ? 'missing' : undefined;
-  }
-}
-
-const sameFingerprint = (
-  a: CacheFingerprint | 'missing',
-  b: CacheFingerprint | 'missing'
-): boolean =>
-  a === 'missing' || b === 'missing'
-    ? a === b
-    : a.mtimeMs === b.mtimeMs && a.size === b.size && a.ino === b.ino;
 
 /**
  * Read the cache file only when it changed since `previous` was read: its modification
@@ -187,14 +210,18 @@ export type SignOutOutcome = 'removed' | 'not-cached';
  * Strict where the server's reads are tolerant: a file it cannot parse is reported, never
  * rewritten as `{}`, which would sign out of every deployment to remove one.
  *
- * Synchronous because the CLI that calls it is. A running server notices on its next
+ * Synchronous because the CLI that calls it is: it waits for the cache's lock by
+ * blocking, where the server's own writes wait on a timer. A running server notices on its next
  * call: it reads this entry before reusing a token it holds in memory.
  */
 export function signOut({ baseUrl, cacheDir = DEFAULT_CACHE_DIR }: SignOutRequest): SignOutOutcome {
-  const cache = readCacheStrictly(cachePath(cacheDir));
-  if (!cache || !Object.hasOwn(cache, baseUrl)) {
-    return 'not-cached';
-  }
-  writeCache(cacheDir, without(cache, baseUrl));
-  return 'removed';
+  return updateCache({
+    cacheDir,
+    read: (dir) => readCacheStrictly(cachePath(dir)),
+    change: (cache): { next?: TokenFile; result: SignOutOutcome } =>
+      cache && Object.hasOwn(cache, baseUrl)
+        ? { next: without(cache, baseUrl), result: 'removed' }
+        : { result: 'not-cached' },
+    sleep: BLOCKING_SLEEP,
+  });
 }

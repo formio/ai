@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ResolvedFormioConfig } from '../config.js';
+import { postLoginToken } from './test-helpers.js';
 
 // The opener's exit status is no longer observed — a detached launch reports only a
 // failure to start — so the login URL on stderr is the one guarantee that the user can
@@ -18,14 +19,6 @@ const CONFIG: ResolvedFormioConfig = {
   projectUrl: 'https://formio.invalid/sub/example',
   forceBrowser: true,
 };
-
-function postCallback(port: number): Promise<Response> {
-  return fetch(`http://127.0.0.1:${port}/callback`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ token: 'jwt' }),
-  });
-}
 
 describe('the login URL is printed whether or not the browser opens', () => {
   let stderr: string[];
@@ -51,9 +44,9 @@ describe('the login URL is printed whether or not the browser opens', () => {
     let loginUrl = '';
 
     await authenticate(CONFIG, {
-      onReady: async (port) => {
-        loginUrl = `http://127.0.0.1:${port}/`;
-        await postCallback(port);
+      onReady: async ({ url }) => {
+        loginUrl = url;
+        await postLoginToken(url, 'jwt');
       },
     });
 
@@ -68,9 +61,9 @@ describe('the login URL is printed whether or not the browser opens', () => {
     let loginUrl = '';
 
     await authenticate(CONFIG, {
-      onReady: async (port) => {
-        loginUrl = `http://127.0.0.1:${port}/`;
-        await postCallback(port);
+      onReady: async ({ url }) => {
+        loginUrl = url;
+        await postLoginToken(url, 'jwt');
       },
     });
 

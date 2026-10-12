@@ -2,6 +2,7 @@ import { spawn } from 'child_process';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { authenticate } from '../auth.js';
 import { ResolvedFormioConfig } from '../config.js';
+import { postLoginToken } from './test-helpers.js';
 
 vi.mock('child_process', () => ({
   spawn: vi.fn(() => ({ on: vi.fn(), unref: vi.fn() })),
@@ -85,13 +86,9 @@ describe('authenticate on a browserless host', () => {
     const jwt = await authenticate(
       { ...CONFIG, forceBrowser: true },
       {
-        onReady: async (port) => {
+        onReady: async ({ port, url }) => {
           observedPort = port;
-          await fetch(`http://127.0.0.1:${port}/callback`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ token: 'forced' }),
-          });
+          await postLoginToken(url, 'forced');
         },
       }
     );
@@ -118,12 +115,8 @@ describe('authenticate on a browserless host', () => {
     const jwt = await authenticate(
       { ...CONFIG, authHost: '127.0.0.1', authPort: 43117 },
       {
-        onReady: async (port) => {
-          await fetch(`http://127.0.0.1:${port}/callback`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ token: 'published' }),
-          });
+        onReady: async ({ url }) => {
+          await postLoginToken(url, 'published');
         },
       }
     );

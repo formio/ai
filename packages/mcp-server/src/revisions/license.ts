@@ -3,7 +3,7 @@ import { gateDisabledHistory, historyNotAccepted } from './history.js';
 import { stripRevisions } from './helpers.js';
 import { BaseUrlUnresolvedError, baseUrlWriteCommand } from '../project-resolver.js';
 import { FormioNetworkError, ToolError } from '../tool-errors.js';
-import { send } from '../formio-client.js';
+import { CertificateScope, send } from '../formio-client.js';
 import { COMMITTED_CONFIG_FILE } from '../committed-config.js';
 
 // ─── License detection ──────────────────────────────────────────────────────
@@ -32,9 +32,14 @@ type DefiniteLicence = { state: 'licensed' } | { state: 'unlicensed' };
  */
 export type RevisionsLicence = DefiniteLicence | { state: 'unknown'; failure: ToolError };
 
-async function probeLicence(url: URL): Promise<RevisionsLicence> {
+interface LicenceProbe {
+  url: URL;
+  certificateScope: CertificateScope;
+}
+
+async function probeLicence({ url, certificateScope }: LicenceProbe): Promise<RevisionsLicence> {
   try {
-    const response = await send(url, { timeoutMs: LICENCE_PROBE_TIMEOUT_MS });
+    const response = await send(url, { timeoutMs: LICENCE_PROBE_TIMEOUT_MS, certificateScope });
     if (!response.ok) {
       return {
         state: 'unknown',
@@ -87,7 +92,10 @@ export async function checkRevisionsLicensed(
   const cached = revisionsLicensedByBaseUrl.get(baseUrl);
   if (cached !== undefined && now() < cached.expiresAt) return cached.licence;
 
-  const licence = await probeLicence(new URL('config.js', `${baseUrl.replace(/\/*$/, '/')}`));
+  const licence = await probeLicence({
+    url: new URL('config.js', `${baseUrl.replace(/\/*$/, '/')}`),
+    certificateScope: cfg,
+  });
   revisionsLicensedByBaseUrl.set(baseUrl, {
     licence,
     expiresAt: licence.state === 'unknown' ? now() + UNKNOWN_LICENCE_TTL_MS : Infinity,

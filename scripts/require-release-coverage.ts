@@ -35,10 +35,15 @@ const REPO_ROOT = path.resolve(path.dirname(__filename), '..');
  * publishes them. `packages/skill-tests/` is absent because it is private.
  *
  * The server's list is what its `files` field packs, not its whole tree: `dist/`
- * — built from `src/` — plus README.md, alongside the package.json every pin is
- * stamped from. Tests are excluded because they are not packed; so are the
- * Dockerfile, DOCKERHUB.md, the docs/ images and the build and inspector config,
- * which publish no different bytes to npm. Owning them made a PR that only
+ * — built from `src/` — plus README.md and LICENSE, alongside the package.json
+ * every pin is stamped from. LICENSE is the repository root's: `prepack` copies it
+ * into the package directory, where the copy is ignored by git, so the root file
+ * is the one a change lands in. A path ending in `/` owns everything beneath it;
+ * any other path owns that file alone.
+ *
+ * Tests are excluded because they are not packed; so are the Dockerfile,
+ * DOCKERHUB.md, the docs/ images and the build and inspector config, which
+ * publish no different bytes to npm. Owning them made a PR that only
  * touched build config demand a byte-identical `@formio/mcp` release, which
  * `ensure-plugin-follows-server` then turns into a pointless `@formio/ai`
  * release and a repo-wide pin restamp.
@@ -47,13 +52,17 @@ const SERVER_PUBLISHED = [
   'packages/mcp-server/src/',
   'packages/mcp-server/README.md',
   'packages/mcp-server/package.json',
+  'LICENSE',
 ];
+
+const isPublishedBy = (published: string, file: string): boolean =>
+  published.endsWith('/') ? file.startsWith(published) : file === published;
 
 export const OWNERSHIP: ReadonlyArray<{ package: string; owns: (file: string) => boolean }> = [
   {
     package: SERVER_PACKAGE,
     owns: (file) =>
-      SERVER_PUBLISHED.some((published) => file.startsWith(published)) &&
+      SERVER_PUBLISHED.some((published) => isPublishedBy(published, file)) &&
       !file.includes('/__tests__/'),
   },
   {

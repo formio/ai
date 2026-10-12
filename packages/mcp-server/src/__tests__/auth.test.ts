@@ -3,6 +3,7 @@ import path from 'node:path';
 import { describe, it, expect, vi } from 'vitest';
 import { authenticate } from '../auth.js';
 import { ResolvedFormioConfig } from '../config.js';
+import { postLoginToken } from './test-helpers.js';
 
 vi.mock('child_process', () => ({
   spawn: vi.fn(() => ({ on: vi.fn(), unref: vi.fn() })),
@@ -16,21 +17,13 @@ const DEFAULT_CONFIG: ResolvedFormioConfig = {
   forceBrowser: true,
 };
 
-function postCallback(port: number, token: string): Promise<Response> {
-  return fetch(`http://127.0.0.1:${port}/callback`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ token }),
-  });
-}
-
 describe('authenticate', () => {
   it('starts an Express server on a random port and returns a JWT after /callback is hit', async () => {
     let serverPort = 0;
     const authPromise = authenticate(DEFAULT_CONFIG, {
-      onReady: async (port) => {
+      onReady: async ({ port, url }) => {
         serverPort = port;
-        await postCallback(port, 'test-jwt-123');
+        await postLoginToken(url, 'test-jwt-123');
       },
     });
 
@@ -42,9 +35,9 @@ describe('authenticate', () => {
   it('shuts down the Express server after capturing the JWT', async () => {
     let serverPort = 0;
     const authPromise = authenticate(DEFAULT_CONFIG, {
-      onReady: async (port) => {
+      onReady: async ({ port, url }) => {
         serverPort = port;
-        await postCallback(port, 'shutdown-test-jwt');
+        await postLoginToken(url, 'shutdown-test-jwt');
       },
     });
 
@@ -58,10 +51,10 @@ describe('authenticate', () => {
   it('GET / serves an HTML page with Form.io SDK script tag and Formio.createForm call', async () => {
     let html = '';
     const authPromise = authenticate(DEFAULT_CONFIG, {
-      onReady: async (port) => {
-        const res = await fetch(`http://127.0.0.1:${port}/`);
+      onReady: async ({ url }) => {
+        const res = await fetch(url);
         html = await res.text();
-        await postCallback(port, 'test-jwt');
+        await postLoginToken(url, 'test-jwt');
       },
     });
 
@@ -97,10 +90,10 @@ describe('authenticate', () => {
 
     let html = '';
     const authPromise = authenticate(config, {
-      onReady: async (port) => {
-        const res = await fetch(`http://127.0.0.1:${port}/`);
+      onReady: async ({ url }) => {
+        const res = await fetch(url);
         html = await res.text();
-        await postCallback(port, 'test-jwt');
+        await postLoginToken(url, 'test-jwt');
       },
     });
 
@@ -122,9 +115,9 @@ describe('the privacy disclosure names the hosts the sign-in page contacts', () 
   it('lists every external host on the page, and no other', async () => {
     let html = '';
     await authenticate(DEFAULT_CONFIG, {
-      onReady: async (port) => {
-        html = await (await fetch(`http://127.0.0.1:${port}/`)).text();
-        await postCallback(port, 'test-jwt');
+      onReady: async ({ url }) => {
+        html = await (await fetch(url)).text();
+        await postLoginToken(url, 'test-jwt');
       },
     });
 

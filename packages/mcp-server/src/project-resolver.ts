@@ -9,10 +9,10 @@ import {
   stripTrailingSlashes,
 } from './config.js';
 import {
-  ProjectEntry,
+  FoundProjectEntry,
   ProjectMapUnreadableError,
+  findProjectEntry,
   projectMapPath,
-  readProjectEntry,
 } from './project-map.js';
 import { projectCommand } from './cli-launch.js';
 import {
@@ -298,9 +298,9 @@ function readMappedEntry({
   cacheDir,
   tolerateUnreadable,
   onNote,
-}: MappedEntryRead): ProjectEntry | undefined {
+}: MappedEntryRead): FoundProjectEntry | undefined {
   try {
-    return readProjectEntry(mapCwd, cacheDir) ?? undefined;
+    return findProjectEntry({ cwd: mapCwd, cacheDir }) ?? undefined;
   } catch (error) {
     if (!tolerateUnreadable || !(error instanceof ProjectMapUnreadableError)) {
       throw error;
@@ -326,18 +326,18 @@ function readMappedEntry({
 // variables themselves.
 function recordName({
   source,
-  mapCwd,
+  mappedDir,
   committedFilePath,
 }: {
   source: ProjectUrlSource;
-  mapCwd: string;
+  mappedDir: string;
   committedFilePath?: string;
 }): string {
   if (source === 'committed') {
     return `the committed ${COMMITTED_CONFIG_FILE} at ${committedFilePath ?? '(unknown path)'}`;
   }
   if (source === 'mapping') {
-    return `the mapping for ${mapCwd}`;
+    return `the mapping for ${mappedDir}`;
   }
   return 'FORMIO_BASE_URL in the environment';
 }
@@ -345,7 +345,7 @@ function recordName({
 interface WinningRecordCheck {
   source: ProjectUrlSource;
   record: { projectUrl: string; baseUrl?: string; forced?: boolean };
-  mapCwd: string;
+  mappedDir: string;
   cacheDir?: string;
   committedFilePath?: string;
   onNote: (message: string) => void;
@@ -364,7 +364,7 @@ interface WinningRecordCheck {
 function validateWinningRecord({
   source,
   record,
-  mapCwd,
+  mappedDir,
   cacheDir,
   committedFilePath,
   onNote,
@@ -386,14 +386,14 @@ function validateWinningRecord({
     try {
       return normalizeHttpUrl(value, key);
     } catch (error) {
-      throw new ProjectMapUnreadableError(
-        projectMapPath(cacheDir),
-        new Error(
-          `the entry for ${mapCwd} holds an unusable ${key}: ${error instanceof Error ? error.message : String(error)}`
+      throw new ProjectMapUnreadableError({
+        filePath: projectMapPath(cacheDir),
+        cause: new Error(
+          `the entry for ${mappedDir} holds an unusable ${key}: ${error instanceof Error ? error.message : String(error)}`
         ),
-        mapCwd,
-        'entry'
-      );
+        cwd: mappedDir,
+        scope: 'entry',
+      });
     }
   };
   const projectUrl =
@@ -434,7 +434,7 @@ function validateWinningRecord({
   // stops working.
   if (faultedHalf(validity) === 'deployment') {
     onNote(
-      `Ignoring the Base URL recorded in ${recordName({ source, mapCwd, committedFilePath })} (${recordBaseUrl}): ${
+      `Ignoring the Base URL recorded in ${recordName({ source, mappedDir, committedFilePath })} (${recordBaseUrl}): ${
         validity === 'api-root-deployment'
           ? API_ROOT_IS_NOT_YOUR_DEPLOYMENT
           : validity === 'underivable-mismatch'
@@ -462,18 +462,18 @@ function validateWinningRecord({
     );
   }
   if (source === 'mapping') {
-    throw new ProjectMapUnreadableError(
-      projectMapPath(cacheDir),
-      new Error(
+    throw new ProjectMapUnreadableError({
+      filePath: projectMapPath(cacheDir),
+      cause: new Error(
         validity === 'not-a-hosted-project'
-          ? `the entry for ${mapCwd} records ${projectUrl} as FORMIO_PROJECT_URL, which is not a Form.io project URL. ${NOT_A_HOSTED_PROJECT}`
+          ? `the entry for ${mappedDir} records ${projectUrl} as FORMIO_PROJECT_URL, which is not a Form.io project URL. ${NOT_A_HOSTED_PROJECT}`
           : validity === 'not-a-project-url'
-            ? `the entry for ${mapCwd} records ${projectUrl} as FORMIO_PROJECT_URL, which is ${API_ROOT_NOT_A_PROJECT}`
-            : `the entry for ${mapCwd} records ${projectUrl} as both FORMIO_PROJECT_URL and FORMIO_BASE_URL. ${ENTERPRISE_ONLY}`
+            ? `the entry for ${mappedDir} records ${projectUrl} as FORMIO_PROJECT_URL, which is ${API_ROOT_NOT_A_PROJECT}`
+            : `the entry for ${mappedDir} records ${projectUrl} as both FORMIO_PROJECT_URL and FORMIO_BASE_URL. ${ENTERPRISE_ONLY}`
       ),
-      mapCwd,
-      'entry'
-    );
+      cwd: mappedDir,
+      scope: 'entry',
+    });
   }
   // Names every variable the record loses, not just the offending one: the whole
   // record is discarded, so a FORMIO_BASE_URL set beside a rejected project URL is
@@ -578,13 +578,17 @@ export function resolveProject(
   // The reason is still said out loud, because a broken map that nothing depends on
   // today breaks every unpinned directory tomorrow.
   const committedIsComplete = Boolean(committed?.projectUrl);
-  const mappedEntry = readMappedEntry({
+  // The nearest mapped directory, this one or an ancestor. Its entry is named by the
+  // directory it is recorded for, which is where a repair has to look.
+  const mapped = readMappedEntry({
     mapCwd,
     cacheDir,
     tolerateUnreadable: committedIsComplete,
     onNote,
   });
+  const mappedEntry = mapped?.entry;
   const mappedEnv = mappedEntry?.env;
+  const mappedDir = mapped?.dir ?? mapCwd;
 
   // One record supplies BOTH halves. Precedence picks the record, narrowest scope
   // first; the base URL is that record's own, or derived from that record's project
@@ -644,7 +648,7 @@ export function resolveProject(
     const validated = validateWinningRecord({
       source,
       record: record as { projectUrl: string; baseUrl?: string; forced?: boolean },
-      mapCwd,
+      mappedDir,
       cacheDir,
       committedFilePath: committed?.filePath,
       onNote,
@@ -666,7 +670,7 @@ export function resolveProject(
       unpaired: [
         ...(mappedEnv?.FORMIO_BASE_URL
           ? [
-              `${mapCwd} has ${mappedEnv.FORMIO_BASE_URL} mapped as a deployment with no project beside it, so nothing says which project it serves. Recording a project for this directory replaces that entry.`,
+              `${mappedDir} has ${mappedEnv.FORMIO_BASE_URL} mapped as a deployment with no project beside it, so nothing says which project it serves. Recording a project for that directory replaces that entry.`,
             ]
           : []),
         ...(baseConfig.baseUrl

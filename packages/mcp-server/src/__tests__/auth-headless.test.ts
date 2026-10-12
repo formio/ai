@@ -5,6 +5,7 @@ import net from 'node:net';
 import { authenticate } from '../auth.js';
 import { browserLaunchCommand } from '../browser-launch.js';
 import { ResolvedFormioConfig } from '../config.js';
+import { postLoginToken } from './test-helpers.js';
 
 vi.mock('child_process', () => ({ spawn: vi.fn() }));
 
@@ -42,14 +43,6 @@ function freePort(): Promise<number> {
   });
 }
 
-function postCallback(port: number, token: string): Promise<Response> {
-  return fetch(`http://127.0.0.1:${port}/callback`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ token }),
-  });
-}
-
 describe('authenticate in headless environments', () => {
   let stderr: string[];
 
@@ -70,8 +63,8 @@ describe('authenticate in headless environments', () => {
   // only ever handed to the browser-launcher, which does not exist there.
   it('writes the login URL to stderr so it can be opened manually', async () => {
     await authenticate(DEFAULT_CONFIG, {
-      onReady: async (port) => {
-        await postCallback(port, 'jwt');
+      onReady: async ({ url }) => {
+        await postLoginToken(url, 'jwt');
       },
     });
 
@@ -88,9 +81,9 @@ describe('authenticate in headless environments', () => {
     await authenticate(
       { ...DEFAULT_CONFIG, authHost: '0.0.0.0', authPort: requested },
       {
-        onReady: async (port) => {
+        onReady: async ({ port, url }) => {
           observed = port;
-          await postCallback(port, 'jwt');
+          await postLoginToken(url, 'jwt');
         },
       }
     );
@@ -108,8 +101,8 @@ describe('authenticate in headless environments', () => {
     });
 
     await authenticate(DEFAULT_CONFIG, {
-      onReady: async (port) => {
-        await postCallback(port, 'jwt');
+      onReady: async ({ url }) => {
+        await postLoginToken(url, 'jwt');
       },
     });
 
@@ -152,18 +145,23 @@ describe('authenticate in headless environments', () => {
   // support was added.
   it('still binds loopback on an ephemeral port and launches a browser by default', async () => {
     let observedPort = 0;
+    let loginUrl = '';
     await authenticate(DEFAULT_CONFIG, {
-      onReady: async (port) => {
+      onReady: async ({ port, url }) => {
         observedPort = port;
-        await postCallback(port, 'jwt');
+        loginUrl = url;
+        await postLoginToken(url, 'jwt');
       },
     });
 
     // Ephemeral, not a fixed port.
     expect(observedPort).toBeGreaterThan(1024);
 
-    // Launched without a shell, the URL as an argument of its own.
-    const loginUrl = `http://127.0.0.1:${observedPort}/`;
+    // Launched without a shell, the URL — on loopback, carrying the login value — as an
+    // argument of its own.
+    expect(loginUrl).toMatch(
+      new RegExp(`^http://127\\.0\\.0\\.1:${observedPort}/\\?s=[0-9a-f]{32}$`)
+    );
     const { command, args } = browserLaunchCommand(loginUrl);
     const [file, passedArgs] = vi.mocked(spawn).mock.calls[0] ?? [];
     expect(file).toBe(command);
@@ -175,8 +173,8 @@ describe('authenticate in headless environments', () => {
     const jwt = await authenticate(
       { ...DEFAULT_CONFIG, authTimeoutMs: 5000 },
       {
-        onReady: async (port) => {
-          await postCallback(port, 'in-time');
+        onReady: async ({ url }) => {
+          await postLoginToken(url, 'in-time');
         },
       }
     );

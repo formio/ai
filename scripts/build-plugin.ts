@@ -27,6 +27,7 @@ const SERVER_ENTRY = path.join(REPO_ROOT, 'packages/mcp-server/src/stdio.ts');
 // module-level test sees. The `.mcpb` desktop bundle builds its own copy at
 // dist/mcpb/server/index.mjs.
 const SERVER_OUT = path.join(DIST_PLUGIN, 'server/stdio.mjs');
+const SERVER_PACKAGE_JSON = path.join(REPO_ROOT, 'packages/mcp-server/package.json');
 
 function cleanDist() {
   fs.rmSync(DIST_PLUGIN, { recursive: true, force: true });
@@ -63,6 +64,13 @@ function syncManifestVersions() {
   }
 }
 
+function serverVersion(): string {
+  const { version } = JSON.parse(fs.readFileSync(SERVER_PACKAGE_JSON, 'utf8')) as {
+    version: string;
+  };
+  return version;
+}
+
 async function bundleServer() {
   fs.mkdirSync(path.dirname(SERVER_OUT), { recursive: true });
   await build({
@@ -72,6 +80,10 @@ async function bundleServer() {
     platform: 'node',
     format: 'esm',
     target: 'node22',
+    // The server's own version, written in at build time: the nearest
+    // package.json to this bundle is @formio/ai's, not @formio/mcp's (see
+    // cli-launch.ts).
+    define: { __FORMIO_MCP_VERSION__: JSON.stringify(serverVersion()) },
     banner: {
       // Shim CommonJS globals for ESM output so bundled CJS deps (e.g. express) resolve correctly.
       // The source file's own `#!/usr/bin/env node` shebang is preserved by esbuild above this.

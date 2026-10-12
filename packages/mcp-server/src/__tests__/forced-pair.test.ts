@@ -4,6 +4,7 @@ import path from 'path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { PROJECT_CLI } from '../cli-launch.js';
 import { runProjectCommand } from '../cli/project-command.js';
+import { canonicalDir } from '../project-map.js';
 import { registerProjectGetTool } from '../tools/project_get.js';
 import { registerProjectSetTool } from '../tools/project_set.js';
 import { connectTools } from './test-helpers.js';
@@ -64,7 +65,11 @@ describe('a forced project/deployment pair', () => {
     if (!fs.existsSync(file)) {
       return undefined;
     }
-    return (JSON.parse(fs.readFileSync(file, 'utf8')) as Record<string, unknown>)[repo];
+    // Whatever spelling it is stored under: a write stores the canonical path in its
+    // true case, and an entry seeded by hand keeps the one it was given.
+    const map = JSON.parse(fs.readFileSync(file, 'utf8')) as Record<string, unknown>;
+    const key = Object.keys(map).find((dir) => canonicalDir(dir) === canonicalDir(repo));
+    return key === undefined ? undefined : map[key];
   };
 
   // The one phrase every clear prints, whatever the entry held.

@@ -11,6 +11,7 @@ import net from 'node:net';
 import { describe, it, expect, vi } from 'vitest';
 import { authenticate } from '../auth.js';
 import { ResolvedFormioConfig } from '../config.js';
+import { loginPageState, postLoginCallback, postLoginToken } from './test-helpers.js';
 
 vi.mock('child_process', () => ({
   spawn: vi.fn(() => ({ on: vi.fn(), unref: vi.fn() })),
@@ -22,33 +23,39 @@ const CONFIG: ResolvedFormioConfig = {
   forceBrowser: true,
 };
 
-function postText(port: number, body: string): Promise<Response> {
-  return fetch(`http://127.0.0.1:${port}/callback`, {
+function postText(loginUrl: string, body: string): Promise<Response> {
+  return fetch(new URL('/callback', loginUrl), {
     method: 'POST',
     headers: { 'Content-Type': 'text/plain' },
     body,
   });
 }
 
-function postJson(port: number, body: unknown): Promise<Response> {
-  return fetch(`http://127.0.0.1:${port}/callback`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body),
-  });
-}
-
 describe('the login callback', () => {
-  it('answers a POST with no JSON body with 400, and keeps waiting for the token', async () => {
+  // A body-less post carries no page value, so it is refused as any other post
+  // without one is — answered, not failed with a 500.
+  it('answers a POST with no JSON body with 403, and keeps waiting for the token', async () => {
     let status = 0;
     const jwt = await authenticate(CONFIG, {
-      onReady: async (port) => {
-        status = (await postText(port, 'not json')).status;
-        await postJson(port, { token: 'after-a-bad-post' });
+      onReady: async ({ url }) => {
+        status = (await postText(url, 'not json')).status;
+        await postLoginToken(url, 'after-a-bad-post');
+      },
+    });
+    expect(status).toBe(403);
+    expect(jwt).toBe('after-a-bad-post');
+  });
+
+  it('answers a post with the page value but no token with 400, and keeps waiting', async () => {
+    let status = 0;
+    const jwt = await authenticate(CONFIG, {
+      onReady: async ({ url }) => {
+        status = (await postLoginCallback(url, { state: await loginPageState(url) })).status;
+        await postLoginToken(url, 'after-an-empty-post');
       },
     });
     expect(status).toBe(400);
-    expect(jwt).toBe('after-a-bad-post');
+    expect(jwt).toBe('after-an-empty-post');
   });
 });
 

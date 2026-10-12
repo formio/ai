@@ -1,4 +1,5 @@
-import { FormioConfig, readBooleanEnv, ResolvedFormioConfig } from './config.js';
+import type { Dispatcher } from 'undici';
+import { FormioConfig, ResolvedFormioConfig } from './config.js';
 import { getAuthHeader } from './auth-header.js';
 import { ensureAuthenticated, invalidateJwtCache } from './ensure-auth.js';
 import { clearToken } from './token-cache.js';
@@ -10,11 +11,6 @@ import {
   FormioPermissionError,
   ToolError,
 } from './tool-errors.js';
-
-// For a self-signed deployment, such as a local Form.io Enterprise server.
-if (readBooleanEnv(process.env.FORMIO_INSECURE_TLS)) {
-  process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
-}
 
 export const MONGO_ID_PATTERN = /^[0-9a-fA-F]{24}$/;
 
@@ -149,9 +145,52 @@ async function readBody(response: Response): Promise<string | undefined> {
   }
 }
 
+/**
+ * The resolved deployment a request belongs to, and whether FORMIO_INSECURE_TLS asks
+ * for its certificate to go unverified. A FormioConfig is one.
+ */
+export interface CertificateScope {
+  insecureTls?: boolean;
+  projectUrl?: string;
+  baseUrl?: string;
+}
+
 export interface SendInit extends RequestInit {
   /** Aborts the request after this many milliseconds; DEFAULT_REQUEST_TIMEOUT_MS when absent. */
   timeoutMs?: number;
+  /** Whose certificate setting applies; without one, the certificate is verified. */
+  certificateScope?: CertificateScope;
+}
+
+function hostOf(raw: string | undefined): string | undefined {
+  return raw && URL.canParse(raw) ? new URL(raw).host : undefined;
+}
+
+// Created on first use, so a server that never relaxes a certificate check never
+// loads undici, and every relaxed request shares one connection pool.
+let relaxedDispatcher: Promise<Dispatcher> | undefined;
+
+function getRelaxedDispatcher(): Promise<Dispatcher> {
+  relaxedDispatcher ??= import('undici').then(
+    ({ Agent }) => new Agent({ connect: { rejectUnauthorized: false } })
+  );
+  return relaxedDispatcher;
+}
+
+/**
+ * The dispatcher a request is sent with: one that accepts a self-signed certificate
+ * when FORMIO_INSECURE_TLS is on and the request's host is the project URL's or the
+ * Base URL's host; otherwise none, and fetch verifies the certificate as usual.
+ */
+export async function selectDispatcher(
+  url: URL,
+  scope: CertificateScope | undefined
+): Promise<Dispatcher | undefined> {
+  if (!scope?.insecureTls) {
+    return undefined;
+  }
+  const hosts = [hostOf(scope.projectUrl), hostOf(scope.baseUrl)];
+  return hosts.includes(url.host) ? getRelaxedDispatcher() : undefined;
 }
 
 /**
@@ -163,12 +202,13 @@ export interface SendInit extends RequestInit {
  */
 export async function send(
   url: URL,
-  { timeoutMs = DEFAULT_REQUEST_TIMEOUT_MS, ...init }: SendInit
+  { timeoutMs = DEFAULT_REQUEST_TIMEOUT_MS, certificateScope, ...init }: SendInit
 ): Promise<Response> {
+  const dispatcher = await selectDispatcher(url, certificateScope);
   const timeout = AbortSignal.timeout(timeoutMs);
   const signal = init.signal ? AbortSignal.any([init.signal, timeout]) : timeout;
   try {
-    return await fetch(url, { ...init, signal });
+    return await fetch(url, { ...init, signal, ...(dispatcher ? { dispatcher } : {}) });
   } catch (cause) {
     const timedOut = timeout.aborted && signal.reason === timeout.reason;
     throw new FormioNetworkError({
@@ -194,6 +234,7 @@ function buildFetchInit(config: FormioConfig, options?: FormioFetchOptions): Sen
     headers,
     redirect: 'manual',
     timeoutMs: requestTimeoutMs(config, options),
+    certificateScope: config,
   };
   if (options?.method) {
     init.method = options.method;

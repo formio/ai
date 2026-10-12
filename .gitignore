@@ -1,5 +1,8 @@
 node_modules/
 dist/
+# Copied from the repository root by @formio/mcp's prepack, so the tarball carries
+# the current licence text; the root LICENSE is the only tracked copy.
+packages/mcp-server/LICENSE
 .turbo/
 coverage/
 .eval-artifacts/

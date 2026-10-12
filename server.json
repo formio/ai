@@ -47,6 +47,27 @@
           "isSecret": false
         },
         {
+          "name": "FORMIO_AUTH_HOST",
+          "description": "Address the browser-login page binds to. Optional; defaults to 127.0.0.1. Set it to 0.0.0.0, together with FORMIO_AUTH_PORT, when the server runs in a container or on a remote machine and the login page must be reachable through a published port. 0.0.0.0 exposes the page on every interface for the duration of a login.",
+          "isRequired": false,
+          "format": "string",
+          "isSecret": false
+        },
+        {
+          "name": "FORMIO_AUTH_PORT",
+          "description": "Fixed port for the browser-login page, so a container can publish it (e.g. 43117). Optional; a positive integer, and by default the page takes an ephemeral port.",
+          "isRequired": false,
+          "format": "string",
+          "isSecret": false
+        },
+        {
+          "name": "FORMIO_AUTH_TIMEOUT",
+          "description": "Seconds to wait for a browser login before the call fails with an error naming the remedies. Optional; a positive integer no larger than 2147483, and any other value is ignored. Defaults to 900.",
+          "isRequired": false,
+          "format": "string",
+          "isSecret": false
+        },
+        {
           "name": "FORMIO_FORCE_BROWSER",
           "description": "Set to 1 to attempt the browser login even where the server detects it cannot present one (CI, a container, a remote shell with no display). Use it when the login page is reachable from a browser elsewhere.",
           "isRequired": false,
@@ -62,7 +83,7 @@
         },
         {
           "name": "FORMIO_INSECURE_TLS",
-          "description": "Set to 1 to skip TLS certificate verification. For local development against self-signed certificates only \u2014 never enable in production.",
+          "description": "Set to 1 to skip TLS certificate verification only for requests to the configured deployment (the hosts of the resolved project URL and base URL); every other host is verified as usual. For local development against self-signed certificates only \u2014 never enable in production.",
           "isRequired": false,
           "format": "string",
           "isSecret": false

@@ -428,3 +428,109 @@ describe('the hosted-cloud API root pasted as a project', () => {
     expect(plan({ requested: { projectUrl: 'https://examples.form.io' } }).outcome).toBe('write');
   });
 });
+
+// A record inherited from an ancestor directory governs this one without being its own.
+// Re-stating the pair it already supplies changes nothing that resolves, so nothing is
+// written — and the ancestor's override flag is never copied onto a child entry, which
+// takes one only from an explicit `--force` for that directory.
+describe('a record inherited from an ancestor', () => {
+  const ANCESTOR = '/w';
+  const inherited = (
+    requested: { projectUrl?: string; baseUrl?: string; force?: boolean },
+    record: { projectUrl: string; baseUrl: string; forced?: boolean }
+  ) =>
+    planProjectEntry({
+      cwd: CWD,
+      requested,
+      record: { ...record, inheritedFrom: ANCESTOR },
+    });
+
+  it('is unchanged when the requested pair is the inherited pair, and names the ancestor', () => {
+    const result = inherited(
+      { projectUrl: 'https://examples.form.io' },
+      { projectUrl: 'https://examples.form.io', baseUrl: 'https://api.form.io' }
+    );
+
+    expect(result.outcome).toBe('unchanged');
+    expect('inheritedFrom' in result && result.inheritedFrom).toBe(ANCESTOR);
+  });
+
+  it('is unchanged when a deployment-only call restates the inherited deployment', () => {
+    const result = inherited(
+      { baseUrl: 'https://api.mysite.com' },
+      { projectUrl: 'https://myproject.mysite.com', baseUrl: 'https://api.mysite.com' }
+    );
+
+    expect(result.outcome).toBe('unchanged');
+  });
+
+  it('is unchanged when an unforced call restates a forced inherited pair', () => {
+    const result = inherited(
+      { projectUrl: 'https://internal.form.io', baseUrl: 'https://forms.internal.form.io' },
+      {
+        projectUrl: 'https://internal.form.io',
+        baseUrl: 'https://forms.internal.form.io',
+        forced: true,
+      }
+    );
+
+    expect(result.outcome).toBe('unchanged');
+  });
+
+  it('writes a child entry for a different pair, never carrying the ancestor override', () => {
+    const result = inherited(
+      { baseUrl: 'https://other.mysite.com' },
+      {
+        projectUrl: 'https://myproject.mysite.com',
+        baseUrl: 'https://api.mysite.com',
+        forced: true,
+      }
+    );
+
+    expect(result.outcome).toBe('write');
+    expect('entry' in result && result.entry).toEqual({
+      env: {
+        FORMIO_PROJECT_URL: 'https://myproject.mysite.com',
+        FORMIO_BASE_URL: 'https://other.mysite.com',
+      },
+    });
+  });
+
+  it('records the override for the child only from an explicit force for it', () => {
+    const result = inherited(
+      {
+        projectUrl: 'https://myproject.mysite.com',
+        baseUrl: 'https://api.mysite.com',
+        force: true,
+      },
+      { projectUrl: 'https://myproject.mysite.com', baseUrl: 'https://api.mysite.com' }
+    );
+
+    expect(result.outcome).toBe('write');
+    expect('entry' in result && result.entry.forced).toBe(true);
+  });
+  it('writes the child its own forced entry for an explicit force, even when the inherited pair is equal and forced', () => {
+    const result = inherited(
+      {
+        projectUrl: 'https://internal.form.io',
+        baseUrl: 'https://forms.internal.form.io',
+        force: true,
+      },
+      {
+        projectUrl: 'https://internal.form.io',
+        baseUrl: 'https://forms.internal.form.io',
+        forced: true,
+      }
+    );
+
+    expect(result.outcome).toBe('write');
+    expect('entry' in result && result.entry).toEqual({
+      env: {
+        FORMIO_PROJECT_URL: 'https://internal.form.io',
+        FORMIO_BASE_URL: 'https://forms.internal.form.io',
+      },
+      forced: true,
+    });
+    expect('inheritedFrom' in result && result.inheritedFrom).toBeFalsy();
+  });
+});

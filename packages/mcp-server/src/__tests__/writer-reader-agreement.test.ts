@@ -586,7 +586,9 @@ describe('a write reports what the next read resolves', () => {
       );
       const map = JSON.parse(fs.readFileSync(path.join(cliCache, 'projects.json'), 'utf8'));
 
-      expect(Object.keys(map)).toEqual([repo]);
+      // The legacy spelling is replaced by the canonical form the write stores: the real
+      // path, in its true case.
+      expect(Object.keys(map)).toEqual([fs.realpathSync.native(repo)]);
     });
 
     it('writes one entry, not two', () => {

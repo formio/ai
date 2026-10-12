@@ -155,6 +155,44 @@ describe('pnpm build:mcpb', () => {
     expect(result.stdout).toContain('"status":"ok"');
   }, 90_000);
 
+  // The bundle holds no package.json to read a version from, so reading one at run
+  // time reported 0.0.0 at initialize and in server_status. The version is written
+  // in at build time instead.
+  it('1.15 the bundled server reports the package version', () => {
+    const { version } = JSON.parse(fs.readFileSync(SERVER_PACKAGE_JSON, 'utf8')) as {
+      version: string;
+    };
+    const request = [
+      '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{},"clientInfo":{"name":"mcpb-test","version":"1"}}}',
+      '{"jsonrpc":"2.0","method":"notifications/initialized"}',
+      '{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"server_status","arguments":{}}}',
+      '',
+    ].join('\n');
+
+    const result = spawnSync('node', [SERVER_BUNDLE], {
+      input: request,
+      encoding: 'utf8',
+      timeout: 60_000,
+      env: { PATH: process.env.PATH, HOME: process.env.HOME },
+    });
+    const messages = result.stdout
+      .split('\n')
+      .filter(Boolean)
+      .map(
+        (line) =>
+          JSON.parse(line) as {
+            id?: number;
+            result?: {
+              serverInfo?: { version?: string };
+              structuredContent?: { version?: string };
+            };
+          }
+      );
+
+    expect(messages.find((m) => m.id === 1)?.result?.serverInfo?.version).toBe(version);
+    expect(messages.find((m) => m.id === 2)?.result?.structuredContent?.version).toBe(version);
+  }, 90_000);
+
   // Directories that ingest the bundle read this list instead of launching the
   // server — Smithery's listing showed no tools at all while the manifest
   // declared none. It is generated from the built server rather than hand-written,

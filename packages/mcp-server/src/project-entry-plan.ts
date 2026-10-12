@@ -39,8 +39,14 @@ export interface ProjectEntryPlanRequest {
    * re-stating the project it already resolved is an ordinary call and must not
    * quietly undo a developer's override, while a call that changes either half forms a
    * pair nobody has vouched for and is judged by the ordinary rules again.
+   *
+   * `inheritedFrom` names the ancestor directory the record is recorded for when it is
+   * not this directory's own. It governs this directory, so a call restating the pair
+   * it already supplies changes nothing that resolves and writes nothing. Its
+   * override flag stays with the ancestor: a child entry is forced only by a `--force`
+   * for that directory.
    */
-  record: { projectUrl?: string; baseUrl?: string; forced?: boolean };
+  record: { projectUrl?: string; baseUrl?: string; forced?: boolean; inheritedFrom?: string };
   /**
    * Where the project lives when this record has none, for a write that cannot reach
    * it. The committed file carries its path, because the refusal that names it
@@ -80,6 +86,11 @@ export interface PlannedWrite {
   droppedBaseUrl?: string;
   /** Whether this call named the project, as opposed to amending the pair. */
   setAProject: boolean;
+  /**
+   * The ancestor directory whose record already supplies this pair, on an `unchanged`
+   * outcome for a directory with no entry of its own.
+   */
+  inheritedFrom?: string;
 }
 
 /** Which record holds the project, for a caller naming the write that reaches it. */
@@ -313,10 +324,18 @@ export function planProjectEntry({
       // Adding the override to a pair already on disk is a WRITE. Compared on the pair
       // alone, `project set --force` over the pair it was already targeting reported
       // "no change" and left the entry unforced, so the very next read refused it.
-      outcome:
-        recordProjectUrl === projectUrl && recordBaseUrl === baseUrl && record.forced
-          ? 'unchanged'
-          : 'write',
+      //
+      // An inherited forced pair restated is unchanged too, so the ancestor's flag is
+      // never written onto this directory's entry — unless this call forces the pair
+      // for this directory, which is what records a forced entry of its own.
+      ...unchangedOrWrite({
+        unchanged:
+          recordProjectUrl === projectUrl &&
+          recordBaseUrl === baseUrl &&
+          record.forced &&
+          !(requested.force && record.inheritedFrom),
+        inheritedFrom: record.inheritedFrom,
+      }),
       cwd,
       entry: { env: { FORMIO_PROJECT_URL: projectUrl, FORMIO_BASE_URL: baseUrl }, forced: true },
       projectUrl,
@@ -415,10 +434,10 @@ export function planProjectEntry({
   return {
     // A record that holds the override and a pair the rules accept still changes when
     // this write drops the flag, so `record.forced` counts as a difference.
-    outcome:
-      recordProjectUrl === projectUrl && recordBaseUrl === baseUrl && !record.forced
-        ? 'unchanged'
-        : 'write',
+    ...unchangedOrWrite({
+      unchanged: recordProjectUrl === projectUrl && recordBaseUrl === baseUrl && !record.forced,
+      inheritedFrom: record.inheritedFrom,
+    }),
     cwd,
     entry,
     projectUrl,
@@ -428,3 +447,19 @@ export function planProjectEntry({
     setAProject: Boolean(requestedProjectUrl),
   };
 }
+
+interface UnchangedOrWrite {
+  unchanged: boolean | undefined;
+  inheritedFrom: string | undefined;
+}
+
+// Whether the pair the record supplies already is the pair being recorded. A record
+// inherited from an ancestor counts: it is what resolves here, and a child entry
+// restating it would change nothing but the number of records holding one pair.
+const unchangedOrWrite = ({
+  unchanged,
+  inheritedFrom,
+}: UnchangedOrWrite): Pick<PlannedWrite, 'outcome' | 'inheritedFrom'> =>
+  unchanged
+    ? { outcome: 'unchanged', ...(inheritedFrom ? { inheritedFrom } : {}) }
+    : { outcome: 'write' };

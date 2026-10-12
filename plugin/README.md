@@ -74,7 +74,7 @@ No client prompts for anything at install time. Both URLs are resolved per direc
 | `FORMIO_API_KEY` | no | `undefined` | Long-lived project API key, applied only to the project `FORMIO_PROJECT_URL` names — set `FORMIO_PROJECT_URL` beside it. Where it applies, the server skips the browser login flow and attaches `x-token`. |
 | `FORMIO_LOGIN_FORM` | no | Auto-resolved | Override the portal login form URL. |
 | `FORMIO_FORCE_BROWSER` | no | `0` | Set to `1` to attempt the browser login even where the server detects no browser (CI, a container, SSH with no display). |
-| `FORMIO_INSECURE_TLS` | no | `false` | When `true`, skips TLS certificate verification — for self-hosted deployments behind self-signed certs. Do not use against production. |
+| `FORMIO_INSECURE_TLS` | no | `false` | When `true`, skips TLS certificate verification only for requests to the configured deployment (the hosts of the resolved Project URL and Base URL) — for self-hosted deployments behind self-signed certs. Do not use against production. |
 
 \* Per-directory mappings are persisted to `~/.formio/projects.json` by the `project_set` tool, or by `npx -y @formio/mcp@0.14.1 project set --project-url <url> --cwd <path>` before any client has connected. A mapping holds a project URL and its base URL as a pair — the base URL derived from the project URL wherever it can be, and recorded beside it only when it cannot — and the server resolves both from that one entry. Halves are never combined across records: a mapping that names a project never takes its base URL from the environment, which is a separate, weaker record that applies only when no committed `formio.json` or mapping names a project for the directory.
 

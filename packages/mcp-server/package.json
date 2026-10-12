@@ -33,13 +33,14 @@
   },
   "files": [
     "dist",
-    "README.md"
+    "README.md",
+    "LICENSE"
   ],
   "publishConfig": {
     "access": "public"
   },
   "scripts": {
-    "build": "tsc -p tsconfig.build.json",
+    "build": "node -e \"require('fs').rmSync('dist',{recursive:true,force:true})\" && tsc -p tsconfig.build.json",
     "build:dev": "tsc",
     "dev": "tsx watch src/stdio.ts",
     "start": "node dist/stdio.js",
@@ -48,6 +49,7 @@
     "typecheck": "tsc --noEmit",
     "lint": "eslint src && tsc --noEmit",
     "clean": "rm -rf dist coverage",
+    "prepack": "node -e \"require('fs').copyFileSync('../../LICENSE','LICENSE')\"",
     "prepublishOnly": "pnpm test && pnpm build"
   },
   "engines": {
@@ -57,6 +59,7 @@
     "@modelcontextprotocol/sdk": "^1.30.1",
     "express": "^5.2.1",
     "tldts": "^7.4.9",
+    "undici": "^6.29.0",
     "zod": "^4.6.5"
   },
   "devDependencies": {

@@ -5,7 +5,7 @@
  * setting that works for one and is silently ignored by the other.
  */
 
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { getConfig, readBooleanEnv } from '../config.js';
 
 const TRUE_SPELLINGS = ['true', 'TRUE', 'True', ' 1 ', '1', '  true  '];
@@ -28,7 +28,6 @@ describe('boolean environment variables', () => {
     process.env = { ...originalEnv };
     delete process.env.FORMIO_FORCE_BROWSER;
     delete process.env.FORMIO_INSECURE_TLS;
-    delete process.env.NODE_TLS_REJECT_UNAUTHORIZED;
   });
 
   afterEach(() => {
@@ -43,14 +42,6 @@ describe('boolean environment variables', () => {
     }
   }
 
-  // FORMIO_INSECURE_TLS is applied once, when the client module loads.
-  async function insecureTlsAppliedFor(raw: string | undefined): Promise<boolean> {
-    setOrClear('FORMIO_INSECURE_TLS', raw);
-    vi.resetModules();
-    await import('../formio-client.js');
-    return process.env.NODE_TLS_REJECT_UNAUTHORIZED === '0';
-  }
-
   it.each(TRUE_SPELLINGS)('FORMIO_FORCE_BROWSER=%j forces the browser', (raw) => {
     setOrClear('FORMIO_FORCE_BROWSER', raw);
     expect(getConfig().forceBrowser).toBe(true);
@@ -61,11 +52,13 @@ describe('boolean environment variables', () => {
     expect(getConfig().forceBrowser).toBe(false);
   });
 
-  it.each(TRUE_SPELLINGS)('FORMIO_INSECURE_TLS=%j disables certificate checks', async (raw) => {
-    expect(await insecureTlsAppliedFor(raw)).toBe(true);
+  it.each(TRUE_SPELLINGS)('FORMIO_INSECURE_TLS=%j relaxes certificate checks', (raw) => {
+    setOrClear('FORMIO_INSECURE_TLS', raw);
+    expect(getConfig().insecureTls).toBe(true);
   });
 
-  it.each(FALSE_SPELLINGS)('FORMIO_INSECURE_TLS=%j leaves certificate checks on', async (raw) => {
-    expect(await insecureTlsAppliedFor(raw)).toBe(false);
+  it.each(FALSE_SPELLINGS)('FORMIO_INSECURE_TLS=%j leaves certificate checks on', (raw) => {
+    setOrClear('FORMIO_INSECURE_TLS', raw);
+    expect(getConfig().insecureTls).toBe(false);
   });
 });

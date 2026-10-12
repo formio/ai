@@ -119,3 +119,28 @@ export function stubRevisionsLicence(licensed: boolean) {
   vi.stubGlobal('fetch', probe);
   return probe;
 }
+
+/**
+ * The per-login value the login page carries, read from the page at the login URL the
+ * server opened — which carries that value as `s` — the way a browser would receive it;
+ * undefined when the page carries none.
+ */
+export async function loginPageState(loginUrl: string): Promise<string | undefined> {
+  const html = await (await fetch(loginUrl)).text();
+  const match = html.match(/var state = ("[^"\n]*");/);
+  return match ? (JSON.parse(match[1]) as string) : undefined;
+}
+
+/** POSTs a JSON body to the `/callback` of the login server at this login URL. */
+export function postLoginCallback(loginUrl: string, body: unknown): Promise<Response> {
+  return fetch(new URL('/callback', loginUrl), {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+}
+
+/** What the login page posts once the user signs in: the token, with the page's own value. */
+export async function postLoginToken(loginUrl: string, token: string): Promise<Response> {
+  return postLoginCallback(loginUrl, { token, state: await loginPageState(loginUrl) });
+}

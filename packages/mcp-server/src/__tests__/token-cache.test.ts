@@ -1,8 +1,14 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { spawn } from 'child_process';
+import { pathToFileURL } from 'url';
 import { saveToken, readToken, clearToken, signOut, readCacheSnapshot } from '../token-cache.js';
 import fs from 'fs';
 import path from 'path';
 import os from 'os';
+
+const packageRoot = path.resolve(__dirname, '../..');
+const tsxEntry = path.resolve(packageRoot, 'node_modules/tsx/dist/cli.mjs');
+const tokenCacheModule = pathToFileURL(path.resolve(packageRoot, 'src/token-cache.ts')).href;
 
 describe('token-cache', () => {
   let tmpDir: string;
@@ -144,6 +150,64 @@ describe('token-cache', () => {
         'https://a.form.io': 'token-a',
       });
       expect(leftovers()).toEqual([]);
+    });
+  });
+
+  // The cache is shared by every server process and the CLI on the machine. A write
+  // takes the cache's lock and reads the file afresh under it, so two processes saving
+  // tokens for different deployments at once both keep theirs.
+  describe('concurrent writes', () => {
+    it('keeps every deployment when several processes save tokens at once', async () => {
+      const writers = 3;
+      const perWriter = 15;
+      const script = path.join(tmpDir, 'saver.mts');
+      fs.writeFileSync(
+        script,
+        `import { saveToken } from ${JSON.stringify(tokenCacheModule)};
+         const [cacheDir, id, count, startAt] = process.argv.slice(2);
+         while (Date.now() < Number(startAt)) {}
+         for (let i = 0; i < Number(count); i += 1) {
+           await saveToken('https://d' + id + '-' + i + '.example.test', 'token-' + id + '-' + i, cacheDir);
+         }`
+      );
+      const startAt = Date.now() + 3_000;
+      const runs = Array.from({ length: writers }, (_, id) => {
+        const child = spawn(process.execPath, [
+          tsxEntry,
+          script,
+          tmpDir,
+          String(id),
+          String(perWriter),
+          String(startAt),
+        ]);
+        const stderr: string[] = [];
+        child.stderr.on('data', (chunk) => stderr.push(String(chunk)));
+        return new Promise<{ code: number | null; stderr: string }>((resolve) =>
+          child.on('exit', (code) => resolve({ code, stderr: stderr.join('') }))
+        );
+      });
+
+      const results = await Promise.all(runs);
+
+      expect(results).toEqual(results.map(() => ({ code: 0, stderr: '' })));
+      const cache = JSON.parse(
+        fs.readFileSync(path.join(tmpDir, 'mcp-tokens.json'), 'utf-8')
+      ) as Record<string, unknown>;
+      expect(Object.keys(cache)).toHaveLength(writers * perWriter);
+      expect(fs.existsSync(path.join(tmpDir, 'mcp-tokens.json.lock'))).toBe(false);
+    }, 60_000);
+
+    it('signOut and clearToken take the same lock', async () => {
+      await saveToken('https://a.form.io', 'token-a', tmpDir);
+      await saveToken('https://b.form.io', 'token-b', tmpDir);
+      const open = vi.spyOn(fs, 'openSync');
+      const lockFile = path.join(tmpDir, 'mcp-tokens.json.lock');
+
+      signOut({ baseUrl: 'https://a.form.io', cacheDir: tmpDir });
+      await clearToken('https://b.form.io', tmpDir);
+
+      expect(open.mock.calls.filter(([target]) => target === lockFile)).toHaveLength(2);
+      expect(fs.existsSync(lockFile)).toBe(false);
     });
   });
 

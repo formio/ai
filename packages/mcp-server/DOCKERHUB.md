@@ -46,7 +46,7 @@ Works with Claude Code, Claude Desktop, Cursor, VS Code, Windsurf, Cline, and an
 | `FORMIO_AUTH_HOST` | no | Bind address for browser login (default `127.0.0.1`). |
 | `FORMIO_AUTH_PORT` | no | Fixed port for browser login, so it can be published from a container. |
 | `FORMIO_AUTH_TIMEOUT` | no | Seconds to wait for a browser login (default `900`). |
-| `FORMIO_INSECURE_TLS` | no | Set to `1` to skip TLS verification. Local development only. |
+| `FORMIO_INSECURE_TLS` | no | Set to `1` to skip TLS verification only for requests to the configured deployment. Local development only. |
 
 ## Authentication
 

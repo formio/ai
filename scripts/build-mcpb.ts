@@ -240,7 +240,7 @@ function writeManifest(target: string, version: string, tools: object[]) {
   fs.writeFileSync(target, `${JSON.stringify(manifestObject(version, tools), null, 2)}\n`);
 }
 
-async function bundleServer() {
+async function bundleServer(version: string) {
   fs.mkdirSync(path.dirname(SERVER_OUT), { recursive: true });
   await build({
     entryPoints: [SERVER_ENTRY],
@@ -249,6 +249,9 @@ async function bundleServer() {
     platform: 'node',
     format: 'esm',
     target: 'node22',
+    // The bundle carries no package.json, so the version it reports at initialize
+    // and in server_status is written in here (see cli-launch.ts).
+    define: { __FORMIO_MCP_VERSION__: JSON.stringify(version) },
     banner: {
       // Same shim as the plugin build: bundled CJS deps (express) need these globals
       // to resolve inside ESM output.
@@ -300,7 +303,7 @@ export async function buildMcpb() {
   fs.rmSync(SMITHERY_BUNDLE_OUT, { force: true });
   const version = serverVersion();
   // Bundle first: the manifest's tool list is read from the built server.
-  await bundleServer();
+  await bundleServer(version);
   const tools = readToolsFromServer();
   // The MCPB schema allows nothing but a name and description per tool.
   writeManifest(

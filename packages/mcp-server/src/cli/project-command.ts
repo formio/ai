@@ -264,9 +264,15 @@ function runReset(cwd: string, context: CommandContext): ProjectCommandResult {
       typeof values[name] === 'string' ? (values[name] as string) : undefined;
     return `${url('FORMIO_PROJECT_URL') ?? '(no project)'} on ${url('FORMIO_BASE_URL') ?? '(no deployment)'}${entry.forced === true ? ', which was forced' : ''}`;
   };
+  // A directory with no entry of its own may still inherit an ancestor's. Clearing it is
+  // done where it is recorded, which governs every directory beneath it, so it is named
+  // rather than cleared from here.
+  const governing = removed ? undefined : readProjectEntryForWrite(cwd, context.cacheDir);
   const cleared = removed
     ? `Cleared the mapping for ${cwd}: ${held(removed)}.`
-    : `No mapping is recorded for ${cwd}, so there was nothing to clear.`;
+    : governing !== undefined && governing.status !== 'absent' && governing.inherited
+      ? `No mapping is recorded for ${cwd} itself, so there was nothing to clear: ${cwd} inherits the mapping recorded for ${governing.dir}. Resetting that mapping is run there, and applies to every directory beneath it: ${projectCommand(`set --reset --cwd ${governing.dir}`)}`
+      : `No mapping is recorded for ${cwd}, so there was nothing to clear.`;
 
   // What the directory resolves to NOW is asked of the reader, for the same reason
   // every other outcome of this command asks it: a committed formio.json or the
@@ -359,7 +365,7 @@ function runSet(flags: Record<string, string>, context: CommandContext): Project
   // See project_set: an entry that EXISTS and cannot be honoured is not an absent one,
   // and treating it as absent made this command diagnose the environment as holding a
   // project this directory's own record governs.
-  const unusableEntry = unusableRecordProjectUrl(mapped, cwd);
+  const unusableEntry = unusableRecordProjectUrl(mapped);
   // Walked ONCE, for both the plan and the note below. A file too broken to read
   // throws out of here into runProjectCommand's catch, which is right: that is a
   // command that could not answer, not a directory with no project.
@@ -375,6 +381,7 @@ function runSet(flags: Record<string, string>, context: CommandContext): Project
       projectUrl: mapped.status === 'usable' ? mapped.entry.env.FORMIO_PROJECT_URL : undefined,
       baseUrl: mapped.status === 'usable' ? mapped.entry.env.FORMIO_BASE_URL : undefined,
       forced: mapped.status === 'usable' ? mapped.entry.forced : undefined,
+      inheritedFrom: mapped.status === 'usable' && mapped.inherited ? mapped.dir : undefined,
     },
     elsewhere: {
       // Where the project lives when this mapping has none. A file too broken to read
@@ -395,10 +402,16 @@ function runSet(flags: Record<string, string>, context: CommandContext): Project
   // outranks it, so a broken entry beneath one decides nothing — and naming the
   // mapping as "the record that governs this directory" there is the same
   // wrong-record diagnosis this guard exists to stop, one layer up. The plan's own
-  // wrong-record branch answers that case, in the committed file's vocabulary.
-  if (unusableEntry !== undefined && !flags['project-url'] && !committed?.projectUrl) {
+  // wrong-record branch answers that case, in the committed file's vocabulary. The
+  // remedy names the directory that holds the entry, an ancestor's when it is inherited.
+  if (
+    unusableEntry !== undefined &&
+    mapped.status !== 'absent' &&
+    !flags['project-url'] &&
+    !committed?.projectUrl
+  ) {
     return notConfigured(
-      `The mapping for ${cwd} holds an unusable value, so it is the record that governs this directory and it cannot answer with a project: ${unusableEntry} Nothing else supplies the project while that entry is on record. Run: ${projectCommand(`set --project-url <project_url> --cwd ${cwd}`)}\n\n${USAGE}`,
+      `The mapping for ${mapped.dir} holds an unusable value, so it is the record that governs this directory and it cannot answer with a project: ${unusableEntry} Nothing else supplies the project while that entry is on record. Run: ${projectCommand(`set --project-url <project_url> --cwd ${mapped.dir}`)}\n\n${USAGE}`,
       notes
     );
   }
@@ -556,7 +569,9 @@ function runSet(flags: Record<string, string>, context: CommandContext): Project
 
   const block = [
     plan.outcome === 'unchanged'
-      ? `No change for ${cwd}`
+      ? plan.inheritedFrom
+        ? `No change for ${cwd}: the pair is inherited from the mapping for ${plan.inheritedFrom}`
+        : `No change for ${cwd}`
       : // A record that does not take effect is described as RECORDED, never as set.
         shadowedByCommitted
         ? `Recorded for ${cwd}`

@@ -75,8 +75,8 @@ describe('a failed browser login carries the code of its cause', () => {
     const attempt = authenticate(
       { ...CONFIG, loginFormUrl: 'not a url', authTimeoutMs: 60_000 },
       {
-        onReady: (port) => {
-          void fetch(`http://127.0.0.1:${port}/`).catch(() => undefined);
+        onReady: ({ url }) => {
+          void fetch(url).catch(() => undefined);
         },
       }
     );

@@ -23,6 +23,10 @@ delete process.env.FORMIO_BASE_URL;
 // The same for the directory a client launch names: under Claude Code it is set for
 // every spawned process, and a tool given no cwd would resolve against it.
 delete process.env.CLAUDE_PROJECT_DIR;
+// And no certificate setting from the shell: either variable, exported where vitest
+// starts, makes a certificate the suite expects to be refused look accepted.
+delete process.env.FORMIO_INSECURE_TLS;
+delete process.env.NODE_TLS_REJECT_UNAUTHORIZED;
 
 beforeEach(() => {
   fs.rmSync(path.join(tmpHome, '.formio'), { recursive: true, force: true });
