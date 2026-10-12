@@ -283,7 +283,7 @@ export class LogoutComponent implements OnInit {
 
 ## 6. `angular.json` — Bootstrap 5 + Bootstrap Icons
 
-For a new workspace or when the user opts in to Bootstrap 5:
+When the user opts in to Bootstrap 5 and the workspace does not already carry it:
 
 ```jsonc
 // angular.json → projects.<app>.architect.build.options

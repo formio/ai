@@ -47,6 +47,18 @@ function skillMdPathsUnder(dir: string): string[] {
   });
 }
 
+// An installed skill lives wherever the client puts it, not under this
+// repository's plugin/skills/. A path that names that prefix resolves only inside
+// the repository, so a file the agent is told to load would not be there.
+describe('no skill names a repository path', () => {
+  it('no markdown under plugin/skills/ contains plugin/skills/', () => {
+    const offenders = markdownFilesUnder(skillsRoot)
+      .filter((path) => readFileSync(path, 'utf8').includes('plugin/skills/'))
+      .map((path) => relative(repoRoot, path));
+    expect(offenders).toEqual([]);
+  });
+});
+
 describe('no skill hides behind a symlink', () => {
   it('every SKILL.md is reachable without traversing one', () => {
     const throughSymlink = skillMdPathsUnder(skillsRoot).filter((skillMd) => {

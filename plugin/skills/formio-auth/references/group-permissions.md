@@ -29,7 +29,7 @@ Not for:
    - **Many-to-many** (user belongs to many groups): a separate join Resource (`UserTeam`, `UserDepartment`, etc.) with a `user` reference and a group reference, one row per membership.
 3. **A "child" Resource** — the data owned by the group. Examples: `task` (owned by `project`), `customer` (owned by `team`). Holds a group-reference `select` component that points back to the group Resource.
 
-The planner's `complex-crm-transitive` example walks through the many-to-many shape with multiple levels: see `plugin/skills/formio-resource-planner/references/examples/complex-crm-transitive/`.
+The planner's `complex-crm-transitive` example walks through the many-to-many shape with multiple levels: see `../../formio-resource-planner/references/examples/complex-crm-transitive/`.
 
 ### Picking the membership shape
 
@@ -80,7 +80,7 @@ Revocation semantics:
 - Deleting a join row revokes the user's membership in that group — but ONLY because the Action fires on `delete`. Revocation is the diff of the removed row against nothing; with `method: ["create"]` the row disappears and the membership survives. Changing a join row's group field moves the membership the same way, via `update`.
 - Add a Save-Submission filter or Delete Action to the join Resource if you need an audit log of membership changes.
 
-For the canonical Group Assignment Action JSON shape and the join Resource shape, see `plugin/skills/formio-resource-planner/references/template-json.md` → "Group Assignment (Group Permissions)".
+For the canonical Group Assignment Action JSON shape and the join Resource shape, see `../../formio-resource-planner/references/template-json.md` → "Group Assignment (Group Permissions)".
 
 ### Single-level group access (three parts)
 
@@ -91,7 +91,7 @@ For the canonical Group Assignment Action JSON shape and the join Resource shape
 - `settings.user` names the join field that holds the user reference (e.g. `"user"`).
 - On every join submission the platform stores an ACL on the referenced group submission tying the user to the group.
 
-For the canonical Group Assignment Action JSON shape, see `plugin/skills/formio-resource-planner/references/template-json.md` → "Group Assignment (Group Permissions)".
+For the canonical Group Assignment Action JSON shape, see `../../formio-resource-planner/references/template-json.md` → "Group Assignment (Group Permissions)".
 
 **Part 2 — Field-based `submissionAccess` on the child Resource's group-reference select:**
 
@@ -133,7 +133,7 @@ Two boundaries worth stating plainly, because both produce silent failures:
 - **Create is covered by this block** — the server reads the group reference out of the submitted payload and authorizes the create from it. A group-scoped child therefore needs no `create_own`, and adding one would additionally permit creating rows outside the group. What it does need is a create-conferring type (`create`, `write`, or `admin`) and a payload that actually carries the group reference as an object with an `_id`. Block-authorized creates are self-policing, which is why the extra grant is harmful: verified live, a caller who is not a member of the referenced group is refused, a member naming a group they do not belong to is refused, and a payload with no group reference is refused. Add `create_own` and all three succeed — a non-member stamps a row into someone else's group and it appears in that group's lists, and a payload with no group reference saves with `access: []`, invisible to every member including whoever created it and removable only by an administrator. A `validate: { "required": true }` on the group-reference field does not backstop this; on a hidden mirror it is not enforced server-side.
 - **The group resource itself is not covered.** Nothing stamps a group row's own `access`, and membership does not confer read of the group record — read checks and reference population consult `read_all` roles and ownership only. The group resource needs `read_all` for the end-user role, which is also what lets the `dataSrc: "resource"` select populate; an empty select means no group reference in the payload, which means every group-scoped create fails with `Unauthorized` while reads keep working.
 
-For the canonical group-reference select shape, see `plugin/skills/formio-resource-planner/references/template-json.md` → "select — reference to a **group** resource".
+For the canonical group-reference select shape, see `../../formio-resource-planner/references/template-json.md` → "select — reference to a **group** resource".
 
 ### The assigner must have update access on the group
 
@@ -193,7 +193,7 @@ The shape:
 }
 ```
 
-For the canonical transitive-mirror shape, see `plugin/skills/formio-resource-planner/references/template-json.md` → "select — reference to a **group** resource" and "select — transitive group-access mirror".
+For the canonical transitive-mirror shape, see `../../formio-resource-planner/references/template-json.md` → "select — reference to a **group** resource" and "select — transitive group-access mirror".
 
 ### Resource Map vocabulary
 
@@ -216,7 +216,7 @@ Use those tokens when planning the project; once the resources are deployed, thi
 
 ## See also
 
-- `formio-resource-planner` — owns the canonical Group Assignment Action JSON shape, group-reference select shape, and transitive mirror shape. Run the planner first if your data model does not yet include a join Resource or a group-reference select. See `plugin/skills/formio-resource-planner/references/template-json.md` → "select — reference to a **group** resource", "select — transitive group-access mirror", and "Group Assignment (Group Permissions)", and the `complex-crm-transitive` example.
+- `formio-resource-planner` — owns the canonical Group Assignment Action JSON shape, group-reference select shape, and transitive mirror shape. Run the planner first if your data model does not yet include a join Resource or a group-reference select. See `../../formio-resource-planner/references/template-json.md` → "select — reference to a **group** resource", "select — transitive group-access mirror", and "Group Assignment (Group Permissions)", and the `complex-crm-transitive` example.
 - [`roles-and-permissions.md`](./roles-and-permissions.md) — how the eight permission types interact with group ACLs.
 - [`resource-auth.md`](./resource-auth.md) — how a user's roles + group memberships combine into the effective access set the JWT carries.
 - [`../../formio-api/references/runtime-access-control.md`](../../formio-api/references/runtime-access-control.md) — the authoritative runtime description, endpoint by endpoint: the Group Assignment Action grants the user a role tied to the group submission, and the field-based block makes the server stamp the new row's `access` with that group id. Read it when the mechanism itself is in question rather than the shape of the JSON.

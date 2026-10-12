@@ -91,7 +91,7 @@ Form URLs passed to `Formio.createForm` live under the project URL: `{projectUrl
 
 ## MCP Tool Preference
 
-When an embed task requires reading or changing the form definition itself, prefer the MCP server's first-party tools over ad-hoc HTTP requests:
+When an embed task requires the form definition itself, prefer the MCP server's first-party tools over ad-hoc HTTP requests:
 
 - `form_get` / `form_list` — fetch the form JSON you are about to render or inspect its components.
-- `form_update` / `form_create` — persist component changes (conditionals, `calculateValue`, `validate.json`, `logic`) back to the project. The server authenticates implicitly via its browser-based portal-login flow: the first authenticated tool call triggers it on a cache miss, captures a portal JWT, and attaches it to every request as the `x-jwt-token` header via `formioFetch`. There is no explicit authenticate tool. Do not use PKCE or API keys.
+- Writing a change into a saved form — a conditional, `calculateValue`, `validate.json`, `logic` — runs through `formio-form-builder`'s edit lane, which fetches the current definition, shows the change, and asks before `form_update` writes it. This skill supplies the component JSON that lane writes, from its references; it does not call `form_update` itself. The server authenticates implicitly via its browser-based portal-login flow: the first authenticated tool call triggers it on a cache miss, captures a portal JWT, and attaches it to every request as the `x-jwt-token` header via `formioFetch`. There is no explicit authenticate tool. Do not use PKCE or API keys.

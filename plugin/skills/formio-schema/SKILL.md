@@ -9,7 +9,7 @@ license: MIT
 
 # Form.io JSON Schema
 
-This skill describes the JSON schemas for the three Form.io document types whose shape is non-trivial — projects, forms (and resources), and submissions. Action configs live in the `formio-actions` skill; role objects are simple enough to use directly from the `formio-api` reference. Use this skill to construct new JSON payloads, interpret existing ones, or modify them via the MCP server tools.
+This skill describes the JSON schemas for the three Form.io document types whose shape is non-trivial — projects, forms (and resources), and submissions. Action configs live in the `formio-actions` skill; role objects are simple enough to use directly from the `formio-api` reference. Use this skill to construct new JSON payloads, interpret existing ones, or author changes to them. Writing a change into a saved form runs through `formio-form-builder`'s edit lane, which shows the change and asks before `form_update` writes it.
 
 Detail is split across reference files under `references/<domain>/`. Read only the files you need for the task at hand — the overview below is usually enough to orient yourself; load a reference file when you need a specific property list.
 

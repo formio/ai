@@ -234,6 +234,16 @@ describe('preflight contract', () => {
   // the configuration for the client it is running in rather than all four in one
   // pass, and the description says so, because the write-everything path is now a
   // fallback rather than the promise.
+  //
+  // Three entries moved with the routing fix. formio-application claims a new app
+  // that names a framework ("build me a CRM in React") and names only registered
+  // skills in its Not-for clause, because framework-named builds with no plan used
+  // to bounce between it and the framework skills; formio-angular's Not-for sends
+  // an unplanned app to formio-application to match, and formio-application's
+  // Not-for hands it only Angular- or React-named work, so a framework-neutral
+  // extension stays with the orchestrator. formio-mcp-setup no longer
+  // routes logging in to Form.io to formio-auth — the server opens that login on
+  // the first tool call, and formio-auth is about an application's own users.
   it('left every existing description byte-identical', () => {
     const before = JSON.parse(readFileSync(descriptionSnapshot, 'utf8')) as Record<string, string>;
     const now = Object.fromEntries(

@@ -6,7 +6,7 @@ description: >-
 
 # Form.io Resource → Angular CRUD
 
-> **Nested sub-skill.** This file lives at `plugin/skills/formio-angular/formio-angular-resources/SKILL.md` — a sub-folder of the `formio-angular` skill. The `name: formio-angular-resources` frontmatter is preserved for documentation and eval tooling, but this is NOT a separately-registered top-level skill: callers (the `formio-angular` parent, or `formio-application` Step 5) load this file directly by path, the same way `formio-angular` loads `SETUP.md` / `BOOTSTRAP.md` / `CONFIG.md` / `AUTH.md`. Do not invoke it by frontmatter name — load the file.
+> **Nested sub-skill.** This file lives at `formio-angular/formio-angular-resources/SKILL.md` — a sub-folder of the `formio-angular` skill. The `name: formio-angular-resources` frontmatter is preserved for documentation and eval tooling, but this is NOT a separately-registered top-level skill: callers (the `formio-angular` parent, or `formio-application` Step 4) load this file directly by path, the same way `formio-angular` loads `SETUP.md` / `BOOTSTRAP.md` / `CONFIG.md` / `AUTH.md`. Do not invoke it by frontmatter name — load the file.
 
 Turn a Form.io Resource Map into a working Angular application whose CRUD screens are wired through `@formio/angular`'s `FormioResource` module — one module per resource, nested parent/child routing, and bidirectional N:N joins generated from the map.
 
@@ -57,7 +57,7 @@ You are a code generator that plans before it writes: two distinct phases with a
 - **One resource, one NgModule.** Every browsable resource in the map becomes a module with `FormioResourceConfig` + `FormioResourceRoutes()`. No exceptions.
 - **Always override the UI templates.** Every resource module passes a custom `ResourceComponent` AND `ViewComponent` into `FormioResourceRoutes({ resource, view })`; the bare defaults are base classes to SUBCLASS, never shipped unmodified. Routing shape comes from `@formio/angular`; **UI shape is your contribution** — design templates from the resource's fields (see `references/resource-module-patterns.md` → "Designing the ViewComponent from the resource's fields").
 - **Joins are bidirectional by default.** A `(type: resource, join)` entry between two browsable resources becomes two sibling modules, each mounted as a child route under the opposite side's `:id/` view.
-- **Batch your questions.** Ask integration choices (base URL, app name, existing-vs-new workspace, design language) together in ONE question round, using the client's structured question mechanism (in Claude Code, `AskUserQuestion`); do not pepper.
+- **Batch your questions.** Ask the integration choices this sub-skill owns — the workspace root when you were invoked directly, and the design language — together in ONE question round, using the client's structured question mechanism (in Claude Code, `AskUserQuestion`); do not pepper. The Project URL and Base URL are never part of that round: `project_get` resolves them (see "Which project the tools target").
 - **Gate on approval.** Do not write files or emit Phase B until the user has explicitly approved the Phase A plan, which must sketch each resource's `ViewComponent` — not pixel-precise, but enough to sanity-check the design direction before files get generated.
 - **NgModules with `standalone: false`.** `FormioResource` is itself an NgModule and its `ResourceComponent`/`ViewComponent` overrides expect NgModule-based declaration (matches the Form.io docs and the official angular-demo). Do not generate standalone components.
 - **Consult `frontend-design` for every UI surface — always briefed with the Bootstrap 5 stack.** Load it before writing any plan or template, prepending the `FRONTEND_DESIGN_BRIEF` stashed by BOOTSTRAP Step 7d. Never ship a Phase B output that was not reviewed against `frontend-design` with the brief applied; the Phase A plan must explicitly confirm both happened. Full rule + the six overridable template surfaces (`resource`, `view`, plus optional `edit`, `create`, `delete`, `index`): [references/phase-a-plan-template.md](references/phase-a-plan-template.md) → "Consulting `frontend-design`".
@@ -75,7 +75,7 @@ If the user hands you a `template.json` only (no `template.md`), reverse-extract
 
 ## Handoff mode — invoked from a parent skill
 
-You are reached two ways: directly (the user asks for Angular resource work) or via handoff from `formio-angular` (build-new Phase 5) or `formio-application` (modify-existing extend path). **Detect handoff mode first**: the invoking context hands you a payload instead of a conversation. Expected payload fields (any subset may arrive):
+You are reached two ways: directly (the user asks for Angular resource work) or via handoff from `formio-angular` (build-new Phase 5) or `formio-application` (modify-existing extend path). `formio-application`'s side of that contract is stated once, in [`formio-application/FRAMEWORK.md`](../../formio-application/FRAMEWORK.md#handoff-context-reference) → "Handoff context reference"; the list below is what this sub-skill reads from either caller, and no URL is among it. **Detect handoff mode first**: the invoking context hands you a payload instead of a conversation. Expected payload fields (any subset may arrive):
 
 - `workspacePath` — the Angular workspace root. Handoff always supplies this; do NOT ask for it.
 - `templateMdPath` + `templateJsonPath` — the planner pair (see "Inputs you expect").
@@ -95,11 +95,12 @@ Work through these rounds; compress aggressively when the user has already answe
 
 ### 1. Confirm workspace context (direct invocation only — skipped in handoff mode)
 
-One batched question round covering three things — full question wording in [references/interview-guide.md](references/interview-guide.md):
+One batched question round covering these — full question wording in [references/interview-guide.md](references/interview-guide.md):
 
-1. **New or existing Angular workspace?** (existing → workspace root path; new → kebab-case app name)
-2. **Form.io project URL** (`projectUrl`) — the value that goes into `FormioAppConfig.appUrl`. Do not ask for this: resolve it with `project_get` for the workspace directory, and reconcile it against `src/app/config.ts` as above. Ask only when the command itself says a value is missing, and then only for the value it names.
-3. **Design language** — **Bootstrap 5** (matches angular-demo, default), **Tailwind**, **Material**, **the workspace's existing design system**, or **unstyled HTML**. Routing shape is identical regardless; only template classes and markup change.
+1. **Workspace root** — the existing Angular workspace to extend: it must contain `angular.json`. If there is no Angular workspace, stop and route to `formio-angular`, whose application branch creates one (BOOTSTRAP); this sub-skill never creates a workspace. A workspace whose `AppModule` is not yet wired with `FormioAppConfig` is extended here: the plan marks `AppModule` as MODIFY and wires it per [references/app-integration.md](references/app-integration.md).
+2. **Design language** — **Bootstrap 5** (matches angular-demo, default), **Tailwind**, **Material**, **the workspace's existing design system**, or **unstyled HTML**. Routing shape is identical regardless; only template classes and markup change.
+
+The Form.io Project URL (`projectUrl`, which goes into `FormioAppConfig.appUrl`) is not a question in this round: resolve it with `project_get` for the workspace directory, and reconcile it against `src/app/config.ts` as above. Ask only when the report itself says a value is missing, and then only for the value it names.
 
 ### 2. Confirm the resource set
 
@@ -151,13 +152,12 @@ If the user says revise: incorporate the feedback, re-emit, re-ask — iterate u
 
 Only when the user has approved the plan:
 
-1. **If mode = new workspace**: print the exact `ng new` / `ng add` commands, then write the files into the created workspace. If you cannot run `ng new` for the user, print the command and pause until the user runs it and confirms.
-2. **If mode = existing workspace**: write the new files under `src/app/`, modify `app-module.ts` and `app-routing-module.ts` in place — `app.module.ts` and `app-routing.module.ts` on a workspace generated before Angular 20, edited under their own names and never renamed.
-3. Announce each file path as you write it. Short lines; no file-by-file paragraphs.
+1. Write the new files under `src/app/`, modify `app-module.ts` and `app-routing-module.ts` in place — `app.module.ts` and `app-routing.module.ts` on a workspace generated before Angular 20, edited under their own names and never renamed.
+2. Announce each file path as you write it. Short lines; no file-by-file paragraphs.
 
 Use `references/resource-module-patterns.md` for the exact code for every pattern, and `references/app-integration.md` for `AppModule`, `AppRoutingModule`, `AppConfig`, and the home / auth module shapes. Do not improvise structure.
 
-After all files are emitted, finish with a short "Next steps" section. **In handoff mode, trim it**: the parent already scaffolded the workspace (BOOTSTRAP), installed dependencies, and imported the template (orchestrator Step 5) — emit only steps 4–5 (serve + first-user sign-up), and skip step 5 too on the extend path (the app already has users). The full list is for direct invocation:
+After all files are emitted, finish with a short "Next steps" section. **In handoff mode, trim it**: the parent already scaffolded the workspace (BOOTSTRAP), installed dependencies, and imported the template (orchestrator Step 3) — emit only steps 4–5 (serve + first-user sign-up), and skip step 5 too on the extend path (the app already has users). The full list is for direct invocation:
 
 ```
 ### Next steps

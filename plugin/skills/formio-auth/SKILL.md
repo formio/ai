@@ -75,4 +75,4 @@ The planner owns the data model. `formio-auth` owns the auth configuration that 
 - When the user is still designing roles, the user resource, login/registration forms, or a group join, run `formio-resource-planner` first. The planner emits a `template.json` with role objects, the Login Action, the Role Assignment Action, the Group Assignment Action, `submissionAccess` arrays, and field-based `submissionAccess` on group-reference selects.
 - When the user is configuring SSO, Token Swap, Custom JWT, email-token auth, JWT customization, 2FA, reCAPTCHA, or tuning RBAC beyond the planner's defaults, hand off to `formio-auth`.
 
-Action JSON shapes are NOT duplicated here — they live in `plugin/skills/formio-resource-planner/references/template-json.md` and are referenced by file path from this skill.
+Action JSON shapes are NOT duplicated here — they live in `../formio-resource-planner/references/template-json.md` and are referenced by file path from this skill.

@@ -47,7 +47,7 @@ The login form is a normal Form.io form with two components — `email` (type `e
 
 The Login Action's `settings.resources` should be `["user"]` for most cases (or whichever Resource holds the credentials, such as `"admin"` for applications requiring admin logins). `settings.username` names the field that holds the username/email (typically `"email"`); `settings.password` names the password field (typically `"password"`). Brute-force protection is controlled by `allowedAttempts`, `attemptWindow`, and `lockWait`.
 
-For the canonical Login Action JSON shape (priority, handler, method, all field names), see `plugin/skills/formio-resource-planner/references/template-json.md` → "Login".
+For the canonical Login Action JSON shape (priority, handler, method, all field names), see `../../formio-resource-planner/references/template-json.md` → "Login".
 
 ### Registration form + Role Assignment Action
 
@@ -56,11 +56,11 @@ The registration form is a separate form (typically `userRegister`) that writes 
 - A Role Assignment Action (`name: "role"`, `settings.association: "new"`, `settings.type: "add"`, `settings.role: "authenticated"`, `priority: 1`, `handler: ["after"]`) to attach the initial role to the new submission.
 - A Login Action immediately afterward (priority 2, `handler: ["before"]`) so the new user is logged in without a second round-trip.
 
-For the canonical Role Assignment Action JSON shape, see `plugin/skills/formio-resource-planner/references/template-json.md` → "Role Assignment".
+For the canonical Role Assignment Action JSON shape, see `../../formio-resource-planner/references/template-json.md` → "Role Assignment".
 
 ### The `user` Resource
 
-The canonical `user` Resource holds `email` (unique, `protected: false`) and `password` (`protected: true`). Its `submissionAccess` grants the administrator full CRUD and the authenticated role `read_own` + `update_own`. See the planner reference at `plugin/skills/formio-resource-planner/references/template-json.md` → "The canonical `user` resource".
+The canonical `user` Resource holds `email` (unique, `protected: false`) and `password` (`protected: true`). Its `submissionAccess` grants the administrator full CRUD and the authenticated role `read_own` + `update_own`. See the planner reference at `../../formio-resource-planner/references/template-json.md` → "The canonical `user` resource".
 
 ## MCP Tool Preference
 
@@ -76,7 +76,7 @@ If you are seeding a fresh project from a planner-produced `template.json`, `pro
 
 ## See also
 
-- `formio-resource-planner` — owns the canonical JSON shapes for the user Resource, login/registration forms, the Login Action, and the Role Assignment Action. Run the planner first if any of these do not yet exist in the project. See `plugin/skills/formio-resource-planner/SKILL.md` and `plugin/skills/formio-resource-planner/references/template-json.md`.
+- `formio-resource-planner` — owns the canonical JSON shapes for the user Resource, login/registration forms, the Login Action, and the Role Assignment Action. Run the planner first if any of these do not yet exist in the project. See `../../formio-resource-planner/SKILL.md` and `../../formio-resource-planner/references/template-json.md`.
 - [`login-forms.md`](./login-forms.md) — login + registration form shapes in more detail.
 - [`roles-and-permissions.md`](./roles-and-permissions.md) — what each role can do and how the eight permission types layer onto these forms.
 - [`jwt-and-sessions.md`](./jwt-and-sessions.md) — the JWT payload Form.io returns, `jti` Session ID, logout, 2FA, reCAPTCHA.

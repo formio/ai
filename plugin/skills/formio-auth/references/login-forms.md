@@ -43,7 +43,7 @@ Actions:
   - `attemptWindow` — seconds during which `allowedAttempts` is counted (typical 30).
   - `lockWait` — seconds the account stays locked after exceeding `allowedAttempts` (typical 1800 = 30 minutes).
 
-For the full Login Action JSON shape (priority, handler, method, settings), see `plugin/skills/formio-resource-planner/references/template-json.md` → "Login".
+For the full Login Action JSON shape (priority, handler, method, settings), see `../../formio-resource-planner/references/template-json.md` → "Login".
 
 ### Registration form
 
@@ -61,13 +61,13 @@ Access:
 
 Actions (order matters because `priority` is the tie-breaker among handlers at the same phase):
 
-1. **Save Submission** (built-in) — persists the new submission. Priority 10, `handler: ["before"]`.
+1. **Save Submission** with `settings.resource` set to the `user` Resource and `settings.fields` mapping its keys — the default Save Submission `form_create` adds stores submissions on the registration form itself, where the Login Action cannot find them. Priority 11, `handler: ["before"]`.
 2. **Role Assignment Action** — `settings.association: "new"`, `settings.type: "add"`, `settings.role: "authenticated"`. Priority 1, `handler: ["after"]`. Runs after the save so the new submission already has an `_id`.
 3. **Login Action** — `settings.resources: ["user"]`, same field names as the login form. Priority 2, `handler: ["before"]`. Issues the JWT immediately so the new user is logged in without a second round-trip.
 
 If the prompt specifically requires that "admins" log into the application, then you may include `"admin"` in the Login Action's `settings.resources`. It should be noted, however, that most administrative work is performed via the Form.io project portal.
 
-For the canonical action JSON shapes, see `plugin/skills/formio-resource-planner/references/template-json.md` → "Login" and "Role Assignment".
+For the canonical action JSON shapes, see `../../formio-resource-planner/references/template-json.md` → "Login" and "Role Assignment".
 
 ### Anonymous vs admin write paths
 
@@ -86,7 +86,7 @@ The Resource Map terminology used by the planner:
 
 ## See also
 
-- `formio-resource-planner` — owns the canonical login and registration form JSON shapes plus the Login Action and Role Assignment Action shapes. Use the planner first if the forms do not yet exist. See `plugin/skills/formio-resource-planner/references/template-json.md` → "Login" and "Role Assignment" and `plugin/skills/formio-resource-planner/references/examples/task-manager/template.json` for a working end-to-end example.
+- `formio-resource-planner` — owns the canonical login and registration form JSON shapes plus the Login Action and Role Assignment Action shapes. Use the planner first if the forms do not yet exist. See `../../formio-resource-planner/references/template-json.md` → "Login" and "Role Assignment" and `../../formio-resource-planner/references/examples/task-manager/template.json` for a working end-to-end example.
 - [`resource-auth.md`](./resource-auth.md) — the six-step auth flow, the `x-jwt-token` header, and the `user` Resource shape.
 - [`roles-and-permissions.md`](./roles-and-permissions.md) — what `access` and `submissionAccess` actually permit, and how the eight permission types interact.
 - [`jwt-and-sessions.md`](./jwt-and-sessions.md) — the JWT that the Login Action returns and how the renderer carries it.

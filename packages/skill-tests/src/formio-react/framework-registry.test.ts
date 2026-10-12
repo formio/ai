@@ -99,12 +99,25 @@ describe('modify-existing detects rather than asking a preference', () => {
   });
 });
 
-describe('the how-to-add example does not name a live framework', () => {
-  it('uses Vue as the placeholder', () => {
-    const text = framework();
-    const howTo = text.slice(text.indexOf('## How to add a new framework'));
+// FRAMEWORK.md ships to every installation, where a repository path or a test
+// command means nothing; the contributor checklist lives in CONTRIBUTING.md.
+describe('the add-a-framework checklist lives outside the shipped tree', () => {
+  const contributing = () => readFileSync(join(repoRoot, 'CONTRIBUTING.md'), 'utf8');
+
+  it('CONTRIBUTING.md carries it, with Vue as the placeholder', () => {
+    const text = contributing();
+    const start = text.indexOf('### Adding a framework implementor');
+    expect(start).toBeGreaterThan(-1);
+    const howTo = text.slice(start, text.indexOf('\n## ', start));
     expect(howTo).toContain('| Vue | formio-vue |');
     expect(howTo).not.toContain('| React | formio-react |');
+  });
+
+  it('FRAMEWORK.md carries no contributor instructions', () => {
+    const text = framework();
+    expect(text).not.toContain('## How to add a new framework');
+    expect(text).not.toMatch(/npm test|pnpm test/);
+    expect(text).not.toContain('formio-vue');
   });
 
   it('carries no second React detection signal', () => {
@@ -128,9 +141,13 @@ describe('formio-application description', () => {
     return text.slice(start, text.indexOf('\n---', start)).replace(/\s+/g, ' ').trim();
   };
 
-  it('names the React skills in its Not for clause', () => {
-    expect(description()).toContain('formio-react');
-    expect(description()).toContain('formio-react-resources');
+  // Clients register top-level skills only; a nested sub-skill named here is a
+  // route nothing can follow.
+  it('names the framework skills and no nested sub-skill', () => {
+    expect(description()).toContain('`formio-react`');
+    expect(description()).toContain('`formio-angular`');
+    expect(description()).not.toContain('formio-react-resources');
+    expect(description()).not.toContain('formio-angular-resources');
   });
 
   it('still fits the budget', () => {

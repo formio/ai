@@ -41,7 +41,7 @@ This uses the **standard Email action** (not a special "authentication" action).
 - **To** — the recipient's email address (a fixed address, or a value pulled from the triggering submission's data).
 - **Message** — the email body, which contains the magic link with the `[[token(...)]]` macro.
 
-Use `action_type_get` on the `email` action type to inspect its current `settings` schema before authoring, since transport and template fields evolve faster than other actions. For general action shape conventions in `template.json`, see `plugin/skills/formio-resource-planner/references/template-json.md`.
+Use `action_type_get` on the `email` action type to inspect its current `settings` schema before authoring, since transport and template fields evolve faster than other actions. For general action shape conventions in `template.json`, see `../../formio-resource-planner/references/template-json.md`.
 
 ### The token macro
 
@@ -115,7 +115,7 @@ The recipient authenticates **as their existing Resource record**, carrying what
 - **Read All** / **Update All** → Manager (managers review and edit submissions).
 - Remove Anonymous access to the form so it requires login.
 
-For the canonical Role Assignment Action JSON shape used to assign a role to a Resource's records, see `plugin/skills/formio-resource-planner/references/template-json.md`. Design the underlying Resource and role with `formio-resource-planner` if they are not yet in place.
+For the canonical Role Assignment Action JSON shape used to assign a role to a Resource's records, see `../../formio-resource-planner/references/template-json.md`. Design the underlying Resource and role with `formio-resource-planner` if they are not yet in place.
 
 ### Security considerations
 
@@ -137,7 +137,7 @@ For Email Transport secrets (host, port, credentials), use the Form.io project p
 
 ## See also
 
-- `formio-resource-planner` — owns the canonical Role Assignment Action shape and the underlying Resource model. See `plugin/skills/formio-resource-planner/references/template-json.md`.
+- `formio-resource-planner` — owns the canonical Role Assignment Action shape and the underlying Resource model. See `../../formio-resource-planner/references/template-json.md`.
 - [`resource-auth.md`](./resource-auth.md) — the underlying Form.io auth flow that email-token auth slots into.
 - [`jwt-and-sessions.md`](./jwt-and-sessions.md) — the JWT the token resolves to and how sessions / logout work after `setToken`.
 - [`roles-and-permissions.md`](./roles-and-permissions.md) — what the recipient's role can do once authenticated.

@@ -8,7 +8,7 @@ The existing-application branch. This is **not** a greenfield run with steps ski
 
 Report all of the following before modifying a single file:
 
-- **Router style.** Does the application route through React Router's **data-router** API (`createBrowserRouter`), or through `<BrowserRouter>` with `<Routes>` alone? See step 2 — this one is a gate.
+- **Router style.** Does the application route through React Router's **data-router** API (`createBrowserRouter`), or through `<BrowserRouter>` with `<Routes>` alone — or neither, because a framework owns routing? Steps 2 and 3 are gates on this finding.
 - **Packages.** Are `@formio/react` and `@formio/js` installed, and at what versions?
 - **Router package and major.** Is routing on `react-router` 7 or 8, or on `react-router-dom` 6 or 7? The generated kernel imports from `react-router`, which needs version 7 or later; on `react-router-dom` 6.4 or later, generate the same imports from `react-router-dom` instead. Never upgrade the router major without approval: version 8 needs React 19.2.7 or newer and Node 22.22 or newer, and it removes `react-router-dom` altogether, so the bump reaches every file that imports the router.
 - **Renderer stylesheets — both of them.** `@formio/js/dist/formio.form.css` carries the `.formio-*` and `.choices*` rules, and a Bootstrap 5 stylesheet supplies the classes the default template emits. An application that predates this guidance commonly has the Bootstrap half and not the renderer's own, which renders every reference select as an unstyled list. Check for each separately; a form missing either looks broken rather than erroring.
@@ -18,7 +18,11 @@ Report all of the following before modifying a single file:
 
 State what you found. Then backfill ONLY what is missing.
 
-## 2. The data-router gate
+## 2. The rendering-mode gate — Next.js and framework mode stop here
+
+Check how the application renders before the router-style finding means anything. A `next` dependency or a `next.config.*` file is Next.js; `@react-router/dev` in `devDependencies`, a `react-router.config.*` file, or `@remix-run/*` packages are React Router framework mode or its Remix predecessor. Both are out of scope for this branch: their routes are declared by the framework, so the generated data-router resources have nowhere to mount. Detect this **before writing any file**, say so plainly, and stop. Offer what does fit — embedding individual forms through the embed branch, whose `formio-react-form` documents the Next.js client-component requirement. **Never offer to convert such an application to `createBrowserRouter`**: that replaces its framework rather than migrating its routing.
+
+## 3. The data-router gate
 
 The generated resources require loaders and actions. An application on `<Routes>` alone cannot host them.
 
@@ -26,7 +30,7 @@ Detect this **before writing any file**. On detection, explain the constraint pl
 
 **Never migrate routing without that explicit approval.** Routing is shared infrastructure the whole application depends on, and a silent migration is a change nobody asked for. If the user declines, stop and say what is blocked.
 
-## 3. Backfill only what is missing
+## 4. Backfill only what is missing
 
 - **No provider** → load [`CONFIG.md`](./CONFIG.md).
 - **No auth surface** → load [`AUTH.md`](./AUTH.md).
@@ -34,7 +38,7 @@ Detect this **before writing any file**. On detection, explain the constraint pl
 
 **Integrate with what exists; do not replace it.** Leaving a satisfied prerequisite alone is not the same as ignoring it. An application with its own authentication gets no second login surface generated — `AUTH.md` does not run — but the generated resource routes still have to protect themselves through that existing mechanism, so record its current-user source in the handoff and wire the generated code to it. An application with an established design language does not need `frontend-design` skipped either — it needs composition within that language. Where integration genuinely is not possible, raise it with the user rather than overwriting.
 
-## 4. Hand off
+## 5. Hand off
 
 Load [`formio-react-resources/SKILL.md`](./formio-react-resources/SKILL.md) by path, with `branch: 'existing'` and the inspection findings in the payload. The sub-skill generates different code for an application whose auth and layout it must integrate with than for one the greenfield chain just wrote, and it cannot tell the two apart from a workspace path alone.
 

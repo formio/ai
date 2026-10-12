@@ -8,7 +8,7 @@ This directory holds everything a teammate needs to run evals against the skill 
 | --- | --- |
 | `evals.json` | The test prompts + expected outcomes. Three cases: task-manager (simple), user-team-bidirectional (N:N + existing-workspace merge), complex-crm-transitive (deep hierarchy with hidden mirrors). |
 | `grade.py` | Converts subagent outputs → pass/fail grades (≈18 structural assertions per eval). Reads run outputs from `.eval-artifacts/`; writes `grading.json` next to each run. |
-| `fixtures/existing-workspace-seed/` | A minimal, buildable Angular 21 NgModule workspace (the shape `ng new --no-standalone` generates: `app-module.ts`, `app-routing-module.ts`, zoneless, no `zone.js`) that eval-1 requires. Keep it on the Angular major `BOOTSTRAP.md` targets, and run `npm install && npx ng build` in a scratch copy after changing it. Copy it into the eval's `with_skill/outputs/workspace/` and `without_skill/outputs/workspace/` so the subagents have something to merge into. |
+| `fixtures/existing-workspace-seed/` | A minimal, buildable Angular 21 NgModule workspace (the shape `ng new --no-standalone` generates: `app-module.ts`, `app-routing-module.ts`, zoneless, no `zone.js`) that every eval extends. Keep it on the Angular major `BOOTSTRAP.md` targets, and run `npm install && npx ng build` in a scratch copy after changing it. Copy it into the eval's `with_skill/outputs/workspace/` and `without_skill/outputs/workspace/` so the subagents have something to merge into. |
 
 ## The iteration loop
 
@@ -28,11 +28,14 @@ mkdir -p $OUT/eval-0-task-manager-simple/{with_skill,without_skill}/outputs
 mkdir -p $OUT/eval-1-user-team-bidirectional/{with_skill,without_skill}/outputs
 mkdir -p $OUT/eval-2-complex-crm-transitive/{with_skill,without_skill}/outputs
 
-# eval-1 needs an existing Angular workspace to merge INTO
-cp -R packages/skill-tests/evals/formio-angular-resources/fixtures/existing-workspace-seed \
-      $OUT/eval-1-user-team-bidirectional/with_skill/outputs/workspace
-cp -R packages/skill-tests/evals/formio-angular-resources/fixtures/existing-workspace-seed \
-      $OUT/eval-1-user-team-bidirectional/without_skill/outputs/workspace
+# Every eval extends an existing Angular workspace: the sub-skill never creates
+# one (formio-angular's BOOTSTRAP does), so seed each run with the fixture.
+for eval in eval-0-task-manager-simple eval-1-user-team-bidirectional eval-2-complex-crm-transitive; do
+  for run in with_skill without_skill; do
+    cp -R packages/skill-tests/evals/formio-angular-resources/fixtures/existing-workspace-seed \
+          $OUT/$eval/$run/outputs/workspace
+  done
+done
 
 # Carry forward eval_metadata.json from a previous iteration if you want to keep the assertion set
 # OR regenerate by editing evals.json — `grade.py` embeds its own assertions, so metadata is optional.

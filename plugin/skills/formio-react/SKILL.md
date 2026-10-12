@@ -1,7 +1,7 @@
 ---
 name: formio-react
 description: >-
-  React framework implementor for the Form.io skill library — a router over three branches: build a greenfield React application around a Form.io project, add Form.io resource CRUD to a React application that already exists, or embed a single form. Targets Vite, React Router data routers, and `@formio/react`. Claims ONLY React-explicit triggers. Use when the user says "build it in React", "React front-end for this Form.io project", "use React", "use `@formio/react`", "the React skill", "add Form.io CRUD to my React app", "wire this Form.io project into my existing React app", or "embed a Form.io form in React". Not for: framework-agnostic app requests (see `formio-application`); planning a data model (see `formio-resource-planner`); framework-agnostic embed/render-a-form requests (see `formio-form`); Angular work (see `formio-angular`); REST endpoint lookups (see `formio-api`).
+  React framework implementor for the Form.io skill library — a router over three branches: build a greenfield React application around a Form.io project, add Form.io resource CRUD to a React application that already exists, or embed a single form. Targets Vite, React Router data routers, and `@formio/react`. Claims ONLY React-explicit triggers. Use when the user says "build it in React", "React front-end for this Form.io project", "use React", "use `@formio/react`", "the React skill", "add Form.io CRUD to my React app", "wire this Form.io project into my existing React app", or "embed a Form.io form in React". Not for: a new app whose data model is not yet planned, React-named or not (see `formio-application`); planning a data model (see `formio-resource-planner`); framework-agnostic embed/render-a-form requests (see `formio-form`); Angular work (see `formio-angular`); REST endpoint lookups (see `formio-api`).
 ---
 
 # Form.io + React — Framework Implementor
@@ -76,7 +76,7 @@ Load [`EXISTING.md`](./EXISTING.md). It inspects the application and reports bef
 
 This skill never runs the planner and never imports. `formio-resource-planner` and template import into a Form.io project both belong to `formio-application`.
 
-When you are invoked directly by a React-explicit trigger, expect an already-approved `template.json` and a project the template has been imported into. **When neither exists, ask the user to invoke `formio-application` first** rather than planning yourself — that skill runs the planner, imports, and hands off to you. The chain cannot usefully proceed without the plan in any case: BOOTSTRAP sizes the workspace against it, AUTH renders the planner's login and registration forms, and Resources generates from it.
+When you are invoked directly by a React-explicit trigger, expect an already-approved `template.json` and a project the template has been imported into. **When neither exists, hand the request to `formio-application`, carrying React as the chosen framework** — say so in one line, then load it — rather than planning yourself or asking the user to re-invoke anything. That skill runs the planner, imports, and hands back to you without asking the framework question again. The chain cannot usefully proceed without the plan in any case: BOOTSTRAP sizes the workspace against it, AUTH renders the planner's login and registration forms, and Resources generates from it.
 
 ## Target stack
 
@@ -90,7 +90,7 @@ React Router's data-router API (`createBrowserRouter` with `RouteObject` arrays)
 
 Load `./formio-react-resources/SKILL.md` by path as the last step of BOTH CRUD branches. Do not invoke it by frontmatter name.
 
-Payload — the field names `formio-angular` uses, so `formio-application` needs no per-framework adaptation, plus two this skill adds for its own two CRUD branches (`formio-application` sends neither; the sub-skill defaults a missing `branch` to `'existing'` and runs `EXISTING.md`'s inspection itself):
+Payload — the fields `formio-application` sends are defined in [`formio-application/FRAMEWORK.md`](../formio-application/FRAMEWORK.md) → "Handoff context reference", the same for every framework so the orchestrator needs no per-framework adaptation; this skill adds two for its own two CRUD branches (`formio-application` sends neither; the sub-skill defaults a missing `branch` to `'existing'` and runs `EXISTING.md`'s inspection itself):
 
 - `workspacePath`
 - `templateMdPath` and `templateJsonPath`
