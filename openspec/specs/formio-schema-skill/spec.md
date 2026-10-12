@@ -1,9 +1,7 @@
 ## Purpose
 
 Defines the `formio-schema` skill: one consolidated router over domain-partitioned references for the form, submission, and project JSON shapes, and the scoping that keeps its bare-noun triggers inside Form.io JSON contexts.
-
 ## Requirements
-
 ### Requirement: Consolidated Form.io JSON schema skill
 
 The `formio-schema` skill SHALL be the single Form.io JSON schema reference skill in the library. The historical form-schema reference skill once named `formio-form` SHALL remain merged into `formio-schema`; the `formio-form` name is now used by the separate embed skill (see the `formio-form-skill` capability), whose scope is rendering/embedding with `@formio/js`, not JSON schema authoring.
@@ -224,3 +222,21 @@ The `formio-schema` `SKILL.md` frontmatter `description` SHALL scope its noun tr
 
 - **WHEN** the `formio-schema` `SKILL.md` frontmatter is inspected
 - **THEN** its `description` contains no blanket claim to trigger on the bare nouns when the user has not said Form.io and no Form.io JSON context exists
+
+### Requirement: Access shapes MUST match the server's access schema
+
+- `references/submission/submission-access.md` SHALL state that a submission's `access` is computed by the server — cleared on every create and update and rebuilt from the form's component-level `submissionAccess` — so a client never sets it.
+- Submission access examples SHALL use the submission access types `read`, `create`, `update`, `delete`, `write`, and `admin`, keyed by `resources`.
+- `references/form/form-definition.md` SHALL list every form access type, including `read_own` and `self`.
+- `references/project/project-access.md` SHALL NOT state that every layer uses the same access types: projects and forms use role-keyed types, submissions a resource-keyed set.
+
+#### Scenario: Submission access is server-computed
+
+- **WHEN** `submission-access.md` is read
+- **THEN** it states that the server sets `access` and does not present it as a field the client writes
+
+#### Scenario: No read_all in submission access
+
+- **WHEN** the submission definition example is parsed
+- **THEN** its `access` entries use the submission access types, not `read_all`
+

@@ -1,9 +1,7 @@
 ## Purpose
 
 Defines the trigger boundaries of the `formio-resource-planner` skill: it claims planning verbs only, routes build intents to `formio-application`, and routes standalone single-form creation to `formio-form-builder`.
-
 ## Requirements
-
 ### Requirement: formio-resource-planner description routes standalone single-form creation to formio-form-builder
 
 The `formio-resource-planner` `SKILL.md` frontmatter `description` SHALL contain a `Not for:` pointer at `` `formio-form-builder` `` for standalone single-form creation requests — building or creating one form (a survey, contact form, intake form, registration form, questionnaire, wizard, or PDF form) without designing a data model, resources, or permissions. The planner keeps claiming data-model, resource, and app-planning triggers; only the single-form creation intent is excluded.
@@ -46,3 +44,27 @@ The `formio-resource-planner` `SKILL.md` frontmatter `description` SHALL claim o
 - **WHEN** the user says "design the resources for a task manager" or "plan the data model for my CRM"
 - **THEN** `formio-resource-planner` activates
 - **AND** `formio-application` does not activate
+
+### Requirement: The planner MUST describe action order as the server runs it
+
+`references/template-json.md` and `references/phase-b-emission.md` SHALL state that within one handler phase the action with the higher `priority` runs first, and that every `before` action runs before every `after` action. The order they describe for a register form SHALL be the order the emitted numbers and handlers produce: Save (before), Login (before), then Role Assignment (after). The emitted priority values are unchanged.
+
+#### Scenario: No "higher runs later"
+
+- **WHEN** `template-json.md` is searched for "higher runs later"
+- **THEN** no match is found
+
+#### Scenario: Described order matches emitted values
+
+- **WHEN** the register-form order in `phase-b-emission.md` is compared with the handlers and priorities `template-json.md` emits
+- **THEN** the described order is the order the server runs them in
+
+### Requirement: Persona Role Assignment actions are documented as create-only
+
+Every document that describes the conditional `user:role<Persona>` actions SHALL state that they run on create only, by design, and SHALL NOT say they cover users who are edited.
+
+#### Scenario: No "created or edited"
+
+- **WHEN** the planner's and `formio-actions`' persona-action text is read
+- **THEN** it states create-only and does not say "created or edited"
+
