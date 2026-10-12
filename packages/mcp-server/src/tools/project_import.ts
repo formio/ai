@@ -1,7 +1,7 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 import { FormioConfig } from '../config.js';
-import { formioFetch } from '../formio-client.js';
+import { formioFetch, TEMPLATE_TRANSFER_TIMEOUT_MS } from '../formio-client.js';
 import { toMcpError, toMcpStructuredResult } from '../mcp-responses.js';
 import { acknowledgementOutput } from '../output-schemas.js';
 import { overwrites } from '../tool-annotations.js';
@@ -28,6 +28,7 @@ export function registerProjectImportTool(server: McpServer, config: FormioConfi
           method: 'POST',
           body: { template },
           responseType: 'text',
+          timeoutMs: TEMPLATE_TRANSFER_TIMEOUT_MS,
         });
         // The endpoint answers with a short status string rather than a document,
         // so it is passed through as the text view unchanged.

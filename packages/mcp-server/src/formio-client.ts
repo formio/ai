@@ -3,7 +3,13 @@ import { getAuthHeader } from './auth-header.js';
 import { ensureAuthenticated, invalidateJwtCache } from './ensure-auth.js';
 import { clearToken } from './token-cache.js';
 import { requireBaseUrl } from './project-resolver.js';
-import { FormioApiError, FormioNetworkError, ToolError } from './tool-errors.js';
+import { checkCurrentUser } from './token-validation.js';
+import {
+  FormioApiError,
+  FormioNetworkError,
+  FormioPermissionError,
+  ToolError,
+} from './tool-errors.js';
 
 // For a self-signed deployment, such as a local Form.io Enterprise server.
 if (readBooleanEnv(process.env.FORMIO_INSECURE_TLS)) {
@@ -16,11 +22,22 @@ export function isMongoId(value: string): boolean {
   return MONGO_ID_PATTERN.test(value);
 }
 
+/** How long a Form.io request may go unanswered, unless FORMIO_REQUEST_TIMEOUT says otherwise. */
+export const DEFAULT_REQUEST_TIMEOUT_MS = 60_000;
+
+/**
+ * How long `project_import` and `project_export` wait: a large template legitimately
+ * takes minutes, so these are not shortened by FORMIO_REQUEST_TIMEOUT.
+ */
+export const TEMPLATE_TRANSFER_TIMEOUT_MS = 300_000;
+
 export interface FormioFetchOptions {
   method?: string;
   body?: unknown;
   responseType?: 'text' | 'json';
   signal?: AbortSignal;
+  /** This request's timeout, in place of the configured or default one. */
+  timeoutMs?: number;
   /** Return `{ data, total }`, reading the total from an index route's Content-Range. */
   withMeta?: boolean;
 }
@@ -91,26 +108,48 @@ async function readBody(response: Response): Promise<string | undefined> {
   }
 }
 
+export interface SendInit extends RequestInit {
+  /** Aborts the request after this many milliseconds; DEFAULT_REQUEST_TIMEOUT_MS when absent. */
+  timeoutMs?: number;
+}
+
 /**
  * `fetch`, with a request that received no response raised as a FormioNetworkError
- * naming the cause and the URL — the one wrapper every Form.io request goes through.
+ * naming the cause and the URL — the one wrapper every Form.io request goes through,
+ * and so the one place every request is given a timeout. A caller's own `signal`
+ * still aborts it, and that abort keeps its own reason rather than reading as a
+ * timeout.
  */
-export async function send(url: URL, init: RequestInit): Promise<Response> {
+export async function send(
+  url: URL,
+  { timeoutMs = DEFAULT_REQUEST_TIMEOUT_MS, ...init }: SendInit
+): Promise<Response> {
+  const timeout = AbortSignal.timeout(timeoutMs);
+  const signal = init.signal ? AbortSignal.any([init.signal, timeout]) : timeout;
   try {
-    return await fetch(url, init);
+    return await fetch(url, { ...init, signal });
   } catch (cause) {
-    throw new FormioNetworkError({ url: url.toString(), cause });
+    const timedOut = timeout.aborted && signal.reason === timeout.reason;
+    throw new FormioNetworkError({
+      url: url.toString(),
+      cause,
+      ...(timedOut ? { timeoutMs } : {}),
+    });
   }
 }
 
-function buildFetchInit(config: FormioConfig, options?: FormioFetchOptions): RequestInit {
+function buildFetchInit(config: FormioConfig, options?: FormioFetchOptions): SendInit {
   const hasBody = options?.body !== undefined;
   const headers: Record<string, string> = {
     ...getAuthHeader(config),
     ...(hasBody ? { 'Content-Type': 'application/json' } : {}),
   };
 
-  const init: RequestInit = { headers, redirect: 'manual' };
+  const init: SendInit = {
+    headers,
+    redirect: 'manual',
+    timeoutMs: options?.timeoutMs ?? config.requestTimeoutMs ?? DEFAULT_REQUEST_TIMEOUT_MS,
+  };
   if (options?.method) {
     init.method = options.method;
   }
@@ -137,6 +176,17 @@ export async function formioRawFetch(
     // so an unreachable state raises the actionable error instead of keying
     // the cache under "undefined".
     const baseUrl = requireBaseUrl(config);
+    // Form.io also answers 401 to a signed-in account it refuses, so the token is
+    // checked before it is discarded: one /current still accepts is kept, and the
+    // refusal is reported rather than answered with a login that cannot change it.
+    const current = await checkCurrentUser({ ...config, baseUrl });
+    if (current.accepted) {
+      throw new FormioPermissionError({
+        url: url.toString(),
+        account: current.account,
+        body: await readBody(response),
+      });
+    }
     invalidateJwtCache(baseUrl);
     await clearToken(baseUrl);
     config.jwt = undefined;

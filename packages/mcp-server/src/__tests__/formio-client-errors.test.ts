@@ -157,16 +157,21 @@ describe('formioFetch raises a FormioApiError for an error response', () => {
     mockEnsureAuth.mockImplementation(async () => {
       jwtConfig.jwt = 'still-bad';
     });
-    mockFetch
-      .mockResolvedValueOnce(errorResponse(401, 'Unauthorized'))
-      .mockResolvedValueOnce(errorResponse(401, 'Token expired'));
+    const answers = [errorResponse(401, 'Unauthorized'), errorResponse(401, 'Token expired')];
+    // /current refuses the token, so the 401 is re-authenticated and retried.
+    mockFetch.mockImplementation(async (input: URL | string) =>
+      String(input) === `${config.baseUrl}/current`
+        ? errorResponse(401, 'Unauthorized')
+        : answers.shift()
+    );
 
     const error = (await caught(formioFetch('form', {}, jwtConfig))) as FormioApiError;
 
     expect(error).toBeInstanceOf(FormioApiError);
     expect(error.status).toBe(401);
     expect(error.body).toBe('Token expired');
-    expect(mockFetch).toHaveBeenCalledTimes(2);
+    // The request, the /current check, and the one retry.
+    expect(mockFetch).toHaveBeenCalledTimes(3);
   });
 });
 
@@ -209,5 +214,109 @@ describe('formioFetch raises a FormioNetworkError when no response arrives', () 
     const error = (await caught(formioFetch('form', {}, config))) as FormioNetworkError;
 
     expect(error.message).toContain('ECONNREFUSED');
+  });
+});
+
+// AbortSignal.timeout runs on Node's own timers, which fake timers do not reach, so
+// these shorten the real timeout instead: the configured duration is still the one
+// asked for and the one the message names.
+describe('formioFetch times out a request that receives no response', () => {
+  const mockFetch = vi.fn();
+  const realTimeout = AbortSignal.timeout.bind(AbortSignal);
+
+  // A deployment that accepts the request and never answers: only an abort ends it.
+  const hang = (_input: URL | string, init?: RequestInit) =>
+    new Promise((_, reject) => {
+      init?.signal?.addEventListener('abort', () => reject(init.signal?.reason));
+    });
+
+  // What a request still in flight after a second settles to, so a missing timeout
+  // fails the assertion rather than the test's own time limit.
+  const STILL_WAITING = 'still waiting after 1 second';
+  const settled = (attempt: Promise<unknown>) =>
+    Promise.race([
+      caught(attempt),
+      new Promise((resolve) => setTimeout(() => resolve(STILL_WAITING), 1000)),
+    ]);
+
+  // Makes the timeout of `ms` fire at once, leaving every other duration as asked.
+  function shorten(ms: number) {
+    return vi
+      .spyOn(AbortSignal, 'timeout')
+      .mockImplementation((asked) => realTimeout(asked === ms ? 5 : asked));
+  }
+
+  beforeEach(() => {
+    vi.stubGlobal('fetch', mockFetch);
+    mockEnsureAuth.mockReset();
+    mockFetch.mockReset();
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('aborts after 60 seconds by default, as NETWORK_ERROR naming the URL and the wait', async () => {
+    const timeout = shorten(60_000);
+    mockFetch.mockImplementation(hang);
+
+    const error = (await settled(formioFetch('form', {}, config))) as FormioNetworkError;
+
+    expect(error).toBeInstanceOf(FormioNetworkError);
+    expect(timeout).toHaveBeenCalledWith(60_000);
+    expect(error.code).toBe('NETWORK_ERROR');
+    expect(error.message).toContain('timed out after 60 seconds');
+    expect(error.message).toContain(`${TEST_PROJECT_URL}/form`);
+  });
+
+  it('uses the configured request timeout in place of the default', async () => {
+    const timeout = shorten(5_000);
+    mockFetch.mockImplementation(hang);
+
+    const error = (await settled(
+      formioFetch('form', {}, { ...config, requestTimeoutMs: 5_000 })
+    )) as FormioNetworkError;
+
+    expect(error).toBeInstanceOf(FormioNetworkError);
+    expect(timeout).toHaveBeenCalledWith(5_000);
+    expect(timeout).not.toHaveBeenCalledWith(60_000);
+    expect(error.code).toBe('NETWORK_ERROR');
+    expect(error.message).toContain('timed out after 5 seconds');
+  });
+
+  it('gives a per-call timeout precedence over the configured one', async () => {
+    const timeout = vi.spyOn(AbortSignal, 'timeout');
+    mockFetch.mockResolvedValue(new Response('Ok', { status: 200 }));
+
+    await formioFetch(
+      'import',
+      {},
+      { ...config, requestTimeoutMs: 5_000 },
+      {
+        method: 'POST',
+        body: { template: {} },
+        responseType: 'text',
+        timeoutMs: 300_000,
+      }
+    );
+
+    expect(timeout).toHaveBeenCalledWith(300_000);
+    expect(timeout).not.toHaveBeenCalledWith(5_000);
+    expect((mockFetch.mock.calls[0][1] as RequestInit).signal).toBeInstanceOf(AbortSignal);
+  });
+
+  it('lets a caller signal abort the request with its own reason, not a timeout', async () => {
+    const controller = new AbortController();
+    const reason = new Error('caller stopped waiting');
+    mockFetch.mockImplementation(hang);
+
+    const attempt = caught(formioFetch('form', {}, config, { signal: controller.signal }));
+    // After the auth gate, once the request is in flight.
+    await vi.waitFor(() => expect(mockFetch).toHaveBeenCalled());
+    controller.abort(reason);
+    const error = (await attempt) as FormioNetworkError;
+
+    expect(error.cause).toBe(reason);
+    expect(error.message).not.toMatch(/timed out/);
   });
 });

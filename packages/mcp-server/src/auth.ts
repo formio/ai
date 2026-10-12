@@ -171,7 +171,7 @@ async function checkLoginForm(
   const url = new URL(loginFormUrl);
   url.searchParams.set('select', '_id');
   const loginForm = await formioRawFetch(url, config, {
-    signal: AbortSignal.timeout(LOGIN_FORM_PROBE_TIMEOUT_MS),
+    timeoutMs: LOGIN_FORM_PROBE_TIMEOUT_MS,
   }).catch(() => null);
   return (loginForm as { _id?: string } | null)?._id ? true : false;
 }
@@ -306,17 +306,18 @@ export async function authenticate(
       const port = addr.port;
       // A wildcard bind is not a usable address to visit, so advertise loopback.
       const reachableHost = host === '0.0.0.0' || host === '::' ? '127.0.0.1' : host;
-      loginUrl = `http://${reachableHost}:${port}/`;
+      const url = `http://${reachableHost}:${port}/`;
+      loginUrl = url;
 
       // Always print the URL. It is the only recourse where no browser can be
       // launched — a container, an SSH session, CI — and without it the user has
       // no way to reach the login page.
-      process.stderr.write(`Form.io login required: ${loginUrl}\n`);
+      process.stderr.write(`Form.io login required: ${url}\n`);
 
-      openInBrowser(loginUrl, (err) => {
+      openInBrowser(url, (err) => {
         process.stderr.write(
           `Could not open a browser automatically (${err.message}). ` +
-            `Open the URL above manually to finish signing in.\n`
+            `Open ${url} manually to finish signing in.\n`
         );
       });
       options?.onReady?.(port);

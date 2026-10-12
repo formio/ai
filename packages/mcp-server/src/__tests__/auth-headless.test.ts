@@ -1,11 +1,17 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { execFile } from 'child_process';
+import { ChildProcess, spawn } from 'child_process';
+import { EventEmitter } from 'node:events';
 import net from 'node:net';
 import { authenticate } from '../auth.js';
 import { browserLaunchCommand } from '../browser-launch.js';
 import { ResolvedFormioConfig } from '../config.js';
 
-vi.mock('child_process', () => ({ execFile: vi.fn() }));
+vi.mock('child_process', () => ({ spawn: vi.fn() }));
+
+// A child that started: an emitter, so a test can raise the 'error' a failed start emits.
+function startedChild() {
+  return Object.assign(new EventEmitter(), { unref: vi.fn() }) as unknown as ChildProcess;
+}
 
 // forceBrowser because these tests exercise the browser path itself: the suite
 // runs on CI, which is exactly what browserless detection refuses to launch a
@@ -53,7 +59,7 @@ describe('authenticate in headless environments', () => {
       stderr.push(typeof chunk === 'string' ? chunk : Buffer.from(chunk).toString());
       return true;
     });
-    vi.mocked(execFile).mockReset();
+    vi.mocked(spawn).mockReset().mockImplementation(startedChild);
   });
 
   afterEach(() => {
@@ -95,15 +101,11 @@ describe('authenticate in headless environments', () => {
   // The spawn failure was previously swallowed, leaving no clue why nothing
   // opened.
   it('reports a failure to launch the browser instead of swallowing it', async () => {
-    vi.mocked(execFile).mockImplementation(((
-      _file: string,
-      _args: readonly string[],
-      _options: unknown,
-      cb?: (err: Error | null) => void
-    ): unknown => {
-      cb?.(new Error('spawn xdg-open ENOENT'));
-      return {};
-    }) as unknown as typeof execFile);
+    vi.mocked(spawn).mockImplementation(() => {
+      const child = startedChild();
+      queueMicrotask(() => child.emit('error', new Error('spawn xdg-open ENOENT')));
+      return child;
+    });
 
     await authenticate(DEFAULT_CONFIG, {
       onReady: async (port) => {
@@ -163,7 +165,7 @@ describe('authenticate in headless environments', () => {
     // Launched without a shell, the URL as an argument of its own.
     const loginUrl = `http://127.0.0.1:${observedPort}/`;
     const { command, args } = browserLaunchCommand(loginUrl);
-    const [file, passedArgs] = vi.mocked(execFile).mock.calls[0] ?? [];
+    const [file, passedArgs] = vi.mocked(spawn).mock.calls[0] ?? [];
     expect(file).toBe(command);
     expect(passedArgs).toEqual(args);
     expect(passedArgs).toContain(loginUrl);

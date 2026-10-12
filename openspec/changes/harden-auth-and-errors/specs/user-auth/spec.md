@@ -16,9 +16,9 @@ The login page SHALL be opened by starting the platform's opener (`open` on macO
 
 ### Requirement: Only a found login form is remembered
 
-The login-form lookup SHALL cache, per deployment, only a login form it found. A lookup that fails or finds none SHALL NOT be cached, so the next login tries again.
+The login-form lookup SHALL cache, per project (keyed by the deployment and the Project URL), only a login form it found. A lookup that fails or finds none SHALL NOT be cached, so the next login tries again. This is the lookup's existing behaviour, pinned by a regression test.
 
 #### Scenario: A failed lookup is retried
 
-- **WHEN** a login-form lookup fails and a later login runs for the same deployment
+- **WHEN** a login-form lookup fails and a later login runs for the same project
 - **THEN** the later login performs the lookup again

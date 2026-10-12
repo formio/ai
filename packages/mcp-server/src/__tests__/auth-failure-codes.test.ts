@@ -10,7 +10,9 @@ import { authenticate, loginFormFailed } from '../auth.js';
 import { FormioNetworkError, ToolError } from '../tool-errors.js';
 import { ResolvedFormioConfig } from '../config.js';
 
-vi.mock('child_process', () => ({ execFile: vi.fn() }));
+vi.mock('child_process', () => ({
+  spawn: vi.fn(() => ({ on: vi.fn(), unref: vi.fn() })),
+}));
 
 const CONFIG: ResolvedFormioConfig = {
   baseUrl: 'https://formio.invalid/sub',

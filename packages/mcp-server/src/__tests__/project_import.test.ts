@@ -40,10 +40,13 @@ describe('project_import tool', () => {
 
     await client.callTool({ name: 'project_import', arguments: { cwd: TEST_CWD, template } });
 
+    // A large template legitimately takes minutes, so the import waits 300 seconds
+    // whatever FORMIO_REQUEST_TIMEOUT sets for everyday calls.
     expect(mockFormioFetch).toHaveBeenCalledWith('import', {}, TEST_CONFIG, {
       method: 'POST',
       body: { template },
       responseType: 'text',
+      timeoutMs: 300_000,
     });
   });
 

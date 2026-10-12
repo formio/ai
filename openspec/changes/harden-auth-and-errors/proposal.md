@@ -7,7 +7,7 @@ Four paths still cost a user a browser login, a hung call, or a 500 they did not
 - On Linux, the browser launcher's child process can stay attached to the browser, and its buffered output is capped at 1 MB; a chatty browser is then terminated, sometimes mid-login.
 - `project_import` sends any object. Form.io's importer reads `template.forms` and `template.resources` unconditionally (`templates/import.js`), so a template missing either fails server-side with a 500.
 
-And two gaps leave the user without a lever: there is no way to sign out or switch accounts (the running server keeps its token in memory), and a failed login-form lookup is remembered for the session.
+And one gap leaves the user without a lever: there is no way to sign out or switch accounts (the running server keeps its token in memory).
 
 ## What Changes
 
@@ -16,7 +16,7 @@ And two gaps leave the user without a lever: there is no way to sign out or swit
 - **The browser is launched detached**, with its output discarded, so the launcher never holds or terminates it. The login URL is still printed every time.
 - **Sign out:** a new `formio-mcp project logout` CLI subcommand clears the cached token for the directory's deployment (or a named `--base-url`). The running server notices: before reusing an in-memory token it checks the cache still holds it, and logs in again when it does not. No MCP tool is added.
 - **`project_import` checks the template's shape** before sending it: `forms` and `resources` must be objects (empty is fine), and `roles` / `actions`, when present, must be objects. Anything else is `INVALID_ARGUMENT` naming the key.
-- **The login-form lookup caches only a found form**; a failed lookup is tried again on the next login.
+- **The login-form lookup's caching is pinned by a test**: it already caches only a found form (since the initial release), so a failed lookup is tried again on the next login; a regression test now holds that, with no code change.
 - **Docs:** `plugin/README.md` no longer says a mapping entry falls back to environment values for a half it omits; halves are never combined across records.
 - Changesets: `minor` for `@formio/mcp` (new CLI subcommand and env var), `patch` for `@formio/ai` (README). Both fold into the pending 1.0 major.
 
@@ -30,7 +30,7 @@ None.
 
 - `formio-client`: a 401 with a valid token is a permission refusal, not a re-login; requests time out.
 - `lazy-auth`: re-authentication on 401 runs only after `/current` refuses the token; an in-memory token removed from the cache is not reused.
-- `user-auth`: the browser is launched detached; the login-form lookup caches only a found form.
+- `user-auth`: the browser is launched detached; the login-form lookup's existing found-only caching is pinned as a requirement.
 - `token-cache`: a CLI command clears a deployment's cached token.
 - `project-import`: the template's shape is checked before it is sent.
 - `server-config`: `FORMIO_REQUEST_TIMEOUT` sets the request timeout.

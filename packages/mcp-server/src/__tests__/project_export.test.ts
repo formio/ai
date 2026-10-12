@@ -37,7 +37,11 @@ describe('project_export tool', () => {
 
     const result = await client.callTool({ name: 'project_export', arguments: { cwd: TEST_CWD } });
 
-    expect(mockFormioFetch).toHaveBeenCalledWith('export', {}, TEST_CONFIG);
+    // Exporting a large project takes as long as importing it: 300 seconds, whatever
+    // FORMIO_REQUEST_TIMEOUT sets for everyday calls.
+    expect(mockFormioFetch).toHaveBeenCalledWith('export', {}, TEST_CONFIG, {
+      timeoutMs: 300_000,
+    });
     expect(result.content).toEqual([{ type: 'text', text: JSON.stringify(template, null, 2) }]);
   });
 

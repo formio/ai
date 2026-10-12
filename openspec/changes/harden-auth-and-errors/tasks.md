@@ -3,50 +3,50 @@
 
 ### Red
 
-- [ ] 1.1 Write failing tests in `formio-client.test.ts`: a 401 with a JWT and `/current` 200 (`data.email`) → `FORBIDDEN`-coded error with status 401 naming the email and URL; token not cleared (memory and disk); gate not called; no retry
-- [ ] 1.2 Write failing tests: `/current` non-2xx, redirect, timeout, or network failure → today's clear/gate/retry path; API-key 401 → no `/current` request, no retry
-- [ ] 1.3 Update `lazy-auth` tests: the re-auth scenarios assert `/current` refused first; add the permission-refusal scenario (no browser opens)
+- [x] 1.1 Write failing tests in `formio-client.test.ts`: a 401 with a JWT and `/current` 200 (`data.email`) → `FORBIDDEN`-coded error with status 401 naming the email and URL; token not cleared (memory and disk); gate not called; no retry
+- [x] 1.2 Write failing tests: `/current` non-2xx, redirect, timeout, or network failure → today's clear/gate/retry path; API-key 401 → no `/current` request, no retry
+- [x] 1.3 Update `lazy-auth` tests: the re-auth scenarios assert `/current` refused first; add the permission-refusal scenario (no browser opens)
 
 ### Green
 
-- [ ] 1.4 Implement the `/current` check in `formioRawFetch` (shared helper with `token-validation.ts`), returning a `ToolError` FORBIDDEN with status 401
+- [x] 1.4 Implement the `/current` check in `formioRawFetch` (shared helper with `token-validation.ts`), returning a `ToolError` FORBIDDEN with status 401
 
 ### Refactor
 
-- [ ] 1.5 Review implementation and refactor as needed
+- [x] 1.5 Review implementation and refactor as needed
 
 ## 2. Request timeouts
 <!-- depends_on: none -->
 
 ### Red
 
-- [ ] 2.1 Write failing tests: a request with no response aborts after the default (fake timers or a test-supplied timeout) with `NETWORK_ERROR` naming the URL and seconds; a caller `signal` still aborts with its own error
-- [ ] 2.2 Write failing tests: `project_import` / `project_export` use 300 s; `FORMIO_REQUEST_TIMEOUT=5` sets the default to 5 s and does not change import/export; `0` / `abc` / unset → 60 s
+- [x] 2.1 Write failing tests: a request with no response aborts after the default (fake timers or a test-supplied timeout) with `NETWORK_ERROR` naming the URL and seconds; a caller `signal` still aborts with its own error
+- [x] 2.2 Write failing tests: `project_import` / `project_export` use 300 s; `FORMIO_REQUEST_TIMEOUT=5` sets the default to 5 s and does not change import/export; `0` / `abc` / unset → 60 s
 
 ### Green
 
-- [ ] 2.3 Implement the timeout in `formioRawFetch` (`AbortSignal.any` with `AbortSignal.timeout`), the env var in `config.ts`, and the 300 s option on the two tools
+- [x] 2.3 Implement the timeout in `formioRawFetch` (`AbortSignal.any` with `AbortSignal.timeout`), the env var in `config.ts`, and the 300 s option on the two tools
 
 ### Refactor
 
-- [ ] 2.4 Review implementation and refactor as needed
+- [x] 2.4 Review implementation and refactor as needed
 
 ## 3. Detached browser launch and the login-form cache
 <!-- depends_on: none -->
 
 ### Red
 
-- [ ] 3.1 Write failing tests in `browser-launch.test.ts`: `spawn` called with `{ stdio: 'ignore', detached: true, windowsHide: true }`, `unref()` called, an `'error'` event calls `onError`; `execFile` not used
-- [ ] 3.2 Write a failing test that the login URL is printed on stderr when the launch succeeds and when it fails
-- [ ] 3.3 Write a failing test that a failed login-form lookup is retried by the next login for the same deployment, and a found one is reused
+- [x] 3.1 Write failing tests in `browser-launch.test.ts`: `spawn` called with `{ stdio: 'ignore', detached: true, windowsHide: true }`, `unref()` called, an `'error'` event calls `onError`; `execFile` not used
+- [x] 3.2 Write a failing test that the login URL is printed on stderr when the launch succeeds and when it fails
+- [x] 3.3 Write a regression test that a failed login-form lookup is retried by the next login for the same project, and a found one is reused (the lookup already caches only a found form; no code change)
 
 ### Green
 
-- [ ] 3.4 Switch `browser-launch.ts` to a detached `spawn`; cache only found login forms in `auth.ts`
+- [x] 3.4 Switch `browser-launch.ts` to a detached `spawn`
 
 ### Refactor
 
-- [ ] 3.5 Review implementation and refactor as needed
+- [x] 3.5 Review implementation and refactor as needed
 
 ## 4. Sign out
 <!-- depends_on: 1 -->

@@ -1,4 +1,4 @@
-import { execFile } from 'child_process';
+import { spawn } from 'child_process';
 
 export interface BrowserLaunchCommand {
   command: string;
@@ -30,15 +30,24 @@ export function browserLaunchCommand(
 }
 
 /**
- * Opens `url` in the default browser without a shell. A launch failure goes to
- * `onError`; the caller decides how to tell the user, since only it knows what
- * the page was for.
+ * Opens `url` in the default browser without a shell. A failure to start the opener
+ * goes to `onError`; the caller decides how to tell the user, since only it knows
+ * what the page was for.
+ *
+ * Detached, with every stream ignored and the child unreferenced: `xdg-open` can keep
+ * the browser as its own child, and a launcher that buffers that output, waits on it,
+ * or caps it would hold — or terminate — the browser mid-login. Only a failure to
+ * start is observed; the opener's exit status never was reliable (Windows'
+ * `rundll32` reports none), so the caller prints the URL every time.
  */
 export function openInBrowser(url: string, onError?: (err: Error) => void): void {
   const { command, args } = browserLaunchCommand(url);
-  execFile(command, args, { windowsHide: true }, (err) => {
-    if (err) {
-      onError?.(err);
-    }
-  });
+  try {
+    const child = spawn(command, args, { stdio: 'ignore', detached: true, windowsHide: true });
+    // Always listened for: an 'error' with no listener is thrown, taking the server down.
+    child.on('error', (err) => onError?.(err));
+    child.unref();
+  } catch (err) {
+    onError?.(err instanceof Error ? err : new Error(String(err)));
+  }
 }

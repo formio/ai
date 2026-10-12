@@ -13,6 +13,7 @@ describe('getConfig', () => {
     delete process.env.FORMIO_LOGIN_FORM;
     delete process.env.FORMIO_FORCE_BROWSER;
     delete process.env.FORMIO_PLUGIN_CONTEXT;
+    delete process.env.FORMIO_REQUEST_TIMEOUT;
   });
 
   afterEach(() => {
@@ -124,6 +125,22 @@ describe('getConfig', () => {
     process.env.FORMIO_FORCE_BROWSER = '1';
 
     expect(getConfig().forceBrowser).toBe(true);
+  });
+
+  // Seconds, read like FORMIO_AUTH_TIMEOUT: a positive integer, anything else ignored
+  // so the client keeps its 60-second default.
+  it('reads FORMIO_REQUEST_TIMEOUT as seconds', () => {
+    process.env.FORMIO_REQUEST_TIMEOUT = '5';
+    expect(getConfig().requestTimeoutMs).toBe(5_000);
+  });
+
+  it.each([['0'], ['abc'], ['-3'], ['1.5'], ['']])('ignores FORMIO_REQUEST_TIMEOUT=%j', (raw) => {
+    process.env.FORMIO_REQUEST_TIMEOUT = raw;
+    expect(getConfig().requestTimeoutMs).toBeUndefined();
+  });
+
+  it('leaves requestTimeoutMs unset when FORMIO_REQUEST_TIMEOUT is unset', () => {
+    expect(getConfig().requestTimeoutMs).toBeUndefined();
   });
 
   it('leaves forceBrowser false when FORMIO_FORCE_BROWSER is unset', () => {

@@ -7,7 +7,7 @@ After #91 every tool error carries a code, network failures are typed (`FormioNe
 - `browser-launch.ts` uses `execFile` with a callback. `xdg-open` can keep the browser as its child; `execFile` buffers that output (1 MB cap) and kills the child when the cap is passed.
 - `ensure-auth.ts` keeps a per-deployment JWT in memory and reuses it without consulting the cache file, so removing the file entry has no effect on a running server.
 - `project_import` forwards any object. Form.io's `/import` reads `Object.values(template.forms)` and `Object.values(template.resources)` before anything else (`templates/import.js:1170`); `roles` and `actions` are read only when present.
-- `auth.ts` caches the resolved login-form URL per deployment for the process, including a lookup that failed.
+- `auth.ts` caches the resolved login-form URL per project (keyed by deployment and Project URL) for the process, and only a lookup that found a form — the case since the initial release — but nothing pins that behaviour.
 
 ## Goals / Non-Goals
 
@@ -44,8 +44,8 @@ After #91 every tool error carries a code, network failures are typed (`FormioNe
 **5. Template shape checked against what the importer reads.**
 `forms` and `resources` are required plain objects (empty allowed) because the importer reads both unconditionally; `roles` and `actions`, when present, must be plain objects. Other keys pass through untouched (Form.io accepts `reports`, `revisions`, `name`, and so on). The refusal names the key and says entries are keyed by machine name — the common mistake is an array.
 
-**6. Cache only a found login form.**
-The resolved-form map stores only success; a failure is returned and forgotten.
+**6. Pin the found-only login-form cache.**
+The resolved-form map already stores only success; a failure is returned and forgotten. This change adds a regression test that a failed lookup is retried by the next login and a found one is reused, with no code change.
 
 **7. Docs follow the pair rule.**
 `plugin/README.md`'s footnote stops saying a mapping falls back to environment values for an omitted half; it says the mapping's own pair is used and the environment is a separate, weaker record.

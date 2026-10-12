@@ -1,9 +1,11 @@
-import { execFile } from 'child_process';
+import { spawn } from 'child_process';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { authenticate } from '../auth.js';
 import { ResolvedFormioConfig } from '../config.js';
 
-vi.mock('child_process', () => ({ execFile: vi.fn() }));
+vi.mock('child_process', () => ({
+  spawn: vi.fn(() => ({ on: vi.fn(), unref: vi.fn() })),
+}));
 
 const CONFIG: ResolvedFormioConfig = {
   baseUrl: 'https://formio.invalid/sub',
@@ -21,7 +23,7 @@ describe('authenticate on a browserless host', () => {
     delete process.env.SSH_CONNECTION;
     delete process.env.SSH_TTY;
     process.env.CI = 'true';
-    vi.mocked(execFile).mockReset();
+    vi.mocked(spawn).mockClear();
     vi.spyOn(process.stderr, 'write').mockImplementation((): boolean => true);
   });
 
@@ -66,7 +68,7 @@ describe('authenticate on a browserless host', () => {
   it('never launches a browser', async () => {
     await expect(authenticate(CONFIG)).rejects.toThrow();
 
-    expect(vi.mocked(execFile)).not.toHaveBeenCalled();
+    expect(vi.mocked(spawn)).not.toHaveBeenCalled();
   });
 
   it('never binds a port', async () => {

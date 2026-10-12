@@ -125,6 +125,8 @@ export interface FormioConfig {
   authHost?: string;
   authPort?: number;
   authTimeoutMs?: number;
+  /** FORMIO_REQUEST_TIMEOUT: replaces the client's default request timeout when set. */
+  requestTimeoutMs?: number;
   forceBrowser?: boolean;
 }
 
@@ -209,6 +211,7 @@ export function getConfig(): FormioConfig {
     authHost: process.env.FORMIO_AUTH_HOST || undefined,
     authPort: parsePositiveInt(process.env.FORMIO_AUTH_PORT),
     authTimeoutMs: toMilliseconds(parsePositiveInt(process.env.FORMIO_AUTH_TIMEOUT)),
+    requestTimeoutMs: toMilliseconds(parsePositiveInt(process.env.FORMIO_REQUEST_TIMEOUT)),
     forceBrowser: readBooleanEnv(process.env.FORMIO_FORCE_BROWSER),
   };
 }

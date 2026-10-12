@@ -102,6 +102,43 @@ describe('auth URLs are built from the deployment, not the project’s host', ()
     expect(second).toBe(`${DEPLOYMENT}/other/user/login`);
   });
 
+  // Only a found form is remembered: a lookup that found none — a deployment that was
+  // briefly unreachable, say — is tried again by the next login, while a found one is
+  // reused without probing again.
+  it('retries a failed login-form lookup on the next login and reuses a found one', async () => {
+    const probed: string[] = [];
+    let reachable = false;
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: URL | string) => {
+        const url = String(input).split('?')[0];
+        probed.push(url);
+        const found = reachable && url === `${DEPLOYMENT}/formio/user/login`;
+        return {
+          ok: found,
+          status: found ? 200 : 503,
+          headers: new Headers({ 'content-type': 'application/json' }),
+          json: async () => (found ? { _id: 'form-id' } : {}),
+          text: async () => (found ? '{"_id":"form-id"}' : '{}'),
+        } as unknown as Response;
+      })
+    );
+
+    const { resolveDefaultLoginFormUrl } = await import('../auth.js');
+
+    await resolveDefaultLoginFormUrl(config);
+    const afterFailure = probed.length;
+    expect(afterFailure).toBeGreaterThan(0);
+
+    reachable = true;
+    expect(await resolveDefaultLoginFormUrl(config)).toBe(`${DEPLOYMENT}/formio/user/login`);
+    const afterFound = probed.length;
+    expect(afterFound).toBeGreaterThan(afterFailure);
+
+    expect(await resolveDefaultLoginFormUrl(config)).toBe(`${DEPLOYMENT}/formio/user/login`);
+    expect(probed.length).toBe(afterFound);
+  });
+
   // The Security Module probe is an anonymous GET to the DEPLOYMENT's config.js.
   // Built from the project instead it fetches a path that does not serve that file,
   // silently resolves "unlicensed", and strips a user's revisions setting on every

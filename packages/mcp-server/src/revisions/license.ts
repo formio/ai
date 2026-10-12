@@ -34,7 +34,7 @@ export type RevisionsLicence = DefiniteLicence | { state: 'unknown'; failure: To
 
 async function probeLicence(url: URL): Promise<RevisionsLicence> {
   try {
-    const response = await send(url, { signal: AbortSignal.timeout(LICENCE_PROBE_TIMEOUT_MS) });
+    const response = await send(url, { timeoutMs: LICENCE_PROBE_TIMEOUT_MS });
     if (!response.ok) {
       return {
         state: 'unknown',
