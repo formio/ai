@@ -26,10 +26,22 @@ export function isMongoId(value: string): boolean {
 export const DEFAULT_REQUEST_TIMEOUT_MS = 60_000;
 
 /**
- * How long `project_import` and `project_export` wait: a large template legitimately
- * takes minutes, so these are not shortened by FORMIO_REQUEST_TIMEOUT.
+ * The least `project_import` and `project_export` wait: a large template legitimately
+ * takes minutes, so FORMIO_REQUEST_TIMEOUT does not shorten these.
  */
-export const TEMPLATE_TRANSFER_TIMEOUT_MS = 300_000;
+const TEMPLATE_TRANSFER_TIMEOUT_MS = 300_000;
+
+/**
+ * How long a template transfer waits: TEMPLATE_TRANSFER_TIMEOUT_MS, or the configured
+ * request timeout when that is longer — so FORMIO_REQUEST_TIMEOUT can lengthen a
+ * transfer but never shorten one.
+ */
+export function templateTransferTimeoutMs(config: FormioConfig): number {
+  return Math.max(
+    TEMPLATE_TRANSFER_TIMEOUT_MS,
+    config.requestTimeoutMs ?? DEFAULT_REQUEST_TIMEOUT_MS
+  );
+}
 
 export interface FormioFetchOptions {
   method?: string;
@@ -219,6 +231,7 @@ export async function formioRawFetch(
         url: url.toString(),
         account: current.account,
         body: await readBody(response),
+        baseUrl,
       });
     }
     invalidateJwtCache(baseUrl);

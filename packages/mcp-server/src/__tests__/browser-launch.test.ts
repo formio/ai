@@ -97,7 +97,39 @@ describe('openInBrowser', () => {
   it('does not report success as a failure', () => {
     const onError = vi.fn();
     openInBrowser(URL, onError);
+    child.emit('exit', 0, null);
 
     expect(onError).not.toHaveBeenCalled();
+  });
+
+  // xdg-open and open exit non-zero when they cannot open the URL — no browser, no
+  // handler for it — and the caller then prints the "open it manually" hint.
+  it('reports an opener that exits non-zero, naming the command and the code', () => {
+    const onError = vi.fn();
+    openInBrowser(URL, onError);
+
+    child.emit('exit', 3, null);
+
+    const { command } = browserLaunchCommand(URL);
+    expect(onError).toHaveBeenCalledOnce();
+    const [error] = onError.mock.calls[0] as [Error];
+    expect(error.message).toContain(command);
+    expect(error.message).toContain('3');
+  });
+
+  it('reports a failure once when the opener fails to start and then exits', () => {
+    const onError = vi.fn();
+    openInBrowser(URL, onError);
+
+    child.emit('error', new Error('spawn xdg-open ENOENT'));
+    child.emit('exit', 1, null);
+
+    expect(onError).toHaveBeenCalledOnce();
+  });
+
+  it('handles a non-zero exit with no caller listening', () => {
+    openInBrowser(URL);
+
+    expect(() => child.emit('exit', 1, null)).not.toThrow();
   });
 });

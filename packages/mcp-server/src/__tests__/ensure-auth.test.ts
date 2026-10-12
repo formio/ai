@@ -6,6 +6,7 @@ vi.mock('../token-cache.js', () => ({
   readToken: vi.fn(),
   saveToken: vi.fn(),
   clearToken: vi.fn(),
+  readCacheSnapshot: vi.fn(),
 }));
 
 vi.mock('../token-validation.js', () => ({
@@ -16,13 +17,14 @@ vi.mock('../auth.js', () => ({
   authenticate: vi.fn(),
 }));
 
-import { readToken, saveToken, clearToken } from '../token-cache.js';
+import { readToken, saveToken, clearToken, readCacheSnapshot } from '../token-cache.js';
 import { validateToken } from '../token-validation.js';
 import { authenticate } from '../auth.js';
 
 const mockReadToken = vi.mocked(readToken);
 const mockSaveToken = vi.mocked(saveToken);
 const mockClearToken = vi.mocked(clearToken);
+const mockReadCacheSnapshot = vi.mocked(readCacheSnapshot);
 const mockValidateToken = vi.mocked(validateToken);
 const mockAuthenticate = vi.mocked(authenticate);
 
@@ -31,6 +33,18 @@ function makeJwt(expSecondsFromNow: number): string {
     Buffer.from(JSON.stringify(obj)).toString('base64url');
   const exp = Math.floor(Date.now() / 1000) + expSecondsFromNow;
   return `${encode({ alg: 'HS256' })}.${encode({ exp })}.sig`;
+}
+
+const BASE_URL = 'https://formio.invalid/sub';
+
+// What the cache file holds for the deployment: the cold path reads it through
+// readToken, the check before reusing an in-memory token through readCacheSnapshot.
+function diskHolds(token: string | null): void {
+  mockReadToken.mockResolvedValue(token);
+  mockReadCacheSnapshot.mockReturnValue({
+    fingerprint: { mtimeMs: 1, size: 1, ino: 1 },
+    tokens: token === null ? {} : { [BASE_URL]: token },
+  });
 }
 
 describe('ensureAuthenticated', () => {
@@ -148,7 +162,7 @@ describe('ensureAuthenticated', () => {
       baseUrl: 'https://formio.invalid/sub',
       projectUrl: 'https://formio.invalid/sub/example',
     };
-    mockReadToken.mockResolvedValue('cached-jwt');
+    diskHolds('cached-jwt');
     mockValidateToken.mockResolvedValue(true);
 
     await ensureAuthenticated(config);
@@ -161,8 +175,9 @@ describe('ensureAuthenticated', () => {
     };
     await ensureAuthenticated(second);
 
-    // The on-disk entry is read — it still holds the same token — and nothing else runs.
-    expect(mockReadToken).toHaveBeenCalledWith('https://formio.invalid/sub');
+    // The on-disk entry is checked — it still holds the same token — and nothing else runs.
+    expect(mockReadCacheSnapshot).toHaveBeenCalled();
+    expect(mockReadToken).not.toHaveBeenCalled();
     expect(mockValidateToken).not.toHaveBeenCalled();
     expect(mockAuthenticate).not.toHaveBeenCalled();
     expect(second.jwt).toBe('cached-jwt');
@@ -175,11 +190,11 @@ describe('ensureAuthenticated', () => {
       baseUrl: 'https://formio.invalid/sub',
       projectUrl: 'https://formio.invalid/sub/example',
     };
-    mockReadToken.mockResolvedValue('cached-jwt');
+    diskHolds('cached-jwt');
     mockValidateToken.mockResolvedValue(true);
     await ensureAuthenticated(config);
 
-    mockReadToken.mockResolvedValue(null);
+    diskHolds(null);
     mockAuthenticate.mockResolvedValue('signed-in-again');
     const next: ResolvedFormioConfig = {
       baseUrl: 'https://formio.invalid/sub',
@@ -197,13 +212,13 @@ describe('ensureAuthenticated', () => {
       baseUrl: 'https://formio.invalid/sub',
       projectUrl: 'https://formio.invalid/sub/example',
     };
-    mockReadToken.mockResolvedValue('first-account');
+    diskHolds('first-account');
     mockValidateToken.mockResolvedValue(true);
     await ensureAuthenticated(config);
     mockValidateToken.mockClear();
 
     // Signed in under another account from elsewhere: the file now holds its token.
-    mockReadToken.mockResolvedValue('second-account');
+    diskHolds('second-account');
     const next: ResolvedFormioConfig = {
       baseUrl: 'https://formio.invalid/sub',
       projectUrl: 'https://formio.invalid/sub/example',
@@ -225,6 +240,53 @@ describe('ensureAuthenticated', () => {
     expect(after.jwt).toBe('second-account');
   });
 
+  // A file torn by a concurrent writer, or otherwise unreadable, says nothing about the
+  // token: it is not a sign-out, so the token in memory is kept and no login starts.
+  it('keeps the in-memory token when the cache file cannot be read', async () => {
+    diskHolds('cached-jwt');
+    mockValidateToken.mockResolvedValue(true);
+    await ensureAuthenticated({ baseUrl: BASE_URL, projectUrl: `${BASE_URL}/example` });
+    mockValidateToken.mockClear();
+
+    mockReadToken.mockResolvedValue(null);
+    mockReadCacheSnapshot.mockReturnValue({ fingerprint: { mtimeMs: 2, size: 9, ino: 2 } });
+    const next: ResolvedFormioConfig = { baseUrl: BASE_URL, projectUrl: `${BASE_URL}/example` };
+    await ensureAuthenticated(next);
+
+    expect(next.jwt).toBe('cached-jwt');
+    expect(mockAuthenticate).not.toHaveBeenCalled();
+    expect(mockValidateToken).not.toHaveBeenCalled();
+    expect(mockClearToken).not.toHaveBeenCalled();
+  });
+
+  // The file is re-read only when it changed: each check hands the last snapshot back,
+  // and readCacheSnapshot reuses it while the file's stat is unchanged.
+  it('hands the previous snapshot back on each check', async () => {
+    diskHolds('cached-jwt');
+    mockValidateToken.mockResolvedValue(true);
+    await ensureAuthenticated({ baseUrl: BASE_URL, projectUrl: `${BASE_URL}/example` });
+
+    await ensureAuthenticated({ baseUrl: BASE_URL, projectUrl: `${BASE_URL}/example` });
+    const first = mockReadCacheSnapshot.mock.results[0].value;
+    await ensureAuthenticated({ baseUrl: BASE_URL, projectUrl: `${BASE_URL}/example` });
+
+    expect(mockReadCacheSnapshot).toHaveBeenNthCalledWith(1, { previous: undefined });
+    expect(mockReadCacheSnapshot).toHaveBeenNthCalledWith(2, { previous: first });
+  });
+
+  it('starts from no snapshot after resetAuthState()', async () => {
+    diskHolds('cached-jwt');
+    mockValidateToken.mockResolvedValue(true);
+    await ensureAuthenticated({ baseUrl: BASE_URL, projectUrl: `${BASE_URL}/example` });
+    await ensureAuthenticated({ baseUrl: BASE_URL, projectUrl: `${BASE_URL}/example` });
+
+    resetAuthState();
+    await ensureAuthenticated({ baseUrl: BASE_URL, projectUrl: `${BASE_URL}/example` });
+    await ensureAuthenticated({ baseUrl: BASE_URL, projectUrl: `${BASE_URL}/example` });
+
+    expect(mockReadCacheSnapshot).toHaveBeenLastCalledWith({ previous: undefined });
+  });
+
   it('concurrent calls resolve via a single login flow', async () => {
     const config: ResolvedFormioConfig = {
       baseUrl: 'https://formio.invalid/sub',
@@ -244,6 +306,25 @@ describe('ensureAuthenticated', () => {
     expect(mockAuthenticate).toHaveBeenCalledOnce();
     expect(mockSaveToken).toHaveBeenCalledOnce();
     expect(config.jwt).toBe('shared-jwt');
+  });
+
+  // Every tool call resolves its own config object, so a caller that joins a login
+  // already in flight must still end up holding the token on ITS object.
+  it('gives every concurrent caller the new JWT on its own config object', async () => {
+    const configFor = (): ResolvedFormioConfig => ({
+      baseUrl: 'https://formio.invalid/sub',
+      projectUrl: 'https://formio.invalid/sub/example',
+    });
+    const callers = [configFor(), configFor(), configFor()];
+    mockReadToken.mockResolvedValue(null);
+    mockAuthenticate.mockImplementation(
+      () => new Promise((resolve) => setTimeout(() => resolve('shared-jwt'), 20))
+    );
+
+    await Promise.all(callers.map((caller) => ensureAuthenticated(caller)));
+
+    expect(mockAuthenticate).toHaveBeenCalledOnce();
+    expect(callers.map((caller) => caller.jwt)).toEqual(['shared-jwt', 'shared-jwt', 'shared-jwt']);
   });
 
   it('after rejection, a subsequent call retries fresh', async () => {

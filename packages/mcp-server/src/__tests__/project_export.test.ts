@@ -37,8 +37,8 @@ describe('project_export tool', () => {
 
     const result = await client.callTool({ name: 'project_export', arguments: { cwd: TEST_CWD } });
 
-    // Exporting a large project takes as long as importing it: 300 seconds, whatever
-    // FORMIO_REQUEST_TIMEOUT sets for everyday calls.
+    // Exporting a large project takes as long as importing it: at least 300 seconds,
+    // however short FORMIO_REQUEST_TIMEOUT makes everyday calls.
     expect(mockFormioFetch).toHaveBeenCalledWith('export', {}, TEST_CONFIG, {
       timeoutMs: 300_000,
     });
@@ -55,5 +55,22 @@ describe('project_export tool', () => {
     expect(result.content).toEqual([
       expect.objectContaining({ type: 'text', text: expect.stringContaining('401') }),
     ]);
+  });
+
+  // FORMIO_REQUEST_TIMEOUT can lengthen a template transfer, never shorten it.
+  it.each([
+    [5_000, 300_000],
+    [600_000, 600_000],
+  ])('with FORMIO_REQUEST_TIMEOUT at %i ms, waits %i ms', async (requestTimeoutMs, expected) => {
+    mockFormioFetch.mockResolvedValue({ forms: {}, resources: {} });
+    const { client } = await createTestClient((server) =>
+      registerProjectExportTool(server, { ...TEST_CONFIG, requestTimeoutMs })
+    );
+
+    await client.callTool({ name: 'project_export', arguments: { cwd: TEST_CWD } });
+
+    expect(mockFormioFetch).toHaveBeenCalledWith('export', {}, expect.anything(), {
+      timeoutMs: expected,
+    });
   });
 });

@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { createTestClient, TEST_CONFIG, TEST_CWD } from './test-helpers.js';
 import { ERROR_META_KEY } from '../mcp-responses.js';
+import { FormioNetworkError } from '../tool-errors.js';
 
 const mockFormioFetch = vi.fn();
 vi.mock('../formio-client.js', async (importOriginal) => {
@@ -41,8 +42,8 @@ describe('project_import tool', () => {
 
     await client.callTool({ name: 'project_import', arguments: { cwd: TEST_CWD, template } });
 
-    // A large template legitimately takes minutes, so the import waits 300 seconds
-    // whatever FORMIO_REQUEST_TIMEOUT sets for everyday calls.
+    // A large template legitimately takes minutes, so the import waits at least 300
+    // seconds, however short FORMIO_REQUEST_TIMEOUT makes everyday calls.
     expect(mockFormioFetch).toHaveBeenCalledWith('import', {}, TEST_CONFIG, {
       method: 'POST',
       body: { template },
@@ -177,5 +178,76 @@ describe('project_import tool', () => {
       expect(result.isError).toBeFalsy();
       expect(mockFormioFetch).toHaveBeenCalledOnce();
     });
+  });
+
+  // FORMIO_REQUEST_TIMEOUT can lengthen a template transfer, never shorten it.
+  it.each([
+    [5_000, 300_000],
+    [600_000, 600_000],
+  ])('with FORMIO_REQUEST_TIMEOUT at %i ms, waits %i ms', async (requestTimeoutMs, expected) => {
+    mockFormioFetch.mockResolvedValue('Ok');
+    const { client } = await createTestClient((server) =>
+      registerProjectImportTool(server, { ...TEST_CONFIG, requestTimeoutMs })
+    );
+
+    await client.callTool({
+      name: 'project_import',
+      arguments: { cwd: TEST_CWD, template: { forms: {}, resources: {} } },
+    });
+
+    expect(mockFormioFetch).toHaveBeenCalledWith(
+      'import',
+      {},
+      expect.anything(),
+      expect.objectContaining({ timeoutMs: expected })
+    );
+  });
+
+  // The server may still be working through a template the client stopped waiting for,
+  // so a blind retry imports on top of it.
+  it('says a timed-out import may still complete, and to check with project_export first', async () => {
+    mockFormioFetch.mockRejectedValue(
+      new FormioNetworkError({
+        url: 'https://formio.invalid/sub/example/import',
+        cause: new DOMException('The operation timed out.', 'TimeoutError'),
+        timeoutMs: 300_000,
+      })
+    );
+    const { client } = await createTestClient(registerProjectImportTool);
+
+    const result = (await client.callTool({
+      name: 'project_import',
+      arguments: { cwd: TEST_CWD, template: { forms: {}, resources: {} } },
+    })) as {
+      isError?: boolean;
+      content: Array<{ text?: string }>;
+      _meta?: Record<string, unknown>;
+    };
+
+    const text = result.content.map((part) => part.text ?? '').join('\n');
+    expect(result.isError).toBe(true);
+    expect(result._meta?.[ERROR_META_KEY]).toEqual({ code: 'NETWORK_ERROR' });
+    expect(text).toContain('timed out after 300 seconds');
+    expect(text).toMatch(/may still complete/i);
+    expect(text).toContain('project_export');
+  });
+
+  it('adds nothing to a network failure that was not a timeout', async () => {
+    mockFormioFetch.mockRejectedValue(
+      new FormioNetworkError({
+        url: 'https://formio.invalid/sub/example/import',
+        cause: Object.assign(new Error('connect ECONNREFUSED'), { code: 'ECONNREFUSED' }),
+      })
+    );
+    const { client } = await createTestClient(registerProjectImportTool);
+
+    const result = (await client.callTool({
+      name: 'project_import',
+      arguments: { cwd: TEST_CWD, template: { forms: {}, resources: {} } },
+    })) as { content: Array<{ text?: string }> };
+
+    const text = result.content.map((part) => part.text ?? '').join('\n');
+    expect(text).toContain('ECONNREFUSED');
+    expect(text).not.toMatch(/may still complete/i);
   });
 });

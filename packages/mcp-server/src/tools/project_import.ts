@@ -1,13 +1,13 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 import { FormioConfig } from '../config.js';
-import { formioFetch, TEMPLATE_TRANSFER_TIMEOUT_MS } from '../formio-client.js';
+import { formioFetch, templateTransferTimeoutMs } from '../formio-client.js';
 import { toMcpError, toMcpStructuredResult } from '../mcp-responses.js';
 import { acknowledgementOutput } from '../output-schemas.js';
 import { overwrites } from '../tool-annotations.js';
 import { cwdSchema } from '../project-resolver.js';
 import { resolveToolConfig } from './project-resolution.js';
-import { ToolError } from '../tool-errors.js';
+import { FormioNetworkError, ToolError } from '../tool-errors.js';
 
 // What Form.io's importer reads before anything else: `forms` and `resources`
 // unconditionally, `roles` and `actions` when present. A template that gets any of
@@ -49,6 +49,19 @@ function refuseMalformedTemplate(template: Record<string, unknown>): void {
   });
 }
 
+// The client stopped waiting; the server may not have. Retrying blind imports the
+// template a second time on top of whatever the first attempt merged.
+function explainTimeout(error: unknown): unknown {
+  if (!(error instanceof FormioNetworkError) || error.timeoutMs === undefined) {
+    return error;
+  }
+  return new ToolError({
+    code: error.code,
+    message: `${error.message} | The import may still complete on the server: check the project with project_export before retrying.`,
+    cause: error,
+  });
+}
+
 export function registerProjectImportTool(server: McpServer, config: FormioConfig) {
   server.registerTool(
     'project_import',
@@ -70,14 +83,14 @@ export function registerProjectImportTool(server: McpServer, config: FormioConfi
           method: 'POST',
           body: { template },
           responseType: 'text',
-          timeoutMs: TEMPLATE_TRANSFER_TIMEOUT_MS,
+          timeoutMs: templateTransferTimeoutMs(cfg),
         });
         // The endpoint answers with a short status string rather than a document,
         // so it is passed through as the text view unchanged.
         const message = String(result);
         return toMcpStructuredResult({ ok: true, message }, message);
       } catch (error) {
-        return toMcpError(error);
+        return toMcpError(explainTimeout(error));
       }
     }
   );

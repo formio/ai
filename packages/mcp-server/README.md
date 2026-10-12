@@ -306,8 +306,8 @@ The probe runs lazily — only when the local auth page is actually served.
 | `FORMIO_LOGIN_FORM` | no | Auto-resolved | Override the portal login form URL used by the JWT login flow. | `https://formio.form.io/user/login` | `https://forms.example.com/formio/user/login` |
 | `FORMIO_AUTH_HOST` | no | `127.0.0.1` | Bind address for the browser-login page. `0.0.0.0` makes it reachable from outside a container. |  |  |
 | `FORMIO_AUTH_PORT` | no | ephemeral | Fixed port for the browser-login page, so a container can publish it. | `43117` | `43117` |
-| `FORMIO_AUTH_TIMEOUT` | no | `900` | Seconds to wait for a browser login before failing the call. |  |  |
-| `FORMIO_REQUEST_TIMEOUT` | no | `60` | Seconds a Form.io request may go unanswered before the call fails with `NETWORK_ERROR` naming the URL and the wait. A positive integer; any other value is ignored. `project_import` and `project_export` wait 300 seconds whatever this is set to. |  |  |
+| `FORMIO_AUTH_TIMEOUT` | no | `900` | Seconds to wait for a browser login before failing the call. A positive integer no larger than `2147483`; any other value is ignored. |  |  |
+| `FORMIO_REQUEST_TIMEOUT` | no | `60` | Seconds a Form.io request may go unanswered before the call fails with `NETWORK_ERROR` naming the URL and the wait. A positive integer no larger than `2147483`; any other value is ignored. `project_import` and `project_export` wait 300 seconds, or this value when it is longer. |  |  |
 | `FORMIO_INSECURE_TLS` | no | `undefined` | Set to `1` to skip TLS verification. Local development only — never against production. |  |  |
 | `FORMIO_FORCE_BROWSER` | no | `0` | Set to `1` to attempt the browser login even where the server detects no browser (CI, a container, SSH with no display). |  |  |
 
@@ -331,8 +331,8 @@ The `formio-mcp` binary (`npx -y @formio/mcp@0.14.1 project …`) reports what a
 | Exit code | `project get` | `project set` | `project logout` |
 | --- | --- | --- | --- |
 | `0` | The directory resolved a project and its Base URL. | The directory is ready to serve a call. | The token was removed, or none was cached for that deployment; the output says which. |
-| `1` | Nothing is mapped for that directory. | A named value is still missing. | Nothing is mapped for that directory, so no deployment resolves; name one with `--base-url`. |
-| `2` | The command could not answer: a usage error, a malformed URL, an unreadable `~/.formio/projects.json`. | The command could not answer. | The command could not answer: a usage error, a malformed URL, or a `~/.formio/mcp-tokens.json` it cannot read or write. |
+| `1` | Nothing is mapped for that directory. | A named value is still missing. | Nothing is mapped for that directory, so no deployment resolves; name one with `--base-url`. Or the `--base-url` given is not a valid URL; ask for it again. |
+| `2` | The command could not answer: a usage error, a malformed URL, an unreadable `~/.formio/projects.json`. | The command could not answer. | The command could not answer: a usage error, or a `~/.formio/mcp-tokens.json` it cannot read or write. |
 | `3` | A project resolved, but its Base URL could not be determined. | The record was written, and the directory still resolves no Base URL: a committed `formio.json` governs it and supplies none, so the remedy is an edit to that file. | A project resolved, but its deployment could not be determined; name it with `--base-url`. |
 
 ---

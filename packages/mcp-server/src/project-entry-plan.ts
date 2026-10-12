@@ -1,4 +1,4 @@
-import { InvalidRequestedUrlError, normalizeHttpUrl, readHttpUrlEnv } from './config.js';
+import { normalizeRequestedUrl, readHttpUrlEnv } from './config.js';
 import { classifyPair, deriveBaseUrl } from './pair-rule.js';
 
 /**
@@ -190,23 +190,11 @@ export function planProjectEntry({
 
   // Marked as the caller's own typing, so the entry points can answer it as a value
   // to re-ask for rather than as a command that could not run.
-  const requestedUrl = (raw: string, label: string) => {
-    try {
-      return normalizeHttpUrl(raw, label);
-    } catch (error) {
-      // Names the value AS TYPED. The underlying message reports only what the parser
-      // made of it ("got: htps:"), which tells a reader the scheme was wrong but not
-      // which of their two arguments carried it.
-      throw new InvalidRequestedUrlError(
-        `${error instanceof Error ? error.message : String(error)} (${label} was ${raw})`
-      );
-    }
-  };
   const requestedProjectUrl = requested.projectUrl
-    ? requestedUrl(requested.projectUrl, 'projectUrl')
+    ? normalizeRequestedUrl(requested.projectUrl, 'projectUrl')
     : undefined;
   const requestedBaseUrl = requested.baseUrl
-    ? requestedUrl(requested.baseUrl, 'baseUrl')
+    ? normalizeRequestedUrl(requested.baseUrl, 'baseUrl')
     : undefined;
 
   // A deployment alone amends the pair where the project already is. The mapping is

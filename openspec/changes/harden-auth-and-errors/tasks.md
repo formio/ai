@@ -98,3 +98,24 @@
 ### Refactor
 
 - [x] 6.4 Review implementation and refactor as needed
+
+## 7. Review follow-ups
+<!-- depends_on: 1, 2, 3, 4 -->
+
+### Red
+
+- [x] 7.1 Write failing tests: concurrent callers with separate config objects (including a 401 re-auth that joins another call's login) each end up with the new JWT
+- [x] 7.2 Write failing tests: `FORMIO_REQUEST_TIMEOUT` of `2500000` / `5000000` is ignored (timer overflow)
+- [x] 7.3 Write failing tests: cache writes go through a `0600` temporary file and a rename; a failed write leaves the old file and no temporary file; an unreadable cache keeps the in-memory token without a login; the file is re-read only when its stat changed
+- [x] 7.4 Write failing tests: the template transfer timeout is `max(300 s, FORMIO_REQUEST_TIMEOUT)`; a timed-out `project_import` says the import may still complete and to check with `project_export`
+- [x] 7.5 Write failing tests: an opener exiting non-zero calls `onError` once
+- [x] 7.6 Write failing tests: `FormioPermissionError` is a `FormioApiError` with code `FORBIDDEN`, carries Form.io's explanation, and names `project logout --base-url` and a retry
+- [x] 7.7 Write a failing test: `project logout --base-url` with an invalid URL exits 1
+
+### Green
+
+- [x] 7.8 Implement each, sharing one strict reader and one atomic writer across `readCache` / `saveToken` / `clearToken` / `signOut`, and reusing `isRecord` from `tool-errors.ts`
+
+### Refactor
+
+- [x] 7.9 Review implementation and refactor as needed

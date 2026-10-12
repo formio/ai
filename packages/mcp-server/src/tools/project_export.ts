@@ -1,6 +1,6 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { FormioConfig } from '../config.js';
-import { formioFetch, TEMPLATE_TRANSFER_TIMEOUT_MS } from '../formio-client.js';
+import { formioFetch, templateTransferTimeoutMs } from '../formio-client.js';
 import { toMcpStructuredResult, toMcpError } from '../mcp-responses.js';
 import { templateDocument } from '../output-schemas.js';
 import { reads } from '../tool-annotations.js';
@@ -23,7 +23,7 @@ export function registerProjectExportTool(server: McpServer, config: FormioConfi
       try {
         const cfg = await resolveToolConfig({ server, cwd, config });
         const template = (await formioFetch('export', {}, cfg, {
-          timeoutMs: TEMPLATE_TRANSFER_TIMEOUT_MS,
+          timeoutMs: templateTransferTimeoutMs(cfg),
         })) as Record<string, unknown>;
         return toMcpStructuredResult(template);
       } catch (error) {

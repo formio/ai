@@ -2,7 +2,7 @@
 
 ### Requirement: The browser is launched detached
 
-The login page SHALL be opened by starting the platform's opener (`open` on macOS, `xdg-open` on Linux, `rundll32.exe url.dll,FileProtocolHandler` on Windows) as a detached process with its standard streams ignored, so the server neither buffers the browser's output nor holds or terminates the browser. A failure to start the opener SHALL be reported on stderr with the login URL. The login URL SHALL be printed on stderr whether or not the launch succeeds.
+The login page SHALL be opened by starting the platform's opener (`open` on macOS, `xdg-open` on Linux, `rundll32.exe url.dll,FileProtocolHandler` on Windows) as a detached process with its standard streams ignored, so the server neither buffers the browser's output nor holds or terminates the browser. A failure to start the opener, or an opener that exits with a non-zero code, SHALL be reported once on stderr with the login URL and a hint to open it manually; the exit is observed without the server waiting on it. The login URL SHALL be printed on stderr whether or not the launch succeeds.
 
 #### Scenario: A browser that writes a lot of output
 
@@ -13,6 +13,11 @@ The login page SHALL be opened by starting the platform's opener (`open` on macO
 
 - **WHEN** starting the opener fails
 - **THEN** stderr names the failure and the login URL
+
+#### Scenario: The opener exits non-zero
+
+- **WHEN** the opener starts and exits with code 3 (for example `xdg-open` with no browser to hand the URL to)
+- **THEN** stderr names the opener and the code, and says to open the login URL manually
 
 ### Requirement: Only a found login form is remembered
 

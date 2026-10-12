@@ -1,5 +1,5 @@
 import path from 'path';
-import { InvalidRequestedUrlError, normalizeHttpUrl, readHttpUrlEnv } from '../config.js';
+import { InvalidRequestedUrlError, normalizeRequestedUrl, readHttpUrlEnv } from '../config.js';
 import { signOut } from '../token-cache.js';
 import { COMMITTED_CONFIG_FILE, findCommittedConfig } from '../committed-config.js';
 import {
@@ -739,7 +739,8 @@ function logoutDeployment(
   context: CommandContext
 ): { baseUrl: string } | { unresolved: ProjectCommandResult } {
   if (flags['base-url'] !== undefined) {
-    return { baseUrl: normalizeHttpUrl(flags['base-url'], '--base-url') };
+    // Typed by the caller, so a malformed one is re-asked for (exit 1), as `set` does.
+    return { baseUrl: normalizeRequestedUrl(flags['base-url'], '--base-url') };
   }
   const cwd = resolveCwd(flags.cwd, context.cwd);
   const report = reportDirectory(cwd, context);

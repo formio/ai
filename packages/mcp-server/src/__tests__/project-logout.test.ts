@@ -172,9 +172,11 @@ describe('project logout', () => {
     expect(fs.readFileSync(tokensFile(), 'utf8')).toBe('{ not json');
   });
 
+  // The cache is replaced by renaming a new file into its directory, so what blocks a
+  // write is a directory that cannot be written, not the file's own mode.
   it.skipIf(process.getuid?.() === 0)('exits 2 when the cache cannot be written', () => {
     writeTokens({ 'https://api.form.io': 'hosted' });
-    fs.chmodSync(tokensFile(), 0o400);
+    fs.chmodSync(cacheDir, 0o500);
 
     const result = runProjectCommand(['project', 'logout', '--base-url', 'https://api.form.io'], {
       cacheDir,
@@ -183,6 +185,21 @@ describe('project logout', () => {
 
     expect(result.exitCode).toBe(EXIT_FAILED);
     expect(result.stderr).toContain(tokensFile());
+  });
+
+  // The caller typed the URL, so it is re-asked for, as `project set` answers it.
+  it('exits 1, naming the value as typed, when --base-url is not a valid URL', () => {
+    writeTokens({ 'https://api.form.io': 'hosted' });
+
+    const result = runProjectCommand(['project', 'logout', '--base-url', 'htps//api.form.io'], {
+      cacheDir,
+      env: {},
+    });
+
+    expect(result.exitCode).toBe(EXIT_NOT_CONFIGURED);
+    expect(result.stderr).toContain('htps//api.form.io');
+    expect(result.stderr).toMatch(/ask the user for the url again/i);
+    expect(readTokens()).toEqual({ 'https://api.form.io': 'hosted' });
   });
 
   it('refuses an unknown flag as a usage error', () => {
