@@ -354,3 +354,18 @@ It SHALL route to `formio-form-builder` when the form to embed does not exist ye
 
 - **WHEN** the form the user wants to embed is not in the project
 - **THEN** the sub-skill routes to `formio-form-builder`, and embedding resumes with the saved form URL
+
+### Requirement: Provider and wizard examples match @formio/react's types
+
+`references/provider.md` SHALL state that `FormioProvider`'s `Formio` prop takes the static `Formio` class, whose static setters write global state, so a second provider does not isolate a second deployment, and neither does a full URL: the SDK sends its one token with every request whatever the host. The document SHALL keep an application to one deployment and SHALL NOT direct the reader to reach a second through full URLs. The wizard example in `references/mounting.md` SHALL type-check under `strict` TypeScript against `@formio/react`'s published declarations, reading the page from the wizard instance rather than destructuring the handler's argument.
+
+#### Scenario: Provider takes the class
+
+- **WHEN** `references/provider.md` is read
+- **THEN** it states that the `Formio` prop is the static class, not an instance
+
+#### Scenario: Wizard handlers do not destructure their argument
+
+- **WHEN** the `onNextPage` and `onPrevPage` examples in `references/mounting.md` are read
+- **THEN** neither destructures `{ page }` from its argument
+

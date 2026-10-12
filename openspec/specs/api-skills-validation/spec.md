@@ -1,9 +1,7 @@
 ## Purpose
 
 Defines the automated validation suite for the API and SDK skill libraries: the section layout every reference must have, the canonical auth paragraph, forbidden legacy-auth tokens and deep imports, resolved Postman placeholders, PDF scope, URL terminology, and example-value rules.
-
 ## Requirements
-
 ### Requirement: Validation suite runs under pnpm test
 
 The repository SHALL include a Vitest validation suite that invokes `validateLibrary(libraryDir)` against `plugin/skills/` and fails the test run if any issue is reported. It SHALL live in `@formio/skill-tests` — the package that exists to test the skills library — at `packages/skill-tests/src/library-validation/validate-library.ts`, with its suite beside it. It SHALL NOT live in `packages/mcp-server`: a validator for the skills library kept in the server package is superfluous to that package by construction, which is how the previous implementation came to be deleted while this capability went on specifying it, leaving every rule below as prose nothing ran for four months.
@@ -38,14 +36,27 @@ Absence or misordering of any required heading SHALL fail validation.
 
 ### Requirement: Authenticated references MUST contain the canonical auth paragraph
 
-Every reference EXCEPT `server-status.md` SHALL contain the canonical authentication paragraph verbatim in its `## Authentication` section. The paragraph is exposed as the exported constant `CANONICAL_AUTH_PARAGRAPH`.
+Every reference SHALL carry, verbatim in its `## Authentication` section, the paragraph its scope requires:
+
+- a platform- or project-scope reference carries the canonical authentication paragraph, exposed as the exported constant `CANONICAL_AUTH_PARAGRAPH`;
+- a runtime-scope reference — `runtime-*.md`, and `pdf-api.md`, whose submission downloads run in the application — carries the runtime authentication paragraph, exposed as `RUNTIME_AUTH_PARAGRAPH`, which states that application code sends the end user's JWT from login — or no token where the Anonymous role holds the permission — and that the portal-login JWT authorizes only the MCP server's own tool calls. It SHALL NOT carry the canonical paragraph, which requires the portal-login JWT on every request and so contradicts it; a runtime reference that also shows build-time setup states in its own words which token that setup carries.
 
 `server-status.md` is exempt because its endpoints are unauthenticated.
 
 #### Scenario: Reference lacking the canonical auth paragraph fails
 
-- **WHEN** a reference doc (not `server-status`) `## Authentication` section omits `CANONICAL_AUTH_PARAGRAPH`
+- **WHEN** a platform- or project-scope reference doc (not `server-status`) `## Authentication` section omits `CANONICAL_AUTH_PARAGRAPH`
 - **THEN** `validateReferenceContent` SHALL emit an `auth.canonical_paragraph` issue
+
+#### Scenario: Runtime reference lacking the runtime paragraph fails
+
+- **WHEN** a runtime-scope reference omits `RUNTIME_AUTH_PARAGRAPH`
+- **THEN** `validateReferenceContent` SHALL emit an `auth.runtime_paragraph` issue
+
+#### Scenario: Runtime reference carrying the canonical paragraph fails
+
+- **WHEN** a runtime-scope reference carries `CANONICAL_AUTH_PARAGRAPH`, with or without `RUNTIME_AUTH_PARAGRAPH`
+- **THEN** `validateReferenceContent` SHALL emit an `auth.canonical_in_runtime` issue
 
 ### Requirement: References MUST NOT contain legacy-auth tokens
 
@@ -106,6 +117,7 @@ Validation SHALL additionally reject an `FORMIO_*` name used as a substitution s
 - **WHEN** a reference or skill document uses `FORMIO_PROJECT_URL` as an endpoint root or as the name of a value handed between phases
 - **THEN** `validateTerminology` SHALL emit an issue
 - **AND** the same name in an environment table or an `env`-block warning SHALL NOT be flagged
+
 ### Requirement: Example values MUST NOT contain collision-avoidance integer suffixes
 
 Example JSON values (`title`, `name`, `path`, `key`, `machineName`) SHALL NOT end in `-<digits>` or ` <digits>` suffixes used solely to avoid name collisions in tests. Canonical examples SHALL present clean human-authored values. The rule SHALL NOT flag MongoDB ObjectId hex strings, UUIDs, PDF overlay field keys (`f1010`, `f1_01[0]`), or single-digit numeric tokens (`email2`).
@@ -177,3 +189,4 @@ Forbidden-import detection SHALL ignore non-import occurrences (prose mentioning
 
 - **WHEN** a fenced JavaScript block contains `const { Formio } = require('@formio/js');`
 - **THEN** `validateFormioSdkSkill` SHALL emit a `formio_sdk.forbidden_import` issue with `import_path: "@formio/js"`
+
