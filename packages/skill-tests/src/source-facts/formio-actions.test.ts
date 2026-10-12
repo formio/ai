@@ -7,27 +7,16 @@
 // util/email/index.js (email filtering), EmailAction.js (template).
 
 import { describe, expect, it } from 'vitest';
-import { readSkillFile } from './skill-text.js';
+import { readSkillFile, section } from './skill-text.js';
 
 const read = readSkillFile;
 
 const SKILL = 'formio-actions/SKILL.md';
 const TYPES = 'formio-actions/references/action-types.md';
 
-// The text of one `##`/`###` section, from its heading to the next heading of
-// the same or higher level.
-function section(text: string, heading: string): string {
-  const start = text.indexOf(heading);
-  if (start === -1) return '';
-  const level = heading.match(/^#+/)?.[0].length ?? 2;
-  const rest = text.slice(start + heading.length);
-  const next = rest.search(new RegExp(`\\n#{1,${level}} `));
-  return heading + (next === -1 ? rest : rest.slice(0, next));
-}
-
 describe('formio-actions: action priority', () => {
   it('states that priority orders actions only within a handler phase', () => {
-    const priority = section(read(SKILL), '### Priority');
+    const priority = section(read(SKILL), '### Priority — Execution order');
     expect(priority).toMatch(/Higher numbers run first/);
     expect(priority).toMatch(/every `before` action runs before every `after` action/i);
   });
@@ -108,5 +97,18 @@ describe('formio-actions: action_type_get', () => {
     expect(read(SKILL)).toMatch(
       /Call `action_type_get` with the form's `formId`[^\n]*`actionName`/
     );
+  });
+});
+
+// The open-source webhook never reads the response body and records `{}`; only an
+// Enterprise webhook in a before handler stores the response with the submission.
+describe('formio-actions: blocking webhook response', () => {
+  it('the SKILL.md bullet states which server and handler store the response', () => {
+    const skill = read(SKILL);
+    expect(skill).not.toMatch(/whatever that host returns becomes part of the record/);
+    const bullet =
+      skill.split('\n').find((line) => line.startsWith('- **A blocking webhook')) ?? '';
+    expect(bullet).toMatch(/open-source/);
+    expect(bullet).toMatch(/Enterprise/);
   });
 });

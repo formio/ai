@@ -34,12 +34,12 @@ Login is project-scoped: `saveSubmission` on `${projectUrl}/user/login` posts to
 
 ## API
 
-- `Formio.currentUser(formio?: Formio, options?): Promise<object>` — resolve the current user. Returns the stored user without a request when one is cached; otherwise sends GET `${authUrl || formio?.projectUrl || projectUrl || baseUrl}/current`, stores the result, and emits `formio.user` on the global `Formio.events`. Resolves `null` when no token is set.
-- `Formio.logout(formio?: Formio, options?): Promise<void>` — sends GET `${authUrl || formio?.projectUrl || baseUrl}/logout`, then clears the token, the stored user, and the request cache, and emits `formio.user` with `null`. The token is cleared even when the request fails.
+- `Formio.currentUser(formio?: Formio, options?): Promise<object>` — resolve the current user. Returns the stored user without a request when one is cached; otherwise sends GET `<root>/current`, where `<root>` is `authUrl` when set, else the passed instance's project URL (with no fallback to the globals), else the global project URL or Base URL; stores the result, and emits `formio.user` on the global `Formio.events`. Resolves `null` when no token is set.
+- `Formio.logout(formio?: Formio, options?): Promise<void>` — sends GET `<root>/logout`, where `<root>` is `authUrl` when set, else the passed instance's project URL, else the global Base URL; then clears the token, the stored user, and the request cache, and emits `formio.user` with `null`. The token is cleared even when the request fails.
 - `Formio.setToken(token: string, options?: { namespace?: string }): Promise<void>` — install a JWT; the SDK persists it to `localStorage` under `Formio.namespace`. `localStorage` is readable by any script running on the origin, so what keeps the token private is keeping foreign script off the page — the loader rule in [setup.md](./setup.md) and the sanitizer rule in [utils-mask-sanitize.md](./utils-mask-sanitize.md); do not copy the token into a cookie, a global, or a log.
 - `Formio.getToken(options?: { decode?: boolean }): string` — read the active JWT; with `{ decode: true }` returns the decoded payload (`{ user, form, project, exp, iat, ... }`), or `{}` when no token is set. The decoded payload is cached and `setToken` does not refresh that cache, so decode again from the raw token after a token change.
 - `Formio.setToken(null): Promise<void>` — clear the cached JWT/user payload. The SDK has no `clearTokens()` shortcut; pass `null` to `setToken` (and optionally clear `Formio.tokens` directly) for logout flows that should not send the `/logout` request.
-- `Formio.ssoInit(type: 'saml' | 'okta', options?): Promise<object> | false` — call it on every page load, including the page the provider returns to. With no callback present it redirects to the provider and returns `false`; on the return trip it consumes the callback itself, installs the JWT, and resolves the user. For `saml` the server appends `?saml=<jwt>` to the return URL, and the SDK reads it, installs it, and strips it with `history.replaceState`; for `okta` the Okta SDK reads its own hash and Formio exchanges the access token at `/current`. Application code reads no token from the URL in either flow.
+- `Formio.ssoInit(type: 'saml' | 'okta', options?): Promise<object> | false` — call it when the application holds no token: on a page load without a session, and on the page the provider returns to. With no callback present it redirects to the provider and returns `false` even when a session exists (`samlInit` checks only for its own callback), so a page that already holds a token resolves the user with `Formio.currentUser()` instead; on the return trip it consumes the callback itself, installs the JWT, and resolves the user. For `saml` the server appends `?saml=<jwt>` to the return URL, and the SDK reads it, installs it, and strips it with `history.replaceState`; for `okta` the Okta SDK reads its own hash and Formio exchanges the access token at `/current`. Application code reads no token from the URL in either flow.
 - `Formio.samlInit(options?): Promise<object> | false` — direct SAML entry point (equivalent to `ssoInit('saml', options)`); `options.relay` sets the return URL.
 - `Formio.oktaInit(options?): Promise<object | false>` — direct Okta entry point. `options` are Okta Auth JS settings (`issuer`, `clientId`, `redirectUri`, `scopes`) plus `OktaAuth`, the class from `@okta/okta-auth-js`, when it is not a global.
 - `Formio.oAuthCurrentUser(formio: Formio, token: string): Promise<object>` — exchange an OAuth bearer token for a Form.io JWT + current-user payload.
@@ -100,15 +100,18 @@ import { OktaAuth } from '@okta/okta-auth-js';
 Formio.setBaseUrl('https://api.form.io');
 Formio.setProjectUrl('https://myproject.form.io');
 
-// Run on every page load, including the page the provider returns to. The SDK
-// consumes the callback itself (SAML's ?saml=, Okta's hash) and installs the JWT.
-const user = await Formio.ssoInit('okta', {
+// Reuse the session the SDK already holds; start SSO only without one. ssoInit
+// redirects whenever its callback is absent, even for a signed-in user. On the page
+// the provider returns to it consumes the callback itself (SAML's ?saml=, Okta's
+// hash) and installs the JWT.
+const session = Formio.getToken() ? await Formio.currentUser() : null;
+const user = session ?? (await Formio.ssoInit('okta', {
   OktaAuth,
   issuer: oktaIssuerUrl,
   clientId: oktaClientId,
   redirectUri: window.location.origin + '/callback',
   scopes: ['openid', 'email', 'profile'],
-});
+}));
 if (user === false) {
   // The browser is navigating to the provider.
 } else {

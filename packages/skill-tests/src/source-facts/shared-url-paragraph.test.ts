@@ -4,20 +4,12 @@
 // Project URL is never built from a Base URL. Only SKILL.md copies are covered by
 // the shared-prose suite, so this collects every copy.
 
-import { readdirSync, readFileSync } from 'node:fs';
-import { join, relative } from 'node:path';
+import { readFileSync } from 'node:fs';
+import { relative } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { skillsRoot } from './skill-text.js';
+import { markdownFiles, skillsRoot } from './skill-text.js';
 
 const OPENING = '**Where these two values come from.**';
-
-function markdownFiles(dir: string): string[] {
-  return readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
-    const full = join(dir, entry.name);
-    if (entry.isDirectory()) return markdownFiles(full);
-    return entry.isFile() && entry.name.endsWith('.md') ? [full] : [];
-  });
-}
 
 const copies = markdownFiles(skillsRoot).flatMap((path) =>
   readFileSync(path, 'utf8')

@@ -81,7 +81,7 @@ Two-Factor Authentication adds a second factor (typically a TOTP from an authent
 
 ### CAPTCHA Component
 
-The CAPTCHA Component gates form submission against bot abuse. It is wired as a premium component on the login or registration form, configured against a Google reCAPTCHA site key. When enabled, the Login Action / Email Authentication action will not run unless the reCAPTCHA token is present and valid.
+The CAPTCHA Component gates form submission against bot abuse. It is wired as a premium component on the login or registration form, configured against a Google reCAPTCHA site key. When enabled, the server validates the submission — the reCAPTCHA token included — before any of the form's actions run, so a submission without a present and valid token is rejected and its Login action never runs.
 
 Use a CAPTCHA Component on any user-facing auth form that anonymous users can hit (login, registration, send-magic-link). For SSO buttons (OIDC, SAML, LDAP) CAPTCHA usually adds little because the bot would also have to defeat the IdP.
 

@@ -6,7 +6,7 @@ To add a new Form.io API capability group to the reference library, authors SHAL
 
 1. Create `plugin/skills/formio-api/references/<group>.md` (no frontmatter).
 2. Include the five required section headings in order: `## Overview`, `## Root URL`, `## Authentication`, `## MCP Tool Preference`, `## Endpoints`.
-3. Include the paragraph its scope requires in the `## Authentication` section: the canonical auth paragraph for a platform- or project-scope group, the runtime auth paragraph for a `runtime-` group, both for a group that documents build-time and runtime endpoints together (like `pdf-api`), and neither for an unauthenticated group (like `server-status`).
+3. Include the paragraph its scope requires in the `## Authentication` section: the canonical auth paragraph for a platform- or project-scope group, the runtime auth paragraph — and not the canonical one — for a runtime group (a `runtime-` group, or one like `pdf-api` whose endpoints application code calls), stating in its own words which token any build-time setup it shows carries, and neither for an unauthenticated group (like `server-status`).
 4. Document endpoints with `### <METHOD> <url>` headings rooted at `{baseUrl}` or `{projectUrl}` — the substitution-slot form, NOT an environment-variable name and NOT a raw Postman `{{baseUrl}}` / `{{projectName}}` placeholder outside code fences.
 5. Add the group name to the library's required-groups registry.
 6. Add a scope entry for the group in the matching scope registry.

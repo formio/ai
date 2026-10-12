@@ -4,17 +4,9 @@
 // precede the save belongs in `hooks.beforeSubmit`.
 
 import { describe, expect, it } from 'vitest';
-import { skillReader } from './skill-text.js';
+import { section, skillReader } from './skill-text.js';
 
 const read = skillReader('formio-form');
-
-function section(markdown: string, heading: string): string {
-  const start = markdown.indexOf(`\n## ${heading}`);
-  if (start === -1) return '';
-  const rest = markdown.slice(start + 1);
-  const next = rest.indexOf('\n## ', 1);
-  return next === -1 ? rest : rest.slice(0, next);
-}
 
 describe('javascript-api.md: the submit sequence', () => {
   const doc = read('references/javascript-api.md');
@@ -31,7 +23,7 @@ describe('javascript-api.md: the submit sequence', () => {
   });
 
   it('the programmatic submit text saves before emitting submit', () => {
-    const text = section(doc, 'Submitting programmatically');
+    const text = section(doc, '## Submitting programmatically');
     expect(text).not.toMatch(/emits `submit`, and — for URL-backed forms — saves/);
     expect(text).toMatch(/saves to the server[^.]*then emits `submit`/);
   });
@@ -41,11 +33,11 @@ describe('options.md: the combined example keeps the default sanitizer', () => {
   const doc = read('references/options.md');
 
   it('the combined example does not set sanitizeConfig', () => {
-    expect(section(doc, 'Combined example')).not.toContain('sanitizeConfig');
+    expect(section(doc, '## Combined example')).not.toContain('sanitizeConfig');
   });
 
   it('a separately labelled opt-in snippet allows iframes', () => {
-    const optIn = section(doc, 'Opt-in: allow embedded iframes');
+    const optIn = section(doc, '## Opt-in: allow embedded iframes');
     expect(optIn).toContain("addTags: ['iframe']");
     expect(optIn).toMatch(/Add this only/);
   });

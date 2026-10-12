@@ -13,7 +13,7 @@ All endpoints below are rooted at `{projectUrl}` — the project endpoint, equiv
 
 ## Authentication
 
-Application code calling these endpoints at runtime sends the end user's JWT in the `x-jwt-token` header — the token the login form's Login action, or an SSO flow, returns in its `x-jwt-token` response header — or no token where the Anonymous role holds the permission. The JWT from the MCP server's browser-based portal-login flow authorizes only the server's own tool calls; application code neither receives nor sends it. The setup steps this page also shows — creating the forms, roles, and actions the runtime calls depend on — are build-time work: make them with the MCP tools named under MCP Tool Preference, which carry the portal-login JWT themselves.
+Application code calling these endpoints at runtime sends the end user's JWT in the `x-jwt-token` header — the token the login form's Login action, or an SSO flow, returns in its `x-jwt-token` response header — or no token where the Anonymous role holds the permission. The JWT from the MCP server's browser-based portal-login flow authorizes only the server's own tool calls; application code neither receives nor sends it. The setup steps this page also shows — creating the forms, roles, and actions the runtime calls depend on — are build-time work: make them with the MCP tools named under MCP Tool Preference, which carry the portal-login JWT themselves; a setup request sent by hand carries that same portal-login JWT, never an end user's token.
 
 ## MCP Tool Preference
 

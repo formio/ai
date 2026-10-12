@@ -4,41 +4,15 @@
 // a test asserts the corrected statement is present AND the old one is gone, and
 // where the package can answer the question itself, asks it.
 
-import { readFileSync, readdirSync } from 'node:fs';
+import { readFileSync } from 'node:fs';
 import { join, relative } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { skillReader, skillsRoot } from './skill-text.js';
+import { exampleUnder, markdownFiles, section, skillReader, skillsRoot } from './skill-text.js';
 import { Formio } from '@formio/js';
 import { createForm } from '../formio-form/renderer-harness.js';
 
 const skillDir = join(skillsRoot, 'formio-sdk');
 const read = skillReader('formio-sdk');
-
-function everyMarkdownUnder(dir: string): string[] {
-  return readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
-    const full = join(dir, entry.name);
-    if (entry.isDirectory()) return everyMarkdownUnder(full);
-    return entry.isFile() && entry.name.endsWith('.md') ? [full] : [];
-  });
-}
-
-/** The body of one `## <heading>` section — everything up to the next `## `. */
-function section(markdown: string, heading: string): string {
-  const start = markdown.indexOf(`\n## ${heading}`);
-  if (start === -1) return '';
-  const rest = markdown.slice(start + 1);
-  const next = rest.indexOf('\n## ', 1);
-  return next === -1 ? rest : rest.slice(0, next);
-}
-
-/** The fenced code block that follows a `### <heading>`. */
-function exampleUnder(markdown: string, heading: string): string {
-  const start = markdown.indexOf(`### ${heading}`);
-  if (start === -1) return '';
-  const fence = markdown.indexOf('```', start);
-  const body = markdown.indexOf('\n', fence) + 1;
-  return markdown.slice(body, markdown.indexOf('```', body));
-}
 
 describe('login', () => {
   it('@formio/js has no static Formio.login', () => {
@@ -46,14 +20,14 @@ describe('login', () => {
   });
 
   it('no document under formio-sdk calls Formio.login', () => {
-    const offenders = everyMarkdownUnder(skillDir)
+    const offenders = markdownFiles(skillDir)
       .filter((path) => /Formio\.login\(/.test(readFileSync(path, 'utf8')))
       .map((path) => relative(skillDir, path));
     expect(offenders).toEqual([]);
   });
 
   it('SKILL.md names a submission to the login form as the login call', () => {
-    const auth = section(read('SKILL.md'), 'Authentication');
+    const auth = section(read('SKILL.md'), '## Authentication');
     expect(auth).toMatch(/\/user\/login`\)\.saveSubmission/);
     expect(auth).toMatch(/installs the JWT/);
   });
@@ -64,7 +38,7 @@ describe('login', () => {
 });
 
 describe('SSO', () => {
-  const example = exampleUnder(read('references/auth.md'), 'SSO');
+  const example = exampleUnder(read('references/auth.md'), '### SSO');
 
   it('the example calls ssoInit on the page the provider returns to and branches on false', () => {
     expect(example).toContain('Formio.ssoInit(');
@@ -82,7 +56,7 @@ describe('SSO', () => {
   });
 
   it('ssoInit is documented as consuming the callback and resolving false while redirecting', () => {
-    const api = section(read('references/auth.md'), 'API');
+    const api = section(read('references/auth.md'), '## API');
     const ssoInit = api.split('\n').find((line) => line.includes('`Formio.ssoInit(')) ?? '';
     expect(ssoInit).toMatch(/`false`/);
     expect(ssoInit).toContain('saml');
@@ -91,7 +65,7 @@ describe('SSO', () => {
 });
 
 describe('current user and logout', () => {
-  const api = section(read('references/auth.md'), 'API');
+  const api = section(read('references/auth.md'), '## API');
   const line = (name: string) => api.split('\n').find((l) => l.includes(`\`Formio.${name}(`)) ?? '';
 
   it('logout is a GET and emits formio.user', () => {
@@ -101,14 +75,18 @@ describe('current user and logout', () => {
   });
 
   it('currentUser resolves against the project URL before the Base URL and emits formio.user', () => {
-    expect(line('currentUser')).toMatch(/projectUrl \|\| baseUrl/);
+    // authUrl, else the passed instance's project URL (no fallback to the globals),
+    // else the global project URL or Base URL.
+    expect(line('currentUser')).toMatch(/passed instance's project URL \(with no fallback/);
+    expect(line('currentUser')).toMatch(/global project URL or Base URL/);
+    expect(line('currentUser')).not.toMatch(/formio\?\.projectUrl \|\| projectUrl/);
     expect(line('currentUser')).toContain('formio.user');
     expect(line('currentUser')).not.toMatch(/decodes the JWT/);
   });
 
   it('the decoded-token example tests a claim, because getToken returns {} with no token', () => {
     expect(Formio.getToken({ decode: true })).toEqual({});
-    const example = exampleUnder(read('references/auth.md'), 'Read the decoded JWT');
+    const example = exampleUnder(read('references/auth.md'), '### Read the decoded JWT');
     expect(example).not.toMatch(/!claims \|\|/);
     expect(example).toMatch(/!claims\.exp/);
   });
@@ -123,7 +101,10 @@ describe('current user and logout', () => {
 });
 
 describe('custom storage provider', () => {
-  const example = exampleUnder(read('references/files.md'), 'Register a custom storage provider');
+  const example = exampleUnder(
+    read('references/files.md'),
+    '### Register a custom storage provider'
+  );
 
   it('is declared with function or class, not an arrow function', () => {
     expect(example).not.toMatch(/addProvider\([^)]*,\s*\(formio\)\s*=>/);
@@ -168,7 +149,7 @@ describe('validation', () => {
   it('the example checks the array length', () => {
     const example = exampleUnder(
       read('references/rendering.md'),
-      'Programmatic submit + validation'
+      '### Programmatic submit + validation'
     );
     expect(example).not.toMatch(/await form\.validate\(\)/);
     expect(example).toMatch(/errors\.length/);
@@ -177,7 +158,7 @@ describe('validation', () => {
 
 describe('role deletion', () => {
   it('roles.md says no MCP tool deletes a role and the user confirms the deletion', () => {
-    const preference = section(read('references/roles.md'), 'MCP Tool Preference');
+    const preference = section(read('references/roles.md'), '## MCP Tool Preference');
     expect(preference).toMatch(/no MCP tool deletes a role/i);
     expect(preference).toMatch(/confirm/i);
     expect(preference).toMatch(/Roles page/);
@@ -185,7 +166,7 @@ describe('role deletion', () => {
 });
 
 describe('the Security section addresses everything returned to the agent', () => {
-  const body = section(read('SKILL.md'), 'Security');
+  const body = section(read('SKILL.md'), '## Security');
 
   it('covers whatever any Formio call or MCP tool returns', () => {
     expect(body).toMatch(/any `Formio` call or MCP tool/);
@@ -197,5 +178,24 @@ describe('the Security section addresses everything returned to the agent', () =
 
   it('does not name Formio.login', () => {
     expect(body).not.toContain('Formio.login');
+  });
+});
+
+// samlInit checks only for its own `?saml=` callback: called with no callback it
+// redirects, even when a session exists. Starting SSO on every load would send a
+// signed-in user back to the provider.
+describe('SSO runs only without a session', () => {
+  const auth = read('references/auth.md');
+
+  it('documents ssoInit as the call made when no session is held', () => {
+    expect(auth).not.toMatch(/call it on every page load/);
+    expect(auth).toMatch(/`Formio\.ssoInit[^\n]*no token/);
+  });
+
+  it('the SSO example reuses an existing session before starting SSO', () => {
+    const example = auth.slice(auth.indexOf('### SSO'), auth.indexOf('### Logout'));
+    expect(example).toMatch(/Formio\.getToken\(\)/);
+    expect(example.indexOf('Formio.getToken()')).toBeLessThan(example.indexOf('Formio.ssoInit('));
+    expect(example).not.toMatch(/Run on every page load/);
   });
 });

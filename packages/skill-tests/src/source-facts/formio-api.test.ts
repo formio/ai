@@ -6,27 +6,13 @@
 import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { repoRoot, skillReader, skillsRoot } from './skill-text.js';
+import { repoRoot, section, skillReader, skillsRoot } from './skill-text.js';
 
 const skillDir = join(skillsRoot, 'formio-api');
 const toolsDir = join(repoRoot, 'packages/mcp-server/src/tools');
 
 const read = skillReader('formio-api');
 const reference = (name: string): string => read(`references/${name}`);
-
-function section(body: string, heading: string): string {
-  const start = body.indexOf(heading);
-  if (start === -1) return '';
-  const next = body.indexOf('\n## ', start + heading.length);
-  return body.slice(start, next === -1 ? body.length : next);
-}
-
-function endpoint(body: string, heading: string): string {
-  const start = body.indexOf(heading);
-  if (start === -1) return '';
-  const next = body.slice(start + heading.length).search(/\n#{2,3} /);
-  return body.slice(start, next === -1 ? body.length : start + heading.length + next);
-}
 
 function registeredTools(): string[] {
   return readdirSync(toolsDir)
@@ -103,7 +89,10 @@ describe('PUT keeps omitted fields', () => {
   });
 
   it('states the project PUT rules', () => {
-    const put = endpoint(reference('platform-projects.md'), '### PUT {projectUrl}');
+    const put = section(
+      reference('platform-projects.md'),
+      '### PUT {projectUrl} _(project-endpoint, update project metadata)_'
+    );
 
     expect(put).toContain('`settings.licenseKey`');
     expect(put).toContain('`billing`');
@@ -179,5 +168,30 @@ describe('the revision tools as they behave', () => {
 
     expect(save).not.toMatch(/validates against the `formio-schema` conventions/);
     expect(save).toMatch(/checks only the top-level shape/);
+  });
+});
+
+// The SDK resolves an end user's /current against the project URL.
+describe('runtime current-user endpoint', () => {
+  it('runtime-auth.md roots /current at the project URL', () => {
+    const body = reference('runtime-auth.md');
+    expect(body).not.toMatch(/\{baseUrl\}\/current/);
+    expect(body).toMatch(/### GET \{projectUrl\}\/current/);
+  });
+});
+
+// Setup steps on a runtime page are build-time requests; the page says which token
+// one sent by hand carries.
+describe('hand-sent setup requests on runtime pages', () => {
+  it.each(['runtime-custom-users.md', 'runtime-access-control.md'])('%s', (name) => {
+    const auth = section(reference(name), '## Authentication');
+    expect(auth).toMatch(/sent by hand[^.]*portal-login JWT/);
+  });
+});
+
+describe('form_create shape check', () => {
+  it('SAVE.md names every field the tool checks', () => {
+    const save = readFileSync(join(repoRoot, 'plugin/skills/formio-form-builder/SAVE.md'), 'utf8');
+    expect(save).toMatch(/`tags`/);
   });
 });

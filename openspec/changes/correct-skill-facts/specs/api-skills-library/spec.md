@@ -9,7 +9,8 @@
 - A login locked by the Login action's attempt limit answers 401.
 - Validating a submission without saving it uses `?dryrun=1`.
 - An action that always runs omits `condition`; no example sends `conjunction: ""`.
-- Where a runtime reference documents an endpoint an MCP tool covers (`form_create`, `role_create`, `action_create`), its `## MCP Tool Preference` section names that tool.
+- Where a runtime reference documents an endpoint an MCP tool covers (`form_create`, `role_create`, `action_create`), its `## MCP Tool Preference` section names that tool, and its `## Authentication` section states that such a setup request sent by hand carries the portal-login JWT.
+- An end user's current-user request is `GET {projectUrl}/current`, the URL the SDK resolves.
 
 #### Scenario: Registration uses the register form
 
@@ -43,7 +44,7 @@
 
 ### Requirement: The router and revision reference MUST describe the tools as registered
 
-`formio-api/SKILL.md`'s preferred-tool list SHALL name every tool the MCP server registers that reaches a deployment, plus `project_get` and `project_set`. `project-form-revisions.md` SHALL describe `form_update`'s draft save as refusing a changed non-draft field, `form_revert` as refusing the draft version, and `form_create`'s note as optional. `formio-form-builder/SAVE.md` SHALL NOT claim that `form_create` validates a form against `formio-schema`'s conventions.
+`formio-api/SKILL.md`'s preferred-tool list SHALL name every tool the MCP server registers that reaches a deployment, plus `project_get` and `project_set`. `project-form-revisions.md` SHALL describe `form_update`'s draft save as refusing a changed non-draft field, `form_revert` as refusing the draft version, and `form_create`'s note as optional. `formio-form-builder/SAVE.md` SHALL NOT claim that `form_create` validates a form against `formio-schema`'s conventions, and SHALL name every field the tool's input schema checks.
 
 #### Scenario: Router names every tool
 

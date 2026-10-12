@@ -78,7 +78,7 @@ curl -X POST -H "Content-Type: application/json" \
   "{projectUrl}/user/login/submission"
 ```
 
-### GET {baseUrl}/current
+### GET {projectUrl}/current
 
 Return the currently authenticated user's submission document. Used to rehydrate user state on app start or to check that a stored JWT is still valid.
 
@@ -90,7 +90,7 @@ Example:
 
 ```bash
 curl -H "x-jwt-token: $FORMIO_JWT" \
-  "{baseUrl}/current"
+  "{projectUrl}/current"
 ```
 
 ### GET {projectUrl}/logout
@@ -108,7 +108,7 @@ curl -H "x-jwt-token: $FORMIO_JWT" \
   "{projectUrl}/logout"
 ```
 
-### GET {baseUrl}/current (session expired)
+### GET {projectUrl}/current (session expired)
 
 Same endpoint as `Get Current User`, but documents the expired-session behavior. When the supplied `x-jwt-token` has expired or its session has ended, Form.io answers with HTTP status `440` and a plain-text reason that varies with the cause — `Token Expired` (the JWT is past its `exp`), `Session no longer valid.` (after logout), `Session expired.` (the session lifetime was exceeded), `Token No Longer Valid` (the password changed after the token was issued). Key on the `440` status, not the text: clear the locally stored JWT and send the user to the login flow. A malformed token returns `400 Bad Token`.
 
@@ -116,7 +116,7 @@ Example:
 
 ```bash
 curl -H "x-jwt-token: $EXPIRED_JWT" \
-  "{baseUrl}/current"
+  "{projectUrl}/current"
 ```
 
 ## Related Skills

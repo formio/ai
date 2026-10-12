@@ -107,3 +107,9 @@ describe('roles and permissions', () => {
     expect(body).toMatch(/run on create only/);
   });
 });
+
+describe('no reference names an Email Authentication action', () => {
+  it.each(references())('%s', (name) => {
+    expect(reference(name)).not.toMatch(/Email Authentication action/);
+  });
+});

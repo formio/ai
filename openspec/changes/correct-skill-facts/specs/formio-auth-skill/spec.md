@@ -33,7 +33,7 @@ Each reference doc's `## MCP Tool Preference` section SHALL state explicitly whi
 `formio-auth`'s references SHALL state:
 
 - **Token swap:** a swapped user whose claims match no role mapping holds no role — not Authenticated, not Anonymous; a mapping row with no claim applies to every swapped user.
-- **Email token:** the `[[token(<fieldPath>=<resource>[,<resource>…])[,<minutes>]]]` macro is placed in the standard Email action's message; `<fieldPath>` is the field on the searched resource matched against the recipient address, the default lifetime is 120 minutes, it is replaced only in the message body of a single-recipient email, and an unmatched recipient yields `INVALID_TOKEN`. `SKILL.md` SHALL NOT call it a separate "Email Authentication" action.
+- **Email token:** the `[[token(<fieldPath>=<resource>[,<resource>…])[,<minutes>]]]` macro is placed in the standard Email action's message; `<fieldPath>` is the field on the searched resource matched against the recipient address, the default lifetime is 120 minutes, it is replaced only in the message body of a single-recipient email, and an unmatched recipient yields `INVALID_TOKEN`. No document in `formio-auth` SHALL call it a separate "Email Authentication" action.
 - **Project `_id`:** for Custom JWT, the project `_id` is the `project` field of any form in the project (for example `form_get` on the user resource with `select: "_id,project"`); `project_export` is not a source, because the export omits it.
 - **Everyone role:** its id is `000000000000000000000000` (24 zeros).
 - **Docs links:** every link to Form.io's documentation carries its host.

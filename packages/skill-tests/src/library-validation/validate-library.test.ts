@@ -125,36 +125,32 @@ describe('the runtime auth paragraph', () => {
   it('is not satisfied by the canonical paragraph alone', () => {
     expect(validateAuthParagraph(RUNTIME, REFERENCE).map((issue) => issue.rule)).toEqual([
       'auth.runtime_paragraph',
+      'auth.canonical_in_runtime',
     ]);
   });
 
-  it('may sit beside the canonical paragraph in a runtime reference', () => {
+  // The canonical paragraph says every request carries the portal-login JWT, which
+  // contradicts the runtime paragraph; a page carrying both gives application code
+  // two answers. A page that also shows setup steps says how those authenticate.
+  it('is refused beside the canonical paragraph in a runtime reference', () => {
     const both = runtimeReference.replace(
       RUNTIME_AUTH_PARAGRAPH,
       `${CANONICAL_AUTH_PARAGRAPH}\n\n${RUNTIME_AUTH_PARAGRAPH}`
     );
 
-    expect(validateAuthParagraph(RUNTIME, both)).toEqual([]);
+    expect(validateAuthParagraph(RUNTIME, both).map((issue) => issue.rule)).toEqual([
+      'auth.canonical_in_runtime',
+    ]);
   });
 
-  it('is required beside the canonical paragraph in pdf-api, which documents both', () => {
+  it('is required in pdf-api, which documents runtime downloads, without the canonical paragraph', () => {
     const PDF = 'formio-api/references/pdf-api.md';
 
+    expect(validateAuthParagraph(PDF, runtimeReference)).toEqual([]);
     expect(validateAuthParagraph(PDF, REFERENCE).map((issue) => issue.rule)).toEqual([
       'auth.runtime_paragraph',
+      'auth.canonical_in_runtime',
     ]);
-    expect(validateAuthParagraph(PDF, runtimeReference).map((issue) => issue.rule)).toEqual([
-      'auth.canonical_paragraph',
-    ]);
-    expect(
-      validateAuthParagraph(
-        PDF,
-        REFERENCE.replace(
-          CANONICAL_AUTH_PARAGRAPH,
-          `${CANONICAL_AUTH_PARAGRAPH}\n\n${RUNTIME_AUTH_PARAGRAPH}`
-        )
-      )
-    ).toEqual([]);
   });
 
   it('does not replace the canonical paragraph in a platform or project reference', () => {

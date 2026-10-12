@@ -2,7 +2,7 @@
 
 ### Requirement: Provider and wizard examples match @formio/react's types
 
-`references/provider.md` SHALL state that `FormioProvider`'s `Formio` prop takes the static `Formio` class, whose static setters write global state, so a second provider does not isolate a second deployment; a second deployment is reached through full URLs on `new Formio(url)` or `<Form src>`. The wizard example in `references/mounting.md` SHALL type-check under `strict` TypeScript against `@formio/react`'s published declarations, reading the page from the wizard instance rather than destructuring the handler's argument.
+`references/provider.md` SHALL state that `FormioProvider`'s `Formio` prop takes the static `Formio` class, whose static setters write global state, so a second provider does not isolate a second deployment, and neither does a full URL: the SDK sends its one token with every request whatever the host. The document SHALL keep an application to one deployment and SHALL NOT direct the reader to reach a second through full URLs. The wizard example in `references/mounting.md` SHALL type-check under `strict` TypeScript against `@formio/react`'s published declarations, reading the page from the wizard instance rather than destructuring the handler's argument.
 
 #### Scenario: Provider takes the class
 

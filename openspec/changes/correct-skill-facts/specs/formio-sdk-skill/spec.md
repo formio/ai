@@ -38,8 +38,8 @@ The section's prose SHALL be specific to the SDK surface and SHALL NOT be a near
 `formio-sdk`'s `SKILL.md` and `references/auth.md` SHALL describe login, SSO, the current user, and logout as `@formio/js` implements them:
 
 - Login is a submission to the project's login form — ``new Formio(`${projectUrl}/user/login`).saveSubmission({ data })``, which posts to `/user/login/submission` — and the SDK installs the JWT from the response's `x-jwt-token` header itself. No static `Formio.login` exists, and no document under `formio-sdk` SHALL tell the reader to call one.
-- SSO calls `Formio.ssoInit(type, options)` on every page load, including the page the provider returns to; the call consumes the provider's callback (SAML's `?saml=` parameter, Okta's own redirect) and resolves `false` while it is redirecting. No example reads a token from the query string itself.
-- `Formio.currentUser` resolves `/current` against `authUrl`, then the project URL, then the Base URL; `Formio.logout` sends a GET to `${authUrl || projectUrl || baseUrl}/logout` and clears the stored token even when that request fails; both emit `formio.user`.
+- SSO calls `Formio.ssoInit(type, options)` when the application holds no token — on a page load without a session and on the page the provider returns to; the call consumes the provider's callback (SAML's `?saml=` parameter, Okta's own redirect) and resolves `false` while it is redirecting. Because it redirects whenever its callback is absent, even for a signed-in user, a page that holds a token resolves the user with `Formio.currentUser()` instead. No example reads a token from the query string itself.
+- `Formio.currentUser` resolves `/current` against `authUrl`, else a passed instance's project URL (with no fallback to the globals), else the global project URL or Base URL; `Formio.logout` sends a GET to `/logout` under `authUrl`, else a passed instance's project URL, else the global Base URL, and clears the stored token even when that request fails; both emit `formio.user`.
 - `Formio.getToken({ decode: true })` returns an empty object when no token is set, so an example tests for a claim rather than for a falsy result.
 - `pathType` has no default.
 
@@ -52,7 +52,7 @@ The section's prose SHALL be specific to the SDK surface and SHALL NOT be a near
 #### Scenario: SSO example consumes its own callback
 
 - **WHEN** the SSO example in `references/auth.md` is read
-- **THEN** it calls `Formio.ssoInit` on the return page
+- **THEN** it reuses a token the SDK already holds before calling `Formio.ssoInit`
 - **AND** it does not read `query.token`
 
 #### Scenario: Logout is documented as a GET emitting formio.user

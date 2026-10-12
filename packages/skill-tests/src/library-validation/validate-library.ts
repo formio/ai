@@ -47,11 +47,13 @@ export const RUNTIME_AUTH_PARAGRAPH =
 // requiring one, so the canonical paragraph would be a false statement there.
 const UNAUTHENTICATED_REFERENCES = ['server-status.md'];
 
-// `pdf-api` documents template upload (build time) beside submission downloads
-// (runtime), so it states both tokens.
-const BUILD_AND_RUNTIME_REFERENCES = ['pdf-api.md'];
+// Pages application code calls at runtime. `pdf-api` belongs here: submission
+// downloads run in the finished application, and the page says in its own words
+// that template upload is build-time work.
+const RUNTIME_PAGES = ['pdf-api.md'];
 
-const isRuntimeReference = (path: string): boolean => /(^|\/)runtime-[^/]+\.md$/.test(path);
+const isRuntimeReference = (path: string): boolean =>
+  /(^|\/)runtime-[^/]+\.md$/.test(path) || RUNTIME_PAGES.some((name) => path.endsWith(name));
 
 // Portal-login JWT is the only mechanism these endpoints document. An API key is a
 // real server feature, but a reference that mentions one invites an agent to reach
@@ -110,28 +112,27 @@ export function validateAuthParagraph(path: string, body: string): LibraryIssue[
     return [];
   }
   const line = body.indexOf('## Authentication') === -1 ? 1 : lineOf(body, '## Authentication');
-  const both = BUILD_AND_RUNTIME_REFERENCES.some((name) => path.endsWith(name));
-  const needsCanonical = both || !isRuntimeReference(path);
-  const needsRuntime = both || isRuntimeReference(path);
+  const issue = (rule: string, message: string): LibraryIssue => ({ path, rule, message, line });
+  if (!isRuntimeReference(path)) {
+    return body.includes(CANONICAL_AUTH_PARAGRAPH)
+      ? []
+      : [
+          issue(
+            'auth.canonical_paragraph',
+            'does not carry the canonical portal-login auth paragraph verbatim'
+          ),
+        ];
+  }
   return [
-    ...(needsCanonical && !body.includes(CANONICAL_AUTH_PARAGRAPH)
+    ...(body.includes(RUNTIME_AUTH_PARAGRAPH)
+      ? []
+      : [issue('auth.runtime_paragraph', 'does not carry the runtime auth paragraph verbatim')]),
+    ...(body.includes(CANONICAL_AUTH_PARAGRAPH)
       ? [
-          {
-            path,
-            rule: 'auth.canonical_paragraph',
-            message: 'does not carry the canonical portal-login auth paragraph verbatim',
-            line,
-          },
-        ]
-      : []),
-    ...(needsRuntime && !body.includes(RUNTIME_AUTH_PARAGRAPH)
-      ? [
-          {
-            path,
-            rule: 'auth.runtime_paragraph',
-            message: 'does not carry the runtime auth paragraph verbatim',
-            line,
-          },
+          issue(
+            'auth.canonical_in_runtime',
+            'carries the canonical portal-login paragraph, which contradicts the runtime paragraph'
+          ),
         ]
       : []),
   ];

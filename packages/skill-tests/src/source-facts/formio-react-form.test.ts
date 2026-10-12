@@ -29,3 +29,14 @@ describe('mounting.md wizard handlers', () => {
     expect(doc).toMatch(/onNextPage=\{\(\) => setPage\(wizard\.current\?\.page \?\? 0\)\}/);
   });
 });
+
+// The SDK keeps one token per namespace and sends it with every request whatever
+// the host, so a form loaded by full URL from another deployment receives the
+// first deployment's end-user token.
+describe('a second deployment', () => {
+  it('is not reached by passing full URLs through the same SDK', () => {
+    const doc = read('references/provider.md');
+    expect(doc).not.toMatch(/reach one by passing full URLs/);
+    expect(doc).toMatch(/sends? (it|that token) with every request/);
+  });
+});
