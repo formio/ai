@@ -12,7 +12,7 @@ import { Formio } from '@formio/js';
 
 ## URL Configuration
 
-**Where these two values come from.** The hosts below are illustrations — never ship one. Take both URLs from whichever of the two paths applies, per [`project-urls.md`](../../formio-mcp-setup/references/project-urls.md). **If the Form.io MCP tools are callable by you**, call `project_get` as the preflight does — without `cwd`, unless its `cwdSource` was `server` or `claude-project-dir` — and use exactly what it reports: its `projectUrl` for `setProjectUrl`, its `baseUrl` for `setBaseUrl`; if it reports a value missing, relay its instruction, persist the answer with `project_set`, and call it again. **If they are not, ask the user** — for the Project URL first and alone, deriving the Base URL from it, and asking for the Base URL only in the one shape where it cannot be derived. Do not install the MCP server to obtain these two values: writing them into an application reaches no deployment. Either way, do not hardcode an example host, do not derive either URL from the other, and do not carry a value over from another project or an earlier session — a wrong value here ships an application pointed at a deployment nobody is managing.
+**Where these two values come from.** The hosts below are illustrations — never ship one. Take both URLs from whichever of the two paths applies, per [`project-urls.md`](../../formio-mcp-setup/references/project-urls.md). **If the Form.io MCP tools are callable by you**, call `project_get` as the preflight does — without `cwd`, unless its `cwdSource` was `server` or `claude-project-dir` — and use exactly what it reports: its `projectUrl` for `setProjectUrl`, its `baseUrl` for `setBaseUrl`; if it reports a value missing, relay its instruction, persist the answer with `project_set`, and call it again. **If they are not, ask the user** — for the Project URL first and alone, deriving the Base URL from it, and asking for the Base URL only in the one shape where it cannot be derived. Do not install the MCP server to obtain these two values: writing them into an application reaches no deployment. Either way, do not hardcode an example host, never build a Project URL from a Base URL, and do not carry a value over from another project or an earlier session — a wrong value here ships an application pointed at a deployment nobody is managing.
 
 ### Hosted
 
@@ -74,8 +74,9 @@ Programmatic access on the resolved instance:
 
 - `form.submission = { data: {...} }` — prefill values; the renderer diffs and updates components.
 - `form.setSubmission(submission, flags?)` — explicit setter that returns a Promise.
-- `form.submit()` — programmatically submit.
-- `form.validate(): Promise<boolean>` — run validation without submitting.
+- `form.submit()` — programmatically submit; validates first, renders any errors, and rejects with them.
+- `form.validate(data?, flags?): Array` — run validation without submitting; synchronously returns an array of errors for `data` (the form's current data by default), empty when valid. Pass `{ async: true }` to get a Promise of that array. Pass `{ dirty: true }` to validate untouched fields as well.
+- `form.showErrors(errors)` — render an error array, such as the one `validate` returned.
 - `form.setForm(newDefinition)` — swap the form definition at runtime.
 - `form.destroy()` — tear down the form and detach from the DOM.
 - `form.checkValidity(): boolean` — synchronous validity check.
@@ -225,9 +226,9 @@ const form = await Formio.createForm(
 );
 
 document.getElementById('submitBtn')!.addEventListener('click', async () => {
-  const valid = await form.validate();
-  if (!valid) {
-    console.warn('not valid yet');
+  const errors = form.validate(form.submission.data, { dirty: true });
+  if (errors.length) {
+    form.showErrors(errors);
     return;
   }
   await form.submit();

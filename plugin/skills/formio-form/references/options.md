@@ -37,6 +37,15 @@ const form = await Formio.createForm(el, 'https://myproject.form.io/myform', {
     es: { 'First Name': 'Nombre' },
   },
   language: 'es',
+});
+```
+
+## Opt-in: allow embedded iframes
+
+The default sanitizer removes `<iframe>` elements from labels and HTML/Content components. Add this only on a form whose own content embeds an iframe:
+
+```js
+const form = await Formio.createForm(el, 'https://myproject.form.io/myform', {
   sanitizeConfig: {
     addTags: ['iframe'],
     addAttr: ['allow'],

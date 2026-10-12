@@ -1,10 +1,10 @@
 # Submission Access Reference
 
-`access` on a submission is a row-level access-control override stored on that one record. It grants permission on the submission to a set of **resource/user IDs** — not to roles. Use it to open a single submission to specific users (or groups of users) beyond whatever the form's `submissionAccess` already allows.
+`access` on a submission is a row-level access list stored on that one record, granting permission on the submission to a set of **resource/user IDs** — not to roles. It is computed by the server on every create and update (POST, PUT, PATCH) and is not client-writable: any `access` in the request body is discarded — for an administrator too — and rebuilt from the form's components that carry a `submissionAccess` (or `defaultPermission`) setting, one entry per resource or group submission selected in that component's value. To change who can reach a record, change the selected value of that component, or the component's `submissionAccess` on the form definition.
 
-> **Important:** the submission-level `access` array is **not** role-based. Each entry maps a permission `type` to a list of `resources` (IDs). There is no `roles` key on a submission access entry — role-based grants live on the form definition's `submissionAccess` array (see `references/form/form-definition.md`). The server silently ignores any entry that lacks a `resources` key.
+> **Important:** the submission-level `access` array is **not** role-based. Each entry maps a permission `type` to a list of `resources` (IDs). There is no `roles` key on a submission access entry — role-based grants live on the form definition's `submissionAccess` array (see `references/form/form-definition.md`). The server reads only entries that carry a `resources` key.
 
-## Access entry shape
+## Access entry shape (as the server writes it)
 
 | Property | Type | Required | Description |
 | --- | --- | --- | --- |
@@ -49,11 +49,11 @@ The form definition can carry its own `submissionAccess` array — a **role-base
 - Form-level `submissionAccess` grants by **role** (e.g. "Authenticated users can read_own").
 - Submission-level `access` grants by **resource/user ID** on a single record.
 
-The two are additive: a request is allowed if either source grants it. This lets a form's default stay restrictive while individual records open themselves to specific physicians or groups without editing the form definition.
+The two are additive: a request is allowed if either source grants it. This lets a form's default stay restrictive while individual records open to specific physicians or groups through the value selected in a component that carries `submissionAccess`.
 
 ## Worked example
 
-A patient record granting read access to the selected primary physician (field-based) and full read access to the assigned physician group (group-based):
+A patient record as the server stores it after a physician and a physician group were selected in components that carry `submissionAccess` — read access for the selected primary physician (field-based) and write access for the assigned physician group (group-based):
 
 ```json
 {

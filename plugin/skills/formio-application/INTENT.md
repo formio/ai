@@ -26,7 +26,7 @@ When the user's phrasing is genuinely ambiguous, ask the question.
 
 1. **Step 2 — Plan (full)** — `formio-resource-planner` produces the approved artifact pair `template.md` (architectural intent with Access Matrix + ER and Access Flow diagrams) and `template.json` (full project export with every resource, role, form, and action for the new app). The planner classifies each entity as a Resource (reusable data model) or a bespoke Form (purpose-specific data collection) — see `formio-resource-planner/SKILL.md` → "Resources vs. Forms" — so survey-like / one-off intakes become forms, not resources. The planner's own Phase A → Phase B gate is the only gate needed.
 2. **Step 3 — Import** — `project_import` of the full template into the (empty) project, against the configuration the Preflight resolved.
-3. **Step 4 — Framework routing** — hand off to the framework's entry skill (`formio-angular` today).
+3. **Step 4 — Framework routing** — hand off to the entry skill of the framework chosen from the registry in [`FRAMEWORK.md`](./FRAMEWORK.md) (Angular when the user does not choose).
 
 The project configuration is NOT a step on this branch or the other one. Step 3 settles it with `project_get` when the import needs it, so neither list starts with a URL interview.
 

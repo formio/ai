@@ -1,6 +1,6 @@
 ## Overview
 
-The runtime authentication API covers end-user (application user) account lifecycle inside a Form.io project: creating a new user via the default `user` resource, logging in, retrieving the currently authenticated user, logging out, and recognizing an expired session. This skill documents the default `user`/`userLogin` endpoints — for custom user types (e.g., `employee`) and role assignment wiring, see `runtime-custom-users.md`. For platform-admin auth use the `platform-auth` skill; for project-admin auth use `project-auth`.
+The runtime authentication API covers end-user (application user) account lifecycle inside a Form.io project: registering a new user through the default `user/register` form, logging in, retrieving the currently authenticated user, logging out, and recognizing an expired session. This skill documents the default `userRegister`/`userLogin` endpoints — for custom user types (e.g., `employee`) and role assignment wiring, see `runtime-custom-users.md`. For platform-admin auth use the `platform-auth` skill; for project-admin auth use `project-auth`.
 
 ## Root URL
 
@@ -8,9 +8,9 @@ All endpoints below are rooted at `{projectUrl}` — the project endpoint, equiv
 
 ## Authentication
 
-Every request to these endpoints MUST include an `x-jwt-token` header holding the user JWT issued by the MCP server's browser-based portal-login flow. The MCP server attaches this header automatically via `formioFetch`; external clients must obtain the JWT through the same portal-login flow. Do not use any other authentication mechanism with these endpoints.
+Application code calling these endpoints at runtime sends the end user's JWT in the `x-jwt-token` header — the token the login form's Login action, or an SSO flow, returns in its `x-jwt-token` response header — or no token where the Anonymous role holds the permission. The JWT from the MCP server's browser-based portal-login flow authorizes only the server's own tool calls; application code neither receives nor sends it.
 
-Note: the `Create User` and `User Login` endpoints below are themselves the producers of a user JWT — on a successful response Form.io returns an `x-jwt-token` response header whose value is the new user's JWT. Subsequent requests use that JWT in the request `x-jwt-token` header.
+Note: the `Register` and `User Login` endpoints below are called without a token and are themselves the producers of a user JWT — on a successful response Form.io returns an `x-jwt-token` response header whose value is the user's JWT. Subsequent requests use that JWT in the request `x-jwt-token` header.
 
 ## MCP Tool Preference
 
@@ -20,9 +20,9 @@ So this document is a specification for the code you write — the app's login, 
 
 ## Endpoints
 
-### POST {projectUrl}/user/submission
+### POST {projectUrl}/user/register/submission
 
-Register a new end-user by submitting to the default `user` resource. Creates a new submission of the `user` resource with email/password credentials.
+Register a new end user by submitting to the default `userRegister` form (path `user/register`). Its Save Submission action creates the `user` resource submission, the Role Assignment action on `user` adds the Authenticated role, and its Login action authenticates the new user. The default template grants Anonymous `create_own` on this form and no create permission on the `user` resource itself, so `POST {projectUrl}/user/submission` from an anonymous caller returns 401 — and, because the `user` resource carries no Login action, returns no token for any caller.
 
 Request body (JSON):
 
@@ -35,18 +35,18 @@ Request body (JSON):
 }
 ```
 
-Required fields: `data.email`, `data.password`. Additional fields are accepted if the `user` resource has been extended with more components.
+Required fields: `data.email`, `data.password`. Additional fields are accepted when the register form and the `user` resource have been extended with matching components.
 
-Response: the created user submission document, including `_id`, `form` (the `user` resource ID), `owner`, `roles` (default Authenticated role), `access`, `metadata`, and `data` (with the password stripped). The response also sets an `x-jwt-token` response header containing the JWT for the newly created user.
+Response: the new user's submission document, including `_id`, `form` (the `user` resource ID), `owner`, `roles` (the default Authenticated role), `access`, `metadata`, and `data` (with the password stripped). The `x-jwt-token` response header carries the new user's JWT.
 
-Errors: `400` if email/password are missing or the email is already taken; `401`/`403` if anonymous submission is not permitted on the `user` resource.
+Errors: `400` if email/password are missing or the email is already taken; `401` if the project does not grant Anonymous create on the register form.
 
 Example:
 
 ```bash
 curl -X POST -H "Content-Type: application/json" \
   -d '{"data":{"email":"new.user@example.com","password":"CHANGEME"}}' \
-  "{projectUrl}/user/submission"
+  "{projectUrl}/user/register/submission"
 ```
 
 ### POST {projectUrl}/user/login/submission
@@ -78,19 +78,19 @@ curl -X POST -H "Content-Type: application/json" \
   "{projectUrl}/user/login/submission"
 ```
 
-### GET {baseUrl}/current
+### GET {projectUrl}/current
 
 Return the currently authenticated user's submission document. Used to rehydrate user state on app start or to check that a stored JWT is still valid.
 
 Response: the full user submission document (same shape as the login response). Fields include `_id`, `form`, `owner`, `roles`, `access`, `metadata`, and `data`.
 
-Errors: see the `Session Expired` subsection below — a `440`-style plain-text `Session no longer valid.` response indicates the JWT has expired or been revoked.
+Errors: see the session-expired subsection below — status `440` indicates the JWT has expired or its session has ended.
 
 Example:
 
 ```bash
 curl -H "x-jwt-token: $FORMIO_JWT" \
-  "{baseUrl}/current"
+  "{projectUrl}/current"
 ```
 
 ### GET {projectUrl}/logout
@@ -108,21 +108,15 @@ curl -H "x-jwt-token: $FORMIO_JWT" \
   "{projectUrl}/logout"
 ```
 
-### GET {baseUrl}/current (session expired)
+### GET {projectUrl}/current (session expired)
 
-Same endpoint as `Get Current User`, but documents the expired-session behavior. When the supplied `x-jwt-token` has expired or been revoked (e.g., after calling `logout`), Form.io responds with a plain-text body:
-
-```
-Session no longer valid.
-```
-
-Clients should treat this as the signal to clear the locally stored JWT and redirect the user to the login flow.
+Same endpoint as `Get Current User`, but documents the expired-session behavior. When the supplied `x-jwt-token` has expired or its session has ended, Form.io answers with HTTP status `440` and a plain-text reason that varies with the cause — `Token Expired` (the JWT is past its `exp`), `Session no longer valid.` (after logout), `Session expired.` (the session lifetime was exceeded), `Token No Longer Valid` (the password changed after the token was issued). Key on the `440` status, not the text: clear the locally stored JWT and send the user to the login flow. A malformed token returns `400 Bad Token`.
 
 Example:
 
 ```bash
 curl -H "x-jwt-token: $EXPIRED_JWT" \
-  "{baseUrl}/current"
+  "{projectUrl}/current"
 ```
 
 ## Related Skills

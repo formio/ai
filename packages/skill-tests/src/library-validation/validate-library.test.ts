@@ -9,6 +9,7 @@ import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
   CANONICAL_AUTH_PARAGRAPH,
+  RUNTIME_AUTH_PARAGRAPH,
   validateFormioSdkSkill,
   validateAuthParagraph,
   validateForbiddenTokens,
@@ -97,6 +98,73 @@ describe('the canonical auth paragraph', () => {
     expect(validateAuthParagraph('formio-api/references/server-status.md', '## Overview')).toEqual(
       []
     );
+  });
+});
+
+// Runtime endpoints are called by the application on behalf of its end user. The
+// portal-login JWT belongs to the MCP server's own tool calls, so a runtime
+// reference that told application code to send it would point the app at a token
+// it never has.
+describe('the runtime auth paragraph', () => {
+  const RUNTIME = 'formio-api/references/runtime-submissions.md';
+  const runtimeReference = REFERENCE.replace(CANONICAL_AUTH_PARAGRAPH, RUNTIME_AUTH_PARAGRAPH);
+
+  it('is accepted in a runtime reference', () => {
+    expect(validateAuthParagraph(RUNTIME, runtimeReference)).toEqual([]);
+  });
+
+  it('is required in a runtime reference', () => {
+    const issues = validateAuthParagraph(
+      RUNTIME,
+      runtimeReference.replace(RUNTIME_AUTH_PARAGRAPH, 'send a token')
+    );
+
+    expect(issues.map((issue) => issue.rule)).toEqual(['auth.runtime_paragraph']);
+  });
+
+  it('is not satisfied by the canonical paragraph alone', () => {
+    expect(validateAuthParagraph(RUNTIME, REFERENCE).map((issue) => issue.rule)).toEqual([
+      'auth.runtime_paragraph',
+      'auth.canonical_in_runtime',
+    ]);
+  });
+
+  // The canonical paragraph says every request carries the portal-login JWT, which
+  // contradicts the runtime paragraph; a page carrying both gives application code
+  // two answers. A page that also shows setup steps says how those authenticate.
+  it('is refused beside the canonical paragraph in a runtime reference', () => {
+    const both = runtimeReference.replace(
+      RUNTIME_AUTH_PARAGRAPH,
+      `${CANONICAL_AUTH_PARAGRAPH}\n\n${RUNTIME_AUTH_PARAGRAPH}`
+    );
+
+    expect(validateAuthParagraph(RUNTIME, both).map((issue) => issue.rule)).toEqual([
+      'auth.canonical_in_runtime',
+    ]);
+  });
+
+  it('is required in pdf-api, which documents runtime downloads, without the canonical paragraph', () => {
+    const PDF = 'formio-api/references/pdf-api.md';
+
+    expect(validateAuthParagraph(PDF, runtimeReference)).toEqual([]);
+    expect(validateAuthParagraph(PDF, REFERENCE).map((issue) => issue.rule)).toEqual([
+      'auth.runtime_paragraph',
+      'auth.canonical_in_runtime',
+    ]);
+  });
+
+  it('does not replace the canonical paragraph in a platform or project reference', () => {
+    expect(
+      validateAuthParagraph('formio-api/references/project-forms.md', runtimeReference).map(
+        (issue) => issue.rule
+      )
+    ).toEqual(['auth.canonical_paragraph']);
+  });
+
+  it('names the end user and confines the portal-login JWT to the tools', () => {
+    expect(RUNTIME_AUTH_PARAGRAPH).toMatch(/end user's JWT/);
+    expect(RUNTIME_AUTH_PARAGRAPH).toMatch(/Anonymous role/);
+    expect(RUNTIME_AUTH_PARAGRAPH).toMatch(/application code neither receives nor sends it/);
   });
 });
 

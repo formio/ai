@@ -17,7 +17,7 @@ Not for:
 
 - Owner-only patterns (use direct `submissionAccess: read_own`/`update_own`) → see [`roles-and-permissions.md`](./roles-and-permissions.md).
 - Pure role-based access without group affinity → see [`roles-and-permissions.md`](./roles-and-permissions.md).
-- Field-Match-Based Access (gates by literal field values, not group joins) → see Form.io docs at `/developers/roles-and-permissions/field-match-based-access.md`.
+- Field-Match-Based Access (gates by literal field values, not group joins) → see Form.io docs at `https://help.form.io/developers/roles-and-permissions/field-match-based-access`.
 
 ## Configuration
 

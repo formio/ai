@@ -15,8 +15,8 @@ Register handlers with `form.on(event, handler)`; remove with `form.off(event)`.
 | Event | Fires when | Handler receives |
 | --- | --- | --- |
 | `change` | any component value changes (and once on initial load) | the changed submission (`{ data, ... }`) plus a change detail |
-| `submit` | the user submits and validation passes | the submission object |
-| `submitDone` | the server acknowledged the submission (URL-backed forms) | the saved submission |
+| `submit` | validation passes and, for a URL-backed form (a `src` URL, or a definition with an `action`), after the server has saved the submission | `(submission, saved)` — the server's response, including `_id`, when `saved` is true |
+| `submitDone` | immediately after `submit`, only when the renderer saved the submission | the saved submission |
 | `error` | submission failed validation or the server rejected it | the error(s) |
 
 ```js
@@ -69,7 +69,9 @@ Component instances expose `setValue`, `getValue`, `disabled`, `visible`, `compo
 form.submit();
 ```
 
-Runs validation, emits `submit`, and — for URL-backed forms — saves to the server then emits `submitDone`. It returns a promise resolving to the submission, so `await form.submit()` when you need the result inline.
+Runs the `beforeSubmit` hooks and validation, saves to the server when the form is URL-backed, then emits `submit` and, when saved, `submitDone`. It returns a promise resolving to the (saved) submission and rejects with the errors when validation or the save fails, so `await form.submit()` when you need the result inline.
+
+The full order is: `submitButton`, each component's `beforeSubmit`, `options.hooks.beforeSubmit`, validation, `options.hooks.customValidation`, the server save, `submit`, then `submitDone`; a failure emits `submitError` and then `error`. Because `submit` fires after the save, code that must run before it — adding a field, rejecting the submission — goes in `options.hooks.beforeSubmit` ([options.md](./options.md)), not in a `submit` handler.
 
 ## Other instance controls
 

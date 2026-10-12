@@ -41,8 +41,4 @@ Embedding does **not** require a logged-in user, and this skill does not generat
 
 ## More than one deployment
 
-`FormioProvider` accepts a `Formio` instance, for applications talking to more than one Form.io deployment:
-
-```tsx
-<FormioProvider Formio={tenantFormio} projectUrl={tenantProjectUrl} />
-```
+`FormioProvider`'s optional `Formio` prop takes the SDK **class** (`typeof Formio` from `@formio/js`), not an instance from `new Formio(url)`; when the prop is omitted, the provider uses the class `@formio/react` imports. The provider calls static methods on it — `setBaseUrl`, `setProjectUrl`, `getToken`, `logout` — and those write the class's global configuration, so two providers in one bundle share one configuration and one token store. A provider therefore does not isolate a second deployment, and neither does a full URL: the SDK keeps one token per namespace and sends it with every request whatever the host, so a form loaded from another deployment by full URL receives the first deployment's end-user token. Keep an application to the one deployment its provider configures; if a page needs a second, raise it with the user rather than mixing hosts through the same SDK.

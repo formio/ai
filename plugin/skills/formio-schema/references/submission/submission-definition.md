@@ -16,7 +16,7 @@ A submission is a discrete record of values submitted to a single form or resour
 | `externalOwner` | `{ sub, iss, customIdClaim? }` | No | OIDC SSO external owner — `sub` (subject) and `iss` (issuer) of the external identity, with optional `customIdClaim: { key, value }` for the `idPath` resolution. Server-only — not in the upstream TypeScript declaration. |
 | `roles` | `string[]` | No | Role IDs assigned to this submission when the submission represents a user (i.e., when the parent form is a user resource). See `submission-access.md`. |
 | `state` | `'draft' \| 'submitted'` | No | Lifecycle state of the submission. See `submission-state.md` for when each value is written. |
-| `access` | `Access[]` | No | Row-level access overrides applied to this specific submission. See `submission-access.md` for the entry shape and the layering rules with form-level `submissionAccess`. |
+| `access` | `Access[]` | No | Row-level access list for this submission, computed by the server on every create and update from the form's components that carry `submissionAccess`; any value the client sends is discarded. See `submission-access.md` for the entry shape and the layering rules with form-level `submissionAccess`. |
 | `metadata` | `SubmissionMetadata` | No | Bag of contextual values captured at submit time — timezone, browser, headers, etc. See `submission-metadata.md`. |
 | `data` | `object` | No | The actual submitted values, keyed by each input component's `key`. See `submission-data.md` for how the form definition shapes this object. |
 | `externalIds` | `unknown[]` | No | Identifiers from external systems (e.g., OAuth provider IDs) attached to this submission by integrations or actions. |
@@ -37,7 +37,7 @@ A submission is a discrete record of values submitted to a single form or resour
   "owner": "5f8d0c4e9b1e8a0017a1aaaa",
   "roles": ["5f8d0c4e9b1e8a0017a10001"],
   "state": "submitted",
-  "access": [{ "type": "read_all", "roles": ["5f8d0c4e9b1e8a0017a10002"] }],
+  "access": [{ "type": "read", "resources": ["5f8d0c4e9b1e8a0017a10002"] }],
   "metadata": {
     "timezone": "America/Chicago",
     "browserName": "Chrome",

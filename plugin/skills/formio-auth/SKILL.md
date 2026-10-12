@@ -65,7 +65,7 @@ Each reference doc is self-contained and follows the section layout `Overview` �
 - [`references/sso-ldap.md`](./references/sso-ldap.md) — LDAP directory setup plus LDAP Role Mapping.
 - [`references/token-swap.md`](./references/token-swap.md) — Exchanging an external OIDC/OAuth bearer token for a Form.io JWT.
 - [`references/custom-jwt.md`](./references/custom-jwt.md) — Enterprise/on-prem Custom JWT signed with `JWT_SECRET`, required payload shape, and `localStorage.formioToken` injection.
-- [`references/email-auth.md`](./references/email-auth.md) — Email-token (passwordless) authentication via the Email Authentication action.
+- [`references/email-auth.md`](./references/email-auth.md) — Email-token (passwordless) authentication through the standard Email action and its `[[token(...)]]` macro (Enterprise).
 - [`references/jwt-and-sessions.md`](./references/jwt-and-sessions.md) — JWT payload, `x-jwt-token` header, `jti` Session ID, logout semantics, 2FA, and reCAPTCHA.
 
 ## Handoff with formio-resource-planner

@@ -10,7 +10,7 @@ import { Formio } from '@formio/js';
 
 ## URL Configuration
 
-**Where these two values come from.** The hosts below are illustrations — never ship one. Take both URLs from whichever of the two paths applies, per [`project-urls.md`](../../formio-mcp-setup/references/project-urls.md). **If the Form.io MCP tools are callable by you**, call `project_get` as the preflight does — without `cwd`, unless its `cwdSource` was `server` or `claude-project-dir` — and use exactly what it reports: its `projectUrl` for `setProjectUrl`, its `baseUrl` for `setBaseUrl`; if it reports a value missing, relay its instruction, persist the answer with `project_set`, and call it again. **If they are not, ask the user** — for the Project URL first and alone, deriving the Base URL from it, and asking for the Base URL only in the one shape where it cannot be derived. Do not install the MCP server to obtain these two values: writing them into an application reaches no deployment. Either way, do not hardcode an example host, do not derive either URL from the other, and do not carry a value over from another project or an earlier session — a wrong value here ships an application pointed at a deployment nobody is managing.
+**Where these two values come from.** The hosts below are illustrations — never ship one. Take both URLs from whichever of the two paths applies, per [`project-urls.md`](../../formio-mcp-setup/references/project-urls.md). **If the Form.io MCP tools are callable by you**, call `project_get` as the preflight does — without `cwd`, unless its `cwdSource` was `server` or `claude-project-dir` — and use exactly what it reports: its `projectUrl` for `setProjectUrl`, its `baseUrl` for `setBaseUrl`; if it reports a value missing, relay its instruction, persist the answer with `project_set`, and call it again. **If they are not, ask the user** — for the Project URL first and alone, deriving the Base URL from it, and asking for the Base URL only in the one shape where it cannot be derived. Do not install the MCP server to obtain these two values: writing them into an application reaches no deployment. Either way, do not hardcode an example host, never build a Project URL from a Base URL, and do not carry a value over from another project or an earlier session — a wrong value here ships an application pointed at a deployment nobody is managing.
 
 The `Formio` class is a static singleton. URLs are global and must be set once at application bootstrap.
 
@@ -45,9 +45,9 @@ Formio.setProjectUrl('https://myproject.form.io');
 
 `Formio.getBaseUrl()` and `Formio.getProjectUrl()` return the currently configured values.
 
-`Formio.setAuthUrl(url)` overrides the authentication endpoint when SSO or a custom auth backend is in play (otherwise authentication falls back to `baseUrl`).
+`Formio.setAuthUrl(url)` overrides the authentication endpoint when SSO or a custom auth backend is in play. Without it, `currentUser` resolves `/current` against the project URL (falling back to `baseUrl`), and `logout` sends its request to `baseUrl` unless a `Formio` instance with a project URL is passed.
 
-`Formio.setPathType('Subdirectories' | 'Subdomains')` controls how project URLs are derived. Hosted deployments default to `Subdirectories`; SaaS defaults to `Subdomains`. Setting `projectUrl` explicitly is preferred over manipulating `pathType` directly.
+`Formio.setPathType('Subdirectories' | 'Subdomains')` declares how the deployment routes projects. `pathType` is undefined by default, in which case the SDK infers the project from each URL's shape — the first path segment when the host is the Base URL's, the sub-domain otherwise. Setting `Formio.setProjectUrl` explicitly is preferred over setting `pathType`.
 
 ## API
 

@@ -52,7 +52,7 @@ Get a tenant by ID. Returns the tenant's full document including `access`, `sett
 
 ### PUT {baseUrl}/project/:tenantId
 
-Update a tenant's metadata. The full tenant document must be supplied (same shape as create, plus `_id`); omitted fields are reset to defaults.
+Update a tenant's metadata. Fields sent replace the stored value (an array or object is stored as sent, not merged); top-level fields left out keep their stored value, so send only what changes. A tenant is a project, so the project PUT rules apply (see `platform-projects.md`), and a tenant's `settings.cors` is ignored.
 
 Response: the updated tenant document.
 

@@ -71,7 +71,7 @@ Each entry in `access` or `submissionAccess` is one role-to-permission mapping.
 
 | Property | Type | Description |
 | --- | --- | --- |
-| `type` | `string` | Access type: `"read_all"`, `"create_own"`, `"create_all"`, `"update_own"`, `"update_all"`, `"delete_own"`, `"delete_all"`, `"self"`, `"team_read"`, `"team_write"`, `"team_admin"`. |
+| `type` | `string` | Access type: `create_all`, `read_all`, `update_all`, `delete_all`, `create_own`, `read_own`, `update_own`, `delete_own`, `self`; Enterprise servers also accept `group`, `team_access`, `team_read`, `team_write`, `team_admin`, `stage_read`, `stage_write`. |
 | `roles` | `string[]` | Array of role IDs that have this access type. |
 
 Form-level `access` governs who can see/modify the form definition itself. Submission-level `submissionAccess` governs who can create, read, update, or delete submissions against the form.

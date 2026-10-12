@@ -10,7 +10,7 @@ All endpoints below are rooted at `{projectUrl}` — the project endpoint, equiv
 
 ## Authentication
 
-Every request to these endpoints MUST include an `x-jwt-token` header holding the user JWT issued by the MCP server's browser-based portal-login flow. The MCP server attaches this header automatically via `formioFetch`; external clients must obtain the JWT through the same portal-login flow. Do not use any other authentication mechanism with these endpoints.
+Application code calling these endpoints at runtime sends the end user's JWT in the `x-jwt-token` header — the token the login form's Login action, or an SSO flow, returns in its `x-jwt-token` response header — or no token where the Anonymous role holds the permission. The JWT from the MCP server's browser-based portal-login flow authorizes only the server's own tool calls; application code neither receives nor sends it.
 
 ## MCP Tool Preference
 
@@ -63,9 +63,9 @@ curl -X POST -H "x-jwt-token: $FORMIO_JWT" -H "Content-Type: application/json" \
   "{projectUrl}/onboarding-872/submission"
 ```
 
-### POST {projectUrl}/:formPath/submission (validate only)
+### POST {projectUrl}/:formPath/submission?dryrun=1 (validate only)
 
-Validate a submission payload without persisting it. Form.io exposes validation through the same endpoint shape — send the submission with the query/header convention your client library uses to request dry-run validation, or simply inspect the `400 ValidationError` response to surface form-level errors to the UI.
+Validate a submission payload without persisting it. With `?dryrun=1` Form.io runs validation but stores nothing and runs no form action — no email, webhook, login, or save. Enterprise servers also accept `POST {projectUrl}/:formPath/validate` for the same check.
 
 Request body: identical shape to the create endpoint.
 

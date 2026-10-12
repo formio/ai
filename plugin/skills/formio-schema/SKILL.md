@@ -56,7 +56,7 @@ References are partitioned by schema domain. Pick a domain first, then pick a re
 | Top-level submission envelope (`_id`, `form`, `owner`, `roles`, `state`, `metadata`, etc.) | `references/submission/submission-definition.md` |
 | Lifecycle state — `draft` vs `submitted`, when each is written | `references/submission/submission-state.md` |
 | The `metadata` bag (timezone, browser, headers, extension keys) | `references/submission/submission-metadata.md` |
-| Row-level `access` overrides and every `AccessType` value | `references/submission/submission-access.md` |
+| Row-level submission `access` (server-computed) and every `AccessType` value | `references/submission/submission-access.md` |
 | Decoding the `data` envelope — key paths, nesting, address discriminated union | `references/submission/submission-data.md` |
 
 ### Projects

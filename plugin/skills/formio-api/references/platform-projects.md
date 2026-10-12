@@ -74,11 +74,11 @@ Cross-scope convenience: the project endpoint's root returns the same document a
 
 ### PUT {projectUrl} _(project-endpoint, update project metadata)_
 
-Cross-scope: replace the project's metadata (title, description, access, framework, settings, default access). The request body MUST include the project's `_id`; omitted fields are reset to defaults.
+Cross-scope: update the project's metadata (title, description, access, framework, settings, default access). Fields sent replace the stored value (an array or object is stored as sent, not merged); top-level fields left out keep their stored value, so send only what changes. The project `_id` comes from the URL — a body `_id` that differs is rejected with `400`. When `settings` is sent it replaces the stored settings, except that an omitted `settings.licenseKey` keeps its stored value; `billing` is ignored; a `template` in the body is imported into the project. PATCH is not supported (`405`).
 
-Request body: full project document (see create shape) plus `_id`. Include every field you want to preserve.
+Request body: the fields to change (see create shape).
 
-Response: the updated project document. `409` if a stage-aware revision check fails.
+Response: the updated project document.
 
 ### GET {projectUrl}/access _(project-endpoint, access info)_
 
@@ -109,8 +109,10 @@ Cross-scope: import a template JSON into an existing project. Merges the templat
 Request body:
 
 ```json
-{ "template": { "title": "...", "version": "2.0.0", "roles": {}, "forms": [], "resources": [] } }
+{ "template": { "title": "...", "version": "2.0.0", "roles": {}, "forms": {}, "resources": {}, "actions": {} } }
 ```
+
+`roles`, `forms`, `resources`, and `actions` are objects keyed by machine name — the same shape `project_export` returns — and `forms` and `resources` must both be present.
 
 Response: plain text `Ok` on success. `400` if the template is malformed or incompatible with the current project's resources.
 

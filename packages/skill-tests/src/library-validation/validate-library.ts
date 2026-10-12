@@ -38,9 +38,22 @@ export const REQUIRED_REFERENCE_HEADINGS = [
 export const CANONICAL_AUTH_PARAGRAPH =
   "Every request to these endpoints MUST include an `x-jwt-token` header holding the user JWT issued by the MCP server's browser-based portal-login flow. The MCP server attaches this header automatically via `formioFetch`; external clients must obtain the JWT through the same portal-login flow. Do not use any other authentication mechanism with these endpoints.";
 
+// Runtime endpoints are called by the finished application on behalf of its end
+// user, so the token they carry is that user's, never the MCP server's.
+export const RUNTIME_AUTH_PARAGRAPH =
+  "Application code calling these endpoints at runtime sends the end user's JWT in the `x-jwt-token` header — the token the login form's Login action, or an SSO flow, returns in its `x-jwt-token` response header — or no token where the Anonymous role holds the permission. The JWT from the MCP server's browser-based portal-login flow authorizes only the server's own tool calls; application code neither receives nor sends it.";
+
 // Unauthenticated by design: `health` and `status` reject a token rather than
 // requiring one, so the canonical paragraph would be a false statement there.
 const UNAUTHENTICATED_REFERENCES = ['server-status.md'];
+
+// Pages application code calls at runtime. `pdf-api` belongs here: submission
+// downloads run in the finished application, and the page says in its own words
+// that template upload is build-time work.
+const RUNTIME_PAGES = ['pdf-api.md'];
+
+const isRuntimeReference = (path: string): boolean =>
+  /(^|\/)runtime-[^/]+\.md$/.test(path) || RUNTIME_PAGES.some((name) => path.endsWith(name));
 
 // Portal-login JWT is the only mechanism these endpoints document. An API key is a
 // real server feature, but a reference that mentions one invites an agent to reach
@@ -98,16 +111,31 @@ export function validateAuthParagraph(path: string, body: string): LibraryIssue[
   if (UNAUTHENTICATED_REFERENCES.some((name) => path.endsWith(name))) {
     return [];
   }
-  return body.includes(CANONICAL_AUTH_PARAGRAPH)
-    ? []
-    : [
-        {
-          path,
-          rule: 'auth.canonical_paragraph',
-          message: 'does not carry the canonical portal-login auth paragraph verbatim',
-          line: body.indexOf('## Authentication') === -1 ? 1 : lineOf(body, '## Authentication'),
-        },
-      ];
+  const line = body.indexOf('## Authentication') === -1 ? 1 : lineOf(body, '## Authentication');
+  const issue = (rule: string, message: string): LibraryIssue => ({ path, rule, message, line });
+  if (!isRuntimeReference(path)) {
+    return body.includes(CANONICAL_AUTH_PARAGRAPH)
+      ? []
+      : [
+          issue(
+            'auth.canonical_paragraph',
+            'does not carry the canonical portal-login auth paragraph verbatim'
+          ),
+        ];
+  }
+  return [
+    ...(body.includes(RUNTIME_AUTH_PARAGRAPH)
+      ? []
+      : [issue('auth.runtime_paragraph', 'does not carry the runtime auth paragraph verbatim')]),
+    ...(body.includes(CANONICAL_AUTH_PARAGRAPH)
+      ? [
+          issue(
+            'auth.canonical_in_runtime',
+            'carries the canonical portal-login paragraph, which contradicts the runtime paragraph'
+          ),
+        ]
+      : []),
+  ];
 }
 
 export function validateForbiddenTokens(path: string, body: string): LibraryIssue[] {

@@ -10,7 +10,7 @@ import { Formio } from '@formio/js';
 
 ## URL Configuration
 
-**Where these two values come from.** The hosts below are illustrations — never ship one. Take both URLs from whichever of the two paths applies, per [`project-urls.md`](../../formio-mcp-setup/references/project-urls.md). **If the Form.io MCP tools are callable by you**, call `project_get` as the preflight does — without `cwd`, unless its `cwdSource` was `server` or `claude-project-dir` — and use exactly what it reports: its `projectUrl` for `setProjectUrl`, its `baseUrl` for `setBaseUrl`; if it reports a value missing, relay its instruction, persist the answer with `project_set`, and call it again. **If they are not, ask the user** — for the Project URL first and alone, deriving the Base URL from it, and asking for the Base URL only in the one shape where it cannot be derived. Do not install the MCP server to obtain these two values: writing them into an application reaches no deployment. Either way, do not hardcode an example host, do not derive either URL from the other, and do not carry a value over from another project or an earlier session — a wrong value here ships an application pointed at a deployment nobody is managing.
+**Where these two values come from.** The hosts below are illustrations — never ship one. Take both URLs from whichever of the two paths applies, per [`project-urls.md`](../../formio-mcp-setup/references/project-urls.md). **If the Form.io MCP tools are callable by you**, call `project_get` as the preflight does — without `cwd`, unless its `cwdSource` was `server` or `claude-project-dir` — and use exactly what it reports: its `projectUrl` for `setProjectUrl`, its `baseUrl` for `setBaseUrl`; if it reports a value missing, relay its instruction, persist the answer with `project_set`, and call it again. **If they are not, ask the user** — for the Project URL first and alone, deriving the Base URL from it, and asking for the Base URL only in the one shape where it cannot be derived. Do not install the MCP server to obtain these two values: writing them into an application reaches no deployment. Either way, do not hardcode an example host, never build a Project URL from a Base URL, and do not carry a value over from another project or an earlier session — a wrong value here ships an application pointed at a deployment nobody is managing.
 
 ### Hosted
 
@@ -100,27 +100,34 @@ await new Formio(`${Formio.getProjectUrl()}/intake`).deleteFile(fileDescriptor);
 ```ts
 import { Formio } from '@formio/js';
 
-Formio.Providers.addProvider('storage', 'customCdn', (formio) => ({
-  uploadFile(file, name, dir, progress) {
-    // POST to your CDN endpoint and return the descriptor.
-    return fetch('/api/upload', { method: 'POST', body: file })
-      .then((r) => r.json())
-      .then((res) => ({
-        storage: 'customCdn',
-        name: res.key,
-        originalName: file.name,
-        url: res.url,
-        size: file.size,
-        type: file.type,
-      }));
-  },
-  downloadFile(fileInfo) {
-    return Promise.resolve({ url: fileInfo.url });
-  },
-  deleteFile(fileInfo) {
-    return fetch(`/api/upload/${fileInfo.name}`, { method: 'DELETE' }).then(() => undefined);
-  },
-}));
+// The SDK constructs a provider with `new Provider(formio)`, so it is a function
+// declaration or a class — `new` on an arrow function throws.
+function customCdn(formio) {
+  return {
+    uploadFile(file, name, dir, progress) {
+      // POST to your CDN endpoint and return the descriptor.
+      return fetch('/api/upload', { method: 'POST', body: file })
+        .then((r) => r.json())
+        .then((res) => ({
+          storage: 'customCdn',
+          name: res.key,
+          originalName: file.name,
+          url: res.url,
+          size: file.size,
+          type: file.type,
+        }));
+    },
+    downloadFile(fileInfo) {
+      return Promise.resolve({ url: fileInfo.url });
+    },
+    deleteFile(fileInfo) {
+      return fetch(`/api/upload/${fileInfo.name}`, { method: 'DELETE' }).then(() => undefined);
+    },
+  };
+}
+customCdn.title = 'Custom CDN'; // the label the form builder's storage list shows
+
+Formio.Providers.addProvider('storage', 'customCdn', customCdn);
 ```
 
 ## MCP Tool Preference

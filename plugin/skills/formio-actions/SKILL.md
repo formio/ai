@@ -48,7 +48,7 @@ Every action tool takes the form as `formId`, its 24-character `_id`; a form pat
 
 **Workflow for creating an action:**
 
-1. Call `action_type_get` with the action name to discover the required settings schema
+1. Call `action_type_get` with the form's `formId` (its `_id`) and `actionName` (e.g. `email`) to discover the required settings schema
 2. Construct the action definition using the settings schema as a guide
 3. Call `action_create` with the complete action definition
 
@@ -72,9 +72,9 @@ That is what makes the rules below matter _at build time_: the configuration wri
 
 Every `{{ data.* }}` token an action interpolates resolves, at runtime, to a value some submitter typed, and actions carry it off the server: into email bodies, webhook URLs and payloads, and dynamic recipient lists. Configure each of those boundaries as if the value were hostile, because for a public form it eventually will be.
 
-- **Interpolation is not escaping.** Templates substitute the raw value, so a field can carry HTML, a link, or text engineered to look like it came from you. For the email body prefer `{{ submission(data, form.components) }}`, which renders through the platform's own submission formatter, over hand-built markup that concatenates raw field values. If a field must appear inside markup you wrote, constrain the field itself — a select with fixed options, a validated pattern, a maximum length — because that is the only control point the action gives you.
+- **What the email action filters.** Before an email template renders, each string value that a form component holds in `data` has its HTML tags removed (along with the contents of `<script>` and `<style>`), and any remaining `<` and `>` are encoded. The filter does not touch non-string values (numbers, selectboxes objects, the arrays of multi-value fields), `data` keys no component declares, or values outside `data`, and it leaves plain text as typed, so URLs, addresses, and arbitrary wording reach the template verbatim; the template engine escapes nothing further. Webhook URLs and payloads carry the stored values unfiltered. For the email body prefer `{{ submission(data, form.components) }}`, which renders through the platform's own submission formatter, over hand-built markup that concatenates raw field values. If a field must appear inside markup you wrote, constrain the field itself — a select with fixed options, a validated pattern, a maximum length — because that is the only control point the action gives you.
 - **Dynamic recipients let a submitter choose who gets the mail.** `emails`, `cc`, and `bcc` accept tokens such as `{{ data.managerEmail }}`. On a public form that hands an attacker your mail transport as a relay. Use static recipients, or resolve the address server-side from a resource lookup keyed by something the submitter cannot set, rather than from a free-text field.
-- **A blocking webhook writes submitter-influenced text into the submission.** With `block: true` the external service's response is stored in `submission.metadata[action.title]`, so whatever that host returns becomes part of the record the deployed app later renders. That is a runtime property of the app you are configuring: point blocking webhooks only at services the user owns, and treat the stored response as untrusted content wherever the app displays it.
+- **A blocking webhook writes submitter-influenced text into the submission.** On Enterprise, `block: true` writes the external service's response to `metadata[action.title]` — stored with the submission when the webhook runs in a `before` handler, and present only on the returned submission when it runs in an `after` handler — so on a `before` handler what that host returns becomes part of the record the deployed app later renders. The open-source webhook never reads the response body and records `{}`. That is a runtime property of the app you are configuring: point blocking webhooks only at services the user owns, and treat the stored response as untrusted content wherever the app displays it.
 - **Secrets in action settings travel with the request.** Webhook `username`/`password`, transport credentials, and template URLs are stored in the action and sent to whatever host the settings name. Keep hosts literal and HTTPS, and never point them at a URL derived from submitted data.
 
 ## Action Anatomy
@@ -117,7 +117,7 @@ Every action has these core fields:
 
 ### Priority — Execution order
 
-Actions run in descending priority order. Higher numbers run first.
+Actions run in descending priority order. Higher numbers run first. Priority orders actions only within a handler phase: every `before` action runs before every `after` action, whatever their numbers.
 
 | Action Type | Default Priority | Why |
 | --- | --- | --- |
@@ -237,7 +237,7 @@ A login form needs only the login action — no save action (login doesn't creat
 
 The `username` and `password` fields reference component API keys on the login form. The `resources` array lists which resource forms contain the user submissions to authenticate against.
 
-Login includes brute-force protection: after 5 failed attempts within 30 seconds, the account locks for 30 minutes (configurable via `allowedAttempts`, `attemptWindow`, `lockWait`).
+Login can lock an account after repeated failures, but only when the action's `settings.allowedAttempts` is a non-zero number. A Login action created through the API or a template without that key has no lockout; the portal's action form pre-fills 5. With `allowedAttempts: N`, failures are counted from the first failed attempt, and when the count reaches N within `attemptWindow` seconds (default 30) — the (N+1)th failure — the account is locked for `lockWait` seconds (default 1800). While it is locked, every login attempt, including one with the correct password, returns 401. A successful login resets the count.
 
 ### Email notification on submission
 
@@ -298,11 +298,11 @@ The `{{ submission(data, form.components) }}` template renders all form fields a
 }
 ```
 
-Set `block: true` if you need the webhook response before the form submission completes (the response is stored in submission metadata). Leave `false` for fire-and-forget.
+The open-source server and Enterprise run different webhook actions; [`references/action-types.md`](references/action-types.md) → "Webhook" lists every difference. Set `block: true` if you need the webhook response before the request completes; leave `false` for fire-and-forget.
 
-The webhook URL supports interpolation: `https://api.example.com/{{ data.type }}/submit`.
+The webhook URL supports interpolation, with a different context on each server. On Enterprise it resolves `{{ data.<field> }}`, `{{ submission._id }}`, `{{ externalId }}`, and `{{ config.<key> }}`: `https://api.example.com/{{ data.type }}/submit`. On the open-source server the URL is interpolated against the submission's `data` itself, so the same URL is written `https://api.example.com/{{ type }}/submit` — `{{ data.type }}` there produces the text `undefined`.
 
-The webhook sends:
+The open-source server sends the payload below with the incoming request's method; Enterprise sends `{ request, submission, params }`, with no `response` key:
 
 ```json
 {
@@ -373,7 +373,7 @@ The `{{ resetlink }}` template variable is replaced with the full URL including 
 
 - Verify `resources` array contains the correct resource form ID
 - Verify `username` and `password` keys match the login form's component API keys
-- Check brute-force lockout: `allowedAttempts` (default 5), `lockWait` (default 1800s = 30 min)
+- Check the lockout settings: `allowedAttempts` (unset means no lockout), `attemptWindow` (default 30s), `lockWait` (default 1800s = 30 min)
 
 **Role not being assigned:**
 
