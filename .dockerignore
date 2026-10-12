@@ -1,0 +1,29 @@
+# Build context for packages/mcp-server/Dockerfile, which is the repository root
+# so the image can install from pnpm-lock.yaml. The Dockerfile copies only the
+# workspace manifests, the lockfile and the server package's sources; everything
+# below is excluded so it never enters the context at all.
+**/node_modules
+**/dist
+**/coverage
+**/.turbo
+.git
+.github
+.husky
+.changeset
+.claude
+.claude-plugin
+.cursor
+.agents
+agent
+.eval-artifacts
+.vscode
+scratchpad
+examples
+openspec
+plugin
+packages/skill-tests
+packages/mcp-server/docs
+**/*.env
+**/.env.*
+**/inspector-config.json
+.mcp.json

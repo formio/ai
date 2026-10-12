@@ -149,6 +149,58 @@ describe('pnpm build:plugin', () => {
     expect(result.stdout).toContain('form_list');
   }, 60_000);
 
+  // The bundle sits beside plugin/package.json — @formio/ai's manifest, not the
+  // server's — so a version read from the nearest package.json at run time is the
+  // plugin's. The server's own version is written in at build time instead.
+  it('1.13 reports the @formio/mcp package version from server_status', () => {
+    const { version } = JSON.parse(
+      fs.readFileSync(path.join(REPO_ROOT, 'packages/mcp-server/package.json'), 'utf8')
+    ) as { version: string };
+    const request = [
+      JSON.stringify({
+        jsonrpc: '2.0',
+        id: 1,
+        method: 'initialize',
+        params: {
+          protocolVersion: '2025-06-18',
+          capabilities: {},
+          clientInfo: { name: 'plugin-build-test', version: '0.0.0' },
+        },
+      }),
+      JSON.stringify({ jsonrpc: '2.0', method: 'notifications/initialized' }),
+      JSON.stringify({
+        jsonrpc: '2.0',
+        id: 2,
+        method: 'tools/call',
+        params: { name: 'server_status', arguments: {} },
+      }),
+      '',
+    ].join('\n');
+
+    const result = spawnSync('node', [SERVER_BUNDLE], {
+      input: request,
+      encoding: 'utf8',
+      env: { PATH: process.env.PATH, HOME: process.env.HOME } as NodeJS.ProcessEnv,
+      timeout: 30_000,
+    });
+    const messages = result.stdout
+      .split('\n')
+      .filter(Boolean)
+      .map(
+        (line) =>
+          JSON.parse(line) as {
+            id?: number;
+            result?: {
+              serverInfo?: { version?: string };
+              structuredContent?: { version?: string };
+            };
+          }
+      );
+
+    expect(messages.find((m) => m.id === 1)?.result?.serverInfo?.version).toBe(version);
+    expect(messages.find((m) => m.id === 2)?.result?.structuredContent?.version).toBe(version);
+  }, 60_000);
+
   // Every client reads its own manifest, so all three must ship and all three
   // must carry the same version — clients display it and marketplaces key
   // updates on it.

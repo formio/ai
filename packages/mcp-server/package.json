@@ -33,13 +33,14 @@
   },
   "files": [
     "dist",
-    "README.md"
+    "README.md",
+    "LICENSE"
   ],
   "publishConfig": {
     "access": "public"
   },
   "scripts": {
-    "build": "tsc -p tsconfig.build.json",
+    "build": "node -e \"require('fs').rmSync('dist',{recursive:true,force:true})\" && tsc -p tsconfig.build.json",
     "build:dev": "tsc",
     "dev": "tsx watch src/stdio.ts",
     "start": "node dist/stdio.js",
@@ -48,6 +49,7 @@
     "typecheck": "tsc --noEmit",
     "lint": "eslint src && tsc --noEmit",
     "clean": "rm -rf dist coverage",
+    "prepack": "node -e \"require('fs').copyFileSync('../../LICENSE','LICENSE')\"",
     "prepublishOnly": "pnpm test && pnpm build"
   },
   "engines": {

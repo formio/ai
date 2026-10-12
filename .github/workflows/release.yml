@@ -300,11 +300,16 @@ jobs:
       # provenance is off deliberately. With push-by-digest an attestation turns the
       # pushed digest into an index rather than a single-platform manifest, which is
       # not what imagetools expects to combine.
+      #
+      # The context is the repository root so the image installs from
+      # pnpm-lock.yaml with a frozen lockfile; the root .dockerignore keeps
+      # everything the Dockerfile does not copy out of it.
       - name: Build and push formio/mcp by digest
         id: build
         uses: docker/build-push-action@v6
         with:
-          context: packages/mcp-server
+          context: .
+          file: packages/mcp-server/Dockerfile
           platforms: ${{ matrix.platform }}
           provenance: false
           outputs: type=image,name=formio/mcp,push-by-digest=true,name-canonical=true,push=true

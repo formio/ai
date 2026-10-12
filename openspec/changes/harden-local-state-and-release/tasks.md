@@ -63,42 +63,42 @@
 
 ### Red
 
-- [ ] 5.2 Write a failing test that the Dockerfile installs with `pnpm install --frozen-lockfile` and the release workflow's Docker build context is the repository root
+- [x] 5.2 Write a failing test that the Dockerfile installs with `pnpm install --frozen-lockfile` and the release workflow's Docker build context is the repository root
 
 ### Green
 
-- [ ] 5.4 Rework the Dockerfile to build from the repository root with the lockfile and `pnpm deploy`; update the workflow's build context and any Docker docs
+- [x] 5.4 Rework the Dockerfile to build from the repository root with the lockfile and `pnpm deploy`; update the workflow's build context and any Docker docs
 
 ### Refactor
 
-- [ ] 5.5 Review implementation and refactor as needed
+- [x] 5.5 Review implementation and refactor as needed
 
 ## 6. Package contents and version
 <!-- depends_on: none -->
 
 ### Red
 
-- [ ] 6.1 Write failing tests: `npm pack --dry-run` lists `LICENSE`; a stale module in `dist` is gone after `build`; the `.mcpb` and plugin bundles report the package version from `server_status`; every `FORMIO_*` variable read in `src` is declared in `server.json`
+- [x] 6.1 Write failing tests: `npm pack --dry-run` lists `LICENSE`; a stale module in `dist` is gone after `build`; the `.mcpb` and plugin bundles report the package version from `server_status`; every `FORMIO_*` variable read in `src` is declared in `server.json`
 
 ### Green
 
-- [ ] 6.2 Add LICENSE to the package (`files` + `prepack` copy, git-ignored), make `build` clear `dist`, write the version in with esbuild `define` in both bundle scripts with a `package.json` fallback, and add the `FORMIO_AUTH_*` entries to `server.json`
+- [x] 6.2 Add LICENSE to the package (`files` + `prepack` copy, git-ignored), make `build` clear `dist`, write the version in with esbuild `define` in both bundle scripts with a `package.json` fallback, and add the `FORMIO_AUTH_*` entries to `server.json`
 
 ### Refactor
 
-- [ ] 6.3 Review implementation and refactor as needed
+- [x] 6.3 Review implementation and refactor as needed
 
 ## 7. Docs and release notes
 <!-- depends_on: 1, 2, 3, 4, 5, 6 -->
 
 ### Red
 
-- [ ] 7.1 Write a failing docs test: both server READMEs say a mapping applies to subdirectories and that `FORMIO_INSECURE_TLS` applies only to the configured deployment
+- [x] 7.1 Write a failing docs test: both server READMEs say a mapping applies to subdirectories and that `FORMIO_INSECURE_TLS` applies only to the configured deployment
 
 ### Green
 
-- [ ] 7.2 Update the READMEs; add a changeset (`@formio/mcp` patch); run `pnpm test`, `pnpm lint`, `pnpm format`, `pnpm check:releases`, `openspec validate --strict`
+- [x] 7.2 Update the READMEs; add a changeset (`@formio/mcp` patch); run `pnpm test`, `pnpm lint`, `pnpm format`, `pnpm check:releases`, `openspec validate --strict`
 
 ### Refactor
 
-- [ ] 7.3 Review implementation and refactor as needed
+- [x] 7.3 Review implementation and refactor as needed
