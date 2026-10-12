@@ -5,6 +5,7 @@ import net from 'node:net';
 import { authenticate } from '../auth.js';
 import { browserLaunchCommand } from '../browser-launch.js';
 import { ResolvedFormioConfig } from '../config.js';
+import { postLoginToken } from './test-helpers.js';
 
 vi.mock('child_process', () => ({ spawn: vi.fn() }));
 
@@ -42,14 +43,6 @@ function freePort(): Promise<number> {
   });
 }
 
-function postCallback(port: number, token: string): Promise<Response> {
-  return fetch(`http://127.0.0.1:${port}/callback`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ token }),
-  });
-}
-
 describe('authenticate in headless environments', () => {
   let stderr: string[];
 
@@ -71,7 +64,7 @@ describe('authenticate in headless environments', () => {
   it('writes the login URL to stderr so it can be opened manually', async () => {
     await authenticate(DEFAULT_CONFIG, {
       onReady: async (port) => {
-        await postCallback(port, 'jwt');
+        await postLoginToken(port, 'jwt');
       },
     });
 
@@ -90,7 +83,7 @@ describe('authenticate in headless environments', () => {
       {
         onReady: async (port) => {
           observed = port;
-          await postCallback(port, 'jwt');
+          await postLoginToken(port, 'jwt');
         },
       }
     );
@@ -109,7 +102,7 @@ describe('authenticate in headless environments', () => {
 
     await authenticate(DEFAULT_CONFIG, {
       onReady: async (port) => {
-        await postCallback(port, 'jwt');
+        await postLoginToken(port, 'jwt');
       },
     });
 
@@ -155,7 +148,7 @@ describe('authenticate in headless environments', () => {
     await authenticate(DEFAULT_CONFIG, {
       onReady: async (port) => {
         observedPort = port;
-        await postCallback(port, 'jwt');
+        await postLoginToken(port, 'jwt');
       },
     });
 
@@ -176,7 +169,7 @@ describe('authenticate in headless environments', () => {
       { ...DEFAULT_CONFIG, authTimeoutMs: 5000 },
       {
         onReady: async (port) => {
-          await postCallback(port, 'in-time');
+          await postLoginToken(port, 'in-time');
         },
       }
     );

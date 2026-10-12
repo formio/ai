@@ -33,6 +33,7 @@ function requestCurrent({ url, config, timeoutMs }: CurrentRequest): Promise<Res
     headers: getAuthHeader(config),
     redirect: 'manual',
     timeoutMs: timeoutMs ?? config.requestTimeoutMs,
+    certificateScope: config,
   });
 }
 

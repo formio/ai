@@ -1,3 +1,20 @@
+## MODIFIED Requirements
+
+### Requirement: JWT is captured via callback after successful login
+
+On successful form submission, the login page SHALL read the JWT from `Formio.getToken()` and POST it to `/callback` on the same localhost server, together with the per-login value the page was served. The callback SHALL resolve a promise with the JWT when that value matches.
+
+#### Scenario: Successful login posts JWT to callback
+
+- **WHEN** the user successfully submits the login form
+- **THEN** the page reads `Formio.getToken()` and sends `POST /callback` with `{ "token": "<jwt>", "state": "<per-login value>" }`
+- **AND** the callback responds with a "you can close this tab" message
+
+#### Scenario: Login flow resolves with the JWT
+
+- **WHEN** the `/callback` endpoint receives a valid JWT with the matching per-login value
+- **THEN** the authenticate function resolves with the JWT string
+
 ## ADDED Requirements
 
 ### Requirement: The login callback accepts only the post its page was served for

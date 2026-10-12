@@ -1,3 +1,4 @@
+import { randomBytes, timingSafeEqual } from 'node:crypto';
 import express from 'express';
 import { browserlessReason, currentBrowserEnvironment } from './browser-availability.js';
 import { openInBrowser } from './browser-launch.js';
@@ -86,7 +87,20 @@ function scriptTag(asset: PinnedAsset): string {
   return `<script src="${asset.url}" integrity="${asset.integrity}" crossorigin="anonymous"></script>`;
 }
 
-function buildLoginPage(loginFormUrl: string): string {
+// A string as a script literal: its JSON form, with `<` escaped so the value cannot
+// close the script element it sits in. Any character the value carries stays part
+// of the string.
+function scriptString(value: string): string {
+  return JSON.stringify(value).replace(/</g, '\\u003c');
+}
+
+interface LoginPage {
+  loginFormUrl: string;
+  /** This login's value, which the page's script sends back with the token. */
+  state: string;
+}
+
+function buildLoginPage({ loginFormUrl, state }: LoginPage): string {
   const domain = new URL(loginFormUrl).hostname;
   return `<!DOCTYPE html>
 <html>
@@ -121,7 +135,8 @@ ${styleTag(LOGIN_PAGE_ASSETS.formioCss)}
 ${scriptTag(LOGIN_PAGE_ASSETS.formioJs)}
 <script>
 var statusEl = document.getElementById('status');
-Formio.createForm(document.getElementById('formio'), '${loginFormUrl}').then(function(form) {
+var state = ${scriptString(state)};
+Formio.createForm(document.getElementById('formio'), ${scriptString(loginFormUrl)}).then(function(form) {
   // Suppress only Formio's default success alert (to avoid a UI flash); keep login error alerts intact.
   const baseSetAlert = form.setAlert.bind(form);
   form.setAlert = function(type, message, options) {
@@ -135,7 +150,7 @@ Formio.createForm(document.getElementById('formio'), '${loginFormUrl}').then(fun
     fetch('/callback', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ token: token })
+      body: JSON.stringify({ token: token, state: state })
     }).then(function() {
       document.querySelector('.auth-card').innerHTML =
         '<div class="alert alert-success text-center mb-0" role="alert">' +
@@ -239,6 +254,22 @@ function assertBrowserAvailable(config: ResolvedFormioConfig): void {
   );
 }
 
+/** A new value for one login: 128 random bits, as hex. */
+function newLoginState(): string {
+  return randomBytes(16).toString('hex');
+}
+
+// Whether a post carries this login's value. Lengths are compared first, since
+// timingSafeEqual accepts only buffers of equal length.
+function carriesState(expected: string, received: unknown): boolean {
+  if (typeof received !== 'string') {
+    return false;
+  }
+  const want = Buffer.from(expected);
+  const got = Buffer.from(received);
+  return want.length === got.length && timingSafeEqual(want, got);
+}
+
 export async function authenticate(
   config: ResolvedFormioConfig,
   options?: AuthenticateOptions
@@ -247,6 +278,7 @@ export async function authenticate(
 
   const app = express();
   app.use(express.json());
+  const state = newLoginState();
 
   let resolveJwt!: (value: string) => void;
   let rejectJwt!: (reason: Error) => void;
@@ -258,7 +290,7 @@ export async function authenticate(
   app.get('/', async (_req, res) => {
     try {
       const loginFormUrl = config.loginFormUrl ?? (await resolveDefaultLoginFormUrl(config));
-      res.send(buildLoginPage(loginFormUrl));
+      res.send(buildLoginPage({ loginFormUrl, state }));
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       res.status(500).send(`Login form resolution failed: ${message}`);
@@ -269,7 +301,15 @@ export async function authenticate(
   app.post('/callback', (req, res) => {
     // Express 5 leaves `req.body` undefined when no parser matched the request's
     // content type, so a POST that is not JSON arrives with no body at all.
-    const token = (req.body as { token?: unknown } | undefined)?.token;
+    const body = req.body as { token?: unknown; state?: unknown } | undefined;
+    // Only the page this login served knows its value; any other post is refused
+    // and the login keeps waiting for that page.
+    if (!carriesState(state, body?.state)) {
+      process.stderr.write("Auth callback refused: the post did not carry this login's value\n");
+      res.status(403).send('This post is not from the login page this server served');
+      return;
+    }
+    const token = body?.token;
     if (typeof token !== 'string' || !token) {
       process.stderr.write('Auth callback received but token is empty\n');
       res.status(400).send('No token received');

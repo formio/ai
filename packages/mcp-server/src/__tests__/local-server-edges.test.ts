@@ -11,6 +11,7 @@ import net from 'node:net';
 import { describe, it, expect, vi } from 'vitest';
 import { authenticate } from '../auth.js';
 import { ResolvedFormioConfig } from '../config.js';
+import { loginPageState, postLoginCallback, postLoginToken } from './test-helpers.js';
 
 vi.mock('child_process', () => ({
   spawn: vi.fn(() => ({ on: vi.fn(), unref: vi.fn() })),
@@ -30,25 +31,31 @@ function postText(port: number, body: string): Promise<Response> {
   });
 }
 
-function postJson(port: number, body: unknown): Promise<Response> {
-  return fetch(`http://127.0.0.1:${port}/callback`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body),
-  });
-}
-
 describe('the login callback', () => {
-  it('answers a POST with no JSON body with 400, and keeps waiting for the token', async () => {
+  // A body-less post carries no page value, so it is refused as any other post
+  // without one is — answered, not failed with a 500.
+  it('answers a POST with no JSON body with 403, and keeps waiting for the token', async () => {
     let status = 0;
     const jwt = await authenticate(CONFIG, {
       onReady: async (port) => {
         status = (await postText(port, 'not json')).status;
-        await postJson(port, { token: 'after-a-bad-post' });
+        await postLoginToken(port, 'after-a-bad-post');
+      },
+    });
+    expect(status).toBe(403);
+    expect(jwt).toBe('after-a-bad-post');
+  });
+
+  it('answers a post with the page value but no token with 400, and keeps waiting', async () => {
+    let status = 0;
+    const jwt = await authenticate(CONFIG, {
+      onReady: async (port) => {
+        status = (await postLoginCallback(port, { state: await loginPageState(port) })).status;
+        await postLoginToken(port, 'after-an-empty-post');
       },
     });
     expect(status).toBe(400);
-    expect(jwt).toBe('after-a-bad-post');
+    expect(jwt).toBe('after-an-empty-post');
   });
 });
 

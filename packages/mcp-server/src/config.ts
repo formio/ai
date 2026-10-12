@@ -144,6 +144,8 @@ export interface FormioConfig {
   /** FORMIO_REQUEST_TIMEOUT: replaces the client's default request timeout when set. */
   requestTimeoutMs?: number;
   forceBrowser?: boolean;
+  /** FORMIO_INSECURE_TLS: skip certificate verification for the resolved project and Base URL hosts. */
+  insecureTls?: boolean;
 }
 
 // After resolveProjectConfig has merged in the cwd's mapped project URL.
@@ -229,6 +231,7 @@ export function getConfig(): FormioConfig {
     authTimeoutMs: readTimeoutMs(process.env.FORMIO_AUTH_TIMEOUT),
     requestTimeoutMs: readTimeoutMs(process.env.FORMIO_REQUEST_TIMEOUT),
     forceBrowser: readBooleanEnv(process.env.FORMIO_FORCE_BROWSER),
+    insecureTls: readBooleanEnv(process.env.FORMIO_INSECURE_TLS),
   };
 }
 

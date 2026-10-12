@@ -119,3 +119,27 @@ export function stubRevisionsLicence(licensed: boolean) {
   vi.stubGlobal('fetch', probe);
   return probe;
 }
+
+/**
+ * The per-login value the login page at this port carries, read from the page the
+ * way a browser would receive it; undefined when the page carries none.
+ */
+export async function loginPageState(port: number): Promise<string | undefined> {
+  const html = await (await fetch(`http://127.0.0.1:${port}/`)).text();
+  const match = html.match(/var state = ("[^"\n]*");/);
+  return match ? (JSON.parse(match[1]) as string) : undefined;
+}
+
+/** POSTs a JSON body to the login server's `/callback`. */
+export function postLoginCallback(port: number, body: unknown): Promise<Response> {
+  return fetch(`http://127.0.0.1:${port}/callback`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+}
+
+/** What the login page posts once the user signs in: the token, with the page's own value. */
+export async function postLoginToken(port: number, token: string): Promise<Response> {
+  return postLoginCallback(port, { token, state: await loginPageState(port) });
+}

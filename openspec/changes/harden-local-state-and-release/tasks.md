@@ -33,30 +33,30 @@
 
 ### Red
 
-- [ ] 3.1 Write failing tests: with `FORMIO_INSECURE_TLS` true, a request to the resolved deployment host against a local self-signed HTTPS server succeeds; a request to another host is not given the relaxed dispatcher; `NODE_TLS_REJECT_UNAUTHORIZED` is not set; with it false, no dispatcher is passed
+- [x] 3.1 Write failing tests: with `FORMIO_INSECURE_TLS` true, a request to the resolved deployment host against a local self-signed HTTPS server succeeds; a request to another host is not given the relaxed dispatcher; `NODE_TLS_REJECT_UNAUTHORIZED` is not set; with it false, no dispatcher is passed
 
 ### Green
 
-- [ ] 3.2 Add `undici`, implement the lazily created dispatcher and its host check in `formio-client.ts` (and the auth probes that call `send`), and remove the process-wide setting
+- [x] 3.2 Add `undici`, implement the lazily created dispatcher and its host check in `formio-client.ts` (and the auth probes that call `send`), and remove the process-wide setting
 
 ### Refactor
 
-- [ ] 3.3 Review implementation and refactor as needed
+- [x] 3.3 Review implementation and refactor as needed
 
 ## 4. Login callback value and page embedding
 <!-- depends_on: none -->
 
 ### Red
 
-- [ ] 4.1 Write failing tests: the served page carries a per-login value; `/callback` with the matching value completes the login; a missing or different value answers 403 and the login keeps waiting; the login-form URL appears in the page as a JSON string literal (a URL containing `'` is passed whole)
+- [x] 4.1 Write failing tests: the served page carries a per-login value; `/callback` with the matching value completes the login; a missing or different value answers 403 and the login keeps waiting; the login-form URL appears in the page as a JSON string literal (a URL containing `'` is passed whole)
 
 ### Green
 
-- [ ] 4.2 Implement the value, its timing-safe comparison, and JSON embedding in `auth.ts`
+- [x] 4.2 Implement the value, its timing-safe comparison, and JSON embedding in `auth.ts`
 
 ### Refactor
 
-- [ ] 4.3 Review implementation and refactor as needed
+- [x] 4.3 Review implementation and refactor as needed
 
 ## 5. Docker image from the lockfile
 <!-- depends_on: none -->
