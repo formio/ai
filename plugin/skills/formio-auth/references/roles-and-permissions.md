@@ -27,7 +27,7 @@ Not for:
 Every new Form.io project is seeded with these roles, each with a unique MongoDB ID:
 
 - **Anonymous** — for unauthenticated users. Cannot be deleted.
-- **Everyone** — baseline applied to all users. Fixed ID `00000000000000000000000`. Cannot be deleted.
+- **Everyone** — baseline applied to all users. Fixed ID `000000000000000000000000` (24 zeros). Cannot be deleted (405).
 - **Administrator** — preconfigured with full CRUD across the project.
 - **Authenticated** — preconfigured for logged-in workflows; assigned by the Role Assignment Action at signup.
 
@@ -43,11 +43,11 @@ Add custom roles when the default trio is not enough — for example `salesRep`,
 
 ### Assigning roles to users — Role Assignment actions only, never direct `roles` writes
 
-A user's `roles` array lives on their submission, but the submissions API **strips the `roles` key from POST/PUT/PATCH bodies — even for the project owner**. Roles are assigned exclusively by the **Role Assignment action** (self-register forms assign the default persona unconditionally; SSO Role Mapping covers federated logins). For a multi-role application where all personas share ONE `user` resource (`student` / `collegeAdmin` / `scholarshipAdmin`) — the common default — the canonical pattern is a `role` selectboxes component on the user resource plus one CONDITIONAL Role Assignment action per persona (`condition.conditions: [{ component: "role", operator: "isEqual", value: "<persona>" }]`), so creating or editing a user in the portal (or via the API with `data.role.<persona> = true`) attaches the right role server-side. When the requirements instead call for a **resource per role** (e.g., a separate `admin` resource with the Login action's `settings.resources: ["user", "admin"]`), the selectboxes pattern is unnecessary — each user-type resource carries its own unconditional Role Assignment. Exact JSON shapes: `plugin/skills/formio-resource-planner/references/template-json.md` → "Multi-role user systems"; action mechanics: the `formio-actions` skill's `references/action-types.md` → "Role Assignment".
+A user's `roles` array lives on their submission, but the submissions API **strips the `roles` key from POST/PUT/PATCH bodies — even for the project owner**. Roles are assigned exclusively by the **Role Assignment action** (self-register forms assign the default persona unconditionally; SSO Role Mapping covers federated logins). For a multi-role application where all personas share ONE `user` resource (`student` / `collegeAdmin` / `scholarshipAdmin`) — the common default — the canonical pattern is a `role` selectboxes component on the user resource plus one CONDITIONAL Role Assignment action per persona (`condition.conditions: [{ component: "role", operator: "isEqual", value: "<persona>" }]`), so creating a user in the portal (or via the API with `data.role.<persona> = true`) attaches the right role server-side. These actions run on create only, by design: editing a user's `role` selection later does not run them, and changing an existing user's persona is an administrator task, done on an administrator-only form whose Role Assignment action has `association: "existing"` (add or remove) and whose component keyed exactly `submission` holds the target user's submission `_id`. When the requirements instead call for a **resource per role** (e.g., a separate `admin` resource with the Login action's `settings.resources: ["user", "admin"]`), the selectboxes pattern is unnecessary — each user-type resource carries its own unconditional Role Assignment. Exact JSON shapes: `plugin/skills/formio-resource-planner/references/template-json.md` → "Multi-role user systems"; action mechanics: the `formio-actions` skill's `references/action-types.md` → "Role Assignment".
 
 ### The eight permission types
 
-The same eight types appear across every scope:
+The same eight types appear in project `access` and in a form's `access` and `submissionAccess`, each entry carrying a `roles` array (forms also accept `self`, and Enterprise adds `group`, `team_*`, and `stage_*` types). A submission's own `access` array is different: the server computes it, with resource-keyed types — see the `formio-schema` skill's `submission-access.md`.
 
 | Type         | Meaning                                                                  |
 | ------------ | ------------------------------------------------------------------------ |
@@ -82,8 +82,8 @@ The planner reference at `plugin/skills/formio-resource-planner/references/templ
 Beyond the role-keyed `access` / `submissionAccess` arrays, Form.io supports four overlay models:
 
 1. **Self Access Permissions** — write the submission's own `_id` into its `owner` property. The submission becomes its own owner; useful for "users see only their own records" patterns without a separate user lookup.
-2. **Field Match-Based Access** — submission access gated on field values. Configured at `/developers/roles-and-permissions/field-match-based-access.md`.
-3. **Field-Based Resource Access** — permissions assigned via Resource references inside a form. Configured at `/developers/roles-and-permissions/field-based-resource-access.md`.
+2. **Field Match-Based Access** — submission access gated on field values. Configured as described at `https://help.form.io/developers/roles-and-permissions/field-match-based-access`.
+3. **Field-Based Resource Access** — permissions assigned via Resource references inside a form. Configured as described at `https://help.form.io/developers/roles-and-permissions/field-based-resource-access`.
 4. **Group Permissions** — an extension of Field-Based Resource Access where permissions derive from group associations. See [`group-permissions.md`](./group-permissions.md).
 
 ### Worked examples

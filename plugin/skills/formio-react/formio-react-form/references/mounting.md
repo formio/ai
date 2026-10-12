@@ -50,8 +50,8 @@ const [page, setPage] = useState(0);
   src={wizardJson}
   options={HIDE_BUILTIN_NAV}
   onFormReady={(instance) => { wizard.current = instance as Wizard; }}
-  onNextPage={({ page }) => setPage(page)}
-  onPrevPage={({ page }) => setPage(page)}
+  onNextPage={() => setPage(wizard.current?.page ?? 0)}
+  onPrevPage={() => setPage(wizard.current?.page ?? 0)}
 />
 
 <button onClick={() => wizard.current?.prevPage()}>Back</button>
@@ -69,7 +69,7 @@ const HIDE_BUILTIN_NAV = {
 Three pieces, each doing one job:
 
 - **`buttonSettings`** hides the renderer's own navigation so yours is the only one. Add `breadcrumbSettings: { clickable: false }` when users must move strictly forward.
-- **`onNextPage` / `onPrevPage`** are the wizard's page events, mapped to props by the `Form` component. They carry the new page index, which is what a progress indicator renders from. `wizardPageSelected` (a breadcrumb click) has no prop; reach it through `otherEvents`.
+- **`onNextPage` / `onPrevPage`** are the wizard's page events, mapped to props by the `Form` component. The wizard has already moved when they fire, so read the new page from the instance (`wizard.current.page`), which is what a progress indicator renders from. Do not read it from the handler's argument: the renderer passes `{ page, submission }` while `@formio/react`'s declared type says `(page: number, submission)`, so destructuring fails to type-check under `strict` and a plain `page` parameter holds the object at runtime. `wizardPageSelected` (a breadcrumb click) has no prop; reach it through `otherEvents`.
 - **`nextPage()` / `prevPage()` / `setPage(i)` / `submit()`** on the instance drive the flow. `nextPage()` validates the current page first and rejects if it fails, leaving the wizard where it is with the errors rendered — so an `await` on it is also your gate.
 
 The page API, conditional pages, and the events in full are documented once, for every host, in [`formio-form`'s wizards reference](../../../formio-form/references/wizards.md); this section only covers the React wiring around them.

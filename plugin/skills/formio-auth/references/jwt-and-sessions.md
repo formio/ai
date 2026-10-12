@@ -23,7 +23,7 @@ Not for:
 
 ### The on-the-wire header
 
-Every request to these endpoints MUST include an `x-jwt-token` header holding the user JWT issued by the MCP server's browser-based portal-login flow. The MCP server attaches this header automatically via `formioFetch`; external clients must obtain the JWT through the same portal-login flow. Do not use any other authentication mechanism with these endpoints.
+Application code calling these endpoints at runtime sends the end user's JWT in the `x-jwt-token` header — the token the login form's Login action, or an SSO flow, returns in its `x-jwt-token` response header — or no token where the Anonymous role holds the permission. The JWT from the MCP server's browser-based portal-login flow authorizes only the server's own tool calls; application code neither receives nor sends it.
 
 The same header is used by the in-browser renderer, by service-to-service callers, and by Custom JWTs forged on a customer's backend. The token is also persisted by the renderer into `localStorage` under the key `formioToken`; the renderer re-attaches it on every subsequent Form.io request.
 

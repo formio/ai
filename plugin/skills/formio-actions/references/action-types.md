@@ -79,7 +79,7 @@ Authenticates a user against one or more resource forms. Does not create a submi
 | Resources | `resources` | string[] | Yes | — | Resource form IDs to authenticate against |
 | Username Field | `username` | string | Yes | — | Component API key for the username/email field |
 | Password Field | `password` | string | Yes | — | Component API key for the password field |
-| Max Login Attempts | `allowedAttempts` | number | No | 5 | 0 = unlimited. Failed attempts before lockout |
+| Max Login Attempts | `allowedAttempts` | number | No | unset (no lockout); the portal pre-fills 5 | Failed attempts before lockout; unset or 0 means no lockout |
 | Attempt Time Window | `attemptWindow` | number | No | 30 | Seconds. Window for counting failed attempts |
 | Locked Wait Time | `lockWait` | number | No | 1800 | Seconds (30 min). How long the account stays locked |
 
@@ -93,11 +93,11 @@ Authenticates a user against one or more resource forms. Does not create a submi
 
 ### Brute-Force Protection
 
-Failed attempts are tracked in `user.metadata.login`:
+Lockout applies only when `allowedAttempts` is a non-zero number; a Login action created through the API or a template without it never locks an account. Failed attempts are tracked in `user.metadata.login`, and only for a username that matches an existing user:
 
-- After `allowedAttempts` failures within `attemptWindow` seconds, the account locks
-- Locked accounts must wait `lockWait` seconds before retrying
-- Setting `allowedAttempts: 0` disables lockout (not recommended)
+- Failures are counted from the first failed attempt; when the count reaches `allowedAttempts` within `attemptWindow` seconds (default 30) — the failure after that many — the account locks
+- A locked account is refused for `lockWait` seconds (default 1800), and every attempt in that time, including one with the correct password, returns 401
+- A successful login resets the count
 
 ---
 
@@ -164,7 +164,7 @@ When one shared user resource serves several personas (e.g., `applicant` / `admi
 }
 ```
 
-Whoever creates or edits the user (portal admin, or an API caller setting `data.role.admissions = true`) checks the box; the matching action attaches the role server-side. The planner-side emission rules for this pattern live in `formio-resource-planner`'s `references/template-json.md` → "Multi-role user systems".
+These conditional Role Assignment actions run when a user record is **created** (`method: ["create"]`, the Role Assignment action's fixed method), and that is intentional: the persona is chosen when the account is created. Whoever creates the user (portal admin, or an API caller setting `data.role.admissions = true`) checks the box, and the matching action attaches the role server-side. Editing a user later, including changing the `role` boxes, does not add or remove roles. Changing an existing user's persona is an administrator task, done through an administrator-only form whose Role Assignment actions use `association: "existing"` — the target user's submission ID in a component keyed exactly `submission`, one `type: "add"` action for the new role and one `type: "remove"` for the old. See "Association Types" above for the `existing` form. The planner-side emission rules for this pattern live in `formio-resource-planner`'s `references/template-json.md` → "Multi-role user systems".
 
 ---
 
@@ -186,7 +186,7 @@ Sends an email notification when a submission event occurs.
 | Cc | `cc` | string[] | No | — | Carbon copy |
 | Bcc | `bcc` | string[] | No | — | Blind carbon copy |
 | Subject | `subject` | string | No | `New submission for {{ form.title }}.` | Subject line |
-| Template URL | `template` | string | No | Form.io's hosted default wrapper | External HTML template — see "External Templates" below |
+| Template URL | `template` | string | No | none (the portal's settings form pre-fills `https://pro.formview.io/assets/email.html`) | External HTML template — see "External Templates" below |
 | Message | `message` | string | No | `{{ submission(data, form.components) }}` | Email body |
 | Rendering Method | `renderingMethod` | string | No | `dynamic` | `dynamic` (formio.js) or `static` (legacy) |
 
@@ -233,7 +233,7 @@ Set it with a `PUT` to the project endpoint, passing a `config` object:
 
 If `template` is set to a URL, the server fetches that HTML and uses it as the email wrapper. The `message` content is injected into the template. If the fetch fails, the message is sent directly without a template wrapper.
 
-Leave `template` unset to use Form.io's default wrapper. When you do set it, point it at a URL on a host you control and serve it over HTTPS: the server re-fetches it at send time, so whoever controls that URL controls the markup of every email the action sends, and a URL that later expires or changes hands becomes a phishing vector inside your own mail. Do not set it to a third-party or user-supplied URL.
+With `template` unset or empty, the email is the `message` alone, with no wrapper. To use Form.io's hosted wrapper, set `template` to `https://pro.formview.io/assets/email.html`, the value the portal's settings form pre-fills; when the fetch fails, the message is sent without a wrapper. When you set it to your own template, point it at a URL on a host you control and serve it over HTTPS: the server re-fetches it at send time, so whoever controls that URL controls the markup of every email the action sends, and a URL that later expires or changes hands becomes a phishing vector inside your own mail. Do not set it to a third-party or user-supplied URL.
 
 ---
 
@@ -241,20 +241,31 @@ Leave `template` unset to use Form.io's default wrapper. When you do set it, poi
 
 **Name:** `webhook` | **Priority:** 0 | **Handler:** `after` | **Method:** `create`, `update`, `delete`
 
-Makes an HTTP request to an external URL when a submission event occurs.
+Makes an HTTP request to an external URL when a submission event occurs. The open-source server and Enterprise each register their own webhook action under this name; the differences are listed below. Call `action_type_get` to see which settings the connected server offers.
 
 ### Settings
 
 | Field | Key | Type | Required | Default | Description |
 | --- | --- | --- | --- | --- | --- |
-| Webhook URL | `url` | string | Yes | — | Target URL (supports `{{ data.field }}` interpolation) |
-| Block Request | `block` | boolean | No | false | Wait for webhook response before completing submission |
-| Username | `username` | string | No | — | HTTP Basic Auth username |
+| Webhook URL | `url` | string | Yes | — | Target URL (supports interpolation — see "URL Interpolation") |
+| Block Request | `block` | boolean | No | false | Wait for webhook response before completing the request |
+| Username | `username` | string | No | — | HTTP Basic Auth username (Enterprise sends Basic Auth only when both are set) |
 | Password | `password` | string | No | — | HTTP Basic Auth password |
+
+Enterprise adds these settings:
+
+| Key | Purpose |
+| --- | --- |
+| `method` | HTTP method to send (`get`, `post`, `put`, `patch`, `delete`); empty means the incoming request's method |
+| `headers` | Additional request headers, as `[{ "header": "...", "value": "..." }]`; values support the same interpolation as the URL |
+| `forwardHeaders` | Send the incoming request's headers instead of the default `Accept` header |
+| `transform` | JavaScript that reshapes `payload` before sending; when it throws, the untransformed payload is sent |
+| `externalIdType` / `externalIdPath` | Save an id from the response on the submission's `externalIds`, available to later requests as `{{ externalId }}` |
+| `retryType` / `numberOfAttempts` / `initialDelay` | Retry a failed request on a constant, linear, exponential, or jittered schedule |
 
 ### Request Payload
 
-The webhook sends a JSON POST/PUT/DELETE (matching the submission's HTTP method):
+The open-source server sends this JSON body with the incoming request's method:
 
 ```json
 {
@@ -273,17 +284,23 @@ The webhook sends a JSON POST/PUT/DELETE (matching the submission's HTTP method)
 }
 ```
 
+Enterprise sends `{ request, submission, params }` — no `response` key. `submission` is the stored submission (the deleted one on DELETE), `transform` can reshape the payload, and a GET carries no body.
+
 ### Blocking vs Non-Blocking
 
-**Non-blocking** (`block: false`, default): The webhook fires in the background. The form submission completes immediately regardless of webhook success/failure. Errors are logged but not surfaced to the user.
+**Non-blocking** (`block: false`, default): the webhook fires in the background and the request completes without waiting, on both servers. Failures appear only in the action log.
 
-**Blocking** (`block: true`): The submission waits for the webhook response. If the webhook returns a non-2xx status, the submission fails with an error. The webhook response is stored in `submission.metadata[action.title]`.
+**Blocking** (`block: true`) on the open-source server: the request waits for the webhook. The response body is not read (`metadata[action.title]` records `{}`), and a non-2xx response or network error makes the request return an error — in an `after` handler the submission has already been stored by then.
+
+**Blocking** (`block: true`) on Enterprise: the response body is parsed (JSON or text). In a `before` handler it is written to `metadata[action.title]` and stored with the submission, and a failure fails the request with the webhook's status. In an `after` handler it is added to the returned submission's `metadata[action.title]` but not saved to the stored record, and a failure leaves the request successful and lists `{ webhook, message }` in the response's `metadata.webhookErrors`.
 
 ### URL Interpolation
 
-The URL supports template variables: `https://api.example.com/{{ data.type }}/{{ data._id }}`
+On Enterprise the URL (and each header value) is interpolated with `{{ data.<field> }}`, `{{ submission._id }}`, `{{ externalId }}`, and `{{ config.<key> }}` (project public configuration): `https://api.example.com/{{ data.type }}/{{ submission._id }}`.
 
-Keep the scheme and host literal. A submitter controls every `{{ data.* }}` value, so interpolating one into the host — or into a path that a `..` segment can escape — lets a submission redirect the request, and with it the Basic Auth credentials in `username`/`password`, to a server of their choosing. Interpolate only into path or query positions whose value you constrain (a select with fixed options, a validated pattern), and send webhooks only to HTTPS endpoints you own.
+On the open-source server the URL is interpolated against the submission's `data` object itself, so a field is written `{{ <field> }}`: `https://api.example.com/{{ type }}`. Writing `{{ data.type }}` there produces the text `undefined`, and the submission `_id` is not available.
+
+Keep the scheme and host literal. A submitter controls every interpolated field value, so interpolating one into the host — or into a path that a `..` segment can escape — lets a submission redirect the request, and with it the Basic Auth credentials in `username`/`password`, to a server of their choosing. Interpolate only into path or query positions whose value you constrain (a select with fixed options, a validated pattern), and send webhooks only to HTTPS endpoints you own.
 
 ---
 

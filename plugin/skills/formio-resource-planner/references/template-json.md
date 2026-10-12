@@ -553,7 +553,7 @@ Each action is keyed `"<formMachineName>:<actionName>"`. Fields:
 - `title`: human-readable
 - `name`: the action type — `save`, `login`, `role`, `group`, `email`, `webhook`, etc.
 - `form`: the machineName of the form/resource the action runs on
-- `priority`: integer — higher runs later within the same handler phase
+- `priority`: integer. Within one handler phase, actions run in descending priority order (the higher number runs first). Every `before` action runs before the submission is stored and every `after` action runs after it, whatever their priorities.
 - `method`: `["create"]`, `["update"]`, or `["create", "update"]`
 - `handler`: `["before"]` or `["after"]`
 - `settings`: action-specific payload
@@ -658,7 +658,7 @@ Emit `association: "existing"` only on an administrator form that changes anothe
 
 When the plan DOES share one user resource across **more than one assignable persona** (e.g., `student` / `collegeAdmin` / `scholarshipAdmin`), the register form's single unconditional Role Assignment only covers the self-register persona. The other personas need a role-selection mechanism ON the user resource itself, because **a submission's `roles` array cannot be written directly through the API** — the server filters `roles` out of POST/PUT/PATCH bodies even for the project owner, so "create the user, then PATCH `roles`" is a dead end that strands the user with no working way to create staff accounts. The Role Assignment action is the only supported writer of submission roles.
 
-The canonical pattern is: (1) a `selectboxes` component keyed `role` on the user resource, one value per assignable persona; (2) one **conditional** Role Assignment action per persona, executing only when its box is checked. Whoever creates or edits a user (the admin in the Form.io portal, or an authorized API caller setting `data.role.<value> = true`) picks the persona on the form, and the matching action attaches the real role server-side.
+The canonical pattern is: (1) a `selectboxes` component keyed `role` on the user resource, one value per assignable persona; (2) one **conditional** Role Assignment action per persona, executing only when its box is checked. Whoever creates a user (the admin in the Form.io portal, or an authorized API caller setting `data.role.<value> = true`) picks the persona on the form, and the matching action attaches the real role server-side. These conditional Role Assignment actions run when a user record is **created** (`method: ["create"]`, the Role Assignment action's fixed method), and that is intentional: the persona is chosen when the account is created. Editing a user later, including changing the `role` boxes, does not add or remove roles. Changing an existing user's persona is an administrator task, done through an administrator-only form whose Role Assignment actions use `association: "existing"` — the target user's submission ID in a component keyed exactly `submission`, one `type: "add"` action for the new role and one `type: "remove"` for the old — see `formio-actions`' `references/action-types.md` → "Association Types".
 
 Example selectboxes component on the `user` resource:
 
@@ -709,7 +709,7 @@ Rules:
 
 - **Shared collection vs. resource-per-role is a deliberate choice.** Default to ONE `user` resource with personas as roles (one login form, one owner story) and use this selectboxes pattern. A resource per role is equally valid WHEN the requirements call for it (separate credential pools, separate registration flows, `settings.resources: ["user", "admin"]` on Login) — in that shape, skip the selectboxes and give each user-type resource its own unconditional Role Assignment instead. What is NOT valid is a shared user resource whose non-default personas have no assignment mechanism at all.
 - The `condition` object uses the conjunction shape above (`conjunction` + `conditions[{ component, operator, value }]` + `custom: ""`). For a `selectboxes` component, `operator: "isEqual"` with the box's `value` string matches when that box is checked.
-- Emit one conditional `user:role<Persona>` action for EVERY assignable role in the plan, including the self-register persona — the register form's own unconditional Role Assignment still covers self-registration, and the conditional set covers users created or edited on the resource directly (portal or API).
+- Emit one conditional `user:role<Persona>` action for EVERY assignable role in the plan, including the self-register persona — the register form's own unconditional Role Assignment still covers self-registration, and the conditional set covers users created on the resource directly (portal or API).
 - Never plan a step that writes `submission.roles` directly (POST body, PUT, PATCH) — the API silently strips it, and a PUT that includes a `roles` key can wipe the existing roles.
 
 ### Group Assignment (Group Permissions) — has three parts

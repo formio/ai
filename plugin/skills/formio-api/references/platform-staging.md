@@ -109,7 +109,7 @@ Request body:
   "project": "<projectId>",
   "tag": "1.0.0",
   "description": "Initial Version",
-  "template": { "title": "...", "version": "2.0.0", "roles": {}, "forms": [], "resources": [] }
+  "template": { "title": "...", "version": "2.0.0", "roles": {}, "forms": {}, "resources": {}, "actions": {} }
 }
 ```
 
@@ -134,7 +134,7 @@ Request body:
 ```json
 {
   "type": "template",
-  "template": { "title": "...", "version": "2.0.0", "roles": {}, "forms": [], "resources": [] }
+  "template": { "title": "...", "version": "2.0.0", "roles": {}, "forms": {}, "resources": {}, "actions": {} }
 }
 ```
 

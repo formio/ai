@@ -8,13 +8,13 @@ All endpoints below are rooted at `{projectUrl}` — the project endpoint, equiv
 
 ## Authentication
 
-Every request to these endpoints MUST include an `x-jwt-token` header holding the user JWT issued by the MCP server's browser-based portal-login flow. The MCP server attaches this header automatically via `formioFetch`; external clients must obtain the JWT through the same portal-login flow. Do not use any other authentication mechanism with these endpoints.
+Application code calling these endpoints at runtime sends the end user's JWT in the `x-jwt-token` header — the token the login form's Login action, or an SSO flow, returns in its `x-jwt-token` response header — or no token where the Anonymous role holds the permission. The JWT from the MCP server's browser-based portal-login flow authorizes only the server's own tool calls; application code neither receives nor sends it. The setup steps this page also shows — creating the forms, roles, and actions the runtime calls depend on — are build-time work: make them with the MCP tools named under MCP Tool Preference, which carry the portal-login JWT themselves.
 
 ## MCP Tool Preference
 
 No MCP tool covers these operations, and none should: they are **runtime** endpoints. The MCP tools exist for **build-time** work — creating and updating forms, actions, roles, and project settings while the application is being built. The endpoints below are called by the finished application, on behalf of the person using it, with that person's own token.
 
-So this document is a specification for the code you write — how the application authenticates users held outside the default `user` resource, at runtime — not a set of calls to make now.
+So this document is a specification for the code you write — how the application authenticates users held outside the default `user` resource, at runtime — not a set of calls to make now. The setup it walks through is build-time work with a tool for each step: `form_create` for the custom user resource and its login and registration forms, `form_update` to change them, `role_create` for the role, and `action_list`, `action_create`, and `action_delete` for the Save, Role Assignment, and Login actions. Prefer those tools to the raw requests shown for reference.
 
 ## Endpoints
 
@@ -97,12 +97,11 @@ Request body (JSON):
     "role": "{{ employeeRoleId }}"
   },
   "handler": ["after"],
-  "method": ["create"],
-  "condition": { "conjunction": "", "conditions": [], "custom": "" }
+  "method": ["create"]
 }
 ```
 
-Required fields: `name` (`role`), `settings.association` (`new` for registration), `settings.type` (`add`), `settings.role` (the custom role `_id`), `handler` (`["after"]`), `method` (`["create"]`).
+Required fields: `name` (`role`), `settings.association` (`new` for registration), `settings.type` (`add`), `settings.role` (the custom role `_id`), `handler` (`["after"]`), `method` (`["create"]`). Omit `condition` for an action that always runs; a condition takes `conjunction` (`all` or `any`) and `conditions` (`{ component, operator, value }`).
 
 Response: the created action document with `_id`, `form` (the resource ID), `machineName`, plus the fields from the request.
 
@@ -224,17 +223,16 @@ Request body (JSON):
     "resources": ["{{ employeeResourceId }}"],
     "username": "email",
     "password": "password",
-    "allowedAttempts": "5",
-    "attemptWindow": "30",
-    "lockWait": "1800"
+    "allowedAttempts": 5,
+    "attemptWindow": 30,
+    "lockWait": 1800
   },
   "handler": ["before"],
-  "method": ["create"],
-  "condition": { "conjunction": "", "conditions": [], "custom": "" }
+  "method": ["create"]
 }
 ```
 
-Required fields: `name` (`login`), `settings.resources` (array of user-resource `_id`s to authenticate against), `settings.username`, `settings.password`, `handler` (`["before"]`), `method` (`["create"]`). Optional rate-limit fields: `allowedAttempts`, `attemptWindow`, `lockWait` (all stringified seconds/counts per Form.io convention).
+Required fields: `name` (`login`), `settings.resources` (array of user-resource `_id`s to authenticate against), `settings.username`, `settings.password`, `handler` (`["before"]`), `method` (`["create"]`). Optional lockout fields: `allowedAttempts` (no lockout unless set), `attemptWindow` (seconds, default 30), `lockWait` (seconds, default 1800). Omit `condition` for an action that always runs.
 
 Response: the created action document.
 
@@ -260,7 +258,7 @@ Required fields: match the login form's required components — typically `email
 
 Response: the matched user submission document — `_id`, `form` (the custom user resource `_id`), `owner`, `roles` (including the custom role), `access`, `metadata`, `data`. The JWT is in the `x-jwt-token` response header.
 
-Errors: `401` for invalid credentials; `429`-style locked responses when `allowedAttempts` is exceeded within `attemptWindow`.
+Errors: `401` for invalid credentials, and `401` with a wait message while the account is locked — which happens only when `allowedAttempts` is set and that many failures follow the first within `attemptWindow` seconds.
 
 Example:
 

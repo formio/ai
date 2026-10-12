@@ -162,7 +162,7 @@ Required fields: `data.email`, `data.password`.
 
 Response: the authenticated admin submission document (same shape as `GET /admin/submission/:id`). The issued JWT is returned in the `x-jwt-token` response header, not the body.
 
-Errors: `400` for missing credentials; `401` for invalid email/password; `429` if the login action's rate limit (`allowedAttempts`/`attemptWindow`/`lockWait`) has been tripped.
+Errors: `400` for missing credentials; `401` for invalid email/password; `401` with a wait message while the account is locked by the Login action's lockout, which applies only when `allowedAttempts` is set (`attemptWindow` and `lockWait` set the window and the lock length).
 
 Example:
 

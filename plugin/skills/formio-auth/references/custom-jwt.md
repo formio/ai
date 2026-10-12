@@ -109,7 +109,7 @@ For service-to-service callers (a backend script, a CI pipeline), attach the sam
 
 - Use `role_list` to fetch the MongoDB IDs you will put into `user.roles`.
 - Use `form_list` / `form_get` to fetch the `_id` of the `user` Resource form to put into `form._id`.
-- Use `project_export` to fetch the project `_id` to put into `project._id`.
+- Use `form_get` on the `user` Resource (for example with `select: "_id,project"`): its `project` field is the project `_id` to put into `project._id`. `project_export` omits the project `_id`, and `project_get` reports only URLs.
 - For runtime endpoint documentation (token introspection, token validation), see the `runtime-auth` reference in the `formio-api` skill.
 
 ## See also

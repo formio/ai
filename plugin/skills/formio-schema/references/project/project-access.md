@@ -14,7 +14,7 @@ A consumer can hold project-level access without form-level access (e.g., a deve
 
 ## Project access entries
 
-The `Project.access` field is an array of `Access` entries. Each entry maps an access type to a set of role IDs. See `submission/submission-access.md` for the full `AccessType` enumeration and per-value semantics — the access types themselves are the same set used at every layer.
+The `Project.access` field is an array of `Access` entries. Each entry maps an access type to a set of role IDs. Project `access` and form `access` / `submissionAccess` entries use the role-based permission types listed in `references/form/form-definition.md` (`create_all` … `delete_own`, `self`, plus the Enterprise `team_*`, `stage_*`, and `group` types) with a `roles` array. A submission's own `access` uses a different, resource-keyed set (`read`, `create`, `update`, `delete`, `write`, `admin`) with a `resources` array, which the server computes — see `submission/submission-access.md`.
 
 ```json
 {

@@ -66,15 +66,14 @@ describe('SKILL.md carries a Security section', () => {
     expect(body).toMatch(/report(ed)? (it )?to the user/i);
   });
 
-  // Snyk W011 read the skill as having the AGENT read submissions during the
-  // session. It does not: the MCP tools return configuration only, and the SDK
-  // calls are code the application runs. Saying so is what cleared the same
-  // finding on formio-form.
-  it('separates what the agent reads at build time from what the application reads at runtime', () => {
+  // The agent-facing rule covers everything returned to the agent — submissions
+  // included, since formio-api documents the submission endpoints. A narrower
+  // claim that no tool returns submission data is false and is not restored.
+  it('applies the data rule to whatever any Formio call or MCP tool returns', () => {
     const body = section(skill, 'Security');
-    expect(body).toMatch(/none (of them )?returns? submission data/i);
-    expect(body).toMatch(/the application (runs|executes) them at runtime/i);
-    expect(body).not.toMatch(/submission JSON, and project settings returned by any/);
+    expect(body).toMatch(/any `Formio` call or MCP tool/);
+    expect(body).toMatch(/submissions/);
+    expect(body).not.toMatch(/none (of them )?returns? submission data/i);
   });
 });
 

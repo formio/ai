@@ -19,7 +19,7 @@ A declined gate stops the flow — do not save, do not proceed to EMBED, leave n
 
 ## The call
 
-On approval, invoke the MCP server's `form_create` tool with the authored definition. `form_create` itself validates against the `formio-schema` conventions — the definition from Step 2 is passed through unmodified.
+On approval, invoke the MCP server's `form_create` tool with the authored definition, passed through unmodified. `form_create` checks only the top-level shape (`title`, `name`, and `path` are strings; `components` is an array; `type`, `display`, and `revisions` come from their enums) and sends the definition to Form.io, which applies its own validation; it does not check the definition against the `formio-schema` conventions, so the definition from Step 2 must already follow them.
 
 Before the call, if there is any doubt the path is free, check with `form_get` (a hit means the path is taken — pick a new path with the user rather than overwriting).
 

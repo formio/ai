@@ -13,13 +13,13 @@ All endpoints below are rooted at `{projectUrl}` — the project endpoint, equiv
 
 ## Authentication
 
-Every request to these endpoints MUST include an `x-jwt-token` header holding the user JWT issued by the MCP server's browser-based portal-login flow. The MCP server attaches this header automatically via `formioFetch`; external clients must obtain the JWT through the same portal-login flow. Do not use any other authentication mechanism with these endpoints.
+Application code calling these endpoints at runtime sends the end user's JWT in the `x-jwt-token` header — the token the login form's Login action, or an SSO flow, returns in its `x-jwt-token` response header — or no token where the Anonymous role holds the permission. The JWT from the MCP server's browser-based portal-login flow authorizes only the server's own tool calls; application code neither receives nor sends it. The setup steps this page also shows — creating the forms, roles, and actions the runtime calls depend on — are build-time work: make them with the MCP tools named under MCP Tool Preference, which carry the portal-login JWT themselves.
 
 ## MCP Tool Preference
 
 No MCP tool covers these operations, and none should: they are **runtime** endpoints. The MCP tools exist for **build-time** work — creating and updating forms, actions, roles, and project settings while the application is being built. The endpoints below are called by the finished application, on behalf of the person using it, with that person's own token.
 
-So this document is a specification for the code you write, and a description of the rules the server enforces at runtime, when an end user's token reaches it. Configure permissions through the build-time tools (`role_*`, `project_import`, `form_update`); do not exercise them by making requests as an end user.
+So this document is a specification for the code you write, and a description of the rules the server enforces at runtime, when an end user's token reaches it. Configure permissions through the build-time tools — `form_create` and `form_update` for a form's `access` and `submissionAccess`, `role_create` and `role_update` for roles, `action_create` for the actions the examples below add, `project_import` for a whole template — rather than the raw `POST {projectUrl}/form` and action requests shown for reference; do not exercise the permissions by making requests as an end user.
 
 ## Endpoints
 

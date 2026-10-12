@@ -59,10 +59,12 @@ Reading the `[[token(data.email=manager)]]` macro.
 
 So in `[[token(data.email=manager)]]`:
 
-- `data.email` — the email value to look up (here, the `email` field from the triggering submission's data).
-- `manager` — the **Resource that gets searched**. Form.io looks in this Resource for a record whose email matches `data.email`.
+- `data.email` — the path of the field **on the searched resource's records** that holds the address. Form.io looks for a record in that resource whose `data.email` equals the address this email is being sent to (the action's **To**, matched case-insensitively); it does not read this value from the triggering submission.
+- `manager` — the machine name of the **Resource that gets searched**; list several separated by commas.
 
-For a 'default' passwordless **login** flow, the equivalent macro searches the `user` Resource — e.g. `[[token(data.email=user)]]` — where `data.email` is the address the visitor typed into the login form.
+The full grammar is `[[token(<fieldPath>=<resource>[,<resource>…])[,<minutes>]]]`. An optional number after the closing parenthesis — `[[token(data.email=user),60]]` — sets the token lifetime in minutes (default 120). With no `=resource` part, the token is issued for the triggering submission itself. The macro is replaced only in the message body, and only when the email has exactly one recipient — with several recipients, send a separate email to each. When no record matches, the link carries the text `INVALID_TOKEN`.
+
+For a 'default' passwordless **login** flow, the equivalent macro searches the `user` Resource — `[[token(data.email=user)]]` — and the action's **To** is set to the address the visitor typed (for example `{{ data.email }}`). That recipient address is what gets matched against `data.email` on the user records.
 
 `{{ id }}` is the triggering submission's ID, used in the tutorial to deep-link the recipient into that submission in edit mode. It is an ordinary email-template variable, independent of the token.
 
