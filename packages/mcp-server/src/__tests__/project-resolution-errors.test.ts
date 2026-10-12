@@ -42,7 +42,7 @@ const PROJECT_SCOPED_CALLS: Array<{ name: string; args: Record<string, unknown> 
   },
   { name: 'action_delete', args: { formId: OBJECT_ID, actionId: ANOTHER_OBJECT_ID } },
   { name: 'project_export', args: {} },
-  { name: 'project_import', args: { template: { title: 'T' } } },
+  { name: 'project_import', args: { template: { title: 'T', forms: {}, resources: {} } } },
 ];
 
 async function connectAllTools() {

@@ -54,6 +54,13 @@
           "isSecret": false
         },
         {
+          "name": "FORMIO_REQUEST_TIMEOUT",
+          "description": "Seconds a Form.io request may go unanswered before the call fails with a network error naming the URL. Optional; a positive integer no larger than 2147483, and any other value is ignored. Defaults to 60. project_import and project_export wait 300 seconds, or this value when it is longer.",
+          "isRequired": false,
+          "format": "string",
+          "isSecret": false
+        },
+        {
           "name": "FORMIO_INSECURE_TLS",
           "description": "Set to 1 to skip TLS certificate verification. For local development against self-signed certificates only \u2014 never enable in production.",
           "isRequired": false,

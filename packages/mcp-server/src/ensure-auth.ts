@@ -1,5 +1,11 @@
 import { ResolvedFormioConfig } from './config.js';
-import { readToken, saveToken, clearToken } from './token-cache.js';
+import {
+  readToken,
+  saveToken,
+  clearToken,
+  readCacheSnapshot,
+  type CacheSnapshot,
+} from './token-cache.js';
 import { validateToken } from './token-validation.js';
 import { isJwtExpired } from './token-expiry.js';
 import { authenticate } from './auth.js';
@@ -9,6 +15,17 @@ import { requireBaseUrl } from './project-resolver.js';
 // deployment, so caching per-project would over-partition.
 const jwtCache = new Map<string, string>();
 const pendingAuthByBaseUrl = new Map<string, Promise<void>>();
+// The cache file as last read by the check below, reused while its stat is unchanged.
+let diskSnapshot: CacheSnapshot | undefined;
+
+// Whether the cache file still allows reusing `token` for `baseUrl`. Only an entry that
+// is absent from a readable file — or a missing file — or that holds a different token
+// discards it; a file that cannot be read says nothing about the token, so it is kept.
+function diskAllowsReuse(baseUrl: string, token: string): boolean {
+  diskSnapshot = readCacheSnapshot({ previous: diskSnapshot });
+  const { tokens } = diskSnapshot;
+  return tokens === undefined || tokens[baseUrl] === token;
+}
 
 async function runAuthFlow(config: ResolvedFormioConfig): Promise<void> {
   // API key mode: tool calls themselves will validate the key. Ordered ahead of
@@ -65,22 +82,29 @@ export async function ensureAuthenticated(config: ResolvedFormioConfig): Promise
 
   // Short-circuit: already authenticated in this process. Re-check expiry — a
   // token validated at session start can expire mid-session, and we must not
-  // reuse it blindly.
+  // reuse it blindly — and check the on-disk entry: `project logout` removes it
+  // from another process, and a sign-in elsewhere replaces it, so a token the file
+  // no longer holds is not reused. An unchanged entry needs no validation.
   const cached = jwtCache.get(baseUrl);
   if (cached) {
-    if (!isJwtExpired(cached)) {
+    if (diskAllowsReuse(baseUrl, cached) && !isJwtExpired(cached)) {
       config.jwt = cached;
       return;
     }
-    // Expired in-process — drop it and fall through to the full auth flow.
+    // Expired, signed out, or replaced — drop it and fall through to the full auth
+    // flow, which reads the cache again and validates whatever it now holds.
     jwtCache.delete(baseUrl);
     config.jwt = undefined;
   }
 
-  // Single-flight per baseUrl: reuse an in-flight auth promise if one exists
+  // Single-flight per baseUrl: reuse an in-flight auth promise if one exists. That
+  // flow writes the token onto the config that started it; every tool call resolves
+  // its own config, so a caller that joins takes the token from the shared cache.
   const existing = pendingAuthByBaseUrl.get(baseUrl);
   if (existing) {
-    return existing;
+    await existing;
+    config.jwt = jwtCache.get(baseUrl);
+    return;
   }
 
   const pending = runAuthFlow(config).finally(() => {
@@ -94,6 +118,7 @@ export async function ensureAuthenticated(config: ResolvedFormioConfig): Promise
 export function resetAuthState(): void {
   jwtCache.clear();
   pendingAuthByBaseUrl.clear();
+  diskSnapshot = undefined;
 }
 
 export function invalidateJwtCache(baseUrl: string): void {

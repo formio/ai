@@ -91,6 +91,22 @@ export class InvalidRequestedUrlError extends ToolError {
   }
 }
 
+/**
+ * normalizeHttpUrl for a value the caller just typed: a failure is an
+ * InvalidRequestedUrlError naming the value AS TYPED. The parser's own message reports
+ * only what it made of the value ("got: htps:"), which tells a reader the scheme was
+ * wrong but not which argument carried it.
+ */
+export function normalizeRequestedUrl(raw: string, label: string): string {
+  try {
+    return normalizeHttpUrl(raw, label);
+  } catch (error) {
+    throw new InvalidRequestedUrlError(
+      `${error instanceof Error ? error.message : String(error)} (${label} was ${raw})`
+    );
+  }
+}
+
 export function normalizeHttpUrl(input: string, label: string): string {
   let parsed: URL;
   try {
@@ -125,6 +141,8 @@ export interface FormioConfig {
   authHost?: string;
   authPort?: number;
   authTimeoutMs?: number;
+  /** FORMIO_REQUEST_TIMEOUT: replaces the client's default request timeout when set. */
+  requestTimeoutMs?: number;
   forceBrowser?: boolean;
 }
 
@@ -208,7 +226,8 @@ export function getConfig(): FormioConfig {
     jwt: undefined,
     authHost: process.env.FORMIO_AUTH_HOST || undefined,
     authPort: parsePositiveInt(process.env.FORMIO_AUTH_PORT),
-    authTimeoutMs: toMilliseconds(parsePositiveInt(process.env.FORMIO_AUTH_TIMEOUT)),
+    authTimeoutMs: readTimeoutMs(process.env.FORMIO_AUTH_TIMEOUT),
+    requestTimeoutMs: readTimeoutMs(process.env.FORMIO_REQUEST_TIMEOUT),
     forceBrowser: readBooleanEnv(process.env.FORMIO_FORCE_BROWSER),
   };
 }
@@ -271,6 +290,14 @@ function parsePositiveInt(raw: string | undefined): number | undefined {
   return Number.isInteger(value) && value > 0 ? value : undefined;
 }
 
-function toMilliseconds(seconds: number | undefined): number | undefined {
-  return seconds === undefined ? undefined : seconds * 1000;
+/** The longest delay a Node timer holds; a longer one overflows and fires at once. */
+const MAX_TIMER_MS = 2_147_483_647;
+
+// A timeout in seconds, as milliseconds: a positive integer that a timer can hold.
+// Anything else — including a wait too long for a timer — is ignored, so the default
+// applies rather than a timer that fires immediately.
+function readTimeoutMs(raw: string | undefined): number | undefined {
+  const seconds = parsePositiveInt(raw);
+  const ms = seconds === undefined ? undefined : seconds * 1000;
+  return ms !== undefined && ms <= MAX_TIMER_MS ? ms : undefined;
 }

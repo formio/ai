@@ -34,7 +34,7 @@ const PROJECT_SCOPED: Record<string, Record<string, unknown>> = {
   form_publish: { formId: FORM_ID, note: 'n' },
   form_revert: { formId: FORM_ID, version: '1', note: 'n' },
   project_export: {},
-  project_import: { template: {} },
+  project_import: { template: { forms: {}, resources: {} } },
   role_create: { role: { title: 'R' } },
   role_list: {},
   role_update: { roleId: OBJECT_ID, role: { title: 'R' } },

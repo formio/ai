@@ -1,3 +1,5 @@
+import { projectCommand } from './cli-launch.js';
+
 /**
  * The error contract every tool shares: a fixed set of codes a caller can branch on,
  * carried beside the prose message a model reads.
@@ -73,7 +75,8 @@ export function codeForResponse({
   return 'UPSTREAM_ERROR';
 }
 
-function isRecord(value: unknown): value is Record<string, unknown> {
+/** A JSON object: not null, not an array. */
+export function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
@@ -147,6 +150,8 @@ export interface FormioApiErrorOptions {
   body?: string;
   /** Where a 3xx pointed. */
   location?: string;
+  /** What the caller can do about it, appended to the message. */
+  remedy?: string;
 }
 
 /** Form.io answered, and the answer was not a success. */
@@ -155,7 +160,7 @@ export class FormioApiError extends ToolError {
   readonly url: string;
   readonly body?: string;
 
-  constructor({ status, url, body, location }: FormioApiErrorOptions) {
+  constructor({ status, url, body, location, remedy }: FormioApiErrorOptions) {
     const kept = body ? body.slice(0, FORMIO_BODY_LIMIT) : undefined;
     const explanation = formioErrorText(body);
     const redirect = location
@@ -163,12 +168,47 @@ export class FormioApiError extends ToolError {
       : '';
     super({
       code: codeForResponse({ status, body }),
-      message: `Form.io API error: ${status} | URL: ${url}${redirect}${explanation ? ` | ${explanation}` : ''}`,
+      message: `Form.io API error: ${status} | URL: ${url}${redirect}${explanation ? ` | ${explanation}` : ''}${remedy ? ` | ${remedy}` : ''}`,
     });
     this.name = 'FormioApiError';
     this.status = status;
     this.url = url;
     this.body = kept;
+  }
+}
+
+export interface FormioPermissionErrorOptions {
+  url: string;
+  /** The signed-in account `/current` named: its email, else its `_id`. */
+  account?: string;
+  /** The refused response's body as text; truncated to FORMIO_BODY_LIMIT here. */
+  body?: string;
+  /** The deployment the token belongs to, for the sign-out command the message names. */
+  baseUrl: string;
+}
+
+/**
+ * Form.io answered 401 to a token `/current` still accepts. Its permission handler
+ * answers 401 to a signed-in account that lacks the permission, so this is a refusal
+ * a new login as the same account cannot change — FORBIDDEN, carrying the status
+ * Form.io sent. Otherwise an API error like any other.
+ */
+export class FormioPermissionError extends FormioApiError {
+  override readonly code: ToolErrorCode = 'FORBIDDEN';
+
+  constructor({ url, account, body, baseUrl }: FormioPermissionErrorOptions) {
+    const who = account ? `The signed-in account ${account}` : 'The signed-in account';
+    super({
+      status: 401,
+      url,
+      body,
+      remedy:
+        `${who} is not permitted this request. Its token is still valid, so signing in again ` +
+        `as the same account would not change the answer. To use an account with access, ` +
+        `sign out with \`${projectCommand(`logout --base-url ${baseUrl}`)}\` and retry: the ` +
+        `retry signs in again. Or have a project administrator grant this account the permission.`,
+    });
+    this.name = 'FormioPermissionError';
   }
 }
 
@@ -194,18 +234,36 @@ function describeCause(error: unknown): string {
   return code && !detail.includes(code) ? `${code}: ${detail}` : detail;
 }
 
+function seconds(ms: number): string {
+  const value = ms / 1000;
+  return `${value} second${value === 1 ? '' : 's'}`;
+}
+
+export interface FormioNetworkErrorOptions {
+  url: string;
+  cause: unknown;
+  /** Set when the request was aborted by its own timeout, after this many milliseconds. */
+  timeoutMs?: number;
+}
+
 /** The request to Form.io received no response. */
 export class FormioNetworkError extends ToolError {
   readonly url: string;
+  /** Set when the request was aborted by its own timeout. */
+  readonly timeoutMs?: number;
 
-  constructor({ url, cause }: { url: string; cause: unknown }) {
+  constructor({ url, cause, timeoutMs }: FormioNetworkErrorOptions) {
     super({
       code: 'NETWORK_ERROR',
-      message: `Form.io request failed with no response (${describeCause(cause)}) | URL: ${url}`,
+      message:
+        timeoutMs === undefined
+          ? `Form.io request failed with no response (${describeCause(cause)}) | URL: ${url}`
+          : `Form.io request timed out after ${seconds(timeoutMs)} with no response | URL: ${url}`,
       cause,
     });
     this.name = 'FormioNetworkError';
     this.url = url;
+    this.timeoutMs = timeoutMs;
   }
 }
 

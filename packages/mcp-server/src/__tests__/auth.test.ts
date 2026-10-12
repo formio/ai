@@ -4,7 +4,9 @@ import { describe, it, expect, vi } from 'vitest';
 import { authenticate } from '../auth.js';
 import { ResolvedFormioConfig } from '../config.js';
 
-vi.mock('child_process', () => ({ execFile: vi.fn() }));
+vi.mock('child_process', () => ({
+  spawn: vi.fn(() => ({ on: vi.fn(), unref: vi.fn() })),
+}));
 
 // forceBrowser because these tests exercise the browser login path itself, and
 // the suite runs on CI — where browserless detection refuses to launch one.

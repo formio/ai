@@ -15,11 +15,36 @@ vi.mock('../token-cache.js', () => ({
   clearToken: vi.fn(),
 }));
 
-import { ensureAuthenticated } from '../ensure-auth.js';
+import { ensureAuthenticated, invalidateJwtCache } from '../ensure-auth.js';
 import { clearToken } from '../token-cache.js';
+import { toolErrorDetails } from '../tool-errors.js';
 
 const mockEnsureAuth = vi.mocked(ensureAuthenticated);
 const mockClearToken = vi.mocked(clearToken);
+const mockInvalidateJwtCache = vi.mocked(invalidateJwtCache);
+
+const CURRENT_URL = 'https://formio.invalid/sub/current';
+
+interface RouteFetchOptions {
+  /** How `{baseUrl}/current` answers. */
+  current: (init?: RequestInit) => Promise<unknown>;
+  /** Every other request's answer, in order. */
+  responses: unknown[];
+}
+
+// Routes `{baseUrl}/current` apart from the request under test, so a test states how
+// the deployment judges the token without depending on the order the two are sent in.
+function routeFetch(
+  mockFetch: ReturnType<typeof vi.fn>,
+  { current, responses }: RouteFetchOptions
+) {
+  const queue = [...responses];
+  mockFetch.mockImplementation(async (input: URL | string, init?: RequestInit) =>
+    String(input) === CURRENT_URL ? current(init) : queue.shift()
+  );
+}
+
+const refused = async () => ({ ok: false, status: 401, statusText: 'Unauthorized' });
 
 describe('formioFetch', () => {
   const mockFetch = vi.fn();
@@ -162,14 +187,23 @@ describe('formioFetch', () => {
       jwtConfig.jwt = 'still-bad-token';
     });
 
-    mockFetch
-      .mockResolvedValueOnce({ ok: false, status: 401, statusText: 'Unauthorized' })
-      .mockResolvedValueOnce({ ok: false, status: 401, statusText: 'Unauthorized' });
+    routeFetch(mockFetch, {
+      current: refused,
+      responses: [
+        { ok: false, status: 401, statusText: 'Unauthorized' },
+        { ok: false, status: 401, statusText: 'Unauthorized' },
+      ],
+    });
 
     await expect(formioFetch('form', {}, jwtConfig)).rejects.toThrow('401');
     // gate called twice: pre-request + 401 re-auth
     expect(mockEnsureAuth).toHaveBeenCalledTimes(2);
-    expect(mockFetch).toHaveBeenCalledTimes(2);
+    // The request, /current refusing the token, and the one retry.
+    expect(mockFetch.mock.calls.map(([input]) => String(input))).toEqual([
+      'https://formio.invalid/sub/example/form',
+      CURRENT_URL,
+      'https://formio.invalid/sub/example/form',
+    ]);
   });
 
   it('on 401 in API key mode throws without re-auth', async () => {
@@ -185,7 +219,9 @@ describe('formioFetch', () => {
     // gate called once for the pre-request check; 401 re-auth path not taken (no jwt)
     expect(mockEnsureAuth).toHaveBeenCalledTimes(1);
     expect(mockClearToken).not.toHaveBeenCalled();
+    // Nor is /current asked: an API key is not a session a login could replace.
     expect(mockFetch).toHaveBeenCalledTimes(1);
+    expect(String(mockFetch.mock.calls[0][0])).not.toBe(CURRENT_URL);
   });
 
   it('invokes the auth gate before sending the outbound HTTP request', async () => {
@@ -213,16 +249,22 @@ describe('formioFetch', () => {
       // Simulate gate refreshing the token after the cache was cleared
       jwtConfig.jwt = 'fresh-jwt';
     });
-    mockFetch
-      .mockResolvedValueOnce({ ok: false, status: 401, statusText: 'Unauthorized' })
-      .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve({ data: 'ok' }) });
+    routeFetch(mockFetch, {
+      current: refused,
+      responses: [
+        { ok: false, status: 401, statusText: 'Unauthorized' },
+        { ok: true, json: () => Promise.resolve({ data: 'ok' }) },
+      ],
+    });
 
     const result = await formioFetch('/form', {}, jwtConfig);
 
     // gate called twice: once before the initial request, once for re-auth
     expect(mockEnsureAuth).toHaveBeenCalledTimes(2);
     expect(mockClearToken).toHaveBeenCalledWith('https://formio.invalid/sub');
-    const retryOptions = mockFetch.mock.calls[1][1] as RequestInit;
+    // The request, /current refusing the token, and the retry.
+    expect(mockFetch).toHaveBeenCalledTimes(3);
+    const retryOptions = mockFetch.mock.calls[2][1] as RequestInit;
     expect(retryOptions.headers).toEqual({ 'x-jwt-token': 'fresh-jwt' });
     expect(result).toEqual({ data: 'ok' });
   });
@@ -263,13 +305,18 @@ describe('formioFetch', () => {
         jwtConfig.jwt = 'refreshed-jwt';
       }
     });
-    mockFetch
-      .mockResolvedValueOnce({ ok: false, status: 401, statusText: 'Unauthorized' })
-      .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve({ ok: true }) });
+    routeFetch(mockFetch, {
+      current: refused,
+      responses: [
+        { ok: false, status: 401, statusText: 'Unauthorized' },
+        { ok: true, json: () => Promise.resolve({ ok: true }) },
+      ],
+    });
 
     await formioFetch('/form', {}, jwtConfig);
 
-    const retryOptions = mockFetch.mock.calls[1][1] as RequestInit;
+    expect(mockFetch).toHaveBeenCalledTimes(3);
+    const retryOptions = mockFetch.mock.calls[2][1] as RequestInit;
     expect(retryOptions.headers).toEqual({ 'x-jwt-token': 'refreshed-jwt' });
   });
 });
@@ -358,5 +405,179 @@ describe('formioFetch does not follow a redirect with credentials attached', () 
       /302[\s\S]*https:\/\/other\.example\//
     );
     expect(mockFetch).toHaveBeenCalledTimes(1);
+  });
+});
+
+// Form.io answers 401 both to a token it no longer accepts and to a signed-in account
+// the permission handler refuses. Only /current tells the two apart, and only the
+// first is fixed by signing in again.
+describe('a 401 in JWT mode asks /current before re-authenticating', () => {
+  const mockFetch = vi.fn();
+  const REQUEST_URL = 'https://formio.invalid/sub/example/form';
+
+  const jwtConfig = (): ResolvedFormioConfig => ({
+    baseUrl: 'https://formio.invalid/sub',
+    projectUrl: 'https://formio.invalid/sub/example',
+    jwt: 'valid-jwt',
+  });
+
+  const accepted = (body: unknown) => async () =>
+    new Response(JSON.stringify(body), {
+      status: 200,
+      headers: { 'content-type': 'application/json' },
+    });
+
+  const unauthorized = () => new Response('Unauthorized', { status: 401 });
+  const succeeded = () => ({ ok: true, json: () => Promise.resolve({ data: 'ok' }) });
+
+  beforeEach(() => {
+    vi.stubGlobal('fetch', mockFetch);
+    mockEnsureAuth.mockReset();
+    mockClearToken.mockReset();
+    mockInvalidateJwtCache.mockReset();
+    mockFetch.mockReset();
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  describe('when /current accepts the token', () => {
+    it('raises FORBIDDEN with status 401, naming the account and the URL', async () => {
+      routeFetch(mockFetch, {
+        current: accepted({ _id: 'user-id', data: { email: 'ann@example.com' } }),
+        responses: [unauthorized()],
+      });
+
+      const error = await formioFetch('form', {}, jwtConfig()).catch((e: unknown) => e);
+
+      expect(error).toBeInstanceOf(Error);
+      expect(toolErrorDetails(error)).toMatchObject({ code: 'FORBIDDEN', status: 401 });
+      expect((error as Error).message).toContain('ann@example.com');
+      expect((error as Error).message).toContain(REQUEST_URL);
+    });
+
+    it('names the account by _id when /current carries no email', async () => {
+      routeFetch(mockFetch, {
+        current: accepted({ _id: '65a1b2c3d4e5f60718293a4b', data: {} }),
+        responses: [unauthorized()],
+      });
+
+      const error = await formioFetch('form', {}, jwtConfig()).catch((e: unknown) => e);
+
+      expect(toolErrorDetails(error).code).toBe('FORBIDDEN');
+      expect((error as Error).message).toContain('65a1b2c3d4e5f60718293a4b');
+    });
+
+    it('keeps the token, does not run the gate again, and does not retry', async () => {
+      const config = jwtConfig();
+      routeFetch(mockFetch, {
+        current: accepted({ _id: 'user-id', data: { email: 'ann@example.com' } }),
+        responses: [unauthorized()],
+      });
+
+      await formioFetch('form', {}, config).catch(() => undefined);
+
+      expect(config.jwt).toBe('valid-jwt');
+      expect(mockClearToken).not.toHaveBeenCalled();
+      expect(mockInvalidateJwtCache).not.toHaveBeenCalled();
+      // Once, for the pre-request check — never for a re-login.
+      expect(mockEnsureAuth).toHaveBeenCalledTimes(1);
+      expect(mockFetch.mock.calls.map(([input]) => String(input))).toEqual([
+        REQUEST_URL,
+        CURRENT_URL,
+      ]);
+    });
+
+    it('asks /current with the same token, without following a redirect, within 10 seconds', async () => {
+      const timeout = vi.spyOn(AbortSignal, 'timeout');
+      routeFetch(mockFetch, {
+        current: accepted({ _id: 'user-id', data: { email: 'ann@example.com' } }),
+        responses: [unauthorized()],
+      });
+
+      await formioFetch('form', {}, jwtConfig()).catch(() => undefined);
+
+      const currentInit = mockFetch.mock.calls[1][1] as RequestInit;
+      expect(currentInit.headers).toEqual({ 'x-jwt-token': 'valid-jwt' });
+      expect(currentInit.redirect).toBe('manual');
+      expect(currentInit.signal).toBeInstanceOf(AbortSignal);
+      expect(timeout).toHaveBeenCalledWith(10_000);
+    });
+  });
+
+  // A wrong "still valid" would leave the user stuck behind a refusal no login can
+  // clear, so every answer short of a 2xx falls back to re-authenticating.
+  describe('when /current does not accept the token', () => {
+    it.each([
+      ['refuses it', refused],
+      [
+        'redirects',
+        async () =>
+          new Response('', { status: 302, headers: { location: 'https://other.example/' } }),
+      ],
+      [
+        'gets no response',
+        async () => {
+          throw new TypeError('fetch failed', {
+            cause: Object.assign(new Error('connect ECONNREFUSED'), { code: 'ECONNREFUSED' }),
+          });
+        },
+      ],
+    ])('clears the token, runs the gate, and retries once when /current %s', async (_, current) => {
+      const config = jwtConfig();
+      mockEnsureAuth.mockImplementation(async () => {
+        if (mockEnsureAuth.mock.calls.length === 2) {
+          config.jwt = 'fresh-jwt';
+        }
+      });
+      routeFetch(mockFetch, { current, responses: [unauthorized(), succeeded()] });
+
+      const result = await formioFetch('form', {}, config);
+
+      expect(result).toEqual({ data: 'ok' });
+      expect(mockClearToken).toHaveBeenCalledWith('https://formio.invalid/sub');
+      expect(mockEnsureAuth).toHaveBeenCalledTimes(2);
+      expect(mockFetch.mock.calls.map(([input]) => String(input))).toEqual([
+        REQUEST_URL,
+        CURRENT_URL,
+        REQUEST_URL,
+      ]);
+      expect((mockFetch.mock.calls[2][1] as RequestInit).headers).toEqual({
+        'x-jwt-token': 'fresh-jwt',
+      });
+    });
+
+    it('clears the token, runs the gate, and retries once when /current times out', async () => {
+      const realTimeout = AbortSignal.timeout.bind(AbortSignal);
+      // The 10-second limit, shortened so the test does not wait it out.
+      vi.spyOn(AbortSignal, 'timeout').mockImplementation((ms) =>
+        realTimeout(ms === 10_000 ? 5 : ms)
+      );
+      const config = jwtConfig();
+      mockEnsureAuth.mockImplementation(async () => {
+        if (mockEnsureAuth.mock.calls.length === 2) {
+          config.jwt = 'fresh-jwt';
+        }
+      });
+      routeFetch(mockFetch, {
+        current: (init) =>
+          new Promise((_, reject) => {
+            init?.signal?.addEventListener('abort', () => reject(init.signal?.reason));
+          }),
+        responses: [unauthorized(), succeeded()],
+      });
+
+      const result = await formioFetch('form', {}, config);
+
+      expect(result).toEqual({ data: 'ok' });
+      expect(mockClearToken).toHaveBeenCalledWith('https://formio.invalid/sub');
+      expect(mockEnsureAuth).toHaveBeenCalledTimes(2);
+      expect(mockFetch.mock.calls.map(([input]) => String(input))).toEqual([
+        REQUEST_URL,
+        CURRENT_URL,
+        REQUEST_URL,
+      ]);
+    });
   });
 });

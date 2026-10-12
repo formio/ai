@@ -3,7 +3,13 @@ import { getAuthHeader } from './auth-header.js';
 import { ensureAuthenticated, invalidateJwtCache } from './ensure-auth.js';
 import { clearToken } from './token-cache.js';
 import { requireBaseUrl } from './project-resolver.js';
-import { FormioApiError, FormioNetworkError, ToolError } from './tool-errors.js';
+import { checkCurrentUser } from './token-validation.js';
+import {
+  FormioApiError,
+  FormioNetworkError,
+  FormioPermissionError,
+  ToolError,
+} from './tool-errors.js';
 
 // For a self-signed deployment, such as a local Form.io Enterprise server.
 if (readBooleanEnv(process.env.FORMIO_INSECURE_TLS)) {
@@ -16,11 +22,34 @@ export function isMongoId(value: string): boolean {
   return MONGO_ID_PATTERN.test(value);
 }
 
+/** How long a Form.io request may go unanswered, unless FORMIO_REQUEST_TIMEOUT says otherwise. */
+export const DEFAULT_REQUEST_TIMEOUT_MS = 60_000;
+
+/**
+ * The least `project_import` and `project_export` wait: a large template legitimately
+ * takes minutes, so FORMIO_REQUEST_TIMEOUT does not shorten these.
+ */
+const TEMPLATE_TRANSFER_TIMEOUT_MS = 300_000;
+
+/**
+ * How long a template transfer waits: TEMPLATE_TRANSFER_TIMEOUT_MS, or the configured
+ * request timeout when that is longer — so FORMIO_REQUEST_TIMEOUT can lengthen a
+ * transfer but never shorten one.
+ */
+export function templateTransferTimeoutMs(config: FormioConfig): number {
+  return Math.max(
+    TEMPLATE_TRANSFER_TIMEOUT_MS,
+    config.requestTimeoutMs ?? DEFAULT_REQUEST_TIMEOUT_MS
+  );
+}
+
 export interface FormioFetchOptions {
   method?: string;
   body?: unknown;
   responseType?: 'text' | 'json';
   signal?: AbortSignal;
+  /** This request's timeout, in place of the configured or default one. */
+  timeoutMs?: number;
   /** Return `{ data, total }`, reading the total from an index route's Content-Range. */
   withMeta?: boolean;
 }
@@ -68,6 +97,35 @@ async function readResponse({ response, url, options }: ReadResponseRequest): Pr
   return options?.responseType === 'text' ? response.text() : response.json();
 }
 
+interface ReadInTimeRequest extends ReadResponseRequest {
+  timeoutMs: number;
+}
+
+// Whether a body read was cut off by the request's own timeout: the abort rejects the
+// read with the timeout's TimeoutError. A caller's signal can carry a TimeoutError of
+// its own, and that abort keeps it.
+function isTimeoutAbort(error: unknown, signal: AbortSignal | undefined): boolean {
+  const callerAborted = signal?.aborted === true && signal.reason === error;
+  return error instanceof DOMException && error.name === 'TimeoutError' && !callerAborted;
+}
+
+// The timeout keeps running once the headers arrive, so it can cut off the body read
+// as well; that is reported exactly like a request that received no response.
+async function readInTime(request: ReadInTimeRequest): Promise<unknown> {
+  try {
+    return await readResponse(request);
+  } catch (error) {
+    if (isTimeoutAbort(error, request.options?.signal)) {
+      throw new FormioNetworkError({
+        url: request.url.toString(),
+        cause: error,
+        timeoutMs: request.timeoutMs,
+      });
+    }
+    throw error;
+  }
+}
+
 // A redirect is reported rather than followed: fetch would re-send the request, with
 // its x-jwt-token or x-token header, to wherever the Location header points.
 async function apiError(response: Response, url: URL): Promise<FormioApiError> {
@@ -91,26 +149,52 @@ async function readBody(response: Response): Promise<string | undefined> {
   }
 }
 
+export interface SendInit extends RequestInit {
+  /** Aborts the request after this many milliseconds; DEFAULT_REQUEST_TIMEOUT_MS when absent. */
+  timeoutMs?: number;
+}
+
 /**
  * `fetch`, with a request that received no response raised as a FormioNetworkError
- * naming the cause and the URL — the one wrapper every Form.io request goes through.
+ * naming the cause and the URL — the one wrapper every Form.io request goes through,
+ * and so the one place every request is given a timeout. A caller's own `signal`
+ * still aborts it, and that abort keeps its own reason rather than reading as a
+ * timeout.
  */
-export async function send(url: URL, init: RequestInit): Promise<Response> {
+export async function send(
+  url: URL,
+  { timeoutMs = DEFAULT_REQUEST_TIMEOUT_MS, ...init }: SendInit
+): Promise<Response> {
+  const timeout = AbortSignal.timeout(timeoutMs);
+  const signal = init.signal ? AbortSignal.any([init.signal, timeout]) : timeout;
   try {
-    return await fetch(url, init);
+    return await fetch(url, { ...init, signal });
   } catch (cause) {
-    throw new FormioNetworkError({ url: url.toString(), cause });
+    const timedOut = timeout.aborted && signal.reason === timeout.reason;
+    throw new FormioNetworkError({
+      url: url.toString(),
+      cause,
+      ...(timedOut ? { timeoutMs } : {}),
+    });
   }
 }
 
-function buildFetchInit(config: FormioConfig, options?: FormioFetchOptions): RequestInit {
+function requestTimeoutMs(config: FormioConfig, options?: FormioFetchOptions): number {
+  return options?.timeoutMs ?? config.requestTimeoutMs ?? DEFAULT_REQUEST_TIMEOUT_MS;
+}
+
+function buildFetchInit(config: FormioConfig, options?: FormioFetchOptions): SendInit {
   const hasBody = options?.body !== undefined;
   const headers: Record<string, string> = {
     ...getAuthHeader(config),
     ...(hasBody ? { 'Content-Type': 'application/json' } : {}),
   };
 
-  const init: RequestInit = { headers, redirect: 'manual' };
+  const init: SendInit = {
+    headers,
+    redirect: 'manual',
+    timeoutMs: requestTimeoutMs(config, options),
+  };
   if (options?.method) {
     init.method = options.method;
   }
@@ -128,6 +212,7 @@ export async function formioRawFetch(
   config: ResolvedFormioConfig,
   options?: FormioFetchOptions
 ): Promise<unknown> {
+  const timeoutMs = requestTimeoutMs(config, options);
   const response = await send(url, buildFetchInit(config, options));
 
   if (response.status === 401 && config.jwt) {
@@ -137,18 +222,31 @@ export async function formioRawFetch(
     // so an unreachable state raises the actionable error instead of keying
     // the cache under "undefined".
     const baseUrl = requireBaseUrl(config);
+    // Form.io also answers 401 to a signed-in account it refuses, so the token is
+    // checked before it is discarded: one /current still accepts is kept, and the
+    // refusal is reported rather than answered with a login that cannot change it.
+    const current = await checkCurrentUser({ ...config, baseUrl });
+    if (current.accepted) {
+      throw new FormioPermissionError({
+        url: url.toString(),
+        account: current.account,
+        body: await readBody(response),
+        baseUrl,
+      });
+    }
     invalidateJwtCache(baseUrl);
     await clearToken(baseUrl);
     config.jwt = undefined;
     await ensureAuthenticated(config);
-    return readResponse({
+    return readInTime({
       response: await send(url, buildFetchInit(config, options)),
       url,
       options,
+      timeoutMs,
     });
   }
 
-  return readResponse({ response, url, options });
+  return readInTime({ response, url, options, timeoutMs });
 }
 
 // Whether a built URL addresses the project: the same origin, and a path that IS

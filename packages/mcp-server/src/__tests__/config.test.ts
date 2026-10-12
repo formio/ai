@@ -13,6 +13,8 @@ describe('getConfig', () => {
     delete process.env.FORMIO_LOGIN_FORM;
     delete process.env.FORMIO_FORCE_BROWSER;
     delete process.env.FORMIO_PLUGIN_CONTEXT;
+    delete process.env.FORMIO_REQUEST_TIMEOUT;
+    delete process.env.FORMIO_AUTH_TIMEOUT;
   });
 
   afterEach(() => {
@@ -124,6 +126,43 @@ describe('getConfig', () => {
     process.env.FORMIO_FORCE_BROWSER = '1';
 
     expect(getConfig().forceBrowser).toBe(true);
+  });
+
+  // Seconds, read like FORMIO_AUTH_TIMEOUT: a positive integer, anything else ignored
+  // so the client keeps its 60-second default.
+  it('reads FORMIO_REQUEST_TIMEOUT as seconds', () => {
+    process.env.FORMIO_REQUEST_TIMEOUT = '5';
+    expect(getConfig().requestTimeoutMs).toBe(5_000);
+  });
+
+  it.each([['0'], ['abc'], ['-3'], ['1.5'], ['']])('ignores FORMIO_REQUEST_TIMEOUT=%j', (raw) => {
+    process.env.FORMIO_REQUEST_TIMEOUT = raw;
+    expect(getConfig().requestTimeoutMs).toBeUndefined();
+  });
+
+  // A timer longer than 2,147,483,647 ms overflows and fires at once, so a wait past
+  // that is ignored like any other unusable value, and the default applies.
+  it.each([['2500000'], ['5000000']])(
+    'ignores FORMIO_REQUEST_TIMEOUT=%s, too long for a timer',
+    (raw) => {
+      process.env.FORMIO_REQUEST_TIMEOUT = raw;
+      expect(getConfig().requestTimeoutMs).toBeUndefined();
+    }
+  );
+
+  it('accepts the longest FORMIO_REQUEST_TIMEOUT a timer can hold', () => {
+    process.env.FORMIO_REQUEST_TIMEOUT = '2147483';
+    expect(getConfig().requestTimeoutMs).toBe(2_147_483_000);
+  });
+
+  // Read by the same helper, so the same bound holds.
+  it('ignores a FORMIO_AUTH_TIMEOUT too long for a timer', () => {
+    process.env.FORMIO_AUTH_TIMEOUT = '2500000';
+    expect(getConfig().authTimeoutMs).toBeUndefined();
+  });
+
+  it('leaves requestTimeoutMs unset when FORMIO_REQUEST_TIMEOUT is unset', () => {
+    expect(getConfig().requestTimeoutMs).toBeUndefined();
   });
 
   it('leaves forceBrowser false when FORMIO_FORCE_BROWSER is unset', () => {

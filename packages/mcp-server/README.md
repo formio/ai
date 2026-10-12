@@ -306,7 +306,8 @@ The probe runs lazily — only when the local auth page is actually served.
 | `FORMIO_LOGIN_FORM` | no | Auto-resolved | Override the portal login form URL used by the JWT login flow. | `https://formio.form.io/user/login` | `https://forms.example.com/formio/user/login` |
 | `FORMIO_AUTH_HOST` | no | `127.0.0.1` | Bind address for the browser-login page. `0.0.0.0` makes it reachable from outside a container. |  |  |
 | `FORMIO_AUTH_PORT` | no | ephemeral | Fixed port for the browser-login page, so a container can publish it. | `43117` | `43117` |
-| `FORMIO_AUTH_TIMEOUT` | no | `900` | Seconds to wait for a browser login before failing the call. |  |  |
+| `FORMIO_AUTH_TIMEOUT` | no | `900` | Seconds to wait for a browser login before failing the call. A positive integer no larger than `2147483`; any other value is ignored. |  |  |
+| `FORMIO_REQUEST_TIMEOUT` | no | `60` | Seconds a Form.io request may go unanswered before the call fails with `NETWORK_ERROR` naming the URL and the wait. A positive integer no larger than `2147483`; any other value is ignored. `project_import` and `project_export` wait 300 seconds, or this value when it is longer. |  |  |
 | `FORMIO_INSECURE_TLS` | no | `undefined` | Set to `1` to skip TLS verification. Local development only — never against production. |  |  |
 | `FORMIO_FORCE_BROWSER` | no | `0` | Set to `1` to attempt the browser login even where the server detects no browser (CI, a container, SSH with no display). |  |  |
 
@@ -314,24 +315,25 @@ The probe runs lazily — only when the local auth page is actually served.
 
 ---
 
-## CLI reference: `project get` and `project set`
+## CLI reference: `project get`, `project set` and `project logout`
 
-The `formio-mcp` binary (`npx -y @formio/mcp@0.14.1 project …`) reports what a directory resolves to and records a project for it before any client connects. These flags and exit codes are part of the 1.0 surface.
+The `formio-mcp` binary (`npx -y @formio/mcp@0.14.1 project …`) reports what a directory resolves to and records a project for it before any client connects. `project logout` signs out of one deployment — the one the directory resolves to, exactly as `project get` resolves it, or the one `--base-url` names — by removing that deployment's cached token from `~/.formio/mcp-tokens.json` and leaving every other entry in place. A running server notices on its next call there and signs in again, so signing out or switching accounts needs no restart. These flags and exit codes are part of the 1.0 surface.
 
 | Flag | Command | Meaning |
 | --- | --- | --- |
-| `--cwd <absolute path>` | both | The directory to report on or record for. Defaults to the current directory; a relative path is refused. |
+| `--cwd <absolute path>` | all three | The directory to report on, record for, or sign out for. Defaults to the current directory; a relative path is refused. |
 | `--project-url <url>` | `project set` | The Project URL to record. |
 | `--base-url <url>` | `project set` | The deployment hosting the project. Pass it only when the server says it cannot be derived from the Project URL. |
 | `--force` | `project set` | Record the pair exactly as given, skipping the domain checks. Requires both `--project-url` and `--base-url` in the same call. The `project_set` tool has no equivalent. |
 | `--reset` | `project set` | Clear this directory's entry in `~/.formio/projects.json`. Takes no URLs. |
+| `--base-url <url>` | `project logout` | The deployment to sign out of, in place of the one `--cwd` resolves to. |
 
-| Exit code | `project get` | `project set` |
-| --- | --- | --- |
-| `0` | The directory resolved a project and its Base URL. | The directory is ready to serve a call. |
-| `1` | Nothing is mapped for that directory. | A named value is still missing. |
-| `2` | The command could not answer: a usage error, a malformed URL, an unreadable `~/.formio/projects.json`. | The command could not answer. |
-| `3` | A project resolved, but its Base URL could not be determined. | The record was written, and the directory still resolves no Base URL: a committed `formio.json` governs it and supplies none, so the remedy is an edit to that file. |
+| Exit code | `project get` | `project set` | `project logout` |
+| --- | --- | --- | --- |
+| `0` | The directory resolved a project and its Base URL. | The directory is ready to serve a call. | The token was removed, or none was cached for that deployment; the output says which. |
+| `1` | Nothing is mapped for that directory. | A named value is still missing. | Nothing is mapped for that directory, so no deployment resolves; name one with `--base-url`. Or the `--base-url` given is not a valid URL; ask for it again. |
+| `2` | The command could not answer: a usage error, a malformed URL, an unreadable `~/.formio/projects.json`. | The command could not answer. | The command could not answer: a usage error, or a `~/.formio/mcp-tokens.json` it cannot read or write. |
+| `3` | A project resolved, but its Base URL could not be determined. | The record was written, and the directory still resolves no Base URL: a committed `formio.json` governs it and supplies none, so the remedy is an edit to that file. | A project resolved, but its deployment could not be determined; name it with `--base-url`. |
 
 ---
 

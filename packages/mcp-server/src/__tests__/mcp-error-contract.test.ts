@@ -4,6 +4,7 @@ import { formioFetch } from '../formio-client.js';
 import {
   FormioApiError,
   FormioNetworkError,
+  FormioPermissionError,
   ToolError,
   TOOL_ERROR_CODES,
   ToolErrorCode,
@@ -12,6 +13,7 @@ import { ProjectNotConfiguredError, requireBaseUrl, resolveProject } from '../pr
 import { ProjectMapUnreadableError } from '../project-map.js';
 import { CommittedConfigUnusableError } from '../committed-config.js';
 import { TEST_CONFIG, TEST_PROJECT_URL } from './test-helpers.js';
+import { projectCommand } from '../cli-launch.js';
 
 const URL_UNDER_TEST = `${TEST_PROJECT_URL}/form`;
 
@@ -162,5 +164,41 @@ describe('toMcpError maps Form.io responses', () => {
     expect(text(result).startsWith('[NETWORK_ERROR] ')).toBe(true);
     expect(text(result)).toContain('ECONNREFUSED');
     expect(text(result)).toContain(URL_UNDER_TEST);
+  });
+});
+
+// A 401 to a token /current still accepts: an API error like any other, reported with
+// Form.io's own explanation, differing only in its code and the remedy it appends.
+describe('a permission refusal', () => {
+  const refusal = (body?: string) =>
+    new FormioPermissionError({
+      url: URL_UNDER_TEST,
+      account: 'ann@example.com',
+      body,
+      baseUrl: 'https://forms.mysite.com',
+    });
+
+  it('is a FormioApiError with code FORBIDDEN and status 401', () => {
+    const error = refusal('Unauthorized');
+
+    expect(error).toBeInstanceOf(FormioApiError);
+    expect(error.code).toBe('FORBIDDEN');
+    expect(error.status).toBe(401);
+    expect(structured(error)).toEqual({ code: 'FORBIDDEN', status: 401, body: 'Unauthorized' });
+  });
+
+  it("carries Form.io's explanation like any other API error", () => {
+    const message = refusal('{"message":"You do not have permission to read this form."}').message;
+
+    expect(message).toContain('You do not have permission to read this form.');
+    expect(message.startsWith(`Form.io API error: 401 | URL: ${URL_UNDER_TEST}`)).toBe(true);
+  });
+
+  it('names the account, and how to sign in as another one', () => {
+    const message = refusal().message;
+
+    expect(message).toContain('ann@example.com');
+    expect(message).toContain(projectCommand('logout --base-url https://forms.mysite.com'));
+    expect(message).toMatch(/retry/i);
   });
 });

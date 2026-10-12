@@ -76,7 +76,7 @@ No client prompts for anything at install time. Both URLs are resolved per direc
 | `FORMIO_FORCE_BROWSER` | no | `0` | Set to `1` to attempt the browser login even where the server detects no browser (CI, a container, SSH with no display). |
 | `FORMIO_INSECURE_TLS` | no | `false` | When `true`, skips TLS certificate verification — for self-hosted deployments behind self-signed certs. Do not use against production. |
 
-\* Per-directory mappings are persisted to `~/.formio/projects.json` by the `project_set` tool, or by `npx -y @formio/mcp@0.14.1 project set --project-url <url> --base-url <url> --cwd <path>` before any client has connected. Both record the project URL **and** the base URL, and the server resolves both from that file per directory, falling back to the global environment values only when an entry omits them.
+\* Per-directory mappings are persisted to `~/.formio/projects.json` by the `project_set` tool, or by `npx -y @formio/mcp@0.14.1 project set --project-url <url> --cwd <path>` before any client has connected. A mapping holds a project URL and its base URL as a pair — the base URL derived from the project URL wherever it can be, and recorded beside it only when it cannot — and the server resolves both from that one entry. Halves are never combined across records: a mapping that names a project never takes its base URL from the environment, which is a separate, weaker record that applies only when no committed `formio.json` or mapping names a project for the directory.
 
 ### Authentication modes
 
