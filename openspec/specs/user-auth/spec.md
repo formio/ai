@@ -133,3 +133,31 @@ The container and remote-shell cases both ask whether THIS host can open a brows
 - **AND** a tool call authenticates
 - **THEN** no browserless error is raised and the request proceeds with the `x-token` header
 
+### Requirement: The browser is launched detached
+
+The login page SHALL be opened by starting the platform's opener (`open` on macOS, `xdg-open` on Linux, `rundll32.exe url.dll,FileProtocolHandler` on Windows) as a detached process with its standard streams ignored, so the server neither buffers the browser's output nor holds or terminates the browser. A failure to start the opener, or an opener that exits with a non-zero code, SHALL be reported once on stderr with the login URL and a hint to open it manually; the exit is observed without the server waiting on it. The login URL SHALL be printed on stderr whether or not the launch succeeds.
+
+#### Scenario: A browser that writes a lot of output
+
+- **WHEN** the opener leaves the browser attached and the browser writes more than 1 MB to its output
+- **THEN** the browser keeps running and the login completes
+
+#### Scenario: The opener cannot start
+
+- **WHEN** starting the opener fails
+- **THEN** stderr names the failure and the login URL
+
+#### Scenario: The opener exits non-zero
+
+- **WHEN** the opener starts and exits with code 3 (for example `xdg-open` with no browser to hand the URL to)
+- **THEN** stderr names the opener and the code, and says to open the login URL manually
+
+### Requirement: Only a found login form is remembered
+
+The login-form lookup SHALL cache, per project (keyed by the deployment and the Project URL), only a login form it found. A lookup that fails or finds none SHALL NOT be cached, so the next login tries again. This is the lookup's existing behaviour, pinned by a regression test.
+
+#### Scenario: A failed lookup is retried
+
+- **WHEN** a login-form lookup fails and a later login runs for the same project
+- **THEN** the later login performs the lookup again
+

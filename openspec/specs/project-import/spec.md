@@ -1,9 +1,7 @@
 ## Purpose
 
 Defines the `project_import` MCP tool: the template object it accepts and the `POST /import` call that merges roles, resources, forms, and actions into the active project.
-
 ## Requirements
-
 ### Requirement: project_import tool is registered with skill-referencing description
 
 The `project_import` tool SHALL be registered on the MCP server with a description that instructs the LLM to use the `formio-resource-planner` skill to construct the template JSON before calling this tool. The description SHALL warn that import merges into the existing project and recommend exporting first as a snapshot.
@@ -41,3 +39,24 @@ The `project_import` tool SHALL call `POST {projectUrl}/import` with the authent
 
 - **WHEN** the Form.io API returns an error (e.g., 401 Unauthorized)
 - **THEN** the tool returns an error response with `isError: true` and a descriptive message
+
+### Requirement: The template's shape is checked before it is sent
+
+`project_import` SHALL refuse, with code `INVALID_ARGUMENT` and no request, a `template` whose `forms` or `resources` is missing or is not a plain object (an empty object is accepted), or whose `roles` or `actions`, when present, is not a plain object. The message SHALL name the key and say that Form.io templates key each entry by machine name.
+
+#### Scenario: A template with no resources
+
+- **WHEN** `project_import` is called with `{ forms: { contact: {...} } }`
+- **THEN** the tool returns `INVALID_ARGUMENT` naming `resources`
+- **AND** no request is sent
+
+#### Scenario: Arrays instead of objects
+
+- **WHEN** `project_import` is called with `forms: []`
+- **THEN** the tool returns `INVALID_ARGUMENT` naming `forms`
+
+#### Scenario: A valid template
+
+- **WHEN** `project_import` is called with `{ roles: {}, resources: {}, forms: { contact: {...} }, actions: {} }`
+- **THEN** the template is sent
+
