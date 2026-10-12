@@ -1,19 +1,7 @@
 ## Purpose
 
 Defines form revision behavior: the `form_revisions_list` and `form_revision_get` tools, the license gates on draft, publish, and revert, the per-form tracking gate, when a standard update creates a revision, and the field allowlists each write path uses.
-
 ## Requirements
-
-### Requirement: form_revisions_list returns revision summaries
-
-The `form_revisions_list` tool SHALL call `GET /form/{id}/v` (or `GET /{alias}/v` for path aliases) and return the response as MCP text content.
-
-#### Scenario: List by form id
-
-- **WHEN** `form_revisions_list` is called with `formIdOrPath: "67890abcdef012345678abcd"`
-- **THEN** it requests `/form/67890abcdef012345678abcd/v`
-- **AND** returns the revision list as MCP text content
-
 ### Requirement: form_revision_get returns a single revision
 
 The `form_revision_get` tool SHALL call `GET /form/{id}/v/{version}` where `version` is either a sequential `_vid` or a 24-char revision document `_id`, and return the response as MCP text content.
@@ -33,48 +21,6 @@ When the deployment's `/config.js` does not advertise `sac = true`, `form_update
 - **WHEN** `form_update` is called with `draft: true` against a deployment whose `/config.js` reports `sac = false`
 - **THEN** the tool throws an error instructing the caller to drop the flag and call `form_update` as a standard update
 - **AND** no PUT request is sent
-
-### Requirement: License gate prompts once for standard writes on unlicensed deployments
-
-On an unlicensed deployment, `form_create` and standard `form_update` SHALL prompt the user once per `baseUrl` to continue without revision tracking. Positive consent SHALL persist to `~/.formio/revisions-license-consent.json` (mode 0600) and SHALL be cached in-memory thereafter. Cancel SHALL throw a user-cancelled error and SHALL NOT persist.
-
-#### Scenario: User cancels the license gate
-
-- **WHEN** the gate prompts and the user chooses "cancel"
-- **THEN** the tool throws a USER CANCELLED error
-- **AND** no API request is sent
-- **AND** no consent is written to disk
-
-#### Scenario: Cached consent skips the prompt
-
-- **WHEN** `~/.formio/revisions-license-consent.json` already records `true` for the current `baseUrl`
-- **THEN** the gate proceeds without prompting
-
-### Requirement: Per-form tracking gate prompts when revisions are off
-
-On a licensed deployment, a standard `form_update` (no `draft`/`publish`/`revert`) against a stored form whose `revisions` is falsy SHALL prompt the user with three choices — enable revisions (original), enable revisions (current), or proceed without history — UNLESS the caller opted in via `revisions: 'original'|'current'` on the body, OR the user already approved "proceed without history" for that `formId` in the current process. Passing `revisions: ''` SHALL NOT bypass the prompt. On cancel, the tool SHALL throw and no PUT SHALL be sent.
-
-#### Scenario: Caller opted in via revisions: 'current'
-
-- **WHEN** `form_update` is called with `form: { ..., revisions: 'current' }` against a form with revisions disabled
-- **THEN** no prompt is shown
-- **AND** the PUT body contains `revisions: 'current'`
-
-#### Scenario: Caller passes revisions: '' on a disabled form
-
-- **WHEN** `form_update` is called with `form: { ..., revisions: '' }` against a form with revisions disabled
-- **THEN** the per-form tracking gate prompts the user
-
-#### Scenario: User chooses enable revisions (original)
-
-- **WHEN** the gate prompts and the user chooses "enable-original"
-- **THEN** the PUT body contains `revisions: 'original'`
-
-#### Scenario: User chooses proceed without history
-
-- **WHEN** the gate prompts and the user chooses "proceed-without-history"
-- **THEN** any caller-supplied `revisions` is stripped from the PUT body
-- **AND** subsequent `form_update` calls for the same `formId` in this process do not re-prompt
 
 ### Requirement: Standard updates create a new revision when revisions are enabled
 
@@ -124,3 +70,13 @@ Every draft/publish/revert PUT body SHALL include `_vnote` prefixed with `@formi
 
 - **WHEN** `form_update` is called with both `draft: true` and `publish: true`
 - **THEN** the tool throws naming the conflict
+
+### Requirement: form_revision_list returns a form's revisions newest first
+
+The server SHALL register `form_revision_list` (replacing `form_revisions_list`), taking `cwd`, `formIdOrPath`, and the shared list arguments. It SHALL request revisions sorted by `-_vid` by default and select compact metadata (`_id`, `_vid`, `_vnote`, `_vuser`, `created`, `modified`) unless `select` is given, and SHALL return the shared list result.
+
+#### Scenario: Newest first
+
+- **WHEN** a form has 15 revisions and `form_revision_list` is called
+- **THEN** the first item is the highest `_vid`, all 15 are returned, and `total` is 15
+

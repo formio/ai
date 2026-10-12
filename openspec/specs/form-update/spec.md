@@ -1,9 +1,7 @@
 ## Purpose
 
 Defines the `form_update` MCP tool: the form ID and definition it accepts, the `PUT /form/{formId}` call it makes, the note it requires, its draft, publish, and revert flags, and the per-form tracking gate applied to standard writes.
-
 ## Requirements
-
 ### Requirement: form_update tool is registered with workflow guidance
 
 The `form_update` tool SHALL be registered on the MCP server with a description that instructs the LLM to: (1) fetch the current form via `form_get`, (2) use the `formio-schema` skill to apply the requested modifications, and (3) call `form_update` with the complete updated form JSON. The description SHALL NOT reference `formio-form`.
@@ -52,20 +50,24 @@ The `form_update` tool SHALL call `PUT {projectUrl}/form/{formId}` with the `x-t
 - **WHEN** `form_update` is called with `note: "rename email field"`
 - **THEN** the PUT body's `_vnote` equals `@formio/mcp: rename email field`
 
-### Requirement: form_update exposes draft, publish, revert flags
+### Requirement: form_update saves a form or its draft from the body it is given
 
-`form_update` SHALL accept `draft`, `publish`, `revert` (booleans) and `version` (string for `revert`). The flags SHALL be mutually exclusive. Behavior of each flag is governed by the `form-revisions` capability.
+`form_update` SHALL take `cwd`, `formId` (a 24-character ObjectId), `form`, a required `note`, an optional `draft: boolean`, and an optional `acceptNoHistory: boolean`. Without `draft` it SHALL PUT the form. With `draft: true` it SHALL save the draft from the allowlisted draft fields of `form` (`components`, `settings`, `tags`, `properties`, `controller`, `esign`, `display`). It SHALL ignore the server-owned fields `form_get` returns (`_id`, `_vid`, `_rid`, `revisionId`, `created`, `modified`, `owner`, `project`, `machineName`, and the like), and SHALL ignore a caller-editable non-draft field (`title`, `name`, `path`, `type`, `action`, `access`, `submissionAccess`, `fieldMatchAccess`, `revisions`, `submissionRevisions`, `pdfComponents`, `translationsUrl`) whose value equals the stored one — the stored draft's, or the live form's where a draft exists. A caller-editable non-draft field whose value differs from both SHALL be refused with code `INVALID_ARGUMENT`, naming the field and saying to save it with `form_update` without `draft`, and nothing SHALL be written. It SHALL NOT accept `publish`, `revert` or `version`; publishing and reverting are `form_publish` and `form_revert`.
 
-#### Scenario: Mutually exclusive
+#### Scenario: Saving a draft from form_get's output
 
-- **WHEN** `form_update` is called with `draft: true` and `revert: true`
-- **THEN** the tool throws
+- **WHEN** `form_update` is called with `draft: true` and a `form` returned by `form_get` (carrying `_id`, `title`, `path`, `created`)
+- **THEN** the draft is saved with that form's allowlisted fields
+- **AND** no error is returned for the other fields
 
-### Requirement: form_update applies the per-form tracking gate on standard PUTs
+#### Scenario: A changed non-draft field in a draft body is refused
 
-A standard `form_update` (none of `draft`/`publish`/`revert`) SHALL run the per-form revisions tracking gate before issuing the PUT. Gate behavior is specified in the `form-revisions` capability.
+- **WHEN** `form_update` is called with `draft: true` and a `form` whose `title` or `path` differs from the stored form's
+- **THEN** the tool returns `isError: true` with `_meta["io.form/error"].code` `INVALID_ARGUMENT`, naming the field and `form_update` without `draft`
+- **AND** nothing is written
 
-#### Scenario: Tracking gate runs
+#### Scenario: Publish and revert are separate tools
 
-- **WHEN** `form_update` is called against a licensed deployment for a form with revisions disabled, no caller opt-in
-- **THEN** the tracking gate is invoked before any PUT
+- **WHEN** `form_update` is listed
+- **THEN** its input schema has no `publish`, `revert` or `version` argument
+

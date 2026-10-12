@@ -1,9 +1,7 @@
 ## Purpose
 
 Defines the MCP tools that create, list, read, update, and delete Form.io actions on a form: `action_create`, `action_list`, `action_get`, `action_update`, and `action_delete`, including validation of the action type against the server's own catalog.
-
 ## Requirements
-
 ### Requirement: action_create tool is registered
 
 The `action_create` tool SHALL be registered on the MCP server with a description that instructs the LLM to call `action_type_get` first to discover the settings schema. It SHALL accept required `formId` and `action` parameters.
@@ -64,21 +62,6 @@ The `action_list` tool SHALL be registered on the MCP server with a required `fo
 
 - **WHEN** the MCP server is initialized with valid configuration
 - **THEN** the `action_list` tool is available with a required `formId` parameter
-
-### Requirement: action_list retrieves actions configured on a form
-
-The `action_list` tool SHALL call `GET {projectUrl}/form/{formId}/action` and return the array of action instances.
-
-#### Scenario: Successful listing
-
-- **WHEN** `action_list` is called with a valid `formId`
-- **THEN** it sends a GET request to `/form/{formId}/action`
-- **AND** returns the array of action objects as MCP text content
-
-#### Scenario: API error
-
-- **WHEN** the Form.io API returns an error
-- **THEN** the tool returns an error response with `isError: true` and a descriptive message
 
 ### Requirement: action_get tool is registered
 
@@ -149,3 +132,22 @@ The `action_delete` tool SHALL call `DELETE {projectUrl}/form/{formId}/action/{a
 
 - **WHEN** the Form.io API returns an error (e.g., 404 Not Found)
 - **THEN** the tool returns an error response with `isError: true` and a descriptive message
+
+### Requirement: action_list pages a form's actions
+
+`action_list` SHALL take `cwd`, `formId`, and the shared list arguments and SHALL return the shared list result of actions.
+
+#### Scenario: More actions than Form.io's default page
+
+- **WHEN** a form has 11 actions and `action_list` is called with no paging arguments
+- **THEN** all 11 are returned with `total: 11`
+
+### Requirement: Action tools address forms by ObjectId
+
+Every action tool (`action_list`, `action_get`, `action_create`, `action_update`, `action_delete`, `action_type_list`, `action_type_get`) SHALL take `formId` as a 24-character ObjectId and refuse any other value with code `INVALID_ARGUMENT`, because Form.io's action-type catalog route does not resolve a form path.
+
+#### Scenario: A form path is refused with the remedy
+
+- **WHEN** `action_list` is called with `formId: "user/login"`
+- **THEN** the result has code `INVALID_ARGUMENT` and the message tells the agent to read the form's `_id` with `form_get`
+

@@ -110,6 +110,7 @@ These SHALL be reported one at a time and in that order.
 - **THEN** it says to pass `baseUrl` when the server reports that it cannot be determined
 - **AND** it does not instruct passing it by deployment kind
 - **AND** it states that the base URL is otherwise derived from the project URL
+
 ### Requirement: The instructions state the three valid URL shapes
 
 A `FORMIO_PROJECT_URL` / `FORMIO_BASE_URL` pair has exactly three valid shapes, and the server's own guidance SHALL state all three, because a stand-alone agent has no skill to consult:
@@ -315,3 +316,22 @@ The server's declared `instructions` SHALL name `project_get` and what to do wit
 
 - **WHEN** `project set` runs before any client has connected, and a client then starts the server and calls a Form.io tool with that cwd
 - **THEN** the tool resolves its project without any prior `project_set` tool call
+
+### Requirement: Boolean environment variables share one parser
+
+Every boolean environment variable the server reads (`FORMIO_INSECURE_TLS`, `FORMIO_FORCE_BROWSER`) SHALL be read by one parser: after trimming, `true` and `1` (case-insensitive) are true and every other value, including unset, is false.
+
+#### Scenario: Same spelling, same meaning
+
+- **WHEN** `FORMIO_FORCE_BROWSER` is `TRUE` and `FORMIO_INSECURE_TLS` is ` 1 `
+- **THEN** both are read as true
+
+### Requirement: The package publishes its binary and no library entry
+
+`@formio/mcp`'s `package.json` SHALL declare `exports` exposing only `./package.json`, so that no module under `dist/` is importable by consumers; the package's interface is its `formio-mcp` binary.
+
+#### Scenario: No deep import
+
+- **WHEN** a consumer imports `@formio/mcp/dist/server.js`
+- **THEN** module resolution fails with a package-exports error
+
