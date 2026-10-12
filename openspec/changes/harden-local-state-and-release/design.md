@@ -3,12 +3,12 @@
 - `project-map.ts` writes `~/.formio/projects.json` with a read-modify-write and `fs.writeFileSync` in place; lookups key by `path.resolve(cwd)` exact match. The token cache was made atomic in #93; the map was not.
 - `formio-client.ts` sets `process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0'` at import time when `FORMIO_INSECURE_TLS` is true.
 - `auth.ts` serves a login page whose script posts `{ token }` to `/callback`; `/callback` accepts the first non-empty token. The page embeds the login-form URL as `'${loginFormUrl}'`.
-- `.github/workflows/release.yml` installs `npm@latest`, downloads `mcp-publisher` from `releases/latest`, runs `npx @smithery/cli@latest`, and references actions by tag. The Docker build context is `packages/mcp-server`, where there is no lockfile, so `npm install` resolves the caret ranges at build time.
+- The Docker build context is `packages/mcp-server`, where there is no lockfile, so `npm install` resolves the caret ranges at build time.
 - The npm `files` are `dist` and `README.md`; LICENSE is at the repository root only. `build` is `tsc -p tsconfig.build.json`, which never removes outputs. `cli-launch.ts` reads the version from `../package.json`, which the esbuild bundles (`.mcpb`, plugin) do not contain, so they fall back to `0.0.0`.
 
 ## Goals / Non-Goals
 
-**Goals:** no lost or partial map writes across processes; a mapping applies under its directory and survives path spelling differences; certificate settings confined to the deployment they are for; a login completes only with the page's own post; a release that repeats the previous one when the repository has not changed; a complete package that reports its version.
+**Goals:** no lost or partial map writes across processes; a mapping applies under its directory and survives path spelling differences; certificate settings confined to the deployment they are for; a login completes only with the page's own post; a Docker image built from the tested lockfile; a complete package that reports its version.
 
 **Non-Goals:** changing resolution precedence; rewriting existing map entries; the planner, skills, or tool surface.
 
@@ -28,8 +28,8 @@ Node's `fetch` accepts a `dispatcher`. One `undici.Agent({ connect: { rejectUnau
 **4. Per-login value on the callback.**
 `crypto.randomBytes(16).toString('hex')` per login, embedded in the page with `JSON.stringify`, sent back as `{ token, state }`, compared with `crypto.timingSafeEqual`. A mismatch is `403` and the server keeps listening; the login still ends at its timeout. The login-form URL is embedded with `JSON.stringify` as well.
 
-**5. Pinned release tools.**
-Actions referenced as `uses: owner/repo@<40-hex> # vX.Y.Z`. `npm@<x.y.z>`, `@smithery/cli@<x.y.z>`, and `mcp-publisher` from `releases/download/v<x.y.z>/...` with `sha256sum -c` against values written in the workflow. Versions are the ones in use at the time of the change; updating them is a reviewed edit. A test reads the workflow and fails on `@latest`, `/latest/`, or a non-SHA action reference.
+**5. Release tools stay unpinned.** *(Maintainer decision, 2026-10-12.)*
+The release workflow keeps installing `npm`, `@smithery/cli` and `mcp-publisher` at their latest releases and referencing actions by tag. skills.sh scans only the skill directories, so these pins would not affect its results; the pins that do — `@formio/mcp@<version>` in `formio-mcp-setup` and the plugin manifests — are unchanged.
 
 **6. Docker from the lockfile.**
 The build context moves to the repository root; the builder stage runs `corepack enable`, `pnpm install --frozen-lockfile --filter @formio/mcp...`, builds, and `pnpm deploy --filter @formio/mcp --prod /out` for the runtime stage. The image's entrypoint is unchanged.
@@ -42,7 +42,6 @@ The build context moves to the repository root; the builder stage runs `corepack
 - [A lock left by a crashed writer] → Abandoned after 10 s; writes are milliseconds.
 - [Case-folding on a case-sensitive macOS volume] → Two directories differing only by case would share a mapping; such volumes are rare and the nearer explicit mapping still wins.
 - [undici version drift from Node's bundled copy] → Pinned to the bundled major; the scoped dispatcher is exercised in tests against a local HTTPS server with a self-signed certificate.
-- [Pinned tools age] → Updating a pin is a reviewed one-line change; the test keeps it pinned.
 
 ## Migration Plan
 

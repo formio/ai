@@ -58,17 +58,15 @@
 
 - [ ] 4.3 Review implementation and refactor as needed
 
-## 5. Release and Docker pinning
+## 5. Docker image from the lockfile
 <!-- depends_on: none -->
 
 ### Red
 
-- [ ] 5.1 Write a failing test that reads `.github/workflows/release.yml` and fails on `@latest`, `/latest/`, any action reference that is not a 40-character SHA, and an `mcp-publisher` download without a checksum check
 - [ ] 5.2 Write a failing test that the Dockerfile installs with `pnpm install --frozen-lockfile` and the release workflow's Docker build context is the repository root
 
 ### Green
 
-- [ ] 5.3 Pin every action by SHA (tag in a comment), `npm`, `@smithery/cli`, and `mcp-publisher` (with a recorded SHA-256), using the versions current today
 - [ ] 5.4 Rework the Dockerfile to build from the repository root with the lockfile and `pnpm deploy`; update the workflow's build context and any Docker docs
 
 ### Refactor
