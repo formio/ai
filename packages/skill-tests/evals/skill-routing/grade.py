@@ -27,10 +27,12 @@ OUT = REPO / ".eval-artifacts" / "skill-routing" / os.environ.get("ITERATION", "
 
 
 def frontmatter_description(skill_md: Path) -> str:
-    lines = skill_md.read_text(encoding="utf8").split("\n")
-    if lines[0].strip() != "---":
+    lines = skill_md.read_text(encoding="utf8").splitlines()
+    if not lines or lines[0].strip() != "---":
         raise SystemExit(f"{skill_md} has no frontmatter")
-    end = lines.index("---", 1)
+    end = next((index for index, line in enumerate(lines[1:], 1) if line.strip() == "---"), None)
+    if end is None:
+        raise SystemExit(f"{skill_md} frontmatter is not closed")
     block = lines[1:end]
     for index, line in enumerate(block):
         if not line.startswith("description:"):

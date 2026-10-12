@@ -4,14 +4,14 @@
 
 The parent `formio-angular` `SKILL.md` SHALL instruct Claude to execute the following phases in the following strict order, with a user-approval gate between each:
 
-1. **SETUP** — obtain the Form.io `Project URL` and `Base URL` by calling the `project_get` tool with `cwd` set to the workspace root. On `ok` the reported values ARE the configuration: confirm them in one short acknowledgement and proceed without interviewing. Otherwise ask for the single value the report names, record it with `project_set`, and call again until it resolves. `formio-application` hands in no URLs — its handoff names the workspace directory — so SETUP is always where the values come from. After BOOTSTRAP creates the workspace, the skill SHALL call `project_get` for it again; when that no longer resolves — a new `.git` ends the server's lookup above an ancestor's mapping — it SHALL record the Project URL SETUP resolved with `project_set` for the workspace root before CONFIG.
+1. **SETUP** — obtain the Form.io `Project URL` and `Base URL` by calling the `project_get` tool with `cwd` set to the workspace root. On `ok` the reported values ARE the configuration: confirm them in one short acknowledgement and proceed without interviewing. Otherwise ask for the single value the report names, record it with `project_set`, and call again until it resolves. `formio-application` hands in no URLs — its handoff names the workspace directory — so SETUP is always where the values come from. When the workspace root has no `angular.json` yet, BOOTSTRAP will make it a repository of its own, and the server's mapping lookup and committed-file walk both stop at a `.git`; so on `ok`, unless the report names the workspace root's own mapping, SETUP SHALL record the pair for the workspace root with `project_set` before BOOTSTRAP — the reported Project URL, and the reported Base URL whenever its `baseUrlSource` is not `derived`.
 2. **CONFIG** — generate `src/app/config.ts` exporting `AppConfig: FormioAppConfig` with `appUrl` = the project URL and `apiUrl` = the base URL **as reported by `project_get`**, and wire it into `AppModule` via `{ provide: FormioAppConfig, useValue: AppConfig }`. Match the pattern at `https://github.com/formio/angular-demo/blob/master/src/app/config.ts` and `https://github.com/formio/angular-demo/blob/master/src/app/app-module.ts`.
 3. **AUTH** — generate `src/app/auth/auth.module.ts` configuring `FormioAuthConfig` from the `template.json` auth resources and roles. Import `AuthModule` into `AppModule`.
 4. **Resources** — delegate to the `formio-angular-resources` sub-skill with the accumulated context.
 
 SETUP SHALL NOT carry its own URL interview wording. It SHALL NOT enumerate the valid URL shapes, restate plain-language URL descriptions, apply its own URL validation, derive a base URL itself, or reproduce a `project get` exit-code table — the server's message says what is missing and how to fix it, and SETUP relays it.
 
-The skill SHALL NOT run an Inference phase (planner handoff). Planner invocation is `formio-application`'s responsibility. When `formio-angular` is invoked directly by a user (framework-explicit trigger), the skill SHALL expect an already-approved `template.json` and a workspace ready for file generation; if neither exists, it SHALL hand the request to `formio-application` with Angular named as the framework — after telling the user in one line that planning comes first — rather than running the planner itself or asking the user to re-invoke anything.
+The skill SHALL NOT run an Inference phase (planner handoff). Planner invocation is `formio-application`'s responsibility. When `formio-angular` is invoked directly by a user (framework-explicit trigger), the skill SHALL expect an already-approved `template.json` and a workspace ready for file generation; if neither exists and the request needs a data model — a new app or new resources — it SHALL hand the request to `formio-application` with Angular named as the framework — after telling the user in one line that planning comes first — rather than running the planner itself or asking the user to re-invoke anything.
 
 The skill SHALL NOT run an Import phase. Template import into a Form.io project is `formio-application`'s responsibility.
 
@@ -48,11 +48,17 @@ The skill SHALL NOT run an Import phase. Template import into a Form.io project 
 - **THEN** the skill hands the request to `formio-application` with Angular as the framework
 - **AND** it does not run the planner itself
 
-#### Scenario: Scaffolding keeps the workspace on its project
+#### Scenario: A workspace about to be scaffolded is recorded first
 
-- **WHEN** the project resolved from a mapping on the workspace's parent directory and BOOTSTRAP's scaffold created `.git` in the workspace
-- **THEN** the next `project_get` for the workspace is checked before CONFIG
-- **AND** if it no longer resolves, the skill records the Project URL SETUP resolved with `project_set` for the workspace root
+- **WHEN** SETUP's `project_get` returns `ok` from a mapping on the workspace's parent directory, a parent's committed file, or the environment, and the workspace has no `angular.json`
+- **THEN** SETUP records the pair for the workspace root with `project_set` before BOOTSTRAP
+- **AND** it records the Base URL too when `baseUrlSource` is not `derived`
+
+#### Scenario: Repairing existing wiring needs no plan
+
+- **WHEN** the user asks to fix the `FormioAppConfig` wiring of an existing Angular workspace with no planner pair in scope
+- **THEN** the skill proceeds with the partially-wired scenario
+- **AND** it does not hand the request to `formio-application`
 
 #### Scenario: Parent enforces phase order for file generation
 

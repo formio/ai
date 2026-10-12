@@ -198,7 +198,7 @@ The skill SHALL NOT carry its own URL interview: it asks only for what the serve
 
 ### Requirement: FRAMEWORK.md holds the one handoff contract
 
-`FRAMEWORK.md`'s handoff reference SHALL be the single statement of what `formio-application` hands each downstream skill, per branch (build-new, modify-existing) and per receiver (framework entry skill, extend sub-skill, `formio-auth`): the fields passed, that no URL is among them, and which skill calls `project_get`. `SKILL.md`, `INTENT.md`, `IMPORT.md`, `formio-angular/SKILL.md`, `formio-react/SKILL.md`, and both resources sub-skills SHALL link to it rather than restating fields.
+`FRAMEWORK.md`'s handoff reference SHALL be the single statement of what `formio-application` hands each downstream skill, and SHALL define `workspacePath` as the `cwd` the Step 3 Preflight's `project_get` reported — the directory the import ran for. It SHALL state, per branch (build-new, modify-existing) and per receiver (framework entry skill, extend sub-skill, `formio-auth`): the fields passed, that no URL is among them, and which skill calls `project_get`. `SKILL.md`, `INTENT.md`, `IMPORT.md`, `formio-angular/SKILL.md`, `formio-react/SKILL.md`, and both resources sub-skills SHALL link to it rather than restating fields.
 
 #### Scenario: Handoff fields are stated once
 
@@ -215,4 +215,5 @@ In an orchestrated build `formio-auth` SHALL run at Step 3.5, after the project 
 - **WHEN** an approved Resource Map's Users & Auth section names SSO
 - **THEN** `formio-auth` runs at Step 3.5 after the import
 - **AND** the planner does not invoke it at map approval
+- **AND** `formio-auth` calls `project_get` with `cwd` set to the `workspacePath` it was handed
 

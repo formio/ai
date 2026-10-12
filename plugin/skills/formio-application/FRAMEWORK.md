@@ -60,7 +60,7 @@ Detection path — inspect the workspace to find out which framework is already 
 
 ## Handoff context reference
 
-The one contract for what Step 3.5 and Step 4 hand on; every other file links here rather than restating it. **No payload carries a URL.** Step 3 resolved the project and imported against `workspacePath`, and every receiver calls `project_get` with `cwd` set to that same directory, so it reads the same record rather than a copy of it — a copy would give the receiver two authorities and no way to tell which was stale.
+The one contract for what Step 3.5 and Step 4 hand on; every other file links here rather than restating it. **No payload carries a URL.** `workspacePath` is the `cwd` the Step 3 Preflight's `project_get` reported — the directory the import ran for, and on the build-new branch the directory the application is built in. Every receiver calls `project_get` with `cwd` set to that same directory, so it reads the same record rather than a copy of it — a copy would give the receiver two authorities and no way to tell which was stale.
 
 | | Build-new → Entry skill | Modify-existing → Extend sub-skill | Step 3.5 → `formio-auth` |
 | --- | --- | --- | --- |

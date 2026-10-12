@@ -53,7 +53,7 @@ Anything from a one-sentence domain description up to a fully-modeled workspace:
 | "I want to build a CRM" (no existing workspace, no plan, no URLs) | Run the full build-new pipeline — Intent → Plan (full) → Import → Framework routing, all in one invocation, resolving the configuration at Import. |
 | An approved planner `template.md` + `template.json` pair already in scope | Skip planner inference; start at Intent (confirm the user wants to proceed), then Import. |
 | "Also track X in my event app" (existing workspace) | Run Intent → Plan (delta — only the new resources for X) → Import (additive merge) → Framework routing to the extend sub-skill. |
-| A new app or new resources with a framework named ("build me a CRM in React", "add an invoices module to my Angular app" when nothing is planned for it), or a framework skill that handed the request here because no plan existed | Run the full pipeline. The named framework is the user's Step 4 answer: carry it, and [`FRAMEWORK.md`](./FRAMEWORK.md) skips the framework question. |
+| A new app with a framework named ("build me a CRM in React"), or a framework skill that handed the request here because the work needs a plan that does not exist yet | Run the full pipeline. The named framework is the user's Step 4 answer: carry it, and [`FRAMEWORK.md`](./FRAMEWORK.md) skips the framework question. |
 | Framework-named work on a project already planned and imported ("build it in Angular" with an approved pair in scope, "React front-end for this Form.io project", embedding a form, regenerating a module) | Not this skill's: `formio-angular` / `formio-react` handle it directly. |
 
 ## Using Resources within Forms — the anti-pattern to avoid

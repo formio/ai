@@ -29,3 +29,11 @@ When `formio-react` is invoked directly by a framework-explicit trigger, it SHAL
 - **THEN** the skill stops before the data-router gate and offers the embed branch
 - **AND** it does not offer a `createBrowserRouter` migration
 
+### Requirement: A workspace about to be scaffolded is recorded first
+
+`formio-react/SETUP.md` SHALL, when the workspace root holds no application yet and `project_get` returns `ok` from anything but the workspace root's own mapping, record the pair for the workspace root with `project_set` before the scaffold — the reported Project URL, and the reported Base URL whenever its `baseUrlSource` is not `derived` — because the server's mapping lookup and committed-file walk stop at the first directory containing `.git`.
+
+#### Scenario: A parent's mapping is recorded for the new workspace
+
+- **WHEN** the project resolves from a mapping on the workspace's parent directory and the workspace holds no application
+- **THEN** SETUP records the pair for the workspace root before the scaffold

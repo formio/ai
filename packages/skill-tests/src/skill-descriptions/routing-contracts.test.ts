@@ -158,18 +158,6 @@ describe('one handoff contract, carrying no URL', () => {
   });
 });
 
-describe('a scaffolded workspace keeps its project', () => {
-  // A new `.git` ends the server's mapping lookup, so a workspace whose project came
-  // from a mapping on its parent is cut off by `ng new`.
-  it('formio-angular re-checks project_get after scaffolding and records the project', () => {
-    const bootstrap = read('formio-angular/BOOTSTRAP.md');
-    const step = bootstrap.slice(bootstrap.indexOf('## Step 4'), bootstrap.indexOf('## Step 5'));
-    expect(step).toMatch(/`project_get`/);
-    expect(step).toMatch(/`\.git`/);
-    expect(step).toMatch(/`project_set`/);
-  });
-});
-
 describe('formio-auth runs once, after import', () => {
   it.each([
     'formio-resource-planner/SKILL.md',
@@ -206,5 +194,84 @@ describe('framework-neutral extension stays with formio-application', () => {
     const notFor = description('formio-application/SKILL.md').split('Not for:')[1] ?? '';
     expect(notFor).toMatch(/Angular- or React-named work/);
     expect(notFor).not.toMatch(/Not for: Angular or React work/);
+  });
+});
+
+// The server's directory-mapping lookup and the committed-file walk both stop at
+// the first directory containing `.git`, so a workspace about to be scaffolded
+// (and become its own repository) is recorded with its own pair before the
+// scaffold: no later step can find a parent's record or the environment's
+// instead. A Base URL that was recorded rather than derived is recorded too.
+describe('a workspace about to be scaffolded is recorded first', () => {
+  it.each(['formio-angular/SETUP.md', 'formio-react/SETUP.md'])('%s', (path) => {
+    const text = read(path);
+    expect(text).toMatch(/before (BOOTSTRAP|the scaffold)[^.]*`project_set`/);
+    expect(text).toMatch(/`baseUrlSource`[^.]*`derived`/);
+  });
+
+  it('BOOTSTRAP no longer patches the cut-off after the scaffold', () => {
+    expect(read('formio-angular/BOOTSTRAP.md')).not.toMatch(
+      /confirm the workspace still resolves its project/
+    );
+  });
+});
+
+describe('formio-angular hands over only what needs a plan', () => {
+  const skill = read('formio-angular/SKILL.md');
+
+  it('a repair of existing wiring proceeds without a planner pair', () => {
+    expect(skill).not.toMatch(
+      /that is a `formio-application` case whether or not they named Angular/
+    );
+    expect(skill).toMatch(/repair[^.]*without a planner pair/i);
+  });
+
+  it('handoff mode receives no URLs', () => {
+    expect(skill).not.toMatch(/passed both URLs/);
+    expect(skill).not.toMatch(/that you gave me during the import step/);
+  });
+});
+
+describe('workspacePath is defined once and honoured by every receiver', () => {
+  it('FRAMEWORK.md defines it as the directory Step 3 imported for', () => {
+    expect(read('formio-application/FRAMEWORK.md')).toMatch(
+      /`workspacePath` is the `cwd` the Step 3 Preflight's `project_get` reported/
+    );
+  });
+
+  it('formio-auth resolves the handed workspacePath', () => {
+    expect(read('formio-auth/SKILL.md')).toMatch(
+      /`project_get` with `cwd` set to that `workspacePath`/
+    );
+  });
+
+  it("formio-application's Inputs table claims no Angular-named extension", () => {
+    expect(read('formio-application/SKILL.md')).not.toMatch(
+      /add an invoices module to my Angular app/
+    );
+  });
+});
+
+describe('formio-react-resources runs every EXISTING.md step through the backfill', () => {
+  it('names steps 1–4', () => {
+    const text = read('formio-react/formio-react-resources/SKILL.md');
+    expect(text).not.toMatch(/EXISTING\.md\)? steps 1–3/);
+    expect(text).toMatch(/EXISTING\.md\)? steps 1–4/);
+  });
+});
+
+describe('the angular-resources plan matches the workspace it extends', () => {
+  it('the plan template covers a workspace not yet wired', () => {
+    const template = read(
+      'formio-angular/formio-angular-resources/references/phase-a-plan-template.md'
+    );
+    expect(template).toMatch(/not yet wired/);
+    expect(template).toMatch(/config\.ts\s+NEW or VERIFY/);
+  });
+
+  it('the worked example modifies the root modules of an existing workspace', () => {
+    const example = read('formio-angular/formio-angular-resources/references/worked-example.md');
+    expect(example).toMatch(/app-module\.ts\s+MODIFY/);
+    expect(example).toMatch(/app-routing-module\.ts\s+MODIFY/);
   });
 });
