@@ -6,7 +6,7 @@ description: >-
 
 # Form.io Resource → React CRUD
 
-> **Nested sub-skill.** This file lives at `plugin/skills/formio-react/formio-react-resources/SKILL.md`. Its `name` frontmatter exists so recursive-scan clients classify it correctly; callers reach it by path — this file is **loaded by path**, the way `formio-react` loads its own branch documents. It is not a separately-registered top-level skill — do not invoke it by frontmatter name.
+> **Nested sub-skill.** This file lives at `formio-react-resources/SKILL.md` inside the `formio-react` skill. Its `name` frontmatter exists so recursive-scan clients classify it correctly; callers reach it by path — this file is **loaded by path**, the way `formio-react` loads its own branch documents. It is not a separately-registered top-level skill — do not invoke it by frontmatter name.
 
 Turn an approved Resource Map into React Router routes backed by a small generated kernel: one config object per resource, hierarchical parent/child composition, and designed screens on top.
 
@@ -65,7 +65,7 @@ You are reached with a payload rather than a conversation. Expected fields: `wor
 
 **The branch changes what you generate.** On `'greenfield'` the parent just wrote the config, auth, and layout, so you build on them. On `'existing'` they are the application's own, and generated code integrates with them.
 
-**When `branch` is absent, the payload came from `formio-application`'s modify-existing route, not from `formio-react`.** That route loads this file by path with the framework-neutral payload (`workspacePath`, `userRequest`, `templateMdPath`, `templateJsonPath`, `newResourceNames`, `frontendDesignStatus`) and nothing has inspected the application. Treat it as `'existing'` and run [`../EXISTING.md`](../EXISTING.md) steps 1–3 first — the inspection report, the data-router gate, and the backfill of a missing provider or stylesheet — then continue here with the findings that inspection produced. Never infer `'greenfield'` from a missing field: the only caller that omits it is extending an application that already exists.
+**When `branch` is absent, the payload came from `formio-application`'s modify-existing route, not from `formio-react`.** That route loads this file by path with the framework-neutral payload defined in [`formio-application/FRAMEWORK.md`](../../formio-application/FRAMEWORK.md) → "Handoff context reference" (`workspacePath`, `userRequest`, `templateMdPath`, `templateJsonPath`, `newResourceNames`, `frontendDesignStatus`) and nothing has inspected the application. Treat it as `'existing'` and run [`../EXISTING.md`](../EXISTING.md) steps 1–4 first — the inspection report, the rendering-mode gate, the data-router gate, and the backfill of a missing provider or stylesheet — then continue here with the findings that inspection produced. Never infer `'greenfield'` from a missing field: the only caller that omits it is extending an application that already exists.
 
 URLs are not in the payload by design: resolve them with `project_get` for `workspacePath` and reconcile against the workspace's `src/config.ts`. When the two disagree, stop and ask which is correct, naming both pairs and where each came from.
 

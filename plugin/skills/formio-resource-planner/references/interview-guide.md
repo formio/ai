@@ -103,7 +103,7 @@ When the interview has enough signal, emit the resource map as a single fenced m
 - Registration: <self-register via form `<name>` with Role Assignment action | admin-invite only>
 - SSO: <none | OIDC | SAML | LDAP>
 - Custom JWT: <yes | no>
-- Next steps for auth: when `SSO` is anything other than `none`, or `Custom JWT` is `yes`, or the plan calls for Token Swap, email-token auth, 2FA, reCAPTCHA, or RBAC tuning beyond default roles and group permissions, hand off to the `formio-auth` skill after this Resource Map is approved.
+- Next steps for auth: when `SSO` is anything other than `none`, or `Custom JWT` is `yes`, or the plan calls for Token Swap, email-token auth, 2FA, reCAPTCHA, or RBAC tuning beyond default roles and group permissions, the `formio-auth` skill configures it once this template is imported — `formio-application` runs it at its Step 3.5, and a standalone run lists it as a next step; this skill never invokes it.
 
 ## Roles
 

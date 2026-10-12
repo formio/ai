@@ -59,7 +59,23 @@ Skills live at `plugin/skills/<skill>/SKILL.md` (frontmatter `description` is th
 
 - Descriptions must fit a 1,024-character budget and end with a `Not for:` clause pointing at sibling skills — enforced by `packages/skill-tests/src/skill-descriptions/`.
 - Some skills have an eval harness at `packages/skill-tests/evals/<skill>/` (see each harness's `README.md` for the run loop). Use it to measure whether a skill change helped or regressed.
-- To add a framework implementor (e.g. `formio-react`), add the skill directory and register it as a row in `plugin/skills/formio-application/FRAMEWORK.md` — no orchestrator changes needed.
+- To add a framework implementor (e.g. `formio-react`), add the skill directory and register it as a row in `plugin/skills/formio-application/FRAMEWORK.md` — no orchestrator changes needed. See "Adding a framework implementor" below.
+
+### Adding a framework implementor
+
+`FRAMEWORK.md` ships to every installation, so the steps for adding a framework live here rather than there. For a new framework skill (here, Vue):
+
+1. Author the skill at `plugin/skills/formio-vue/` — its `SKILL.md`, sub-skills, and sibling documents — independent of the registry.
+2. In the same change, add one row to the registry in `plugin/skills/formio-application/FRAMEWORK.md`, with all five cells. The `Default` cell is `no`: exactly one row carries `Default: yes`, and changing which one is a separate decision from adding a framework. Write the detection signal to test only for the new framework's own presence.
+
+   ```
+   | Vue | formio-vue | formio-vue-resources — nested at formio-vue/formio-vue-resources/SKILL.md | `vue` listed in `package.json` dependencies | no |
+   ```
+
+3. Check that the new Entry skill and Extend sub-skill accept the payloads in `FRAMEWORK.md` → "Handoff context reference" — no URLs; each resolves the project with `project_get` for `workspacePath`. If they don't, change the new framework skill; the orchestrator does not adapt.
+4. Run `pnpm test` — `packages/skill-tests/src/formio-react/framework-registry.test.ts` covers the registry, and the routing eval in `packages/skill-tests/evals/skill-routing/` measures whether the new description routes as intended.
+
+Adding a framework is a row: no edit to the orchestrator's `SKILL.md`, `INTENT.md`, or `IMPORT.md`, and no new routing logic.
 
 ## Testing the plugin locally
 

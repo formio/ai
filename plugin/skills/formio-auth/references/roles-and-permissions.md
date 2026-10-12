@@ -31,7 +31,7 @@ Every new Form.io project is seeded with these roles, each with a unique MongoDB
 - **Administrator** — preconfigured with full CRUD across the project.
 - **Authenticated** — preconfigured for logged-in workflows; assigned by the Role Assignment Action at signup.
 
-In a planner-produced `template.json` the default roles are emitted as objects with `title`, `description`, `admin`, and `default` fields — see `plugin/skills/formio-resource-planner/references/template-json.md` → "Roles" for the canonical shape.
+In a planner-produced `template.json` the default roles are emitted as objects with `title`, `description`, `admin`, and `default` fields — see `../../formio-resource-planner/references/template-json.md` → "Roles" for the canonical shape.
 
 ### Custom roles
 
@@ -43,7 +43,7 @@ Add custom roles when the default trio is not enough — for example `salesRep`,
 
 ### Assigning roles to users — Role Assignment actions only, never direct `roles` writes
 
-A user's `roles` array lives on their submission, but the submissions API **strips the `roles` key from POST/PUT/PATCH bodies — even for the project owner**. Roles are assigned exclusively by the **Role Assignment action** (self-register forms assign the default persona unconditionally; SSO Role Mapping covers federated logins). For a multi-role application where all personas share ONE `user` resource (`student` / `collegeAdmin` / `scholarshipAdmin`) — the common default — the canonical pattern is a `role` selectboxes component on the user resource plus one CONDITIONAL Role Assignment action per persona (`condition.conditions: [{ component: "role", operator: "isEqual", value: "<persona>" }]`), so creating a user in the portal (or via the API with `data.role.<persona> = true`) attaches the right role server-side. These actions run on create only, by design: editing a user's `role` selection later does not run them, and changing an existing user's persona is an administrator task, done on an administrator-only form whose Role Assignment action has `association: "existing"` (add or remove) and whose component keyed exactly `submission` holds the target user's submission `_id`. When the requirements instead call for a **resource per role** (e.g., a separate `admin` resource with the Login action's `settings.resources: ["user", "admin"]`), the selectboxes pattern is unnecessary — each user-type resource carries its own unconditional Role Assignment. Exact JSON shapes: `plugin/skills/formio-resource-planner/references/template-json.md` → "Multi-role user systems"; action mechanics: the `formio-actions` skill's `references/action-types.md` → "Role Assignment".
+A user's `roles` array lives on their submission, but the submissions API **strips the `roles` key from POST/PUT/PATCH bodies — even for the project owner**. Roles are assigned exclusively by the **Role Assignment action** (self-register forms assign the default persona unconditionally; SSO Role Mapping covers federated logins). For a multi-role application where all personas share ONE `user` resource (`student` / `collegeAdmin` / `scholarshipAdmin`) — the common default — the canonical pattern is a `role` selectboxes component on the user resource plus one CONDITIONAL Role Assignment action per persona (`condition.conditions: [{ component: "role", operator: "isEqual", value: "<persona>" }]`), so creating a user in the portal (or via the API with `data.role.<persona> = true`) attaches the right role server-side. These actions run on create only, by design: editing a user's `role` selection later does not run them, and changing an existing user's persona is an administrator task, done on an administrator-only form whose Role Assignment action has `association: "existing"` (add or remove) and whose component keyed exactly `submission` holds the target user's submission `_id`. When the requirements instead call for a **resource per role** (e.g., a separate `admin` resource with the Login action's `settings.resources: ["user", "admin"]`), the selectboxes pattern is unnecessary — each user-type resource carries its own unconditional Role Assignment. Exact JSON shapes: `../../formio-resource-planner/references/template-json.md` → "Multi-role user systems"; action mechanics: the `formio-actions` skill's `references/action-types.md` → "Role Assignment".
 
 ### The eight permission types
 
@@ -75,7 +75,7 @@ Key rules:
 | Form Definition | `access[]` on each Form/Resource | Who can read/update/delete the form's JSON definition. `read_all` is required for users to load the form's renderer. |
 | Submission Data | `submissionAccess[]` on each Form/Resource | Who can create/read/update/delete actual submission rows. This is "the real access-control story". |
 
-The planner reference at `plugin/skills/formio-resource-planner/references/template-json.md` → "Top-level `access`" and "`access` vs `submissionAccess` — keep these straight" carries the canonical `access` and `submissionAccess` JSON shapes; common patterns (admin-only, owner-level, public-submit, group-based) are documented there.
+The planner reference at `../../formio-resource-planner/references/template-json.md` → "Top-level `access`" and "`access` vs `submissionAccess` — keep these straight" carries the canonical `access` and `submissionAccess` JSON shapes; common patterns (admin-only, owner-level, public-submit, group-based) are documented there.
 
 ### Layered access models
 
@@ -136,7 +136,7 @@ Use the Form.io project portal for direct Role and Permission edits when you are
 
 ## See also
 
-- `formio-resource-planner` — owns the canonical role objects, `access` arrays, and `submissionAccess` arrays for `template.json`. Start there when designing a new project's permission matrix. See `plugin/skills/formio-resource-planner/references/template-json.md` → "Roles", "Top-level `access`", and "`access` vs `submissionAccess` — keep these straight".
+- `formio-resource-planner` — owns the canonical role objects, `access` arrays, and `submissionAccess` arrays for `template.json`. Start there when designing a new project's permission matrix. See `../../formio-resource-planner/references/template-json.md` → "Roles", "Top-level `access`", and "`access` vs `submissionAccess` — keep these straight".
 - [`resource-auth.md`](./resource-auth.md) — how roles get attached to a user at login and signup.
 - [`group-permissions.md`](./group-permissions.md) — group-based access overlay.
 - [`sso-oidc.md`](./sso-oidc.md), [`sso-saml.md`](./sso-saml.md), [`sso-ldap.md`](./sso-ldap.md) — provider role mapping into Form.io roles.

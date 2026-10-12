@@ -156,12 +156,12 @@ The server rejected the template. Surface the server's error message verbatim (i
 
 On successful import, Step 4 receives:
 
-- `projectUrl`, `baseUrl` (as reported by Step 3's `project_get`, on both branches).
+- No URLs: the receiving skill resolves the project with `project_get` for the workspace path, the same directory this step imported against. The full payload is in [`FRAMEWORK.md`](./FRAMEWORK.md) → "Handoff context reference".
 - Path to `template.md` on disk (planner wrote it; still there — architectural-intent seed for the framework skill).
 - Path to `template.json` on disk (planner wrote it; still there — structured companion).
 - A flag: "import succeeded".
 - For modify-existing: the list of newly-imported resource names (so the framework's extend sub-skill scaffolds modules for exactly those).
 
-On skipped import (user declined or error branch chose skip), Step 4 receives the same values but with the flag set to "import skipped". Downstream framework SETUP confirms the configuration against `project_get` either way — it never interviews for it, so a skipped import changes nothing about how the framework skill resolves the project.
+On skipped import (user declined or error branch chose skip), Step 4 receives the same paths but with the flag set to "import skipped". Downstream framework SETUP resolves the configuration with `project_get` either way — it never interviews for it, so a skipped import changes nothing about how the framework skill resolves the project.
 
 On "bail out", the flow stops. Partial state: the planner's `template.md` + `template.json` pair still exists on disk (by design — they are artifacts the user can use later). Nothing has been written to the Form.io project on the server.

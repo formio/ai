@@ -104,7 +104,7 @@ Bulleted facts only. Keep it parseable.
 
 The `Admin operations` line is what `phase-b-emission.md` → "Admin-only work goes through the Form.io portal, not the app login form" and `planning-rules.md` → "Login" both point at: admin-only responsibilities are captured here rather than designed into the app's login surface.
 
-When `SSO` is anything other than `none`, or `Custom JWT` is `yes`, downstream auth configuration (OAuth/SAML/LDAP Role Mapping, Token Swap, `JWT_SECRET`-signed Custom JWT, email-token auth, 2FA, reCAPTCHA) is owned by the `formio-auth` skill — hand off there after this Resource Map is approved.
+When `SSO` is anything other than `none`, or `Custom JWT` is `yes`, downstream auth configuration (OAuth/SAML/LDAP Role Mapping, Token Swap, `JWT_SECRET`-signed Custom JWT, email-token auth, 2FA, reCAPTCHA) is owned by the `formio-auth` skill, which configures it once this template is imported.
 
 ## Roles section
 

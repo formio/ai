@@ -105,7 +105,7 @@ Render the markdown block first, then the JSON block, then the one-line confirma
 
 ## Handoffs
 
-- **`formio-auth`** — when the approved map's `Users & Auth` section has an `SSO` other than `none`, a `Custom JWT: yes`, or any auth concern beyond resource-backed login + Role Assignment + Group Assignment (Token Swap, email-token/passwordless auth, 2FA, reCAPTCHA, RBAC tuning beyond default roles and group permissions), hand off to the `formio-auth` skill immediately after the Resource Map is approved.
+- **`formio-auth`** — when the approved map's `Users & Auth` section has an `SSO` other than `none`, a `Custom JWT: yes`, or any auth concern beyond resource-backed login + Role Assignment + Group Assignment (Token Swap, email-token/passwordless auth, 2FA, reCAPTCHA, RBAC tuning beyond default roles and group permissions), that configuration acts on the project the template creates, so it runs after the import — never from this skill. When `formio-application` invoked you, it runs `formio-auth` at its Step 3.5. When you are running standalone, include the **Configure auth** line in the Next steps menu ([`references/phase-b-emission.md`](references/phase-b-emission.md)).
 - **`formio-application`** — when invoked as the orchestrator's planning step, run the same two phases and gates; the Phase B file paths are what the orchestrator passes to its Import step and the framework-specific scaffolding skill.
 
 ## Worked example

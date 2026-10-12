@@ -1,12 +1,12 @@
 ---
 name: formio-react-form
 description: >-
-  Embed a Form.io form in a React application with `@formio/react`'s `Form` component — mounting, the event surface, the live instance, the lifecycle traps, provider configuration, anonymous versus authenticated submission, and the Vite and Next.js requirements. Reached by handoff from `formio-react`'s embed branch. Use when the user says "embed a Form.io form in React", "render a form in my React app", "use `@formio/react`'s `Form` component", or "add a Form.io form to this React page". Not for: framework-agnostic embedding and every field-behaviour question — conditionals, calculated values, validation, cascading selects (see `formio-form`); resource CRUD screens (see `formio-react-resources`); creating a form that does not exist yet (see `formio-form-builder`); the raw SDK reference (see `formio-sdk`).
+  Embed a Form.io form in a React application with `@formio/react`'s `Form` component — mounting, the event surface, the live instance, the lifecycle traps, provider configuration, anonymous versus authenticated submission, and the Vite and Next.js requirements. Reached by handoff from `formio-react`'s embed branch. Use when the user says "embed a Form.io form in React", "render a form in my React app", "use `@formio/react`'s `Form` component", or "add a Form.io form to this React page". Not for: framework-agnostic embedding and every field-behaviour question — conditionals, calculated values, validation, cascading selects (see `formio-form`); resource CRUD screens (see `formio-react`'s CRUD branches, which load `formio-react-resources`); creating a form that does not exist yet (see `formio-form-builder`); the raw SDK reference (see `formio-sdk`).
 ---
 
 # Embedding a Form.io form in React
 
-> **Nested sub-skill.** This file lives at `plugin/skills/formio-react/formio-react-form/SKILL.md` and is **loaded by path** from `formio-react`'s embed branch. Its `name` frontmatter exists so recursive-scan clients classify it correctly; it is not a separately-registered top-level skill, so do not invoke it by frontmatter name.
+> **Nested sub-skill.** This file lives at `formio-react-form/SKILL.md` inside the `formio-react` skill and is **loaded by path** from `formio-react`'s embed branch. Its `name` frontmatter exists so recursive-scan clients classify it correctly; it is not a separately-registered top-level skill, so do not invoke it by frontmatter name.
 
 Getting a form onto a React page and controlling it from React. One API does the mounting:
 

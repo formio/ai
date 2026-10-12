@@ -25,15 +25,15 @@ End-to-end walk-through of `../SKILL.md`'s flow: the planner's input, the Phase 
 ## Scaffolding Plan — Task Manager
 
 ### Target workspace
-- Mode: new workspace `ng new task-manager`
+- Workspace: `/Users/me/code/task-manager` (existing; `FormioAppConfig` not yet wired — this plan wires it)
 - FormioAppConfig.appUrl: https://taskmanager.form.io
 - UI framework: Bootstrap 5
 
 ### Files to create / modify
 
   src/app/
-    app-module.ts                                       NEW
-    app-routing-module.ts                               NEW
+    app-module.ts                                       MODIFY
+    app-routing-module.ts                               MODIFY
     config.ts                                           NEW
     home/home.{ts,html,scss}                            NEW  (legacy naming: home/home.component.*)
     auth/auth.module.ts                                 NEW

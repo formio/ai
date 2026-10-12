@@ -1,12 +1,12 @@
 ---
 name: formio-angular-form
 description: >-
-  Embed a Form.io form in an Angular application with `@formio/angular`'s `<formio>` component — mounting, the event surface, the live `Webform` instance, change detection under zone.js and zoneless, project URLs, styling, the server-rendering limit, and when to drop to the renderer directly. Reached by handoff from `formio-angular`'s embed branch. Use when the user says "embed a Form.io form in Angular", "render a form in my Angular app", "add a `<formio>` component to this page", or "control an embedded Form.io form from Angular". Not for: framework-agnostic embedding and every field-behaviour question — conditionals, calculated values, validation, cascading selects (see `formio-form`); resource CRUD screens (see `formio-angular-resources`); creating a form that does not exist yet (see `formio-form-builder`); the raw SDK reference (see `formio-sdk`).
+  Embed a Form.io form in an Angular application with `@formio/angular`'s `<formio>` component — mounting, the event surface, the live `Webform` instance, change detection under zone.js and zoneless, project URLs, styling, the server-rendering limit, and when to drop to the renderer directly. Reached by handoff from `formio-angular`'s embed branch. Use when the user says "embed a Form.io form in Angular", "render a form in my Angular app", "add a `<formio>` component to this page", or "control an embedded Form.io form from Angular". Not for: framework-agnostic embedding and every field-behaviour question — conditionals, calculated values, validation, cascading selects (see `formio-form`); resource CRUD screens (see `formio-angular`'s application branch, which loads `formio-angular-resources`); creating a form that does not exist yet (see `formio-form-builder`); the raw SDK reference (see `formio-sdk`).
 ---
 
 # Embedding a Form.io form in Angular
 
-> **Nested sub-skill.** `plugin/skills/formio-angular/formio-angular-form/SKILL.md` sits inside the `formio-angular` skill folder, beside `formio-angular-resources`. The `name: formio-angular-form` frontmatter is there so recursive-scan clients classify the file; it is not a separately-registered top-level skill. The `formio-angular` parent reaches this document the same way it reaches `SETUP.md` and `AUTH.md` — it is **loaded by path**. Never invoke it by frontmatter name; open the file.
+> **Nested sub-skill.** `formio-angular-form/SKILL.md` sits inside the `formio-angular` skill folder, beside `formio-angular-resources`. The `name: formio-angular-form` frontmatter is there so recursive-scan clients classify the file; it is not a separately-registered top-level skill. The `formio-angular` parent reaches this document the same way it reaches `SETUP.md` and `AUTH.md` — it is **loaded by path**. Never invoke it by frontmatter name; open the file.
 
 ## One component
 

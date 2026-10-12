@@ -1,7 +1,7 @@
 ---
 name: formio-mcp-setup
 description: >-
-  Connects the Form.io MCP server (`@formio/mcp`) to whatever coding agent is running, so the Form.io skills have tools to call. Use when a Form.io skill's preflight finds the MCP tools missing, when Form.io tool calls fail because no Form.io tools are available, or when the user asks to install, connect, configure, or fix the Form.io MCP server. Also use when the user has installed the Form.io skills on their own but nothing has wired the server yet. Writes the MCP configuration for the client it is running in — Claude Code, Cursor, VS Code, or Codex — behind an approval gate, falling back to all four when the host cannot be established, then asks the server which Form.io project this directory resolves to and captures only whichever URL it reports missing, so the first tool call works, and tells the user how to reload. Not for: authenticating to Form.io (see `formio-auth`); building anything with Form.io — return to the skill that sent you here once the server is connected.
+  Connects the Form.io MCP server (`@formio/mcp`) to whatever coding agent is running, so the Form.io skills have tools to call. Use when a Form.io skill's preflight finds the MCP tools missing, when Form.io tool calls fail because no Form.io tools are available, or when the user asks to install, connect, configure, or fix the Form.io MCP server. Also use when the user has installed the Form.io skills on their own but nothing has wired the server yet. Writes the MCP configuration for the client it is running in — Claude Code, Cursor, VS Code, or Codex — behind an approval gate, then asks the server which Form.io project this directory resolves to and captures only whichever URL it reports missing, and tells the user how to reload. Not for: logging in to Form.io — the server opens that in the browser on the first tool call; an application's end-user auth (see `formio-auth`); building anything with Form.io — return to the skill that sent you here once the server is connected.
 ---
 
 # Connect the Form.io MCP server
@@ -14,6 +14,7 @@ Your job here is to write that configuration, get it approved, and hand control 
 
 - **Not** collecting an API key. Nothing you write into a client configuration file contains a URL, a key, or any other secret.
 - **Not** continuing the user's original request. Configuration only takes effect after a reload, so this skill ends by asking them to reload and ask again.
+- **Not** logging the user in to Form.io. The server opens the Form.io login in the browser on the first tool call that needs it and caches the token, so there is no login step to run here. `formio-auth` is about how an application's own users sign in, not about this.
 
 You **are** offering to capture which Form.io project to use — see Step 4. That is one errand for the user rather than two, and it means the first Form.io tool call after the reload works instead of failing with "no project configured". It is an offer, never a requirement.
 

@@ -12,7 +12,7 @@ Emit the plan as a single fenced markdown block. Use this exact template — ter
 ## Scaffolding Plan — <App Name>
 
 ### Target workspace
-- Mode: <new workspace `ng new <app-name>` | existing workspace at `<path>`>
+- Workspace: `<path>` (existing; `FormioAppConfig` <wired | not yet wired — this plan wires it>)
 - FormioAppConfig.appUrl: <URL or placeholder>
 - UI framework: <Bootstrap 5 | Tailwind | Angular Material | existing design system | unstyled>
 - Page shell: <VERIFIED — `src/app/app.html` wraps `<router-outlet>` in `<page-layout element + classes>` | MISSING — will add per AUTH.md's page layout contract>  (resource templates add NO page-level wrapper; the shell is the only thing that pads the library-rendered create / edit / delete / index / login / register routes)
@@ -24,9 +24,9 @@ Emit the plan as a single fenced markdown block. Use this exact template — ter
     app.html (or app.component.html)                    MODIFY  (nav link per resource; verify the shell page-layout wrapper)
     app-module.ts                                       MODIFY  (adds imports)
     app-routing-module.ts                               NEW or MODIFY  (NEW only if the workspace has none; AUTH already added the `/auth` route)
-    config.ts                                           VERIFY  (FormioAppConfig only — the parent CONFIG phase owns this file)
+    config.ts                                           NEW or VERIFY  (FormioAppConfig only — NEW when the workspace is not yet wired; VERIFY when the parent CONFIG phase already wrote it)
     home/home.{ts,html,scss}                            NEW     (legacy naming: home/home.component.*)
-    auth/auth.module.ts                                 VERIFY  (routes only; lazy-loaded via /auth — the parent AUTH phase owns this file)
+    auth/auth.module.ts                                 NEW or VERIFY  (routes only; lazy-loaded via /auth — NEW when the workspace is not yet wired; VERIFY when the parent AUTH phase already wrote it)
     <resource>/<resource>.module.ts                     NEW     (one per browsable resource)
     <resource>/resource.component.{ts,html,scss}        NEW     (designed nav — tabs / breadcrumb / sidebar)
     <resource>/view/view.component.{ts,html,scss}       NEW     (designed view — cards / stats / field layout)

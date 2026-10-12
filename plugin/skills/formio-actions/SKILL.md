@@ -196,10 +196,13 @@ The `value` field can be omitted for operators that don't need it (`isEmpty`, `i
 
 ### User registration with role assignment
 
-A registration form typically needs two actions:
+A registration form writes the new user into the project's **user resource** — the collection a Login action searches (its `settings.resources`). It needs:
 
-1. **Save** (built-in, usually already present) — persists the user submission
-2. **Role assignment** — assigns the "Authenticated" role to the new user
+1. **Save Submission pointed at the user resource.** `form_create` already gave the form a Save Submission action with empty `settings`, which stores submissions on the registration form itself, where no Login action finds them. Update that action rather than adding a second one (`action_list` to find it, then `action_update`): set `settings.resource` to the user resource's `_id`, and `settings.fields` to map each user-resource key to the registration form's key — at least `email` and `password`. The shape is [`template-json.md`](../formio-resource-planner/references/template-json.md) → "Save Submission (on a register form — writes into `user` resource)"; over the API, `settings.resource` is the resource's `_id`, not its machine name.
+2. **Role assignment** — assigns the "Authenticated" role to the new user. Skip it when the user resource already carries a Role Assignment with `association: "new"` (Form.io's default `user` resource does); a second one is redundant.
+3. **Login** (optional) — signs the user in on registration: `settings.resources` holds the user resource's `_id`, with the same `username` / `password` keys as the form.
+
+If the project has no user resource, this is not a one-form change: route to `formio-resource-planner`, which owns the user resource, the register form, and its actions.
 
 ```json
 {
@@ -219,7 +222,7 @@ A registration form typically needs two actions:
 
 ### Login form
 
-A login form needs only the login action — no save action (login doesn't create a submission).
+A login form needs only the login action. `form_create` gives every new form a Save action, and on a login form that Save runs first and stores each login attempt as a submission on the login form — so find it with `action_list` and remove it with `action_delete` after confirming with the user. Form.io's own login form carries no Save action.
 
 ```json
 {

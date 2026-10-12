@@ -1,0 +1,196 @@
+{
+  "skill_name": "skill-routing",
+  "evals": [
+    {
+      "id": "build-generic",
+      "prompt": "Build me an app to track maintenance requests for our buildings.",
+      "expected_skill": "formio-application",
+      "context": "An empty project directory. No template.md or template.json exists anywhere.",
+      "must_not": ["formio-form-builder", "formio-resource-planner"]
+    },
+    {
+      "id": "build-archetype",
+      "prompt": "I need a help desk.",
+      "expected_skill": "formio-application",
+      "context": "An empty project directory. No template.md or template.json exists anywhere."
+    },
+    {
+      "id": "build-react-no-plan",
+      "prompt": "Build me a CRM in React.",
+      "expected_skill": "formio-application",
+      "context": "An empty project directory. No template.md or template.json exists anywhere.",
+      "must_not": ["formio-react"]
+    },
+    {
+      "id": "build-angular-no-plan",
+      "prompt": "Create an inventory tracker using Angular.",
+      "expected_skill": "formio-application",
+      "context": "An empty project directory. No template.md or template.json exists anywhere.",
+      "must_not": ["formio-angular"]
+    },
+    {
+      "id": "build-react-use-react",
+      "prompt": "Make me a volunteer scheduling app \u2014 use React for the front end.",
+      "expected_skill": "formio-application",
+      "context": "An empty project directory. No template.md or template.json exists anywhere.",
+      "must_not": ["formio-react"]
+    },
+    {
+      "id": "angular-planned",
+      "prompt": "Build the Angular front-end for this Form.io project.",
+      "expected_skill": "formio-angular",
+      "context": "A template.md and template.json were approved and imported into the user's Form.io project earlier in this conversation. No front-end workspace exists yet.",
+      "must_not": ["formio-application"]
+    },
+    {
+      "id": "react-planned",
+      "prompt": "Now generate the React app for the project we just imported.",
+      "expected_skill": "formio-react",
+      "context": "A template.md and template.json were approved and imported into the user's Form.io project earlier in this conversation. No front-end workspace exists yet.",
+      "must_not": ["formio-application"]
+    },
+    {
+      "id": "extend-generic",
+      "prompt": "Also track which technician handled each request.",
+      "expected_skill": "formio-application",
+      "context": "An existing Angular workspace (angular.json, @angular/core) already wired to Form.io with FormioAppConfig.",
+      "must_not": ["formio-angular"]
+    },
+    {
+      "id": "extend-react-explicit",
+      "prompt": "Add a React route with CRUD screens for a new Vendors resource.",
+      "expected_skill": "formio-react",
+      "context": "An existing Vite + React Router application (react, react-router in package.json) already wired to Form.io."
+    },
+    {
+      "id": "extend-angular-explicit",
+      "prompt": "Add an Angular module for managing Vendors.",
+      "expected_skill": "formio-angular",
+      "context": "An existing Angular workspace (angular.json, @angular/core) already wired to Form.io with FormioAppConfig."
+    },
+    {
+      "id": "embed-generic",
+      "prompt": "Embed our contact form on my marketing site.",
+      "expected_skill": "formio-form",
+      "must_not": ["formio-application", "formio-form-builder"]
+    },
+    {
+      "id": "embed-react",
+      "prompt": "Render the Form.io intake form inside my React app's settings page.",
+      "expected_skill": "formio-react",
+      "context": "An existing Vite + React Router application (react, react-router in package.json) already wired to Form.io.",
+      "must_not": ["formio-form"]
+    },
+    {
+      "id": "embed-angular",
+      "prompt": "Show the Form.io feedback form in one of my Angular components.",
+      "expected_skill": "formio-angular",
+      "context": "An existing Angular workspace (angular.json, @angular/core) already wired to Form.io with FormioAppConfig.",
+      "must_not": ["formio-form"]
+    },
+    {
+      "id": "form-build",
+      "prompt": "Build me a form to collect customer feedback.",
+      "expected_skill": "formio-form-builder",
+      "must_not": ["formio-application"]
+    },
+    {
+      "id": "form-survey",
+      "prompt": "Create a survey for event attendees.",
+      "expected_skill": "formio-form-builder",
+      "must_not": ["formio-application"]
+    },
+    {
+      "id": "form-edit",
+      "prompt": "Add a phone field to my registration form and make it required.",
+      "expected_skill": "formio-form-builder",
+      "must_not": ["formio-schema"]
+    },
+    {
+      "id": "plan-only",
+      "prompt": "Plan the data model for a school management system \u2014 just the resources and roles, don't build anything.",
+      "expected_skill": "formio-resource-planner",
+      "must_not": ["formio-application"]
+    },
+    {
+      "id": "api-endpoint",
+      "prompt": "What's the REST endpoint to list submissions for a form, and which query parameters does it take?",
+      "expected_skill": "formio-api"
+    },
+    {
+      "id": "api-register-curl",
+      "prompt": "How do I call the user registration endpoint with curl?",
+      "expected_skill": "formio-api",
+      "must_not": ["formio-auth"]
+    },
+    {
+      "id": "sdk-static",
+      "prompt": "How do I call Formio.setProjectUrl and then load a form with new Formio(...)?",
+      "expected_skill": "formio-sdk",
+      "must_not": ["formio-api"]
+    },
+    {
+      "id": "sdk-utils",
+      "prompt": "Use Utils.eachComponent to find every required field in a form definition.",
+      "expected_skill": "formio-sdk"
+    },
+    {
+      "id": "schema-component",
+      "prompt": "What does the JSON for a Form.io datagrid component look like?",
+      "expected_skill": "formio-schema"
+    },
+    {
+      "id": "schema-submission",
+      "prompt": "Explain the metadata and access fields on a Form.io submission object.",
+      "expected_skill": "formio-schema"
+    },
+    {
+      "id": "actions-email",
+      "prompt": "Send an email to the manager whenever someone submits the leave request form.",
+      "expected_skill": "formio-actions"
+    },
+    {
+      "id": "actions-webhook",
+      "prompt": "Add a webhook action that posts each submission to our Slack relay service.",
+      "expected_skill": "formio-actions"
+    },
+    {
+      "id": "auth-saml",
+      "prompt": "Set up SAML single sign-on with Okta for our Form.io project.",
+      "expected_skill": "formio-auth"
+    },
+    {
+      "id": "auth-rbac",
+      "prompt": "Configure roles so managers can see every submission but staff only see their own.",
+      "expected_skill": "formio-auth",
+      "also_accept": ["formio-resource-planner"]
+    },
+    {
+      "id": "mcp-connect",
+      "prompt": "Connect the Form.io MCP server to Claude Code.",
+      "expected_skill": "formio-mcp-setup"
+    },
+    {
+      "id": "mcp-missing",
+      "prompt": "The Form.io tools aren't available in this session \u2014 set them up.",
+      "expected_skill": "formio-mcp-setup"
+    },
+    {
+      "id": "mcp-login",
+      "prompt": "How do I log in to Form.io so the Form.io tools work?",
+      "expected_skill": "formio-mcp-setup",
+      "also_accept": ["none"],
+      "must_not": ["formio-auth"]
+    },
+    {
+      "id": "unrelated-geo",
+      "prompt": "What's the capital of France?",
+      "expected_skill": "none"
+    },
+    {
+      "id": "unrelated-code",
+      "prompt": "Refactor this Python function to use a list comprehension.",
+      "expected_skill": "none"
+    }
+  ]
+}
