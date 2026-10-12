@@ -4,6 +4,7 @@ import { browserlessReason, currentBrowserEnvironment } from './browser-availabi
 import { openInBrowser } from './browser-launch.js';
 import { ResolvedFormioConfig } from './config.js';
 import { formioRawFetch } from './formio-client.js';
+import { acceptsLoginHost } from './login-host.js';
 import { ToolError } from './tool-errors.js';
 
 export interface AuthenticateOptions {
@@ -277,6 +278,23 @@ export async function authenticate(
   assertBrowserAvailable(config);
 
   const app = express();
+  // Before any route: which Host headers are answered depends on where the server is
+  // bound (see login-host.ts). Bound to every interface, none is refused here, and the
+  // per-login value on /callback is what ties a post to this login.
+  app.use((req, res, next) => {
+    if (
+      acceptsLoginHost({
+        host: req.headers.host,
+        port: req.socket.localPort ?? 0,
+        configuredHost: config.authHost,
+      })
+    ) {
+      next();
+      return;
+    }
+    process.stderr.write('Login server refused a request addressed to another host\n');
+    res.status(403).send('This login server answers only requests addressed to it');
+  });
   app.use(express.json());
   const state = newLoginState();
 

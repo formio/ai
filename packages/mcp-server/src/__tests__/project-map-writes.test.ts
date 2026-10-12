@@ -4,7 +4,12 @@ import fs from 'fs';
 import os from 'os';
 import path from 'path';
 import { pathToFileURL } from 'url';
-import { readProjectEntry, removeProjectEntry, writeProjectEntry } from '../project-map.js';
+import {
+  DEFAULT_MAP_LOCK_TIMING,
+  readProjectEntry,
+  removeProjectEntry,
+  writeProjectEntry,
+} from '../project-map.js';
 import { ToolError } from '../tool-errors.js';
 
 const packageRoot = path.resolve(__dirname, '../..');
@@ -159,6 +164,198 @@ describe('project map writes', () => {
       );
     }, 20_000);
   });
+
+  describe('lock ownership', () => {
+    const errno = (code: string) => Object.assign(new Error(`${code}: simulated`), { code });
+    const staleLock = (content: string) => {
+      fs.writeFileSync(lockFile(), content);
+      const old = new Date(Date.now() - 60_000);
+      fs.utimesSync(lockFile(), old, old);
+    };
+
+    it('writes an owner token of the process id and a unique value into the lock', () => {
+      const original = fs.writeFileSync;
+      let held = '';
+      vi.spyOn(fs, 'writeFileSync').mockImplementation((...args) => {
+        if (String(args[0]).endsWith('.tmp')) {
+          held = fs.readFileSync(lockFile(), 'utf-8');
+        }
+        return original(...(args as Parameters<typeof fs.writeFileSync>));
+      });
+
+      write('/work/a', 'https://a.form.io');
+
+      expect(held).toMatch(new RegExp(`^${process.pid} [0-9a-f-]{36}$`));
+    });
+
+    it('a holder that outlived the stale limit leaves a lock it no longer owns', () => {
+      const original = fs.writeFileSync;
+      vi.spyOn(fs, 'writeFileSync').mockImplementation((...args) => {
+        const result = original(...(args as Parameters<typeof fs.writeFileSync>));
+        // While this write runs, its lock is judged stale and another writer takes it.
+        if (String(args[0]).endsWith('.tmp')) {
+          original(lockFile(), 'another-owner');
+        }
+        return result;
+      });
+
+      write('/work/a', 'https://a.form.io');
+
+      expect(fs.readFileSync(lockFile(), 'utf-8')).toBe('another-owner');
+      expect(readProjectEntry('/work/a', cacheDir)?.env.FORMIO_PROJECT_URL).toBe(
+        'https://a.form.io'
+      );
+    });
+
+    it('breaks a stale lock by renaming it aside to a unique name, then removing it', () => {
+      staleLock('dead-holder');
+      const rename = vi.spyOn(fs, 'renameSync');
+
+      write('/work/a', 'https://a.form.io');
+
+      const aside = rename.mock.calls.find(([from]) => from === lockFile());
+      expect(aside).toBeDefined();
+      const target = String(aside?.[1]);
+      expect(target.startsWith(`${lockFile()}.`)).toBe(true);
+      expect(target.slice(lockFile().length)).toMatch(/^\.[0-9a-f-]{36}\.stale$/);
+      expect(leftovers()).toEqual([]);
+    });
+
+    it('waits when another writer broke the stale lock first', () => {
+      staleLock('dead-holder');
+      const original = fs.renameSync;
+      vi.spyOn(fs, 'renameSync').mockImplementation((from, to) => {
+        if (from === lockFile()) {
+          // The other breaker's rename lands first and it takes the lock for itself.
+          original(lockFile(), `${lockFile()}.other.stale`);
+          fs.rmSync(`${lockFile()}.other.stale`);
+          fs.writeFileSync(lockFile(), 'other-breaker');
+          throw errno('ENOENT');
+        }
+        return original(from, to);
+      });
+
+      expect(() => write('/work/a', 'https://a.form.io')).toThrow(lockFile());
+
+      expect(fs.readFileSync(lockFile(), 'utf-8')).toBe('other-breaker');
+      expect(readProjectEntry('/work/a', cacheDir)).toBeNull();
+    });
+
+    it('puts back a lock that another writer took between the stale check and the rename', () => {
+      staleLock('dead-holder');
+      const original = fs.renameSync;
+      let raced = false;
+      vi.spyOn(fs, 'renameSync').mockImplementation((from, to) => {
+        if (from === lockFile() && !raced) {
+          raced = true;
+          // The stale lock was broken and a live one taken just before this rename.
+          fs.rmSync(lockFile());
+          fs.writeFileSync(lockFile(), 'live-owner');
+        }
+        return original(from, to);
+      });
+
+      expect(() => write('/work/a', 'https://a.form.io')).toThrow(lockFile());
+
+      expect(fs.readFileSync(lockFile(), 'utf-8')).toBe('live-owner');
+      expect(readProjectEntry('/work/a', cacheDir)).toBeNull();
+      expect(leftovers()).toEqual(['projects.json.lock']);
+    });
+
+    it('treats EPERM on the exclusive create as a held lock and retries', () => {
+      const original = fs.openSync;
+      let refused = false;
+      vi.spyOn(fs, 'openSync').mockImplementation((...args) => {
+        if (args[0] === lockFile() && !refused) {
+          refused = true;
+          throw errno('EPERM');
+        }
+        return original(...(args as Parameters<typeof fs.openSync>));
+      });
+
+      write('/work/a', 'https://a.form.io');
+
+      expect(refused).toBe(true);
+      expect(readProjectEntry('/work/a', cacheDir)?.env.FORMIO_PROJECT_URL).toBe(
+        'https://a.form.io'
+      );
+    });
+  });
+
+  describe('timing', () => {
+    it('judges a lock stale after 3 s and gives up waiting after 5 s', () => {
+      expect(DEFAULT_MAP_LOCK_TIMING.staleMs).toBe(3_000);
+      expect(DEFAULT_MAP_LOCK_TIMING.timeoutMs).toBe(5_000);
+      expect(DEFAULT_MAP_LOCK_TIMING.staleMs).toBeLessThan(DEFAULT_MAP_LOCK_TIMING.timeoutMs);
+    });
+
+    it("clears a crashed holder's lock within a waiter's wait", () => {
+      // Taken just now by a process that then exited without releasing it.
+      fs.writeFileSync(lockFile(), '999999 00000000-0000-0000-0000-000000000000');
+      const started = Date.now();
+
+      writeProjectEntry({
+        cwd: '/work/a',
+        env: { FORMIO_PROJECT_URL: 'https://a.form.io' },
+        cacheDir,
+      });
+
+      expect(Date.now() - started).toBeLessThan(DEFAULT_MAP_LOCK_TIMING.timeoutMs);
+      expect(readProjectEntry('/work/a', cacheDir)?.env.FORMIO_PROJECT_URL).toBe(
+        'https://a.form.io'
+      );
+      expect(leftovers()).toEqual([]);
+    }, 10_000);
+  });
+
+  // Several processes meet one stale lock at the same instant. Only one of them breaks
+  // it; the rest wait their turn, and every entry each of them writes is kept.
+  it('keeps every entry when several processes meet one stale lock at once', async () => {
+    fs.writeFileSync(lockFile(), 'dead-holder');
+    const old = new Date(Date.now() - 60_000);
+    fs.utimesSync(lockFile(), old, old);
+    const writers = 4;
+    const perWriter = 10;
+    const script = path.join(cacheDir, 'breaker.mts');
+    fs.writeFileSync(
+      script,
+      `import { writeProjectEntry } from ${JSON.stringify(projectMapModule)};
+       const [cacheDir, id, count, startAt] = process.argv.slice(2);
+       while (Date.now() < Number(startAt)) {}
+       for (let i = 0; i < Number(count); i += 1) {
+         writeProjectEntry({
+           cwd: '/work/b' + id + '/d' + i,
+           env: { FORMIO_PROJECT_URL: 'https://b' + id + '-' + i + '.form.io' },
+           cacheDir,
+         });
+       }`
+    );
+    const startAt = Date.now() + 3_000;
+    const runs = Array.from({ length: writers }, (_, id) => {
+      const child = spawn(process.execPath, [
+        tsxEntry,
+        script,
+        cacheDir,
+        String(id),
+        String(perWriter),
+        String(startAt),
+      ]);
+      const stderr: string[] = [];
+      child.stderr.on('data', (chunk) => stderr.push(String(chunk)));
+      return new Promise<{ code: number | null; stderr: string }>((resolve) =>
+        child.on('exit', (code) => resolve({ code, stderr: stderr.join('') }))
+      );
+    });
+
+    const results = await Promise.all(runs);
+
+    expect(results).toEqual(results.map(() => ({ code: 0, stderr: '' })));
+    const map = JSON.parse(fs.readFileSync(mapFile(), 'utf-8')) as Record<string, unknown>;
+    expect(Object.keys(map)).toHaveLength(writers * perWriter);
+    expect(fs.readdirSync(cacheDir).filter((name) => name.startsWith('projects.json.'))).toEqual(
+      []
+    );
+  }, 60_000);
 
   // Separate processes, each writing many directories, released at the same instant.
   // An unserialized read-modify-write loses entries here; the lock keeps every one.

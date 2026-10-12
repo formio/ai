@@ -3,7 +3,7 @@
 
 ### Red
 
-- [x] 1.1 Write failing tests: a write goes through a temp file and rename with mode 0600; two concurrent writers (separate processes via child_process, or interleaved calls with the lock held) both keep their entries; a stale lock (>10 s) is replaced; an unobtainable lock fails with CONFIG_UNREADABLE naming the lock file; the lock is removed after success and failure
+- [x] 1.1 Write failing tests: a write goes through a temp file and rename with mode 0600; two concurrent writers (separate processes via child_process, or interleaved calls with the lock held) both keep their entries; a stale lock (>3 s) is replaced; an unobtainable lock fails with CONFIG_UNREADABLE naming the lock file; the lock is removed after success and failure
 
 ### Green
 
@@ -102,3 +102,18 @@
 ### Refactor
 
 - [x] 7.3 Review implementation and refactor as needed
+
+## 8. Review follow-ups
+<!-- depends_on: 1, 2, 4, 6 -->
+
+### Red
+
+- [x] 8.1 Write failing tests: a mapping above a directory holding `.git` does not apply inside it; two directories differing only by case on a case-sensitive volume keep separate entries; a stored directory that no longer exists matches case-insensitively on darwin/win32; restating an inherited pair is unchanged and never copies `forced`; the lock holds an owner token, a holder releases only its own lock, a stale lock is broken by a unique rename and only one breaker proceeds; stale 3 s inside a 5 s wait; transient rename and lock-create errors are retried; reads reuse the parsed map until its stat changes; a root LICENSE change needs a server release; the login server bound to loopback refuses a foreign `Host` on both routes, bound to every interface skips the check (the per-login value still required), and bound to a specific host accepts it at any port; `ProjectMapUnreadableError` takes one options object
+
+### Green
+
+- [x] 8.2 Implement the repository boundary, exact real-path matching, lock ownership and rename-to-break, the timings, transient-error retries, the read cache, the inherited unchanged outcome, the release-coverage entry, and the Host check
+
+### Refactor
+
+- [x] 8.3 Review implementation and refactor as needed

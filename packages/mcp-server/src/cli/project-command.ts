@@ -375,7 +375,7 @@ function runSet(flags: Record<string, string>, context: CommandContext): Project
       projectUrl: mapped.status === 'usable' ? mapped.entry.env.FORMIO_PROJECT_URL : undefined,
       baseUrl: mapped.status === 'usable' ? mapped.entry.env.FORMIO_BASE_URL : undefined,
       forced: mapped.status === 'usable' ? mapped.entry.forced : undefined,
-      inherited: mapped.status === 'usable' && mapped.inherited,
+      inheritedFrom: mapped.status === 'usable' && mapped.inherited ? mapped.dir : undefined,
     },
     elsewhere: {
       // Where the project lives when this mapping has none. A file too broken to read
@@ -562,7 +562,9 @@ function runSet(flags: Record<string, string>, context: CommandContext): Project
 
   const block = [
     plan.outcome === 'unchanged'
-      ? `No change for ${cwd}`
+      ? plan.inheritedFrom
+        ? `No change for ${cwd}: the pair is inherited from the mapping for ${plan.inheritedFrom}`
+        : `No change for ${cwd}`
       : // A record that does not take effect is described as RECORDED, never as set.
         shadowedByCommitted
         ? `Recorded for ${cwd}`

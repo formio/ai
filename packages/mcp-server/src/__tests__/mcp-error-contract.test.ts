@@ -109,8 +109,24 @@ describe('toMcpError maps the resolution errors', () => {
   });
 
   it('maps ProjectMapUnreadableError to CONFIG_UNREADABLE', () => {
-    const error = new ProjectMapUnreadableError('/home/.formio/projects.json', new Error('bad'));
+    const error = new ProjectMapUnreadableError({
+      filePath: '/home/.formio/projects.json',
+      cause: new Error('bad'),
+    });
     expect(structured(error)).toEqual({ code: 'CONFIG_UNREADABLE' });
+  });
+
+  it('builds ProjectMapUnreadableError from one options object', () => {
+    const error = new ProjectMapUnreadableError({
+      filePath: '/home/.formio/projects.json.lock',
+      cause: new Error('held'),
+      cwd: '/workspace/x',
+      scope: 'lock',
+    });
+    expect(error.filePath).toBe('/home/.formio/projects.json.lock');
+    expect(error.reason).toBe('held');
+    expect(error.message).toContain("Cannot take the Form.io project map's lock file");
+    expect(error.message).toContain('--cwd /workspace/x');
   });
 
   it('maps CommittedConfigUnusableError to CONFIG_UNREADABLE', () => {

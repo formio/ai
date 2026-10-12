@@ -39,3 +39,33 @@ The login page SHALL embed the login-form URL in its script as a JSON string lit
 
 - **WHEN** the login-form URL contains `'`
 - **THEN** the page's script passes the whole URL, unchanged, to `Formio.createForm`
+
+### Requirement: The login server answers requests by the host it is bound to
+
+Which requests the local login server answers on `GET /` and `POST /callback` SHALL depend on the host it is bound to:
+
+- Bound to loopback — `FORMIO_AUTH_HOST` unset (the default `127.0.0.1`) or naming `localhost`, `127.0.0.1` or `::1` — it SHALL answer only requests whose `Host` header names `localhost`, `127.0.0.1` or `[::1]` together with the port the server is listening on.
+- Bound to every interface — `FORMIO_AUTH_HOST` `0.0.0.0` or `::` — the user has opted into access from another host, and the server SHALL NOT check the `Host` header.
+- Bound to a specific other host — it SHALL answer requests whose `Host` header names that host or a loopback name, with any port.
+
+A request refused by these rules SHALL be answered `403` and SHALL NOT end the login. In every case `/callback` SHALL still require the per-login value.
+
+#### Scenario: Loopback binding and another host
+
+- **WHEN** the server is bound to loopback and a request reaches `GET /` or `POST /callback` with a `Host` header naming another host, or a loopback name at another port
+- **THEN** it is answered `403`, no token is taken, and the login keeps waiting
+
+#### Scenario: The login page addressed as localhost
+
+- **WHEN** the server is bound to loopback, the browser loads the login page at `http://localhost:<port>/`, and the page posts its token
+- **THEN** the page is served and the login completes with that token
+
+#### Scenario: A forwarded port while bound to every interface
+
+- **WHEN** `FORMIO_AUTH_HOST` is `0.0.0.0` and requests arrive with the `Host` header `foo-43117.app.github.dev:443`
+- **THEN** the login page is served, a `/callback` post carrying the per-login value completes the login, and a post without the value is answered `403`
+
+#### Scenario: A specific host with a remapped port
+
+- **WHEN** `FORMIO_AUTH_HOST` names `login.example.test` and a request is addressed to `login.example.test` at a port other than the one the server listens on
+- **THEN** it is answered as a request addressed to the server

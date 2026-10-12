@@ -386,14 +386,14 @@ function validateWinningRecord({
     try {
       return normalizeHttpUrl(value, key);
     } catch (error) {
-      throw new ProjectMapUnreadableError(
-        projectMapPath(cacheDir),
-        new Error(
+      throw new ProjectMapUnreadableError({
+        filePath: projectMapPath(cacheDir),
+        cause: new Error(
           `the entry for ${mappedDir} holds an unusable ${key}: ${error instanceof Error ? error.message : String(error)}`
         ),
-        mappedDir,
-        'entry'
-      );
+        cwd: mappedDir,
+        scope: 'entry',
+      });
     }
   };
   const projectUrl =
@@ -462,18 +462,18 @@ function validateWinningRecord({
     );
   }
   if (source === 'mapping') {
-    throw new ProjectMapUnreadableError(
-      projectMapPath(cacheDir),
-      new Error(
+    throw new ProjectMapUnreadableError({
+      filePath: projectMapPath(cacheDir),
+      cause: new Error(
         validity === 'not-a-hosted-project'
           ? `the entry for ${mappedDir} records ${projectUrl} as FORMIO_PROJECT_URL, which is not a Form.io project URL. ${NOT_A_HOSTED_PROJECT}`
           : validity === 'not-a-project-url'
             ? `the entry for ${mappedDir} records ${projectUrl} as FORMIO_PROJECT_URL, which is ${API_ROOT_NOT_A_PROJECT}`
             : `the entry for ${mappedDir} records ${projectUrl} as both FORMIO_PROJECT_URL and FORMIO_BASE_URL. ${ENTERPRISE_ONLY}`
       ),
-      mappedDir,
-      'entry'
-    );
+      cwd: mappedDir,
+      scope: 'entry',
+    });
   }
   // Names every variable the record loses, not just the offending one: the whole
   // record is discarded, so a FORMIO_BASE_URL set beside a rejected project URL is

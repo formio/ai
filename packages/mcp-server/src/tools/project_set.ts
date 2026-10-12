@@ -193,7 +193,7 @@ export function registerProjectSetTool(server: McpServer, options: ProjectSetOpt
           // re-stating the project it already resolved is an ordinary call, and the
           // plan keeps the override only while the pair itself is unchanged.
           forced: mapped.status === 'usable' ? mapped.entry.forced : undefined,
-          inherited: mapped.status === 'usable' && mapped.inherited,
+          inheritedFrom: mapped.status === 'usable' && mapped.inherited ? mapped.dir : undefined,
         },
         // Where the project lives when this mapping has none.
         elsewhere: {
@@ -395,7 +395,9 @@ export function registerProjectSetTool(server: McpServer, options: ProjectSetOpt
       const message =
         [...walkNotes, ''].join('\n').trimStart() +
         (plan.outcome === 'unchanged'
-          ? `${verb('Active project is already', 'Mapping already records')} ${written.projectUrl} on ${written.baseUrl}, persisted for ${entryCwd}; no change`
+          ? plan.inheritedFrom
+            ? `${verb('Active project is already', 'Mapping already records')} ${written.projectUrl} on ${written.baseUrl} for ${entryCwd}, inherited from the mapping for ${plan.inheritedFrom}; no change`
+            : `${verb('Active project is already', 'Mapping already records')} ${written.projectUrl} on ${written.baseUrl}, persisted for ${entryCwd}; no change`
           : plan.setAProject
             ? plan.previousProjectUrl
               ? `${verb('Active project set to', 'Recorded')} ${written.projectUrl} on ${written.baseUrl} (was ${plan.previousProjectUrl}; persisted for ${entryCwd})`

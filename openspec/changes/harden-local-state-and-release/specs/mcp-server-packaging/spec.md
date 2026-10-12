@@ -9,6 +9,11 @@ The `@formio/mcp` tarball SHALL include the repository's MIT LICENSE text. Its `
 - **WHEN** the package is packed
 - **THEN** the tarball contains `LICENSE`
 
+#### Scenario: A LICENSE change is released
+
+- **WHEN** a branch changes the repository-root `LICENSE` and no pending changeset releases `@formio/mcp`
+- **THEN** `pnpm check:releases` fails naming `@formio/mcp`
+
 #### Scenario: No stale modules
 
 - **WHEN** `dist` holds a module whose source was deleted and the package is built and packed

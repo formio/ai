@@ -234,12 +234,14 @@ describe('a change to published content has a release', () => {
   }, 30_000);
 
   // The other direction: what is packed still needs a release. README.md renders
-  // on npmjs.com and is copied into the .mcpb bundle, and package.json carries
-  // the version every pin is stamped from.
+  // on npmjs.com and is copied into the .mcpb bundle, package.json carries the
+  // version every pin is stamped from, and the repository-root LICENSE is copied
+  // into the package by `prepack` and listed in its `files`.
   it.each([
     'packages/mcp-server/src/auth.ts',
     'packages/mcp-server/README.md',
     'packages/mcp-server/package.json',
+    'LICENSE',
   ])(
     'still demands a release for %s',
     (file) => {

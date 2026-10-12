@@ -1,12 +1,12 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
 import {
   canonicalDir,
-  dirMatchKey,
   findProjectEntry,
   readProjectEntry,
+  readProjectEntryForWrite,
   removeProjectEntry,
   writeProjectEntry,
 } from '../project-map.js';
@@ -20,8 +20,8 @@ const entryFor = (projectUrl: string) => ({ env: { FORMIO_PROJECT_URL: projectUr
 
 // A mapping applies to its directory's descendants, and directories are compared by
 // canonical path: symlinks resolved and a Git-Bash `/c/...` path read as `C:\...` on
-// Windows. The canonical path keeps its true case — it is what is stored and shown —
-// and only the comparison key folds case, where the filesystem folds it.
+// Windows. The canonical path keeps its true case — it is what is stored, shown, and
+// compared — and case is folded only for a stored directory that no longer exists.
 describe('canonicalDir', () => {
   let tmp: string;
 
@@ -46,13 +46,6 @@ describe('canonicalDir', () => {
     expect(canonicalDir('/c/Users/Me/app', 'win32')).toBe('C:\\Users\\Me\\app');
     expect(canonicalDir('/c', 'win32')).toBe('C:\\');
     expect(canonicalDir('/c/Users/Me/app', 'linux')).toBe('/c/Users/Me/app');
-  });
-
-  it('folds case in the comparison key on darwin and win32 only', () => {
-    expect(dirMatchKey('/work/Repo/', 'darwin')).toBe('/work/repo');
-    expect(dirMatchKey('/c/Users/Me/app', 'win32')).toBe('c:\\users\\me\\app');
-    expect(dirMatchKey('C:\\Users\\Me\\app', 'win32')).toBe('c:\\users\\me\\app');
-    expect(dirMatchKey('/work/Repo', 'linux')).toBe('/work/Repo');
   });
 
   it('resolves a symbolic link to its target', () => {
@@ -237,6 +230,239 @@ describe('mapping lookup', () => {
   });
 });
 
+// The walk from a directory toward the root stops at the first directory, the start
+// included, that contains `.git` — the boundary the committed formio.json walk uses. A
+// mapping above a repository does not reach into it; without any `.git` the walk runs
+// to the filesystem root.
+describe('the repository boundary on the mapping walk', () => {
+  let cacheDir: string;
+  let tree: string;
+
+  beforeEach(() => {
+    cacheDir = fs.mkdtempSync(path.join(os.tmpdir(), 'formio-boundary-cache-'));
+    tree = fs.realpathSync.native(fs.mkdtempSync(path.join(os.tmpdir(), 'formio-boundary-tree-')));
+  });
+
+  afterEach(() => {
+    fs.rmSync(cacheDir, { recursive: true, force: true });
+    fs.rmSync(tree, { recursive: true, force: true });
+  });
+
+  const map = (dir: string, projectUrl: string) =>
+    writeProjectEntry({ cwd: dir, ...entryFor(projectUrl), cacheDir });
+
+  it('does not carry a mapping above a repository into it', () => {
+    const code = path.join(tree, 'code');
+    const otherRepo = path.join(code, 'other-repo');
+    fs.mkdirSync(path.join(otherRepo, '.git'), { recursive: true });
+    fs.mkdirSync(path.join(otherRepo, 'src'));
+    map(code, 'https://code.form.io');
+
+    expect(findProjectEntry({ cwd: otherRepo, cacheDir })).toBeNull();
+    expect(findProjectEntry({ cwd: path.join(otherRepo, 'src'), cacheDir })).toBeNull();
+    expect(() => resolveProject(otherRepo, {}, { cacheDir, onNote: () => {} })).toThrow(
+      'No Form.io project is configured'
+    );
+  });
+
+  it('gives a subdirectory the mapping of its repository root', () => {
+    const repo = path.join(tree, 'repo');
+    fs.mkdirSync(path.join(repo, '.git'), { recursive: true });
+    fs.mkdirSync(path.join(repo, 'apps', 'web'), { recursive: true });
+    map(repo, 'https://repo.form.io');
+
+    expect(findProjectEntry({ cwd: path.join(repo, 'apps', 'web'), cacheDir })?.dir).toBe(repo);
+  });
+
+  it('still prefers a nearer mapping inside the repository', () => {
+    const repo = path.join(tree, 'repo');
+    const apps = path.join(repo, 'apps');
+    fs.mkdirSync(path.join(repo, '.git'), { recursive: true });
+    fs.mkdirSync(path.join(apps, 'web'), { recursive: true });
+    map(tree, 'https://above.form.io');
+    map(repo, 'https://repo.form.io');
+    map(apps, 'https://apps.form.io');
+
+    expect(findProjectEntry({ cwd: path.join(apps, 'web'), cacheDir })?.dir).toBe(apps);
+  });
+
+  it('walks to the filesystem root when no directory holds .git', () => {
+    const nested = path.join(tree, 'plain', 'deeper');
+    fs.mkdirSync(nested, { recursive: true });
+    map(tree, 'https://tree.form.io');
+
+    expect(findProjectEntry({ cwd: nested, cacheDir })?.dir).toBe(tree);
+  });
+
+  it('applies the same boundary to what a writer reads', () => {
+    const code = path.join(tree, 'code');
+    const otherRepo = path.join(code, 'other-repo');
+    fs.mkdirSync(path.join(otherRepo, '.git'), { recursive: true });
+    map(code, 'https://code.form.io');
+
+    expect(readProjectEntryForWrite(otherRepo, cacheDir)).toEqual({ status: 'absent' });
+  });
+});
+
+// Directories compare by their real path, exactly: on a case-insensitive volume the real
+// path already carries the stored case, and on a case-sensitive one two names differing
+// only by case are two directories. Case is folded — on darwin and win32 only — just for
+// a stored key whose directory no longer exists, where no real path can be asked for.
+describe('case and the real path', () => {
+  let cacheDir: string;
+  const mapFile = () => path.join(cacheDir, 'projects.json');
+
+  beforeEach(() => {
+    cacheDir = fs.mkdtempSync(path.join(os.tmpdir(), 'formio-case-cache-'));
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+    fs.rmSync(cacheDir, { recursive: true, force: true });
+  });
+
+  // A case-sensitive volume on darwin: these directories exist, under exactly these names.
+  const caseSensitiveVolume = (existing: string[]) => {
+    const present = new Set(existing);
+    vi.spyOn(fs.realpathSync, 'native').mockImplementation(((target: fs.PathLike) => {
+      const asked = String(target);
+      if (present.has(asked)) {
+        return asked;
+      }
+      throw Object.assign(new Error(`ENOENT: no such file or directory, realpath '${asked}'`), {
+        code: 'ENOENT',
+      });
+    }) as typeof fs.realpathSync.native);
+  };
+
+  it('keeps two directories differing only by case apart on a case-sensitive volume', () => {
+    caseSensitiveVolume(['/', '/vol', '/vol/Foo', '/vol/foo']);
+
+    writeProjectEntry({
+      cwd: '/vol/Foo',
+      ...entryFor('https://upper.form.io'),
+      cacheDir,
+      platform: 'darwin',
+    });
+    writeProjectEntry({
+      cwd: '/vol/foo',
+      ...entryFor('https://lower.form.io'),
+      cacheDir,
+      platform: 'darwin',
+    });
+
+    expect(JSON.parse(fs.readFileSync(mapFile(), 'utf-8'))).toEqual({
+      '/vol/Foo': entryFor('https://upper.form.io'),
+      '/vol/foo': entryFor('https://lower.form.io'),
+    });
+    expect(findProjectEntry({ cwd: '/vol/Foo', cacheDir, platform: 'darwin' })?.dir).toBe(
+      '/vol/Foo'
+    );
+    expect(findProjectEntry({ cwd: '/vol/foo', cacheDir, platform: 'darwin' })?.dir).toBe(
+      '/vol/foo'
+    );
+  });
+
+  it('does not give an existing directory the mapping of its case twin', () => {
+    caseSensitiveVolume(['/', '/vol', '/vol/Foo', '/vol/foo']);
+    fs.writeFileSync(mapFile(), JSON.stringify({ '/vol/Foo': entryFor('https://upper.form.io') }));
+
+    expect(findProjectEntry({ cwd: '/vol/foo', cacheDir, platform: 'darwin' })).toBeNull();
+  });
+
+  it.each(['darwin', 'win32'] as const)(
+    'matches a stored key whose directory no longer exists case-insensitively on %s',
+    (platform) => {
+      caseSensitiveVolume(['/', '/vol', '/vol/foo']);
+      const stored = platform === 'win32' ? 'C:\\Gone\\Repo' : '/vol/FOO';
+      const asked = platform === 'win32' ? 'c:\\gone\\repo\\src' : '/vol/foo/src';
+      fs.writeFileSync(mapFile(), JSON.stringify({ [stored]: entryFor('https://gone.form.io') }));
+
+      expect(findProjectEntry({ cwd: asked, cacheDir, platform })?.dir).toBe(stored);
+    }
+  );
+
+  it('matches a stored key whose directory no longer exists exactly on linux', () => {
+    caseSensitiveVolume(['/', '/vol', '/vol/foo']);
+    fs.writeFileSync(mapFile(), JSON.stringify({ '/vol/FOO': entryFor('https://gone.form.io') }));
+
+    expect(findProjectEntry({ cwd: '/vol/foo/src', cacheDir, platform: 'linux' })).toBeNull();
+  });
+});
+
+// The parsed map and its comparison index are reused while the file is unchanged —
+// the same modification time, size and inode — and rebuilt when any of them changes.
+describe('the map read cache', () => {
+  let cacheDir: string;
+  const mapFile = () => path.join(cacheDir, 'projects.json');
+
+  beforeEach(() => {
+    cacheDir = fs.mkdtempSync(path.join(os.tmpdir(), 'formio-map-cache-'));
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+    fs.rmSync(cacheDir, { recursive: true, force: true });
+  });
+
+  // Probes of a stored key no lookup below asks about, so each one is the index's own.
+  const storedKeyProbes = (realpath: { mock: { calls: unknown[][] } }) =>
+    realpath.mock.calls.filter(([target]) => target === '/stored/a').length;
+  const mapReads = (read: { mock: { calls: unknown[][] } }) =>
+    read.mock.calls.filter(([target]) => target === mapFile()).length;
+
+  it('reuses the parsed map and index while the file is unchanged, and refreshes when it changes', () => {
+    fs.writeFileSync(
+      mapFile(),
+      JSON.stringify({
+        '/stored/a': entryFor('https://a.form.io'),
+        '/stored/b': entryFor('https://b.form.io'),
+      })
+    );
+    const read = vi.spyOn(fs, 'readFileSync');
+    const realpath = vi.spyOn(fs.realpathSync, 'native');
+
+    expect(findProjectEntry({ cwd: '/stored/a/x', cacheDir })?.dir).toBe('/stored/a');
+    expect(mapReads(read)).toBe(1);
+    const probesAfterFirst = storedKeyProbes(realpath);
+    expect(probesAfterFirst).toBeGreaterThan(0);
+    realpath.mockClear();
+
+    expect(findProjectEntry({ cwd: '/elsewhere/y', cacheDir })).toBeNull();
+    expect(findProjectEntry({ cwd: '/stored/b/z', cacheDir })?.dir).toBe('/stored/b');
+    expect(mapReads(read)).toBe(1);
+    expect(storedKeyProbes(realpath)).toBe(0);
+
+    fs.writeFileSync(
+      mapFile(),
+      JSON.stringify({
+        '/stored/a': entryFor('https://a.form.io'),
+        '/stored/c-with-a-longer-name': entryFor('https://c.form.io'),
+      })
+    );
+
+    expect(findProjectEntry({ cwd: '/stored/c-with-a-longer-name', cacheDir })?.dir).toBe(
+      '/stored/c-with-a-longer-name'
+    );
+    expect(findProjectEntry({ cwd: '/elsewhere/z', cacheDir })).toBeNull();
+    expect(mapReads(read)).toBe(2);
+    expect(storedKeyProbes(realpath)).toBeGreaterThan(0);
+  });
+
+  it('sees a write made through the map module at once', () => {
+    writeProjectEntry({ cwd: '/stored/a', ...entryFor('https://a.form.io'), cacheDir });
+    expect(findProjectEntry({ cwd: '/stored/a', cacheDir })?.entry).toEqual(
+      entryFor('https://a.form.io')
+    );
+
+    writeProjectEntry({ cwd: '/stored/a', ...entryFor('https://a2.form.io'), cacheDir });
+
+    expect(findProjectEntry({ cwd: '/stored/a', cacheDir })?.entry).toEqual(
+      entryFor('https://a2.form.io')
+    );
+  });
+});
+
 describe('resolution under a mapped ancestor', () => {
   let cacheDir: string;
   let repo: string;
@@ -344,13 +570,50 @@ describe('writers beneath a mapped ancestor', () => {
       unknown
     >;
 
-  it('`project set` records the subdirectory itself, even for the project its ancestor maps', () => {
+  it('`project set` restating the pair its ancestor maps changes nothing and names the ancestor', () => {
     run(['set', '--project-url', 'https://repo.form.io', '--cwd', repo]);
 
     const result = run(['set', '--project-url', 'https://repo.form.io', '--cwd', web]);
 
     expect(result.exitCode).toBe(0);
+    expect(result.stdout).toContain(`No change for ${web}`);
+    expect(result.stdout).toContain(`inherited from the mapping for ${canonicalDir(repo)}`);
+    expect(Object.keys(stored())).toEqual([canonicalDir(repo)]);
+  });
+
+  it('`project set` records the subdirectory itself for a different project', () => {
+    run(['set', '--project-url', 'https://repo.form.io', '--cwd', repo]);
+
+    const result = run(['set', '--project-url', 'https://web.form.io', '--cwd', web]);
+
+    expect(result.exitCode).toBe(0);
     expect(Object.keys(stored()).sort()).toEqual([canonicalDir(repo), canonicalDir(web)].sort());
+  });
+
+  it('`project set` beneath a forced ancestor never copies the override onto the child', () => {
+    run([
+      'set',
+      '--force',
+      '--project-url',
+      'https://internal.form.io',
+      '--base-url',
+      'https://forms.internal.form.io',
+      '--cwd',
+      repo,
+    ]);
+
+    const restated = run([
+      'set',
+      '--project-url',
+      'https://internal.form.io',
+      '--base-url',
+      'https://forms.internal.form.io',
+      '--cwd',
+      web,
+    ]);
+
+    expect(restated.exitCode).toBe(0);
+    expect(Object.keys(stored())).toEqual([canonicalDir(repo)]);
   });
 
   it('`project set --base-url` beneath a mapped ancestor pairs it with the governing project', () => {
@@ -377,14 +640,34 @@ describe('writers beneath a mapped ancestor', () => {
     expect(readProjectEntry(repo, cacheDir)?.env.FORMIO_BASE_URL).toBe('https://api.mysite.com');
   });
 
-  it('project_set records the subdirectory itself, even for the project its ancestor maps', async () => {
+  it('project_set restating the pair its ancestor maps changes nothing and names the ancestor', async () => {
     // The tool writes the default map, which setup.ts places under a per-worker HOME.
-    writeProjectEntry({ cwd: repo, ...entryFor('https://repo.form.io') });
+    writeProjectEntry({
+      cwd: repo,
+      env: { FORMIO_PROJECT_URL: 'https://repo.form.io', FORMIO_BASE_URL: 'https://api.form.io' },
+    });
     const client = await connectTools((server) => registerProjectSetTool(server));
 
     const result = await client.callTool({
       name: 'project_set',
       arguments: { projectUrl: 'https://repo.form.io', cwd: web },
+    });
+
+    expect(result.isError ?? false).toBe(false);
+    expect(result.structuredContent).toMatchObject({ changed: false });
+    expect(JSON.stringify(result.content)).toContain(
+      `inherited from the mapping for ${canonicalDir(repo)}`
+    );
+    expect(findProjectEntry({ cwd: web })?.dir).toBe(canonicalDir(repo));
+  });
+
+  it('project_set records the subdirectory itself for a different project', async () => {
+    writeProjectEntry({ cwd: repo, ...entryFor('https://repo.form.io') });
+    const client = await connectTools((server) => registerProjectSetTool(server));
+
+    const result = await client.callTool({
+      name: 'project_set',
+      arguments: { projectUrl: 'https://web.form.io', cwd: web },
     });
 
     expect(result.isError ?? false).toBe(false);
