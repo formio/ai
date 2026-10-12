@@ -3,30 +3,30 @@
 
 ### Red
 
-- [ ] 1.1 Write failing tests: a write goes through a temp file and rename with mode 0600; two concurrent writers (separate processes via child_process, or interleaved calls with the lock held) both keep their entries; a stale lock (>10 s) is replaced; an unobtainable lock fails with CONFIG_UNREADABLE naming the lock file; the lock is removed after success and failure
+- [x] 1.1 Write failing tests: a write goes through a temp file and rename with mode 0600; two concurrent writers (separate processes via child_process, or interleaved calls with the lock held) both keep their entries; a stale lock (>10 s) is replaced; an unobtainable lock fails with CONFIG_UNREADABLE naming the lock file; the lock is removed after success and failure
 
 ### Green
 
-- [ ] 1.2 Implement the lock and atomic write in `project-map.ts`, reusing the token cache's atomic writer
+- [x] 1.2 Implement the lock and atomic write in `project-map.ts`, reusing the token cache's atomic writer
 
 ### Refactor
 
-- [ ] 1.3 Review implementation and refactor as needed
+- [x] 1.3 Review implementation and refactor as needed
 
 ## 2. Canonical, ancestor-aware lookup
 <!-- depends_on: 1 -->
 
 ### Red
 
-- [ ] 2.1 Write failing tests: a subdirectory resolves its mapped ancestor; the nearer mapping wins; a symlinked path matches its target's mapping; case-insensitive matching on darwin/win32 (simulate platform); `/c/...` read as `C:\...` on win32; existing keys match without the file being rewritten; writes store the canonical form; committed `formio.json` still outranks a mapping
+- [x] 2.1 Write failing tests: a subdirectory resolves its mapped ancestor; the nearer mapping wins; a symlinked path matches its target's mapping; case-insensitive matching on darwin/win32 (simulate platform); `/c/...` read as `C:\...` on win32; existing keys match without the file being rewritten; writes store the canonical form; committed `formio.json` still outranks a mapping
 
 ### Green
 
-- [ ] 2.2 Implement `canonicalDir` and the ancestor walk in `project-map.ts` / `project-resolver.ts`, and use it in `project_set`, `project set`, and the workspace-root record check
+- [x] 2.2 Implement `canonicalDir` and the ancestor walk in `project-map.ts` / `project-resolver.ts`, and use it in `project_set`, `project set`, and the workspace-root record check
 
 ### Refactor
 
-- [ ] 2.3 Review implementation and refactor as needed
+- [x] 2.3 Review implementation and refactor as needed
 
 ## 3. Scoped certificate setting
 <!-- depends_on: none -->

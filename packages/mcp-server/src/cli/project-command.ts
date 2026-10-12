@@ -359,7 +359,7 @@ function runSet(flags: Record<string, string>, context: CommandContext): Project
   // See project_set: an entry that EXISTS and cannot be honoured is not an absent one,
   // and treating it as absent made this command diagnose the environment as holding a
   // project this directory's own record governs.
-  const unusableEntry = unusableRecordProjectUrl(mapped, cwd);
+  const unusableEntry = unusableRecordProjectUrl(mapped);
   // Walked ONCE, for both the plan and the note below. A file too broken to read
   // throws out of here into runProjectCommand's catch, which is right: that is a
   // command that could not answer, not a directory with no project.
@@ -375,6 +375,7 @@ function runSet(flags: Record<string, string>, context: CommandContext): Project
       projectUrl: mapped.status === 'usable' ? mapped.entry.env.FORMIO_PROJECT_URL : undefined,
       baseUrl: mapped.status === 'usable' ? mapped.entry.env.FORMIO_BASE_URL : undefined,
       forced: mapped.status === 'usable' ? mapped.entry.forced : undefined,
+      inherited: mapped.status === 'usable' && mapped.inherited,
     },
     elsewhere: {
       // Where the project lives when this mapping has none. A file too broken to read
@@ -396,9 +397,14 @@ function runSet(flags: Record<string, string>, context: CommandContext): Project
   // mapping as "the record that governs this directory" there is the same
   // wrong-record diagnosis this guard exists to stop, one layer up. The plan's own
   // wrong-record branch answers that case, in the committed file's vocabulary.
-  if (unusableEntry !== undefined && !flags['project-url'] && !committed?.projectUrl) {
+  if (
+    unusableEntry !== undefined &&
+    mapped.status !== 'absent' &&
+    !flags['project-url'] &&
+    !committed?.projectUrl
+  ) {
     return notConfigured(
-      `The mapping for ${cwd} holds an unusable value, so it is the record that governs this directory and it cannot answer with a project: ${unusableEntry} Nothing else supplies the project while that entry is on record. Run: ${projectCommand(`set --project-url <project_url> --cwd ${cwd}`)}\n\n${USAGE}`,
+      `The mapping for ${mapped.dir} holds an unusable value, so it is the record that governs this directory and it cannot answer with a project: ${unusableEntry} Nothing else supplies the project while that entry is on record. Run: ${projectCommand(`set --project-url <project_url> --cwd ${cwd}`)}\n\n${USAGE}`,
       notes
     );
   }

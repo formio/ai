@@ -39,8 +39,12 @@ export interface ProjectEntryPlanRequest {
    * re-stating the project it already resolved is an ordinary call and must not
    * quietly undo a developer's override, while a call that changes either half forms a
    * pair nobody has vouched for and is judged by the ordinary rules again.
+   *
+   * `inherited` says the record is an ancestor directory's: it governs this directory
+   * but is not its own, so a call that would leave the record as it is still writes —
+   * a write always records for the directory it was given.
    */
-  record: { projectUrl?: string; baseUrl?: string; forced?: boolean };
+  record: { projectUrl?: string; baseUrl?: string; forced?: boolean; inherited?: boolean };
   /**
    * Where the project lives when this record has none, for a write that cannot reach
    * it. The committed file carries its path, because the refusal that names it
@@ -314,7 +318,10 @@ export function planProjectEntry({
       // alone, `project set --force` over the pair it was already targeting reported
       // "no change" and left the entry unforced, so the very next read refused it.
       outcome:
-        recordProjectUrl === projectUrl && recordBaseUrl === baseUrl && record.forced
+        !record.inherited &&
+        recordProjectUrl === projectUrl &&
+        recordBaseUrl === baseUrl &&
+        record.forced
           ? 'unchanged'
           : 'write',
       cwd,
@@ -416,7 +423,10 @@ export function planProjectEntry({
     // A record that holds the override and a pair the rules accept still changes when
     // this write drops the flag, so `record.forced` counts as a difference.
     outcome:
-      recordProjectUrl === projectUrl && recordBaseUrl === baseUrl && !record.forced
+      !record.inherited &&
+      recordProjectUrl === projectUrl &&
+      recordBaseUrl === baseUrl &&
+      !record.forced
         ? 'unchanged'
         : 'write',
     cwd,

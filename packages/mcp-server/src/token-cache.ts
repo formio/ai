@@ -1,7 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import os from 'os';
-import { randomUUID } from 'crypto';
+import { writeFileAtomically } from './atomic-file.js';
 import { isRecord } from './tool-errors.js';
 
 const DEFAULT_CACHE_DIR = path.join(os.homedir(), '.formio');
@@ -56,19 +56,13 @@ function readCache(cacheDir: string): TokenFile {
   }
 }
 
-// The one writer. Written to a temporary file in the same directory, created 0600, and
-// renamed over the cache: a rename within a directory replaces the file in one step, so
-// a concurrent reader — another server, or the CLI — sees the old file or the new one,
-// never a partial one.
+// The one writer, through the shared atomic replacement: a concurrent reader — another
+// server, or the CLI — sees the old file or the new one, never a partial one.
 function writeCache(cacheDir: string, tokens: TokenFile): void {
   const filePath = cachePath(cacheDir);
-  const temporary = path.join(cacheDir, `.${CACHE_FILE}.${process.pid}.${randomUUID()}.tmp`);
   try {
-    fs.mkdirSync(cacheDir, { recursive: true });
-    fs.writeFileSync(temporary, JSON.stringify(tokens), { mode: 0o600, flag: 'wx' });
-    fs.renameSync(temporary, filePath);
+    writeFileAtomically({ filePath, contents: JSON.stringify(tokens) });
   } catch (error) {
-    fs.rmSync(temporary, { force: true });
     throw new Error(`Cannot write the token cache at ${filePath}: ${reason(error)}`, {
       cause: error,
     });

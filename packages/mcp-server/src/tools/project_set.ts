@@ -127,7 +127,7 @@ export function registerProjectSetTool(server: McpServer, options: ProjectSetOpt
       // project comes from the environment" about one state — and the URL the user
       // actually intended, readable only from that entry, was overwritten without ever
       // being shown to them.
-      const unusableEntry = unusableRecordProjectUrl(mapped, entryCwd);
+      const unusableEntry = unusableRecordProjectUrl(mapped);
       // Walked ONCE. The plan needs it to decide whether a deployment-only call has a
       // project to be recorded beside, and the result message needs it to say whether
       // what was just written takes effect; two walks could disagree only if the tree
@@ -193,6 +193,7 @@ export function registerProjectSetTool(server: McpServer, options: ProjectSetOpt
           // re-stating the project it already resolved is an ordinary call, and the
           // plan keeps the override only while the pair itself is unchanged.
           forced: mapped.status === 'usable' ? mapped.entry.forced : undefined,
+          inherited: mapped.status === 'usable' && mapped.inherited,
         },
         // Where the project lives when this mapping has none.
         elsewhere: {
@@ -209,9 +210,14 @@ export function registerProjectSetTool(server: McpServer, options: ProjectSetOpt
       // mapping as "the record that governs this directory" there is the same
       // wrong-record diagnosis this guard exists to stop, one layer up. The plan's own
       // wrong-record branch answers that case, in the committed file's vocabulary.
-      if (unusableEntry !== undefined && !projectUrl && !committed?.projectUrl) {
+      if (
+        unusableEntry !== undefined &&
+        mapped.status !== 'absent' &&
+        !projectUrl &&
+        !committed?.projectUrl
+      ) {
         refuse(
-          `The mapping for ${entryCwd} holds an unusable value, so it is the record that governs this directory and it cannot answer with a project: ${unusableEntry} Nothing else supplies the project while that entry is on record. Call project_set again with cwd ${entryCwd} and projectUrl set to the project this directory should target, which replaces it. Add baseUrl only if the server then reports it cannot be determined.`
+          `The mapping for ${mapped.dir} holds an unusable value, so it is the record that governs this directory and it cannot answer with a project: ${unusableEntry} Nothing else supplies the project while that entry is on record. Call project_set again with cwd ${entryCwd} and projectUrl set to the project this directory should target, which replaces it. Add baseUrl only if the server then reports it cannot be determined.`
         );
       }
 

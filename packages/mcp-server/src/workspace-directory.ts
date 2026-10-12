@@ -103,16 +103,21 @@ export function projectRecordOf(dir: string): ProjectRecord | undefined {
         : path.join(dir, COMMITTED_CONFIG_FILE)
     );
   }
-  const mapping: ProjectRecord = {
-    key: `mapping:${path.resolve(dir)}`,
-    description: `the project mapping for ${dir}`,
-  };
+  // The mapping that governs the directory — its own or the nearest mapped ancestor's —
+  // keyed by the directory it is recorded for, so two roots beneath one mapped
+  // directory resolve the same record.
+  const mapping = (recordedFor: string): ProjectRecord => ({
+    key: `mapping:${recordedFor}`,
+    description: `the project mapping for ${recordedFor}`,
+  });
   try {
     const entry = readProjectEntryForWrite(dir);
     if (entry.status === 'unusable') {
-      return mapping;
+      return mapping(entry.dir);
     }
-    return entry.status === 'usable' && entry.entry.env.FORMIO_PROJECT_URL ? mapping : undefined;
+    return entry.status === 'usable' && entry.entry.env.FORMIO_PROJECT_URL
+      ? mapping(entry.dir)
+      : undefined;
   } catch {
     return undefined;
   }

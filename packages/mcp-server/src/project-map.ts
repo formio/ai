@@ -1,12 +1,32 @@
 import fs from 'fs';
 import path from 'path';
 import os from 'os';
+import { writeFileAtomically } from './atomic-file.js';
 import { projectCommand } from './cli-launch.js';
 import { readHttpUrlEnv } from './config.js';
 import { ToolError } from './tool-errors.js';
 
 const DEFAULT_CACHE_DIR = path.join(os.homedir(), '.formio');
 const PROJECTS_FILE = 'projects.json';
+const LOCK_SUFFIX = '.lock';
+
+/**
+ * How a writer waits for the map's lock: it retries every `retryMs`, gives up after
+ * `timeoutMs`, and treats a lock last touched more than `staleMs` ago as left behind by
+ * a writer that crashed. A write holds the lock for milliseconds, so the defaults are
+ * generous; the seam exists so tests need not wait seconds.
+ */
+export interface MapLockTiming {
+  retryMs: number;
+  timeoutMs: number;
+  staleMs: number;
+}
+
+export const DEFAULT_MAP_LOCK_TIMING: MapLockTiming = {
+  retryMs: 50,
+  timeoutMs: 5_000,
+  staleMs: 10_000,
+};
 
 // A record holds a project and its deployment as a pair, so an entry is just the two
 // values. The `baseUrlFor` field this interface used to carry existed only because a
@@ -48,18 +68,33 @@ export class ProjectMapUnreadableError extends ToolError {
   // Damage to ONE ENTRY does not: a writer replaces that entry in place, and telling
   // the reader to delete the file would destroy every other directory's mapping to fix
   // one. Saying "repair first" for both sent readers to do exactly that.
-  constructor(filePath: string, cause: unknown, cwd?: string, scope: 'file' | 'entry' = 'file') {
+  //
+  // A held LOCK is a third answer. The map itself is intact; what stops the write is a
+  // lock file another writer holds, or one a crashed writer left behind and that has
+  // not yet aged out. Deleting the lock is the remedy only when no other writer is
+  // running, so the message says exactly that and names the write to retry.
+  constructor(
+    filePath: string,
+    cause: unknown,
+    cwd?: string,
+    scope: 'file' | 'entry' | 'lock' = 'file'
+  ) {
     const remap = cwd
       ? `map ${cwd} again: call project_set with cwd set to it, or run: ${projectCommand(`set --project-url <project_url> --cwd ${cwd}`)}`
       : `map the directory again with project_set, or run: ${projectCommand('set --project-url <project_url> --cwd <absolute path>')}`;
     const how =
       scope === 'entry'
         ? `Only this directory's entry is affected and the rest of the file is intact, so do NOT delete it — that would discard every other directory's mapping. Replace the entry instead: ${remap}.`
-        : `Repair or delete that file FIRST — no command can write it while it cannot be read, so nothing below will run until it is. Then ${remap}.`;
+        : scope === 'lock'
+          ? `The map itself is intact. Retry the write; if it keeps failing and no other Form.io MCP server or \`project set\` is running, delete that lock file, then ${remap}.`
+          : `Repair or delete that file FIRST — no command can write it while it cannot be read, so nothing below will run until it is. Then ${remap}.`;
     const reason = cause instanceof Error ? cause.message : String(cause);
     super({
       code: 'CONFIG_UNREADABLE',
-      message: `Cannot read the Form.io project map at ${filePath}: ${reason}. ` + how,
+      message:
+        scope === 'lock'
+          ? `Cannot take the Form.io project map's lock file ${filePath}: ${reason}. ` + how
+          : `Cannot read the Form.io project map at ${filePath}: ${reason}. ` + how,
     });
     this.name = 'ProjectMapUnreadableError';
     this.filePath = filePath;
@@ -83,22 +118,119 @@ export function projectMapPath(cacheDir: string = DEFAULT_CACHE_DIR): string {
   return path.join(cacheDir, PROJECTS_FILE);
 }
 
-// `cwd` is carried only so the error can print the command that maps it again.
+type PlatformPath = typeof path.posix;
+
+// The path rules of the platform being asked about, which tests set to another one.
+const pathFor = (platform: NodeJS.Platform): PlatformPath =>
+  platform === 'win32' ? path.win32 : path.posix;
+
+// Platforms whose default filesystems compare names case-insensitively.
+const CASE_FOLDING: ReadonlySet<NodeJS.Platform> = new Set<NodeJS.Platform>(['darwin', 'win32']);
+
+// A Git-Bash or MSYS spelling of a drive, `/c/...`, which Windows itself reads as a
+// folder named `c` on the current drive.
+const DRIVE_PREFIX = /^\/([a-zA-Z])(?=\/|$)/;
+
+// The real path of the deepest part that exists, with the rest appended as spelled, so
+// a directory not created yet still compares equal under its real parent. Asked only
+// of paths in this host's own flavour: a simulated platform's path names nothing here.
+function realpathOfExisting(dir: string, rules: PlatformPath): string {
+  if (rules !== path) {
+    return dir;
+  }
+  try {
+    return fs.realpathSync.native(dir);
+  } catch {
+    const parent = rules.dirname(dir);
+    return parent === dir
+      ? dir
+      : rules.join(realpathOfExisting(parent, rules), rules.basename(dir));
+  }
+}
+
 /**
- * Every key normalized as the file is loaded.
+ * A directory's canonical path, in its true case: what the map stores as a key and what
+ * messages show.
  *
- * Normalizing only the keys this release writes strands the ones earlier releases wrote
- * raw: a directory whose cwd carried a trailing slash keeps its visible entry and reports
- * that nothing is configured, and the next write lands on the normalized twin, leaving a
- * dead key beside a live one that nothing ever cleans up. Doing it on load makes the
- * migration invisible and idempotent — every key is an absolute directory path, so
- * resolving one that is already resolved changes nothing.
+ * On Windows a `/c/...` path is read as `C:\...`. The path is resolved, and symbolic
+ * links in its existing part are followed (`/tmp` and `/private/tmp` are one directory
+ * on macOS); following them also returns the case the filesystem stores, so
+ * `c:\users\me` that exists as `C:\Users\Me` is spelled the second way. A part that
+ * does not exist keeps the case it was given.
  *
- * A collision (both `/dir` and `/dir/` on disk) keeps the LAST one, which is the same
- * rule object-literal parsing already applied to duplicate keys in the file.
+ * `platform` is the platform whose rules apply; the running one unless a test simulates
+ * another.
  */
-function normalizeKeys(map: ProjectMap): ProjectMap {
-  return Object.fromEntries(Object.entries(map).map(([key, entry]) => [mapKey(key), entry]));
+export function canonicalDir(dir: string, platform: NodeJS.Platform = process.platform): string {
+  const rules = pathFor(platform);
+  const spelled =
+    platform === 'win32'
+      ? dir.replace(DRIVE_PREFIX, (_, drive: string) => `${drive.toUpperCase()}:\\`)
+      : dir;
+  return realpathOfExisting(rules.resolve(spelled), rules);
+}
+
+/**
+ * The key two spellings of one directory share, used only to compare directories and
+ * never stored or shown: the canonical path, lower-cased on macOS and Windows, whose
+ * default filesystems treat `C:\Users\Me` and `c:\users\me` as the same folder.
+ */
+export function dirMatchKey(dir: string, platform: NodeJS.Platform = process.platform): string {
+  const canonical = canonicalDir(dir, platform);
+  return CASE_FOLDING.has(platform) ? canonical.toLowerCase() : canonical;
+}
+
+// The directory and every directory above it, nearest first.
+function ancestry(dir: string, rules: PlatformPath): string[] {
+  const parent = rules.dirname(dir);
+  return parent === dir ? [dir] : [dir, ...ancestry(parent, rules)];
+}
+
+/** A stored entry, under the key it has on disk, unvalidated. */
+interface StoredEntry {
+  dir: string;
+  value: unknown;
+}
+
+/** The entry that applies to a directory, and whether it is an ancestor's. */
+interface NearestEntry extends StoredEntry {
+  inherited: boolean;
+}
+
+/**
+ * Every stored key by its comparison key, computed as the map is read and never written
+ * back: entries recorded by earlier releases, or by hand, match exactly as they are.
+ *
+ * Two keys naming one directory (`/dir` and `/dir/`, or two spellings of one path) are
+ * resolved in favour of the one already in canonical form — the one a write produced —
+ * and otherwise the later one, which is the rule object-literal parsing applies to
+ * duplicate keys.
+ */
+function indexByMatchKey(map: ProjectMap, platform: NodeJS.Platform): Map<string, StoredEntry> {
+  return Object.entries(map).reduce((index, [dir, value]) => {
+    const canonical = canonicalDir(dir, platform);
+    const key = CASE_FOLDING.has(platform) ? canonical.toLowerCase() : canonical;
+    const held = index.get(key);
+    return held !== undefined && held.dir === canonicalDir(held.dir, platform) && dir !== canonical
+      ? index
+      : index.set(key, { dir, value });
+  }, new Map<string, StoredEntry>());
+}
+
+interface NearestEntryRequest {
+  map: ProjectMap;
+  cwd: string;
+  platform: NodeJS.Platform;
+}
+
+// The entry for the nearest directory, `cwd` itself or an ancestor, that has one.
+function nearestEntry({ map, cwd, platform }: NearestEntryRequest): NearestEntry | undefined {
+  const index = indexByMatchKey(map, platform);
+  // The ancestors of a comparison key are the comparison keys of the ancestors.
+  const ancestors = ancestry(dirMatchKey(cwd, platform), pathFor(platform));
+  const depth = ancestors.findIndex((dir) => index.has(dir));
+  const found = depth === -1 ? undefined : index.get(ancestors[depth]);
+  return found && { ...found, inherited: depth > 0 };
 }
 
 function readMap(cacheDir: string, cwd: string): ProjectMap {
@@ -131,14 +263,123 @@ function readMap(cacheDir: string, cwd: string): ProjectMap {
       cwd
     );
   }
-  return normalizeKeys(parsed as ProjectMap);
+  return parsed as ProjectMap;
 }
 
 function writeMap(cacheDir: string, data: ProjectMap): void {
+  const filePath = projectMapPath(cacheDir);
+  try {
+    writeFileAtomically({ filePath, contents: JSON.stringify(data) });
+  } catch (error) {
+    throw new Error(
+      `Cannot write the Form.io project map at ${filePath}: ${error instanceof Error ? error.message : String(error)}`,
+      { cause: error }
+    );
+  }
+}
+
+const errorCode = (error: unknown): string | undefined =>
+  error instanceof Error ? (error as NodeJS.ErrnoException).code : undefined;
+
+// A synchronous pause between attempts. Every writer is synchronous — the CLI and the
+// tool share writeProjectEntry — and the wait is bounded by the lock timeout.
+const pause = (ms: number): void => {
+  Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
+};
+
+// Whether the lock was last touched longer ago than a write could take. A lock that
+// vanished between the failed create and this check is not stale; the next attempt
+// takes it.
+function isAbandoned(lockPath: string, staleMs: number): boolean {
+  try {
+    return Date.now() - fs.statSync(lockPath).mtimeMs > staleMs;
+  } catch (error) {
+    if (errorCode(error) === 'ENOENT') {
+      return false;
+    }
+    throw error;
+  }
+}
+
+interface LockRequest {
+  lockPath: string;
+  cwd: string;
+  timing: MapLockTiming;
+}
+
+/**
+ * Take the map's lock by creating its lock file exclusively, waiting for a writer that
+ * holds it. Exclusive create is the one primitive every platform gives Node without a
+ * native addon, and it either creates the file or fails because it exists.
+ *
+ * A lock older than `staleMs` was left by a writer that died holding it, so it is
+ * removed and the create retried. Two waiters can both judge the same lock abandoned;
+ * that window needs a crashed writer and two simultaneous waiters, and costs at worst
+ * the serialization of one write.
+ */
+function acquireLock({ lockPath, cwd, timing }: LockRequest): void {
+  const failure = (cause: unknown) => new ProjectMapUnreadableError(lockPath, cause, cwd, 'lock');
+  const deadline = Date.now() + timing.timeoutMs;
+  for (;;) {
+    try {
+      if (createLock(lockPath)) {
+        return;
+      }
+      if (isAbandoned(lockPath, timing.staleMs)) {
+        fs.rmSync(lockPath, { force: true });
+        continue;
+      }
+    } catch (error) {
+      throw failure(error);
+    }
+    if (Date.now() >= deadline) {
+      throw failure(new Error(`another writer held it for more than ${timing.timeoutMs / 1000} s`));
+    }
+    pause(timing.retryMs);
+  }
+}
+
+// True when this call created the lock file, false when it already exists.
+function createLock(lockPath: string): boolean {
+  try {
+    fs.closeSync(fs.openSync(lockPath, 'wx', 0o600));
+    return true;
+  } catch (error) {
+    if (errorCode(error) === 'EEXIST') {
+      return false;
+    }
+    throw error;
+  }
+}
+
+interface MapUpdate<T> {
+  cacheDir: string;
+  /** The directory the write is for, named by any failure's remedy. */
+  cwd: string;
+  lock?: Partial<MapLockTiming>;
+  /** The change, applied to the map as it is on disk under the lock. */
+  change: (map: ProjectMap) => { map?: ProjectMap; result: T };
+}
+
+/**
+ * The one read-modify-write. Under the lock the map is read afresh — never a snapshot
+ * taken before the lock — so another process's entry written meanwhile is kept; the
+ * change is applied; and the result replaces the file in one rename. `map` absent
+ * means nothing changed and nothing is written. The lock is released whatever happens.
+ */
+function updateMap<T>({ cacheDir, cwd, lock, change }: MapUpdate<T>): T {
+  const lockPath = `${projectMapPath(cacheDir)}${LOCK_SUFFIX}`;
   fs.mkdirSync(cacheDir, { recursive: true });
-  fs.writeFileSync(projectMapPath(cacheDir), JSON.stringify(data), {
-    mode: 0o600,
-  });
+  acquireLock({ lockPath, cwd, timing: { ...DEFAULT_MAP_LOCK_TIMING, ...lock } });
+  try {
+    const { map, result } = change(readMap(cacheDir, cwd));
+    if (map) {
+      writeMap(cacheDir, map);
+    }
+    return result;
+  } finally {
+    fs.rmSync(lockPath, { force: true });
+  }
 }
 
 // Per entry, not per file. The top-level shape check above says the file is a
@@ -183,26 +424,49 @@ function validateEntry(cacheDir: string, cwd: string, value: unknown): ProjectEn
 }
 
 /**
- * The key one directory has, whatever the caller spelled.
- *
- * The map is keyed by absolute path, and `/repo` and `/repo/` are the same folder — kept
- * raw they were two independent records, so configuring a directory through one spelling
- * left the other reporting nothing configured for the directory just configured, and a
- * caller whose cwd sometimes carries a slash silently maintained two. `findCommittedConfig`
- * resolves its path already, so only the mapping was exposed.
+ * How a failure names the directory asked about: resolved, so `/repo` and `/repo/`
+ * print alike, but otherwise as the caller spelled it.
  */
-function mapKey(cwd: string): string {
-  return path.resolve(cwd);
+const spelledDir = (cwd: string, platform: NodeJS.Platform): string =>
+  pathFor(platform).resolve(cwd);
+
+export interface ProjectEntryLookup {
+  cwd: string;
+  cacheDir?: string;
+  /** Whose path rules apply; the running platform unless a test simulates another. */
+  platform?: NodeJS.Platform;
+}
+
+/** A mapping entry, and the directory it is recorded for as the map spells it. */
+export interface FoundProjectEntry {
+  dir: string;
+  entry: ProjectEntry;
+}
+
+/**
+ * The mapping that applies to a directory: the entry for the nearest directory —
+ * itself or an ancestor — that has one, compared by canonical path. A malformed entry
+ * there fails loudly, naming the directory it is recorded for; it is the record that
+ * governs, so a weaker one must not answer in its place.
+ */
+export function findProjectEntry({
+  cwd,
+  cacheDir = DEFAULT_CACHE_DIR,
+  platform = process.platform,
+}: ProjectEntryLookup): FoundProjectEntry | null {
+  const found = nearestEntry({
+    map: readMap(cacheDir, spelledDir(cwd, platform)),
+    cwd,
+    platform,
+  });
+  return found ? { dir: found.dir, entry: validateEntry(cacheDir, found.dir, found.value) } : null;
 }
 
 export function readProjectEntry(
   cwd: string,
   cacheDir: string = DEFAULT_CACHE_DIR
 ): ProjectEntry | null {
-  const key = mapKey(cwd);
-  const map = readMap(cacheDir, key);
-  const entry: unknown = map[key];
-  return entry === undefined ? null : validateEntry(cacheDir, key, entry);
+  return findProjectEntry({ cwd, cacheDir })?.entry ?? null;
 }
 
 /**
@@ -220,41 +484,49 @@ export function readProjectEntry(
  *
  * File-level damage still throws for both: nothing can be written into a map that cannot
  * be parsed without discarding every other directory's mapping.
+ *
+ * The record is found as a reader finds it — the nearest mapped directory, this one or
+ * an ancestor — because that is the record that governs. `dir` is the directory it is
+ * recorded for, and `inherited` says it is an ancestor's: this directory has no entry
+ * of its own, and a write for it records one.
  */
 export type ProjectEntryForWrite =
   | { status: 'absent' }
-  | { status: 'usable'; entry: ProjectEntry }
-  | { status: 'unusable'; reason: string };
+  | { status: 'usable'; dir: string; inherited: boolean; entry: ProjectEntry }
+  | { status: 'unusable'; dir: string; inherited: boolean; reason: string };
 
 export function readProjectEntryForWrite(
   cwd: string,
   cacheDir: string = DEFAULT_CACHE_DIR
 ): ProjectEntryForWrite {
-  const key = mapKey(cwd);
-  const map = readMap(cacheDir, key);
-  const entry: unknown = map[key];
-  if (entry === undefined) {
+  const platform = process.platform;
+  const found = nearestEntry({ map: readMap(cacheDir, spelledDir(cwd, platform)), cwd, platform });
+  if (found === undefined) {
     return { status: 'absent' };
   }
+  const { dir, inherited } = found;
   try {
-    return { status: 'usable', entry: validateEntry(cacheDir, key, entry) };
+    return { status: 'usable', dir, inherited, entry: validateEntry(cacheDir, dir, found.value) };
   } catch (error) {
-    return { status: 'unusable', reason: error instanceof Error ? error.message : String(error) };
+    return {
+      status: 'unusable',
+      dir,
+      inherited,
+      reason: error instanceof Error ? error.message : String(error),
+    };
   }
 }
 
 /**
- * Why this directory's own entry cannot answer with a project, or undefined if it can.
+ * Why the mapping that governs a directory cannot answer with a project, or undefined
+ * if it can.
  *
  * Structural damage is caught by validateEntry above; a value that is simply not an
  * http(s) URL is not, because a record's URLs are validated only where that record wins
  * precedence. Both are "present and unusable" to a writer, and both must stop it
  * concluding that some other record holds the project.
  */
-export function unusableRecordProjectUrl(
-  mapped: ProjectEntryForWrite,
-  cwd: string
-): string | undefined {
+export function unusableRecordProjectUrl(mapped: ProjectEntryForWrite): string | undefined {
   if (mapped.status === 'unusable') {
     return mapped.reason;
   }
@@ -274,7 +546,7 @@ export function unusableRecordProjectUrl(
   // FORMIO_* name means the environment variable and nothing else.
   readHttpUrlEnv({
     raw,
-    name: `the project URL recorded for ${cwd}`,
+    name: `the project URL recorded for ${mapped.dir}`,
     onIgnored: (message) => (reason = message),
   });
   // The recorded value is quoted back VERBATIM. This entry is the only place it exists,
@@ -294,30 +566,55 @@ export function unusableRecordProjectUrl(
  * undefined when there was nothing to remove, so a caller can name the value it
  * discarded rather than clearing it silently.
  *
- * Reads the file immediately before writing it, for the same reason writeProjectEntry
- * does: the map is shared by every directory on this machine, so a stale snapshot
- * written back drops another process's mapping.
+ * Reads the file under the map's lock, for the same reason writeProjectEntry does: the
+ * map is shared by every directory on this machine, so a stale snapshot written back
+ * drops another process's mapping.
  */
 export function removeProjectEntry({
   cwd,
   cacheDir = DEFAULT_CACHE_DIR,
+  platform = process.platform,
+  lock,
 }: {
   cwd: string;
   cacheDir?: string;
+  platform?: NodeJS.Platform;
+  lock?: Partial<MapLockTiming>;
 }): ProjectEntry | undefined {
-  const key = mapKey(cwd);
-  const map = readMap(cacheDir, key);
-  const existing: unknown = map[key];
-  if (existing === undefined) {
-    return undefined;
-  }
-  delete map[key];
-  writeMap(cacheDir, map);
-  // Reported as it was on disk, unvalidated: the caller is being told what was
-  // discarded, and a malformed entry is exactly the kind this clears. Validating it
-  // would fail the one operation that removes it.
-  return existing as ProjectEntry;
+  // This directory's own entry, under whatever spelling it was recorded — never an
+  // ancestor's, which belongs to every other directory beneath it.
+  const key = dirMatchKey(cwd, platform);
+  return updateMap({
+    cacheDir,
+    cwd: spelledDir(cwd, platform),
+    lock,
+    change: (map) => {
+      const existing = indexByMatchKey(map, platform).get(key);
+      if (existing === undefined) {
+        return { result: undefined };
+      }
+      // Reported as it was on disk, unvalidated: the caller is being told what was
+      // discarded, and a malformed entry is exactly the kind this clears. Validating it
+      // would fail the one operation that removes it.
+      return {
+        map: withoutDirectory({ map, key, platform }),
+        result: existing.value as ProjectEntry,
+      };
+    },
+  });
 }
+
+interface DirectoryRemoval {
+  map: ProjectMap;
+  /** The comparison key of the directory whose entries go, under every spelling. */
+  key: string;
+  platform: NodeJS.Platform;
+}
+
+// Every entry recorded for one directory, whatever spelling it was recorded under, so
+// a write never leaves a twin beside the key it writes.
+const withoutDirectory = ({ map, key, platform }: DirectoryRemoval): ProjectMap =>
+  Object.fromEntries(Object.entries(map).filter(([dir]) => dirMatchKey(dir, platform) !== key));
 
 export interface ProjectEntryWrite {
   cwd: string;
@@ -325,6 +622,9 @@ export interface ProjectEntryWrite {
   /** Whether this pair was forced past the domain rules. Written only when true. */
   forced?: boolean;
   cacheDir?: string;
+  /** Whose path rules apply; the running platform unless a test simulates another. */
+  platform?: NodeJS.Platform;
+  lock?: Partial<MapLockTiming>;
 }
 
 export function writeProjectEntry({
@@ -332,27 +632,36 @@ export function writeProjectEntry({
   env,
   forced = false,
   cacheDir = DEFAULT_CACHE_DIR,
+  platform = process.platform,
+  lock,
 }: ProjectEntryWrite): void {
-  // The key everything else uses. Passed the raw cwd, an unreadable-map failure printed
-  // a re-map command naming a directory spelled differently from the key the write
-  // itself would have used.
-  const key = mapKey(cwd);
-  // Re-read rather than take a map the caller already read. The file is SHARED —
-  // every directory on this machine is a key in it — so the window between the
-  // caller's read and this write is a window in which another process's mapping can
-  // be written and then silently dropped by writing back a stale snapshot. Reading
-  // here makes that window as small as the runtime allows. The cost is one read of a
-  // small file; the alternative trades it for lost entries nobody can attribute.
-  const map = readMap(cacheDir, key);
+  // Stored under the canonical path of the directory it was given, in its true case —
+  // its own entry, even beneath a mapped ancestor — replacing any other spelling of
+  // that directory, which is found by comparison key.
+  const key = canonicalDir(cwd, platform);
+  // Re-read under the lock rather than take a map the caller already read. The file is
+  // SHARED — every directory on this machine is a key in it — so a snapshot read
+  // before the lock and written back silently drops another process's mapping.
+  //
   // This directory's own entry is NOT validated first. It is what the write replaces,
   // and a malformed one holds nothing worth preserving — validating it made the repair
   // this error names impossible to perform, which is the whole reason entry-level damage
   // is reported differently from damage to the file. The FILE is still validated by
-  // readMap above, because a write that cannot read it would destroy every other
+  // the read under the lock, because a write that cannot read it would destroy every other
   // directory's mapping; those entries travel through verbatim.
   // The flag is written only when it is true, so an ordinary entry keeps the shape it
   // has always had: this file is read by hand and diffed in bug reports, and a
   // `"forced": false` on every entry advertises an override nobody asked for.
-  map[key] = { env, ...(forced ? { forced: true } : {}) };
-  writeMap(cacheDir, map);
+  updateMap({
+    cacheDir,
+    cwd: spelledDir(cwd, platform),
+    lock,
+    change: (map) => ({
+      map: {
+        ...withoutDirectory({ map, key: dirMatchKey(cwd, platform), platform }),
+        [key]: { env, ...(forced ? { forced: true } : {}) },
+      },
+      result: undefined,
+    }),
+  });
 }
