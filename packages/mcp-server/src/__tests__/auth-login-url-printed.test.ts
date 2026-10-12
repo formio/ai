@@ -44,9 +44,9 @@ describe('the login URL is printed whether or not the browser opens', () => {
     let loginUrl = '';
 
     await authenticate(CONFIG, {
-      onReady: async (port) => {
-        loginUrl = `http://127.0.0.1:${port}/`;
-        await postLoginToken(port, 'jwt');
+      onReady: async ({ url }) => {
+        loginUrl = url;
+        await postLoginToken(url, 'jwt');
       },
     });
 
@@ -61,9 +61,9 @@ describe('the login URL is printed whether or not the browser opens', () => {
     let loginUrl = '';
 
     await authenticate(CONFIG, {
-      onReady: async (port) => {
-        loginUrl = `http://127.0.0.1:${port}/`;
-        await postLoginToken(port, 'jwt');
+      onReady: async ({ url }) => {
+        loginUrl = url;
+        await postLoginToken(url, 'jwt');
       },
     });
 

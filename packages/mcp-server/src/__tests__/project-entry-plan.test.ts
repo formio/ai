@@ -509,4 +509,28 @@ describe('a record inherited from an ancestor', () => {
     expect(result.outcome).toBe('write');
     expect('entry' in result && result.entry.forced).toBe(true);
   });
+  it('writes the child its own forced entry for an explicit force, even when the inherited pair is equal and forced', () => {
+    const result = inherited(
+      {
+        projectUrl: 'https://internal.form.io',
+        baseUrl: 'https://forms.internal.form.io',
+        force: true,
+      },
+      {
+        projectUrl: 'https://internal.form.io',
+        baseUrl: 'https://forms.internal.form.io',
+        forced: true,
+      }
+    );
+
+    expect(result.outcome).toBe('write');
+    expect('entry' in result && result.entry).toEqual({
+      env: {
+        FORMIO_PROJECT_URL: 'https://internal.form.io',
+        FORMIO_BASE_URL: 'https://forms.internal.form.io',
+      },
+      forced: true,
+    });
+    expect('inheritedFrom' in result && result.inheritedFrom).toBeFalsy();
+  });
 });

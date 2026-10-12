@@ -326,9 +326,14 @@ export function planProjectEntry({
       // "no change" and left the entry unforced, so the very next read refused it.
       //
       // An inherited forced pair restated is unchanged too, so the ancestor's flag is
-      // never written onto this directory's entry.
+      // never written onto this directory's entry — unless this call forces the pair
+      // for this directory, which is what records a forced entry of its own.
       ...unchangedOrWrite({
-        unchanged: recordProjectUrl === projectUrl && recordBaseUrl === baseUrl && record.forced,
+        unchanged:
+          recordProjectUrl === projectUrl &&
+          recordBaseUrl === baseUrl &&
+          record.forced &&
+          !(requested.force && record.inheritedFrom),
         inheritedFrom: record.inheritedFrom,
       }),
       cwd,

@@ -4,11 +4,17 @@ import { browserlessReason, currentBrowserEnvironment } from './browser-availabi
 import { openInBrowser } from './browser-launch.js';
 import { ResolvedFormioConfig } from './config.js';
 import { formioRawFetch } from './formio-client.js';
-import { acceptsLoginHost } from './login-host.js';
 import { ToolError } from './tool-errors.js';
 
+/** Where the login server is listening, once it is. */
+export interface LoginServerReady {
+  port: number;
+  /** The login URL the server opens and prints, carrying this login's value as `s`. */
+  url: string;
+}
+
 export interface AuthenticateOptions {
-  onReady?: (port: number) => void;
+  onReady?: (ready: LoginServerReady) => void;
 }
 
 const DEFAULT_AUTH_HOST = '127.0.0.1';
@@ -255,13 +261,25 @@ function assertBrowserAvailable(config: ResolvedFormioConfig): void {
   );
 }
 
+// What `GET /` answers when the request does not carry this login's value. It names
+// where to find the right URL and nothing about the value itself.
+const LOGIN_PAGE_REFUSED = `<!DOCTYPE html>
+<html>
+<head><title>Form.IO Login</title></head>
+<body>
+<p>This page answers only the login URL the Form.io MCP server opened and printed for this sign-in. Open that URL to sign in.</p>
+</body>
+</html>`;
+
 /** A new value for one login: 128 random bits, as hex. */
 function newLoginState(): string {
   return randomBytes(16).toString('hex');
 }
 
-// Whether a post carries this login's value. Lengths are compared first, since
-// timingSafeEqual accepts only buffers of equal length.
+// Whether a request carries this login's value — the `s` query parameter of the login
+// URL, or the `state` the page posts back. Lengths are compared first, since
+// timingSafeEqual accepts only buffers of equal length. A repeated parameter arrives
+// as an array and is not a match.
 function carriesState(expected: string, received: unknown): boolean {
   if (typeof received !== 'string') {
     return false;
@@ -278,24 +296,10 @@ export async function authenticate(
   assertBrowserAvailable(config);
 
   const app = express();
-  // Before any route: which Host headers are answered depends on where the server is
-  // bound (see login-host.ts). Bound to every interface, none is refused here, and the
-  // per-login value on /callback is what ties a post to this login.
-  app.use((req, res, next) => {
-    if (
-      acceptsLoginHost({
-        host: req.headers.host,
-        port: req.socket.localPort ?? 0,
-        configuredHost: config.authHost,
-      })
-    ) {
-      next();
-      return;
-    }
-    process.stderr.write('Login server refused a request addressed to another host\n');
-    res.status(403).send('This login server answers only requests addressed to it');
-  });
   app.use(express.json());
+  // This login's value. It travels in the login URL the server opens and prints, so
+  // only that URL loads the page — whatever host name and port it reaches the server
+  // under, as a forwarded port does — and the page posts it back with the token.
   const state = newLoginState();
 
   let resolveJwt!: (value: string) => void;
@@ -305,7 +309,12 @@ export async function authenticate(
     rejectJwt = reject;
   });
 
-  app.get('/', async (_req, res) => {
+  app.get('/', async (req, res) => {
+    // Any other request is answered without the page, and the login keeps waiting.
+    if (!carriesState(state, req.query.s)) {
+      res.status(403).send(LOGIN_PAGE_REFUSED);
+      return;
+    }
     try {
       const loginFormUrl = config.loginFormUrl ?? (await resolveDefaultLoginFormUrl(config));
       res.send(buildLoginPage({ loginFormUrl, state }));
@@ -364,7 +373,7 @@ export async function authenticate(
       const port = addr.port;
       // A wildcard bind is not a usable address to visit, so advertise loopback.
       const reachableHost = host === '0.0.0.0' || host === '::' ? '127.0.0.1' : host;
-      const url = `http://${reachableHost}:${port}/`;
+      const url = `http://${reachableHost}:${port}/?s=${state}`;
       loginUrl = url;
 
       // Always print the URL. It is the only recourse where no browser can be
@@ -378,7 +387,7 @@ export async function authenticate(
             `Open ${url} manually to finish signing in.\n`
         );
       });
-      options?.onReady?.(port);
+      options?.onReady?.({ port, url });
     }
   });
 

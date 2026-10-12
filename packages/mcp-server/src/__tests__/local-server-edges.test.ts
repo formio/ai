@@ -23,8 +23,8 @@ const CONFIG: ResolvedFormioConfig = {
   forceBrowser: true,
 };
 
-function postText(port: number, body: string): Promise<Response> {
-  return fetch(`http://127.0.0.1:${port}/callback`, {
+function postText(loginUrl: string, body: string): Promise<Response> {
+  return fetch(new URL('/callback', loginUrl), {
     method: 'POST',
     headers: { 'Content-Type': 'text/plain' },
     body,
@@ -37,9 +37,9 @@ describe('the login callback', () => {
   it('answers a POST with no JSON body with 403, and keeps waiting for the token', async () => {
     let status = 0;
     const jwt = await authenticate(CONFIG, {
-      onReady: async (port) => {
-        status = (await postText(port, 'not json')).status;
-        await postLoginToken(port, 'after-a-bad-post');
+      onReady: async ({ url }) => {
+        status = (await postText(url, 'not json')).status;
+        await postLoginToken(url, 'after-a-bad-post');
       },
     });
     expect(status).toBe(403);
@@ -49,9 +49,9 @@ describe('the login callback', () => {
   it('answers a post with the page value but no token with 400, and keeps waiting', async () => {
     let status = 0;
     const jwt = await authenticate(CONFIG, {
-      onReady: async (port) => {
-        status = (await postLoginCallback(port, { state: await loginPageState(port) })).status;
-        await postLoginToken(port, 'after-an-empty-post');
+      onReady: async ({ url }) => {
+        status = (await postLoginCallback(url, { state: await loginPageState(url) })).status;
+        await postLoginToken(url, 'after-an-empty-post');
       },
     });
     expect(status).toBe(400);

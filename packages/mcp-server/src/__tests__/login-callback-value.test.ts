@@ -29,9 +29,9 @@ const CONFIG: ResolvedFormioConfig = {
 async function servedPage(config: ResolvedFormioConfig): Promise<string> {
   let html = '';
   await authenticate(config, {
-    onReady: async (port) => {
-      html = await (await fetch(`http://127.0.0.1:${port}/`)).text();
-      await postLoginToken(port, 'jwt');
+    onReady: async ({ url }) => {
+      html = await (await fetch(url)).text();
+      await postLoginToken(url, 'jwt');
     },
   });
   return html;
@@ -41,9 +41,9 @@ describe('the per-login value', () => {
   it('is carried by the served page: at least 128 bits, as hex', async () => {
     let state: string | undefined;
     await authenticate(CONFIG, {
-      onReady: async (port) => {
-        state = await loginPageState(port);
-        await postLoginToken(port, 'jwt');
+      onReady: async ({ url }) => {
+        state = await loginPageState(url);
+        await postLoginToken(url, 'jwt');
       },
     });
     expect(state).toMatch(/^[0-9a-f]{32,}$/);
@@ -53,9 +53,9 @@ describe('the per-login value', () => {
     const values: (string | undefined)[] = [];
     for (let i = 0; i < 2; i += 1) {
       await authenticate(CONFIG, {
-        onReady: async (port) => {
-          values.push(await loginPageState(port));
-          await postLoginToken(port, 'jwt');
+        onReady: async ({ url }) => {
+          values.push(await loginPageState(url));
+          await postLoginToken(url, 'jwt');
         },
       });
     }
@@ -66,9 +66,9 @@ describe('the per-login value', () => {
   it('is the same on every load of one login page', async () => {
     const values: (string | undefined)[] = [];
     await authenticate(CONFIG, {
-      onReady: async (port) => {
-        values.push(await loginPageState(port), await loginPageState(port));
-        await postLoginToken(port, 'jwt');
+      onReady: async ({ url }) => {
+        values.push(await loginPageState(url), await loginPageState(url));
+        await postLoginToken(url, 'jwt');
       },
     });
     expect(values[0]).toMatch(/^[0-9a-f]+$/);
@@ -84,8 +84,8 @@ describe('/callback', () => {
   it('completes the login when the post carries the page value', async () => {
     let posted: Promise<Response> | undefined;
     const jwt = await authenticate(CONFIG, {
-      onReady: (port) => {
-        posted = postLoginToken(port, 'the-token');
+      onReady: ({ url }) => {
+        posted = postLoginToken(url, 'the-token');
       },
     });
     expect((await posted)?.status).toBe(200);
@@ -95,9 +95,9 @@ describe('/callback', () => {
   it('answers a post without the value with 403 and keeps waiting', async () => {
     let status = 0;
     const jwt = await authenticate(CONFIG, {
-      onReady: async (port) => {
-        status = (await postLoginCallback(port, { token: 'unaccompanied' })).status;
-        await postLoginToken(port, 'the-token');
+      onReady: async ({ url }) => {
+        status = (await postLoginCallback(url, { token: 'unaccompanied' })).status;
+        await postLoginToken(url, 'the-token');
       },
     });
     expect(status).toBe(403);
@@ -107,11 +107,11 @@ describe('/callback', () => {
   it('answers a post with a different value with 403 and keeps waiting', async () => {
     let status = 0;
     const jwt = await authenticate(CONFIG, {
-      onReady: async (port) => {
-        const state = (await loginPageState(port)) ?? '';
+      onReady: async ({ url }) => {
+        const state = (await loginPageState(url)) ?? '';
         const other = state.replace(/^./, (c) => (c === '0' ? '1' : '0'));
-        status = (await postLoginCallback(port, { token: 'other', state: other })).status;
-        await postLoginToken(port, 'the-token');
+        status = (await postLoginCallback(url, { token: 'other', state: other })).status;
+        await postLoginToken(url, 'the-token');
       },
     });
     expect(status).toBe(403);
@@ -121,10 +121,10 @@ describe('/callback', () => {
   it('answers a post with a value of another length with 403', async () => {
     let status = 0;
     await authenticate(CONFIG, {
-      onReady: async (port) => {
-        const state = (await loginPageState(port)) ?? '';
-        status = (await postLoginCallback(port, { token: 'other', state: `${state}00` })).status;
-        await postLoginToken(port, 'the-token');
+      onReady: async ({ url }) => {
+        const state = (await loginPageState(url)) ?? '';
+        status = (await postLoginCallback(url, { token: 'other', state: `${state}00` })).status;
+        await postLoginToken(url, 'the-token');
       },
     });
     expect(status).toBe(403);
@@ -133,9 +133,9 @@ describe('/callback', () => {
   it('answers a post whose value is not a string with 403', async () => {
     let status = 0;
     await authenticate(CONFIG, {
-      onReady: async (port) => {
-        status = (await postLoginCallback(port, { token: 'other', state: 42 })).status;
-        await postLoginToken(port, 'the-token');
+      onReady: async ({ url }) => {
+        status = (await postLoginCallback(url, { token: 'other', state: 42 })).status;
+        await postLoginToken(url, 'the-token');
       },
     });
     expect(status).toBe(403);
@@ -147,8 +147,8 @@ describe('/callback', () => {
       authenticate(
         { ...CONFIG, authTimeoutMs: 500 },
         {
-          onReady: async (port) => {
-            status = (await postLoginCallback(port, { token: 'unaccompanied' })).status;
+          onReady: async ({ url }) => {
+            status = (await postLoginCallback(url, { token: 'unaccompanied' })).status;
           },
         }
       )

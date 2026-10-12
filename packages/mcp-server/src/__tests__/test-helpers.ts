@@ -121,18 +121,19 @@ export function stubRevisionsLicence(licensed: boolean) {
 }
 
 /**
- * The per-login value the login page at this port carries, read from the page the
- * way a browser would receive it; undefined when the page carries none.
+ * The per-login value the login page carries, read from the page at the login URL the
+ * server opened — which carries that value as `s` — the way a browser would receive it;
+ * undefined when the page carries none.
  */
-export async function loginPageState(port: number): Promise<string | undefined> {
-  const html = await (await fetch(`http://127.0.0.1:${port}/`)).text();
+export async function loginPageState(loginUrl: string): Promise<string | undefined> {
+  const html = await (await fetch(loginUrl)).text();
   const match = html.match(/var state = ("[^"\n]*");/);
   return match ? (JSON.parse(match[1]) as string) : undefined;
 }
 
-/** POSTs a JSON body to the login server's `/callback`. */
-export function postLoginCallback(port: number, body: unknown): Promise<Response> {
-  return fetch(`http://127.0.0.1:${port}/callback`, {
+/** POSTs a JSON body to the `/callback` of the login server at this login URL. */
+export function postLoginCallback(loginUrl: string, body: unknown): Promise<Response> {
+  return fetch(new URL('/callback', loginUrl), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
@@ -140,6 +141,6 @@ export function postLoginCallback(port: number, body: unknown): Promise<Response
 }
 
 /** What the login page posts once the user signs in: the token, with the page's own value. */
-export async function postLoginToken(port: number, token: string): Promise<Response> {
-  return postLoginCallback(port, { token, state: await loginPageState(port) });
+export async function postLoginToken(loginUrl: string, token: string): Promise<Response> {
+  return postLoginCallback(loginUrl, { token, state: await loginPageState(loginUrl) });
 }

@@ -4,17 +4,24 @@ import fs from 'fs';
 import os from 'os';
 import path from 'path';
 import { pathToFileURL } from 'url';
-import {
-  DEFAULT_MAP_LOCK_TIMING,
-  readProjectEntry,
-  removeProjectEntry,
-  writeProjectEntry,
-} from '../project-map.js';
+import { DEFAULT_LOCK_TIMING } from '../atomic-file.js';
+import { readProjectEntry, removeProjectEntry, writeProjectEntry } from '../project-map.js';
 import { ToolError } from '../tool-errors.js';
 
 const packageRoot = path.resolve(__dirname, '../..');
 const tsxEntry = path.resolve(packageRoot, 'node_modules/tsx/dist/cli.mjs');
 const projectMapModule = pathToFileURL(path.resolve(packageRoot, 'src/project-map.ts')).href;
+
+// The pid of a process on this host that has exited.
+async function exitedPid(): Promise<number> {
+  const child = spawn(process.execPath, ['-e', '']);
+  await new Promise((resolve) => child.on('exit', resolve));
+  return child.pid ?? 0;
+}
+
+// A lock left by a writer on this host whose process has exited.
+const abandonedLock = (pid: number) =>
+  JSON.stringify({ host: os.hostname(), pid, id: '00000000-0000-0000-0000-000000000000' });
 
 // The map is shared by every server process on the machine. A write takes a lock file
 // beside it, re-reads under the lock, and renames a complete temporary file over the
@@ -121,10 +128,8 @@ describe('project map writes', () => {
       expect(fs.existsSync(lockFile())).toBe(true);
     });
 
-    it('replaces a lock older than the stale limit and proceeds', () => {
-      fs.writeFileSync(lockFile(), '');
-      const old = new Date(Date.now() - 11_000);
-      fs.utimesSync(lockFile(), old, old);
+    it('replaces a lock whose holder on this host has exited, and proceeds', async () => {
+      fs.writeFileSync(lockFile(), abandonedLock(await exitedPid()));
 
       write('/work/a', 'https://a.form.io');
 
@@ -167,13 +172,13 @@ describe('project map writes', () => {
 
   describe('lock ownership', () => {
     const errno = (code: string) => Object.assign(new Error(`${code}: simulated`), { code });
-    const staleLock = (content: string) => {
-      fs.writeFileSync(lockFile(), content);
-      const old = new Date(Date.now() - 60_000);
-      fs.utimesSync(lockFile(), old, old);
-    };
+    let gonePid = 0;
+    beforeEach(async () => {
+      gonePid = await exitedPid();
+    });
+    const staleLock = () => fs.writeFileSync(lockFile(), abandonedLock(gonePid));
 
-    it('writes an owner token of the process id and a unique value into the lock', () => {
+    it('writes an owner token of this host, the process id and a unique value into the lock', () => {
       const original = fs.writeFileSync;
       let held = '';
       vi.spyOn(fs, 'writeFileSync').mockImplementation((...args) => {
@@ -185,14 +190,18 @@ describe('project map writes', () => {
 
       write('/work/a', 'https://a.form.io');
 
-      expect(held).toMatch(new RegExp(`^${process.pid} [0-9a-f-]{36}$`));
+      expect(JSON.parse(held)).toEqual({
+        host: os.hostname(),
+        pid: process.pid,
+        id: expect.stringMatching(/^[0-9a-f-]{36}$/),
+      });
     });
 
-    it('a holder that outlived the stale limit leaves a lock it no longer owns', () => {
+    it('a holder whose lock was broken and taken meanwhile leaves the lock it no longer owns', () => {
       const original = fs.writeFileSync;
       vi.spyOn(fs, 'writeFileSync').mockImplementation((...args) => {
         const result = original(...(args as Parameters<typeof fs.writeFileSync>));
-        // While this write runs, its lock is judged stale and another writer takes it.
+        // While this write runs, its lock is judged abandoned and another writer takes it.
         if (String(args[0]).endsWith('.tmp')) {
           original(lockFile(), 'another-owner');
         }
@@ -208,7 +217,7 @@ describe('project map writes', () => {
     });
 
     it('breaks a stale lock by renaming it aside to a unique name, then removing it', () => {
-      staleLock('dead-holder');
+      staleLock();
       const rename = vi.spyOn(fs, 'renameSync');
 
       write('/work/a', 'https://a.form.io');
@@ -222,7 +231,7 @@ describe('project map writes', () => {
     });
 
     it('waits when another writer broke the stale lock first', () => {
-      staleLock('dead-holder');
+      staleLock();
       const original = fs.renameSync;
       vi.spyOn(fs, 'renameSync').mockImplementation((from, to) => {
         if (from === lockFile()) {
@@ -242,7 +251,7 @@ describe('project map writes', () => {
     });
 
     it('puts back a lock that another writer took between the stale check and the rename', () => {
-      staleLock('dead-holder');
+      staleLock();
       const original = fs.renameSync;
       let raced = false;
       vi.spyOn(fs, 'renameSync').mockImplementation((from, to) => {
@@ -284,14 +293,14 @@ describe('project map writes', () => {
 
   describe('timing', () => {
     it('judges a lock stale after 3 s and gives up waiting after 5 s', () => {
-      expect(DEFAULT_MAP_LOCK_TIMING.staleMs).toBe(3_000);
-      expect(DEFAULT_MAP_LOCK_TIMING.timeoutMs).toBe(5_000);
-      expect(DEFAULT_MAP_LOCK_TIMING.staleMs).toBeLessThan(DEFAULT_MAP_LOCK_TIMING.timeoutMs);
+      expect(DEFAULT_LOCK_TIMING.staleMs).toBe(3_000);
+      expect(DEFAULT_LOCK_TIMING.timeoutMs).toBe(5_000);
+      expect(DEFAULT_LOCK_TIMING.staleMs).toBeLessThan(DEFAULT_LOCK_TIMING.timeoutMs);
     });
 
-    it("clears a crashed holder's lock within a waiter's wait", () => {
+    it("clears a crashed holder's lock within a waiter's wait", async () => {
       // Taken just now by a process that then exited without releasing it.
-      fs.writeFileSync(lockFile(), '999999 00000000-0000-0000-0000-000000000000');
+      fs.writeFileSync(lockFile(), abandonedLock(await exitedPid()));
       const started = Date.now();
 
       writeProjectEntry({
@@ -300,7 +309,7 @@ describe('project map writes', () => {
         cacheDir,
       });
 
-      expect(Date.now() - started).toBeLessThan(DEFAULT_MAP_LOCK_TIMING.timeoutMs);
+      expect(Date.now() - started).toBeLessThan(DEFAULT_LOCK_TIMING.timeoutMs);
       expect(readProjectEntry('/work/a', cacheDir)?.env.FORMIO_PROJECT_URL).toBe(
         'https://a.form.io'
       );
@@ -308,12 +317,10 @@ describe('project map writes', () => {
     }, 10_000);
   });
 
-  // Several processes meet one stale lock at the same instant. Only one of them breaks
+  // Several processes meet one abandoned lock at the same instant. Only one of them breaks
   // it; the rest wait their turn, and every entry each of them writes is kept.
-  it('keeps every entry when several processes meet one stale lock at once', async () => {
-    fs.writeFileSync(lockFile(), 'dead-holder');
-    const old = new Date(Date.now() - 60_000);
-    fs.utimesSync(lockFile(), old, old);
+  it('keeps every entry when several processes meet one abandoned lock at once', async () => {
+    fs.writeFileSync(lockFile(), abandonedLock(await exitedPid()));
     const writers = 4;
     const perWriter = 10;
     const script = path.join(cacheDir, 'breaker.mts');

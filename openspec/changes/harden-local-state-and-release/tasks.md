@@ -117,3 +117,18 @@
 ### Refactor
 
 - [x] 8.3 Review implementation and refactor as needed
+
+## 9. Second review follow-ups
+<!-- depends_on: 8 -->
+
+### Red
+
+- [x] 9.1 Write failing tests: the login URL opened and printed carries `?s=<value>`; `GET /` without `s`, with a different or repeated value answers 403 with a page that does not carry it and the login keeps waiting; with the right value a request under another `Host` and port (`foo-41000.app.github.dev:443`) is served and its post completes the login; `/callback` without the value answers 403; `project_set` waiting for a lock a running local process holds keeps the event loop running; the lock token is `{ host, pid, id }`; a running local holder is never broken and the wait ends at its limit; a dead local holder is broken at once; another host's lock is broken only after the waiter has seen it unchanged for the stale limit on a test-supplied clock, and a changed token restarts that; a lock that keeps coming back still ends the wait at its limit; breaking takes the breaker lock, waits for a running breaker and clears an abandoned one; a lock put back over another is left as `.stale` and the wait continues; a lock that cannot be created in an unwritable directory fails at once; concurrent token saves from separate processes keep every deployment; `project set --reset` beneath a mapped ancestor names that ancestor and clears nothing; a refusal over an inherited unusable entry names the ancestor; an explicit `--force` for a child writes its own entry even when the inherited forced pair is equal; the fingerprint and errno helpers exist once
+
+### Green
+
+- [x] 9.2 Remove the `Host` check and carry the login value in the login URL; move the lock and locked read-modify-write into `atomic-file.ts` (`updateFileLocked`, with the blocking and timer sleep strategies, the host/pid token, the holder judgement, the breaker lock, and a deadline check on every attempt) and use it for `projects.json` and the token cache; await `writeProjectEntry` with the timer sleep in `project_set`; name the ancestor in the reset and inherited-refusal messages; write a child's own entry for an explicit force
+
+### Refactor
+
+- [x] 9.3 Review implementation and refactor as needed; update the `user-auth`, `project-map-routing` and `token-cache` deltas and design decisions 1 and 4

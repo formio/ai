@@ -86,9 +86,9 @@ describe('authenticate on a browserless host', () => {
     const jwt = await authenticate(
       { ...CONFIG, forceBrowser: true },
       {
-        onReady: async (port) => {
+        onReady: async ({ port, url }) => {
           observedPort = port;
-          await postLoginToken(port, 'forced');
+          await postLoginToken(url, 'forced');
         },
       }
     );
@@ -115,8 +115,8 @@ describe('authenticate on a browserless host', () => {
     const jwt = await authenticate(
       { ...CONFIG, authHost: '127.0.0.1', authPort: 43117 },
       {
-        onReady: async (port) => {
-          await postLoginToken(port, 'published');
+        onReady: async ({ url }) => {
+          await postLoginToken(url, 'published');
         },
       }
     );

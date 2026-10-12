@@ -1,35 +1,25 @@
 import fs from 'fs';
 import path from 'path';
 import os from 'os';
-import { randomUUID } from 'crypto';
-import { isTransientFileError, renameWithRetry, writeFileAtomically } from './atomic-file.js';
+import {
+  BLOCKING_SLEEP,
+  BlockingSleep,
+  FingerprintState,
+  LockOptions,
+  SleepStrategy,
+  TimerSleep,
+  errorCode,
+  fingerprintOf,
+  sameFingerprint,
+  updateFileLocked,
+  writeFileAtomically,
+} from './atomic-file.js';
 import { projectCommand } from './cli-launch.js';
 import { readHttpUrlEnv } from './config.js';
-import { pauseSync } from './sync-pause.js';
 import { ToolError } from './tool-errors.js';
 
 const DEFAULT_CACHE_DIR = path.join(os.homedir(), '.formio');
 const PROJECTS_FILE = 'projects.json';
-const LOCK_SUFFIX = '.lock';
-
-/**
- * How a writer waits for the map's lock: it retries every `retryMs`, gives up after
- * `timeoutMs`, and treats a lock last touched more than `staleMs` ago as left behind by
- * a writer that crashed. A write holds the lock for milliseconds. `staleMs` is below
- * `timeoutMs`, so a waiter that meets a crashed writer's lock clears it within its own
- * wait rather than failing first; the seam exists so tests need not wait seconds.
- */
-export interface MapLockTiming {
-  retryMs: number;
-  timeoutMs: number;
-  staleMs: number;
-}
-
-export const DEFAULT_MAP_LOCK_TIMING: MapLockTiming = {
-  retryMs: 50,
-  timeoutMs: 5_000,
-  staleMs: 3_000,
-};
 
 // A record holds a project and its deployment as a pair, so an entry is just the two
 // values. The `baseUrlFor` field this interface used to carry existed only because a
@@ -84,8 +74,9 @@ export class ProjectMapUnreadableError extends ToolError {
   // one. Saying "repair first" for both sent readers to do exactly that.
   //
   // A held LOCK is a third answer. The map itself is intact; what stops the write is a
-  // lock file another writer holds, or one a crashed writer left behind and that has
-  // not yet aged out. Deleting the lock is the remedy only when no other writer is
+  // lock file another writer holds — a running process on this host is never broken —
+  // or one a writer on another host left behind that this waiter has not yet seen
+  // unchanged for long enough. Deleting the lock is the remedy only when no other writer is
   // running, so the message says exactly that and names the write to retry.
   constructor({ filePath, cause, cwd, scope = 'file' }: ProjectMapUnreadable) {
     const remap = cwd
@@ -301,7 +292,7 @@ function readMap(cacheDir: string, cwd: string): ProjectMap {
   } catch (error) {
     // No file yet is the ordinary first-run state; anything else (a permission
     // error, an unreadable device) is a real failure and must not read as empty.
-    if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
+    if (errorCode(error) === 'ENOENT') {
       return {};
     }
     throw new ProjectMapUnreadableError({ filePath, cause: error, cwd });
@@ -328,16 +319,9 @@ function readMap(cacheDir: string, cwd: string): ProjectMap {
   return parsed as ProjectMap;
 }
 
-/** What identifies one version of the map file without reading it. */
-interface MapFingerprint {
-  mtimeMs: number;
-  size: number;
-  ino: number;
-}
-
 /** The map as last read, with its comparison index per platform asked about. */
 interface MapSnapshot {
-  fingerprint: MapFingerprint | 'missing';
+  fingerprint: FingerprintState;
   map: ProjectMap;
   indexes: Map<NodeJS.Platform, MapIndex>;
 }
@@ -346,20 +330,6 @@ interface MapSnapshot {
 // parsed map and the canonical path of every stored key until the file changes, which
 // every write does by renaming a new file into place.
 const snapshots = new Map<string, MapSnapshot>();
-
-function fingerprintOf(filePath: string): MapFingerprint | 'missing' | undefined {
-  try {
-    const { mtimeMs, size, ino } = fs.statSync(filePath);
-    return { mtimeMs, size, ino };
-  } catch (error) {
-    return errorCode(error) === 'ENOENT' ? 'missing' : undefined;
-  }
-}
-
-const sameFingerprint = (a: MapFingerprint | 'missing', b: MapFingerprint | 'missing'): boolean =>
-  a === 'missing' || b === 'missing'
-    ? a === b
-    : a.mtimeMs === b.mtimeMs && a.size === b.size && a.ino === b.ino;
 
 interface IndexedMapRequest {
   cacheDir: string;
@@ -406,201 +376,47 @@ function writeMap(cacheDir: string, data: ProjectMap): void {
   }
 }
 
-function errorCode(error: unknown): string | undefined {
-  return error instanceof Error ? (error as NodeJS.ErrnoException).code : undefined;
-}
-
-/** What a lock file holds and when it was last touched; undefined when there is none. */
-interface LockState {
-  owner: string;
-  mtimeMs: number;
-}
-
-function readLock(lockPath: string): LockState | undefined {
-  try {
-    const { mtimeMs } = fs.statSync(lockPath);
-    return { owner: fs.readFileSync(lockPath, 'utf-8'), mtimeMs };
-  } catch (error) {
-    if (errorCode(error) === 'ENOENT') {
-      return undefined;
-    }
-    throw error;
-  }
-}
-
-// The value a writer puts in the lock it creates: unique to this acquisition, so a
-// writer can tell its own lock from one another writer took after it.
-const newOwnerToken = (): string => `${process.pid} ${randomUUID()}`;
-
-// True when this call created the lock file, holding `owner`; false when a lock is
-// already there. EPERM counts as held: Windows returns it for an exclusive create of a
-// file that another process is still deleting.
-function createLock(lockPath: string, owner: string): boolean {
-  let fd: number;
-  try {
-    fd = fs.openSync(lockPath, 'wx', 0o600);
-  } catch (error) {
-    if (errorCode(error) === 'EEXIST' || errorCode(error) === 'EPERM') {
-      return false;
-    }
-    throw error;
-  }
-  try {
-    fs.writeSync(fd, owner);
-  } finally {
-    fs.closeSync(fd);
-  }
-  return true;
-}
-
-interface SetAside {
-  lockPath: string;
-  /** What the lock moved aside must be for this caller to remove it. */
-  expected: (state: LockState) => boolean;
-}
-
-/**
- * Break a stale lock: move it aside under a unique name, so of several writers doing
- * this at once only one gets it; then remove it if it is the lock that was judged
- * stale, or put it back.
- *
- * Moving it first is what makes the check safe: whatever is checked is no longer
- * where another writer can replace it. A lock that turns out to be another writer's —
- * taken between this caller's look and its move — is linked back into place; if a
- * third writer took the place meanwhile, that writer's lock stands.
- *
- * Returns false when there was no lock to move: another writer moved it first.
- */
-function setLockAside({ lockPath, expected }: SetAside): boolean {
-  const aside = `${lockPath}.${randomUUID()}.stale`;
-  try {
-    renameWithRetry({ from: lockPath, to: aside });
-  } catch (error) {
-    if (errorCode(error) === 'ENOENT') {
-      return false;
-    }
-    throw error;
-  }
-  const moved = readLock(aside);
-  if (moved === undefined || !expected(moved)) {
-    putBack({ aside, lockPath });
-    return true;
-  }
-  fs.rmSync(aside, { force: true, maxRetries: 3 });
-  return true;
-}
-
-// A lock moved aside by mistake, returned to its place unless another lock now holds it.
-function putBack({ aside, lockPath }: { aside: string; lockPath: string }): void {
-  try {
-    fs.linkSync(aside, lockPath);
-  } catch (error) {
-    if (errorCode(error) !== 'EEXIST') {
-      // A filesystem without hard links: move it back instead.
-      renameWithRetry({ from: aside, to: lockPath });
-      return;
-    }
-  }
-  fs.rmSync(aside, { force: true, maxRetries: 3 });
-}
-
-interface LockRequest {
-  lockPath: string;
-  cwd: string;
-  timing: MapLockTiming;
-}
-
-/**
- * Take the map's lock by creating its lock file exclusively, waiting for a writer that
- * holds it, and return the owner token written into it. Exclusive create is the one
- * primitive every platform gives Node without a native addon, and it either creates
- * the file or fails because it exists.
- *
- * A lock older than `staleMs` was left by a writer that died holding it. It is broken
- * by moving it aside under a unique name (see setLockAside): of several waiters that
- * judged it stale, one moves it and the rest find it gone and go back to waiting.
- */
-function acquireLock({ lockPath, cwd, timing }: LockRequest): string {
-  const failure = (cause: unknown) =>
-    new ProjectMapUnreadableError({ filePath: lockPath, cause, cwd, scope: 'lock' });
-  const owner = newOwnerToken();
-  const deadline = Date.now() + timing.timeoutMs;
-  const isStale = (state: LockState) => Date.now() - state.mtimeMs > timing.staleMs;
-  for (;;) {
-    try {
-      if (createLock(lockPath, owner)) {
-        return owner;
-      }
-      const held = readLock(lockPath);
-      if (held !== undefined && isStale(held)) {
-        setLockAside({
-          lockPath,
-          // The very lock judged stale, not one another writer has taken since.
-          expected: (moved) => moved.owner === held.owner && isStale(moved),
-        });
-        continue;
-      }
-    } catch (error) {
-      // A file Windows kept refusing to move or read is retried on the next pass, like
-      // a held lock.
-      if (!isTransientFileError(error)) {
-        throw failure(error);
-      }
-    }
-    if (Date.now() >= deadline) {
-      throw failure(new Error(`another writer held it for more than ${timing.timeoutMs / 1000} s`));
-    }
-    pauseSync(timing.retryMs);
-  }
-}
-
-/**
- * Release the lock if this writer still owns it. A writer that took longer than the
- * stale limit may have had its lock broken and taken by another; that lock holds the
- * other writer's token, and is left alone.
- */
-function releaseLock({ lockPath, owner }: { lockPath: string; owner: string }): void {
-  try {
-    if (readLock(lockPath)?.owner === owner) {
-      fs.rmSync(lockPath, { force: true, maxRetries: 3 });
-    }
-  } catch {
-    // Left in place, it ages out at the stale limit; the write itself has landed.
-  }
-}
-
 interface MapUpdate<T> {
   cacheDir: string;
   /** The directory the write is for, named by any failure's remedy. */
   cwd: string;
-  lock?: Partial<MapLockTiming>;
+  lock?: LockOptions;
   /** The change, applied to the map as it is on disk under the lock. */
   change: (map: ProjectMap) => { map?: ProjectMap; result: T };
 }
 
 /**
- * The one read-modify-write. Under the lock the map is read afresh — never a snapshot
- * taken before the lock, nor the readers' cached one — so another process's entry
- * written meanwhile is kept; the change is applied; and the result replaces the file in
- * one rename. `map` absent means nothing changed and nothing is written. The lock is
- * released whatever happens, if this writer still owns it.
+ * The one read-modify-write, through the shared locked update (see updateFileLocked).
+ * Under the lock the map is read afresh — never a snapshot taken before the lock, nor the
+ * readers' cached one — so another process's entry written meanwhile is kept; the
+ * change is applied; and the result replaces the file in one rename. `map` absent means
+ * nothing changed and nothing is written.
  *
- * Synchronous, waiting included: `project set` and the tools share this writer, and the
- * CLI is synchronous throughout.
+ * `sleep` is how a wait for the lock passes: blocking for `project set`, which is
+ * synchronous throughout, and on a timer for the MCP server's tools.
  */
-function updateMap<T>({ cacheDir, cwd, lock, change }: MapUpdate<T>): T {
-  const lockPath = `${projectMapPath(cacheDir)}${LOCK_SUFFIX}`;
-  fs.mkdirSync(cacheDir, { recursive: true });
-  const owner = acquireLock({ lockPath, cwd, timing: { ...DEFAULT_MAP_LOCK_TIMING, ...lock } });
-  try {
-    const { map, result } = change(readMap(cacheDir, cwd));
-    if (map) {
-      writeMap(cacheDir, map);
-    }
-    return result;
-  } finally {
-    releaseLock({ lockPath, owner });
-  }
+function updateMap<T>(request: MapUpdate<T> & { sleep: BlockingSleep }): T;
+function updateMap<T>(request: MapUpdate<T> & { sleep: SleepStrategy }): T | Promise<T>;
+function updateMap<T>({
+  cacheDir,
+  cwd,
+  lock,
+  change,
+  sleep,
+}: MapUpdate<T> & { sleep: SleepStrategy }): T | Promise<T> {
+  return updateFileLocked({
+    filePath: projectMapPath(cacheDir),
+    read: () => readMap(cacheDir, cwd),
+    update: (current: ProjectMap) => {
+      const { map, result } = change(current);
+      return { next: map, result };
+    },
+    write: (next: ProjectMap) => writeMap(cacheDir, next),
+    lockFailure: ({ lockPath, cause }) =>
+      new ProjectMapUnreadableError({ filePath: lockPath, cause, cwd, scope: 'lock' }),
+    lock,
+    sleep,
+  });
 }
 
 // Per entry, not per file. The top-level shape check above says the file is a
@@ -804,7 +620,7 @@ export function removeProjectEntry({
   cwd: string;
   cacheDir?: string;
   platform?: NodeJS.Platform;
-  lock?: Partial<MapLockTiming>;
+  lock?: LockOptions;
 }): ProjectEntry | undefined {
   // This directory's own entry, under whatever spelling it was recorded — never an
   // ancestor's, which belongs to every other directory beneath it.
@@ -813,6 +629,8 @@ export function removeProjectEntry({
     cacheDir,
     cwd: spelledDir(cwd, platform),
     lock,
+    // `project set --reset` is the only caller, and the CLI is synchronous.
+    sleep: BLOCKING_SLEEP,
     change: (map) => {
       const existing = entryAt(indexMap(map, platform), dir, platform);
       if (existing === undefined) {
@@ -855,9 +673,18 @@ export interface ProjectEntryWrite {
   cacheDir?: string;
   /** Whose path rules apply; the running platform unless a test simulates another. */
   platform?: NodeJS.Platform;
-  lock?: Partial<MapLockTiming>;
+  lock?: LockOptions;
 }
 
+/**
+ * Record a directory's own entry. `sleep` is how a wait for the map's lock passes: the
+ * blocking default returns once written, for `project set`; TIMER_SLEEP returns a
+ * promise and leaves the MCP server's event loop running while it waits.
+ */
+export function writeProjectEntry(request: ProjectEntryWrite & { sleep?: BlockingSleep }): void;
+export function writeProjectEntry(
+  request: ProjectEntryWrite & { sleep: TimerSleep }
+): Promise<void>;
 export function writeProjectEntry({
   cwd,
   env,
@@ -865,7 +692,8 @@ export function writeProjectEntry({
   cacheDir = DEFAULT_CACHE_DIR,
   platform = process.platform,
   lock,
-}: ProjectEntryWrite): void {
+  sleep = BLOCKING_SLEEP,
+}: ProjectEntryWrite & { sleep?: SleepStrategy }): void | Promise<void> {
   // Stored under the canonical path of the directory it was given, in its true case —
   // its own entry, even beneath a mapped ancestor — replacing any other spelling of
   // that directory.
@@ -883,10 +711,11 @@ export function writeProjectEntry({
   // The flag is written only when it is true, so an ordinary entry keeps the shape it
   // has always had: this file is read by hand and diffed in bug reports, and a
   // `"forced": false` on every entry advertises an override nobody asked for.
-  updateMap({
+  return updateMap({
     cacheDir,
     cwd: spelledDir(cwd, platform),
     lock,
+    sleep,
     change: (map) => ({
       map: {
         ...withoutDirectory({ map, dir: key, platform }),

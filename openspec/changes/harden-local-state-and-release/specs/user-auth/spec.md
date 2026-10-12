@@ -15,6 +15,21 @@ On successful form submission, the login page SHALL read the JWT from `Formio.ge
 - **WHEN** the `/callback` endpoint receives a valid JWT with the matching per-login value
 - **THEN** the authenticate function resolves with the JWT string
 
+### Requirement: Browser opens automatically to the login page
+
+The auth module SHALL open the user's default browser to the login URL — `http://<host>:<port>/?s=<per-login value>` — when the login flow starts, after the browserless check has passed, and SHALL print that URL on stderr. When the launch command fails, the module SHALL keep the login server running and instruct the user to open the printed URL manually.
+
+#### Scenario: Browser opens to login URL
+
+- **WHEN** the login flow starts on a host that is not browserless and the Express server is listening
+- **THEN** the user's default browser is opened to `http://127.0.0.1:{port}/?s=<per-login value>`
+
+#### Scenario: Launch failure leaves a manually openable URL
+
+- **WHEN** the browser launch command exits with an error
+- **THEN** the login server keeps listening until the timeout
+- **AND** the user is told to open the login URL manually
+
 ## ADDED Requirements
 
 ### Requirement: The login callback accepts only the post its page was served for
@@ -40,32 +55,21 @@ The login page SHALL embed the login-form URL in its script as a JSON string lit
 - **WHEN** the login-form URL contains `'`
 - **THEN** the page's script passes the whole URL, unchanged, to `Formio.createForm`
 
-### Requirement: The login server answers requests by the host it is bound to
+### Requirement: The login page is served only for the login URL
 
-Which requests the local login server answers on `GET /` and `POST /callback` SHALL depend on the host it is bound to:
+Each login's value SHALL travel in the login URL the server opens and prints, as its `s` query parameter: `http://<host>:<port>/?s=<value>`, where `<host>` is `FORMIO_AUTH_HOST` (`127.0.0.1` when it is unset or names every interface) and `<port>` the port the server listens on. `GET /` SHALL serve the login page only when its `s` parameter matches this login's value, compared in constant time; any other request SHALL be answered `403` with a short page that does not carry the value, and SHALL NOT end the login. The page SHALL post the same value to `/callback` with the token. Nothing else about a request, such as its `Host` header, SHALL decide whether it is answered.
 
-- Bound to loopback — `FORMIO_AUTH_HOST` unset (the default `127.0.0.1`) or naming `localhost`, `127.0.0.1` or `::1` — it SHALL answer only requests whose `Host` header names `localhost`, `127.0.0.1` or `[::1]` together with the port the server is listening on.
-- Bound to every interface — `FORMIO_AUTH_HOST` `0.0.0.0` or `::` — the user has opted into access from another host, and the server SHALL NOT check the `Host` header.
-- Bound to a specific other host — it SHALL answer requests whose `Host` header names that host or a loopback name, with any port.
+#### Scenario: The login URL
 
-A request refused by these rules SHALL be answered `403` and SHALL NOT end the login. In every case `/callback` SHALL still require the per-login value.
+- **WHEN** a login starts
+- **THEN** the URL the browser is opened to, and the URL printed on stderr, both carry the login's value as `s`
 
-#### Scenario: Loopback binding and another host
+#### Scenario: A request without the value
 
-- **WHEN** the server is bound to loopback and a request reaches `GET /` or `POST /callback` with a `Host` header naming another host, or a loopback name at another port
-- **THEN** it is answered `403`, no token is taken, and the login keeps waiting
+- **WHEN** a request reaches `GET /` without `s`, with a different value, or with `s` given more than once
+- **THEN** it is answered `403` with a page that does not carry the value, and the login keeps waiting
 
-#### Scenario: The login page addressed as localhost
+#### Scenario: A forwarded port
 
-- **WHEN** the server is bound to loopback, the browser loads the login page at `http://localhost:<port>/`, and the page posts its token
-- **THEN** the page is served and the login completes with that token
-
-#### Scenario: A forwarded port while bound to every interface
-
-- **WHEN** `FORMIO_AUTH_HOST` is `0.0.0.0` and requests arrive with the `Host` header `foo-43117.app.github.dev:443`
-- **THEN** the login page is served, a `/callback` post carrying the per-login value completes the login, and a post without the value is answered `403`
-
-#### Scenario: A specific host with a remapped port
-
-- **WHEN** `FORMIO_AUTH_HOST` names `login.example.test` and a request is addressed to `login.example.test` at a port other than the one the server listens on
-- **THEN** it is answered as a request addressed to the server
+- **WHEN** a request for the login URL reaches the server with the `Host` header `foo-41000.app.github.dev:443`, under a name and port the server does not listen on
+- **THEN** the login page is served, the page's post to `/callback` completes the login, and a post without the value is answered `403`

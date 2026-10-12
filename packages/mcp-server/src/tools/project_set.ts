@@ -1,5 +1,6 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
+import { TIMER_SLEEP } from '../atomic-file.js';
 import { readHttpUrlEnv } from '../config.js';
 import { planProjectEntry } from '../project-entry-plan.js';
 import {
@@ -210,6 +211,8 @@ export function registerProjectSetTool(server: McpServer, options: ProjectSetOpt
       // mapping as "the record that governs this directory" there is the same
       // wrong-record diagnosis this guard exists to stop, one layer up. The plan's own
       // wrong-record branch answers that case, in the committed file's vocabulary.
+      // The remedy names the directory that HOLDS the entry — an ancestor's, when this
+      // directory inherits it — since that is the entry the call replaces.
       if (
         unusableEntry !== undefined &&
         mapped.status !== 'absent' &&
@@ -217,7 +220,7 @@ export function registerProjectSetTool(server: McpServer, options: ProjectSetOpt
         !committed?.projectUrl
       ) {
         refuse(
-          `The mapping for ${mapped.dir} holds an unusable value, so it is the record that governs this directory and it cannot answer with a project: ${unusableEntry} Nothing else supplies the project while that entry is on record. Call project_set again with cwd ${entryCwd} and projectUrl set to the project this directory should target, which replaces it. Add baseUrl only if the server then reports it cannot be determined.`
+          `The mapping for ${mapped.dir} holds an unusable value, so it is the record that governs this directory and it cannot answer with a project: ${unusableEntry} Nothing else supplies the project while that entry is on record. Call project_set again with cwd ${mapped.dir} and projectUrl set to the project that directory should target, which replaces it. Add baseUrl only if the server then reports it cannot be determined.`
         );
       }
 
@@ -378,8 +381,10 @@ export function registerProjectSetTool(server: McpServer, options: ProjectSetOpt
           : ` Note: the committed ${COMMITTED_CONFIG_FILE} governs this directory, so it supplies the pair that resolves — this mapping does not take effect while that file is there. To change what resolves, edit that file directly; this server reads a committed file and never writes one.`
         : '';
 
+      // Waited for on a timer: the server's event loop keeps serving while another
+      // writer holds the map's lock.
       if (plan.outcome !== 'unchanged') {
-        writeProjectEntry({ cwd: entryCwd, ...plan.entry });
+        await writeProjectEntry({ cwd: entryCwd, ...plan.entry, sleep: TIMER_SLEEP });
       }
       const settled = settle();
 
