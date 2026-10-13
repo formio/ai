@@ -2,7 +2,7 @@
 
 ### Requirement: project_tag_list reports the project's version and its tags
 
-The `project_tag_list` tool SHALL report, for the project `cwd` resolves to, its current version (the project's `tag` field) and every version tag of its project family — name, description, and creation time — newest first, read from `GET {projectUrl}/tag` without the stored templates. With `compare: true` it SHALL also export the project, fetch the current tag's stored template, and report which roles, resources, forms, and actions were added, removed, or changed since that tag, compared by machine name with server-generated fields (`_id`, `created`, `modified`, `owner`, `project`, `_vid`) ignored. A project whose current version is the default `0.0.0` with no tags SHALL report no current tag. The tool SHALL be annotated read-only.
+The `project_tag_list` tool SHALL report, for the project `cwd` resolves to, its current version (the project's `tag` field) and every version tag of its project family — name, description, and creation time — newest first, read from `GET {projectUrl}/tag`, which omits the stored templates. With `compare: true` it SHALL also export the project, fetch the current tag's stored template, and report which roles, resources, forms, and actions were added, removed, or changed since that tag, compared by machine name (Form.io's exporter carries only design fields). When the current version has no stored tag — a deploy from a template sets it without one, and deleting a tag leaves it — `compare: true` SHALL return the listing with a `comparison` message saying so, not an error. A project whose current version is the default `0.0.0` with no tags SHALL report no current tag. The tool SHALL be annotated read-only.
 
 #### Scenario: Current version and tags are listed
 
@@ -13,7 +13,11 @@ The `project_tag_list` tool SHALL report, for the project `cwd` resolves to, its
 
 - **WHEN** `project_tag_list` is called with `compare: true` and a form was added in the portal since `1.2.0`
 - **THEN** the report lists that form as added since `1.2.0`
-- **AND** it lists nothing as changed for entities that differ only in server-generated fields
+
+#### Scenario: A current version with no stored tag
+
+- **WHEN** the project's `tag` is `1.4.0` and no tag document `1.4.0` exists
+- **THEN** `compare: true` returns the listing and a comparison message naming `1.4.0`, not an error
 
 #### Scenario: A project never tagged
 

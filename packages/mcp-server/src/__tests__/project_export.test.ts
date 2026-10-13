@@ -88,6 +88,7 @@ describe('project_export tool', () => {
       mockFormioFetch.mockImplementation(async (path: string) => {
         if (path === 'tag') return { data: [{ _id: TAG_ID, tag: '1.2.0' }], total: 1 };
         if (path === `tag/${TAG_ID}`) return { _id: TAG_ID, tag: '1.2.0', template };
+        if (path === 'export') return { access: [{ type: 'read_all', roles: ['staff'] }] };
         throw new Error(`unexpected ${path}`);
       });
       const { client } = await createTestClient(registerProjectExportTool);
@@ -103,13 +104,59 @@ describe('project_export tool', () => {
         TEST_CONFIG,
         { withMeta: true }
       );
-      expect(mockFormioFetch).not.toHaveBeenCalledWith(
-        'export',
-        expect.anything(),
-        expect.anything(),
-        expect.anything()
-      );
       expect(result.structuredContent).toEqual(template);
+    });
+
+    // Form.io empties a tag's project-level `access` when it stores the tag, so a
+    // template.json refreshed from a tag would carry no project access lists. The
+    // project's current lists stand in for them.
+    it("fills the tag's emptied project access from the project's current export", async () => {
+      const access = [
+        { type: 'create_all', roles: ['administrator'] },
+        { type: 'read_all', roles: ['administrator', 'staff'] },
+      ];
+      mockFormioFetch.mockImplementation(async (path: string) => {
+        if (path === 'tag') return { data: [{ _id: TAG_ID, tag: '1.2.0' }], total: 1 };
+        if (path === `tag/${TAG_ID}`)
+          return { _id: TAG_ID, tag: '1.2.0', template: { access: [], forms: { order: {} } } };
+        if (path === 'export') return { access, forms: { order: {}, vendor: {} } };
+        throw new Error(`unexpected ${path}`);
+      });
+      const { client } = await createTestClient(registerProjectExportTool);
+
+      const result = await client.callTool({
+        name: 'project_export',
+        arguments: { cwd: TEST_CWD, tag: '1.2.0' },
+      });
+
+      expect(result.structuredContent).toEqual({ access, forms: { order: {} } });
+    });
+
+    it('keeps project access a tag stored', async () => {
+      const stored = [{ type: 'read_all', roles: ['staff'] }];
+      mockFormioFetch.mockImplementation(async (path: string) => {
+        if (path === 'tag') return { data: [{ _id: TAG_ID, tag: '1.2.0' }], total: 1 };
+        if (path === `tag/${TAG_ID}`)
+          return { _id: TAG_ID, tag: '1.2.0', template: { access: stored, forms: {} } };
+        if (path === 'export') return { access: [{ type: 'read_all', roles: ['other'] }] };
+        throw new Error(`unexpected ${path}`);
+      });
+      const { client } = await createTestClient(registerProjectExportTool);
+
+      const result = await client.callTool({
+        name: 'project_export',
+        arguments: { cwd: TEST_CWD, tag: '1.2.0' },
+      });
+
+      expect((result.structuredContent as { access: unknown }).access).toEqual(stored);
+    });
+
+    it('says in its description where a tag export takes project access from', async () => {
+      const { client } = await createTestClient(registerProjectExportTool);
+      const { tools } = await client.listTools();
+      expect(tools.find((t) => t.name === 'project_export')?.description).toMatch(
+        /access[^.]*current/i
+      );
     });
 
     // Chunk documents carry the same tag name as the tag itself.
@@ -124,6 +171,7 @@ describe('project_export tool', () => {
             total: 2,
           };
         if (path === `tag/${TAG_ID}`) return { _id: TAG_ID, tag: '1.2.0', template: { forms: {} } };
+        if (path === 'export') return {};
         throw new Error(`unexpected ${path}`);
       });
       const { client } = await createTestClient(registerProjectExportTool);

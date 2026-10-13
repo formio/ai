@@ -110,7 +110,7 @@ The framework's entry skill (build-new) or extend sub-skill (modify-existing) re
 
 ## Finishing — version the project
 
-When the work is finished — the Form.io changes and the application code that uses them, on either branch — propose the next version, ask, then create it with `project_tag_create` and refresh `template.json` from it with `project_export` and `tag`. `1.0.0` for a first build, a minor bump for a feature, a patch bump for a fix. A declined version leaves the project untagged and `template.json` unchanged. The script is in [`CHANGE.md`](./CHANGE.md) → "Finishing — version the project".
+When the work is finished — the Form.io changes and the application code that uses them, on either branch — propose the next version, ask, then create it with `project_tag_create` and refresh `template.json` from it with `project_export` and `tag`. `1.0.0` for a first build, a minor bump for a feature, a patch bump for a fix. A declined version leaves the project untagged and `template.json` unchanged; when the user declined the import, or nothing was applied, propose no version at all. The next version follows the highest tag in the project family, not the project's current one. The script is in [`CHANGE.md`](./CHANGE.md) → "Finishing — version the project".
 
 ## Handoff contracts
 

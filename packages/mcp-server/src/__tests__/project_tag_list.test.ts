@@ -124,6 +124,71 @@ describe('project_tag_list tool', () => {
     );
   });
 
+  // Form.io's deploy with a template sets the project's `tag` without storing a tag
+  // document, and deleting a tag leaves `tag` as it was: `current` can name a version
+  // the family has no template for. The listing still answers.
+  it('with compare and a current version that has no stored tag, keeps the listing', async () => {
+    serve({
+      current: '1.4.0',
+      tags: [{ _id: TAG_ID, tag: '1.0.0', description: 'First', created: '2026-10-01' }],
+    });
+    const result = await call({ compare: true });
+    expect(result.isError).toBeFalsy();
+    const content = result.structuredContent as {
+      current: string;
+      tags: unknown[];
+      comparison: Record<string, unknown>;
+    };
+    expect(content.current).toBe('1.4.0');
+    expect(content.tags).toHaveLength(1);
+    expect(content.comparison.against).toBeUndefined();
+    expect(content.comparison.message).toMatch(/1\.4\.0[^.]*no stored tag/i);
+    expect(mockFormioFetch).not.toHaveBeenCalledWith(
+      'export',
+      expect.anything(),
+      expect.anything(),
+      expect.anything()
+    );
+  });
+
+  it('fetches the current tag template by the id the listing returned, with no second lookup', async () => {
+    serve({
+      current: '1.0.0',
+      tags: [{ _id: TAG_ID, tag: '1.0.0', description: 'First', created: '2026-10-01' }],
+      exported: { forms: {} },
+      tagged: { forms: {} },
+    });
+    await call({ compare: true });
+    const lookups = mockFormioFetch.mock.calls.filter(
+      ([path, query]) => path === 'tag' && (query as Record<string, string>).tag
+    );
+    expect(lookups).toEqual([]);
+  });
+
+  it('sends no select, which Form.io ignores beside its own projection', async () => {
+    serve({ current: '0.0.0', tags: [] });
+    await call();
+    const [, query] = mockFormioFetch.mock.calls.find(([path]) => path === 'tag') ?? [];
+    expect(query).not.toHaveProperty('select');
+  });
+
+  it('starts the listing and the current-version read together', async () => {
+    const started: string[] = [];
+    const release: Array<() => void> = [];
+    mockFormioFetch.mockImplementation((path: string) => {
+      started.push(path);
+      return new Promise((resolve) => {
+        release.push(() =>
+          resolve(path === 'tag/current' ? { tag: '0.0.0' } : { data: [], total: 0 })
+        );
+      });
+    });
+    const pending = call();
+    await vi.waitFor(() => expect(started).toEqual(expect.arrayContaining(['tag', 'tag/current'])));
+    release.forEach((go) => go());
+    expect((await pending).structuredContent).toEqual({ tags: [] });
+  });
+
   it('reports a Form.io failure with the shared error contract', async () => {
     mockFormioFetch.mockRejectedValue(new Error('boom'));
     const result = await call();

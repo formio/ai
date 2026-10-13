@@ -113,17 +113,22 @@ It SHALL refer to the import as Step 3 of the four-step flow, and SHALL NOT refe
 
 ### Requirement: Each branch finishes by versioning the project
 
-On build-new, after a successful import, and on modify-existing, once the change and the application code that uses it are finished, `formio-application` SHALL propose the next semver version — `1.0.0` for a first build, a minor bump for a feature, a patch bump for a fix, after the current version `project_tag_list` reports — with a one-line description of the change, ask the user, and on approval create it with `project_tag_create` and export it with `project_export` `tag` over `template.json`. A declined proposal leaves the project untagged and `template.json` unchanged, and the skill says so.
+On build-new, only after a successful import, and on modify-existing, only after the change plan was applied — once the change and the application code that uses it are finished — `formio-application` SHALL propose the next semver version — `1.0.0` when the project family has no semver tag, otherwise a minor bump for a feature or a patch bump for a fix of the highest semver tag `project_tag_list` lists (tags are shared by the family, so not the project's `current`) — with a one-line description of the change, ask the user, and on approval create it with `project_tag_create` and export it with `project_export` `tag` over `template.json`. A declined proposal leaves the project untagged and `template.json` unchanged, and the skill says so.
 
 #### Scenario: First build is tagged 1.0.0
 
 - **WHEN** the build-new import succeeds and the user approves the proposed tag
 - **THEN** the skill creates tag `1.0.0` with the description and exports it over `template.json`
 
-#### Scenario: A feature bumps the minor version
+#### Scenario: A feature bumps the minor version of the highest tag
 
-- **WHEN** the current version is `1.2.0` and a feature is finished
-- **THEN** the skill proposes `1.3.0` and asks before creating it
+- **WHEN** the project's current version is `1.2.0`, the family's highest tag is `1.3.0`, and a feature is finished
+- **THEN** the skill proposes `1.4.0` and asks before creating it
+
+#### Scenario: A declined import proposes no version
+
+- **WHEN** the user declined the build-new import
+- **THEN** the skill proposes no version and leaves `template.json` as the planner wrote it
 
 ### Requirement: CHANGE.md checks for changes made outside the agent before planning
 
@@ -136,7 +141,7 @@ On build-new, after a successful import, and on modify-existing, once the change
 
 ### Requirement: CHANGE.md applies a change plan with the granular tools
 
-`CHANGE.md` SHALL apply the planner's change plan behind one approval gate that lists every entity to create or update, in dependency order — roles, then resources, then forms, then actions — with `role_create`, `form_create`, `form_update` (reading each form with `form_get` first, and taking the user's agreement on history as those tools require), and `action_create`, resolving machine names in the plan to ids from the project. A failure SHALL stop the run and report what was applied and what was not; nothing applied SHALL be rolled back without the user's say-so.
+`CHANGE.md` SHALL apply the planner's change plan behind one approval gate that lists every entity to create or update, in dependency order — roles, then resources (a new resource another new resource references created first, and a reference cycle closed afterwards with `form_update`), then forms, then actions — with `role_create`, `form_create`, `form_update` (reading each form with `form_get` first, and taking the user's agreement on history as those tools require), and `action_create`, resolving machine names in the plan to ids from the project, including those inside `updates`: a select's `data.resource` and role names in `access` and `submissionAccess`. A failure SHALL stop the run and report what was applied and what was not; nothing applied SHALL be rolled back without the user's say-so.
 
 #### Scenario: A new resource and its form are applied in order
 

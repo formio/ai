@@ -39,17 +39,17 @@ Proceed?
 **The order.** Apply roles, then resources, then forms, then actions, so every reference resolves to something that already exists:
 
 1. `role_create` for each new role.
-2. `form_create` for each new resource, then each new form. Replace each role and resource machine name in an `access` or `submissionAccess` list, and in a resource select's `data.resource`, with the `_id` the project has for it — from `role_list` and `form_get`, or from the create call just made.
-3. For each entry in `updates`: `form_get` the stored form, apply the change to it, and `form_update` it with a `note` naming the change. When `form_update` asks for agreement to save without history, relay that to the user rather than answering it yourself.
+2. `form_create` for each new resource, then each new form. When a new resource references another new resource — a select's `data.resource`, or a field-based `submissionAccess` on its select — create the referenced one first. For a cycle, where two new resources reference each other, create the first without that one select, then add the select with `form_update` once both exist. Replace each role and resource machine name in an `access` or `submissionAccess` list, and in a resource select's `data.resource`, with the `_id` the project has for it — from `role_list` and `form_get`, or from the create call just made.
+3. For each entry in `updates`: `form_get` the stored form, apply the change to it, and `form_update` it with a `note` naming the change. Machine names inside an update resolve exactly as in a new form: a select added by `addComponents` has its `data.resource` replaced with the resource's `_id`, and role names in a `set` of `access` or `submissionAccess` — or in a field-based `submissionAccess` on an added select — are replaced with role `_id`s. A name the project does not have stops the run, as any failure does. When `form_update` asks for agreement to save without history, relay that to the user rather than answering it yourself.
 4. `action_create` for each new action, on its form's `_id`, with resource machine names in its settings resolved to `_id`s the same way.
 
 **A failure stops the run.** Report what was applied and what was not, by name, and the error. Do not retry with different values and do not roll back what was applied: undoing is itself a change to the project, so it waits for the user's say-so.
 
 ## Finishing — version the project
 
-When the work is finished — the Form.io changes and the application code that uses them — version the project. This applies to both branches: on build-new it follows the import and the framework handoff.
+When the work is finished — the Form.io changes and the application code that uses them — version the project. This applies to both branches, and only when work reached the project: on build-new only when the import succeeded, and on modify-existing only after the change plan was applied. When the user declined the import, or nothing was applied, propose no version and leave `template.json` as the planner wrote it.
 
-1. **Propose the version.** From the `current` version `project_tag_list` reports: `1.0.0` for a first build; a minor bump for a feature (`1.2.0` → `1.3.0`); a patch bump for a fix (`1.2.0` → `1.2.1`). Write a one-line description of what changed (at most 256 characters).
+1. **Propose the version.** Tags are shared by every stage of the project family, so start from the highest semver version in `tags` that `project_tag_list` reports — not from `current`, which is only where this project stands and can trail a tag made on another stage. `1.0.0` when there is none; a minor bump for a feature (highest `1.3.0` → `1.4.0`); a patch bump for a fix (`1.3.0` → `1.3.1`). Write a one-line description of what changed (at most 256 characters).
 2. **Ask.** Show the proposed version and description and ask before creating it; the user may change either.
 3. **On approval:** create it with `project_tag_create`, then call `project_export` with `tag` set to that version and write the result over `template.json`. Say which version `template.json` now holds.
 4. **If the user declines:** create nothing, leave `template.json` as it is, and say that the project's changes are untagged and `template.json` does not include them.

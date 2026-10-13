@@ -390,6 +390,24 @@ def grade_change_run(run_dir: Path, eval_name: str):
     check("changes.json has no top-level `access`", "access" not in changes, f"keys: {list(changes)}")
     check("changes.json has an `updates` list", isinstance(changes.get("updates"), list))
 
+    # A malformed entity fails this one check; the checks below see only the
+    # well-formed ones, so one bad value cannot abort grading for every run.
+    malformed = [
+        f"{kind}.{name}"
+        for kind in ("roles", "resources", "forms", "actions")
+        for name, value in (changes.get(kind) if isinstance(changes.get(kind), dict) else {}).items()
+        if not isinstance(value, dict)
+    ] + [kind for kind in ("roles", "resources", "forms", "actions") if kind in changes and not isinstance(changes[kind], dict)]
+    check("every entity map and entity in changes.json is an object", not malformed, f"malformed: {malformed}")
+    changes = {
+        **changes,
+        **{
+            kind: {n: v for n, v in changes[kind].items() if isinstance(v, dict)} if isinstance(changes.get(kind), dict) else {}
+            for kind in ("roles", "resources", "forms", "actions")
+        },
+        "updates": [u for u in changes.get("updates") or [] if isinstance(u, dict)] if isinstance(changes.get("updates"), list) else [],
+    }
+
     repeated = [
         f"{kind}.{name}"
         for kind in ("roles", "resources", "forms")

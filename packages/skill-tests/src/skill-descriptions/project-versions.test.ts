@@ -109,3 +109,36 @@ describe('the extend handoff carries the change plan', () => {
     expect(read(path)).toMatch(/`changesJsonPath`/);
   });
 });
+
+// Review of #101. Updates to existing forms carry machine names exactly as new
+// forms do; new resources can reference each other; versions only follow work
+// that reached the project; and tags are shared by the whole project family, so
+// the next version is computed from the highest tag, not from this stage's
+// current one.
+describe('CHANGE.md applies and versions safely', () => {
+  const change = read('formio-application/CHANGE.md');
+  const skill = read('formio-application/SKILL.md');
+
+  it('resolves machine names inside updates to existing forms', () => {
+    const updates = change.slice(change.indexOf('For each entry in `updates`'));
+    expect(updates).toMatch(/`data\.resource`[^.]*`_id`/);
+    expect(updates).toMatch(/`submissionAccess`/);
+  });
+
+  it('orders new resources so referenced ones exist first', () => {
+    expect(change).toMatch(
+      /new resource references another new resource[\s\S]{0,200}?create the referenced one first/
+    );
+    expect(change).toMatch(/For a cycle[\s\S]{0,200}?`form_update`/);
+  });
+
+  it('versions only when the import succeeded or the change was applied', () => {
+    expect(change).toMatch(/only (when|after) (the|a) (first-build )?import (succeeded|ran)/);
+    expect(skill).toMatch(/declined the import[^.]*no version/);
+  });
+
+  it('proposes the next version from the highest tag, not the current one', () => {
+    expect(change).toMatch(/highest (semver )?(version|tag) in `tags`/);
+    expect(change).not.toMatch(/From the `current` version `project_tag_list` reports: `1\.0\.0`/);
+  });
+});

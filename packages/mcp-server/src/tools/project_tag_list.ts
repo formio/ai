@@ -1,14 +1,19 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 import { FormioConfig } from '../config.js';
-import { formioFetch, templateTransferTimeoutMs } from '../formio-client.js';
 import { toMcpStructuredResult, toMcpError } from '../mcp-responses.js';
 import { tagListOutput } from '../output-schemas.js';
 import { compareTemplates } from '../project-versions/template-compare.js';
-import { currentVersion, listTags, taggedTemplate } from '../project-versions/tags.js';
+import {
+  currentVersion,
+  exportProject,
+  listTagEntries,
+  readCurrentTag,
+  summaryOf,
+  templateOfEntry,
+} from '../project-versions/tags.js';
 import { reads } from '../tool-annotations.js';
 import { cwdSchema } from '../project-resolver.js';
-import { isRecord } from '../tool-errors.js';
 import { resolveToolConfig } from './project-resolution.js';
 
 export function registerProjectTagListTool(server: McpServer, config: FormioConfig) {
@@ -30,8 +35,9 @@ export function registerProjectTagListTool(server: McpServer, config: FormioConf
     async ({ cwd, compare }) => {
       try {
         const cfg = await resolveToolConfig({ server, cwd, config });
-        const tags = await listTags(cfg);
-        const current = await currentVersion(cfg, tags);
+        const [entries, reported] = await Promise.all([listTagEntries(cfg), readCurrentTag(cfg)]);
+        const tags = entries.map(summaryOf);
+        const current = currentVersion(reported, tags);
         const listing = { ...(current ? { current } : {}), tags };
         if (!compare) {
           return toMcpStructuredResult(listing);
@@ -42,16 +48,24 @@ export function registerProjectTagListTool(server: McpServer, config: FormioConf
             comparison: { message: 'The project has no version to compare against.' },
           });
         }
-        const exported = await formioFetch('export', {}, cfg, {
-          timeoutMs: templateTransferTimeoutMs(cfg),
-        });
-        const tagged = await taggedTemplate(cfg, current);
+        // A deploy from a template, or a deleted tag, can leave `current` naming a
+        // version with no stored template.
+        const entry = entries.find((candidate) => candidate.tag === current && candidate.id);
+        if (!entry) {
+          return toMcpStructuredResult({
+            ...listing,
+            comparison: {
+              message: `The project is at ${current}, which has no stored tag to compare against.`,
+            },
+          });
+        }
+        const [exported, tagged] = await Promise.all([
+          exportProject(cfg),
+          templateOfEntry(cfg, entry),
+        ]);
         return toMcpStructuredResult({
           ...listing,
-          comparison: {
-            against: current,
-            ...compareTemplates({ current: isRecord(exported) ? exported : {}, tagged }),
-          },
+          comparison: { against: current, ...compareTemplates({ current: exported, tagged }) },
         });
       } catch (error) {
         return toMcpError(error);

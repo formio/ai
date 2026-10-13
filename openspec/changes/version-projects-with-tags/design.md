@@ -54,12 +54,16 @@ Spotting changes made outside the agent means comparing two large templates. An 
 
 `compare: true` exports the project and fetches the current tag's template. It then compares the two:
 
-- roles, resources, and forms by machine name, after removing `_id`, `created`, `modified`, `owner`, `project`, and `_vid`;
+- roles, resources, and forms by machine name, as exported (Form.io's exporter carries only design fields);
 - actions by the form they belong to plus their name.
 
 It reports what was added, removed, and changed. It is off by default, because it costs two template transfers.
 
 *Alternative:* comparing each form's `modified` time with the tag's `created` time is cheaper, but it misses role and action changes and any change that restores an earlier value.
+
+### 2a. A tag export carries the project's current access
+
+Form.io empties a template's project-level `access` when it stores a tag, so a tag's template alone would give `template.json` no project access lists, and a later first-build import of that file would apply none. `project_export` with `tag` therefore fills an empty `access` from the project's current export, fetched alongside the tag. Access a tag did store is kept. A current version with no stored tag — set by a deploy from a template, or left by deleting a tag — makes `compare: true` report that, not fail.
 
 ### 3. Errors use the existing contract
 
@@ -125,7 +129,7 @@ It also proposes a one-line description, asks, and on approval creates the tag a
 
 The single failing assertion is the same in all three: the login forms carry only a Login action, which the planner prescribes, so the grader's "every form" check appears stale. It is left as-is so the after-run is graded identically.
 
-**After the change** (`iteration-change`, same grader): 152 pass / 3 fail.
+**After the change** (`iteration-change`, same grader for the existing cases): 154 pass / 3 fail.
 
 | Case | Baseline | After |
 | --- | --- | --- |
@@ -133,10 +137,10 @@ The single failing assertion is the same in all three: the login forms carry onl
 | eval-1-crm-with-company-scoping | 32 / 1 | 32 / 1 |
 | eval-2-minimal-no-auth-feedback | 32 / 0 | 32 / 0 |
 | eval-3-complex-crm-transitive | 34 / 1 | 34 / 1 |
-| eval-4-change-time-entries (new) | — | 11 / 0 |
-| eval-5-change-vendor-on-deals (new) | — | 11 / 0 |
+| eval-4-change-time-entries (new) | — | 12 / 0 |
+| eval-5-change-vendor-on-deals (new) | — | 12 / 0 |
 
-The full-plan cases score exactly as on `main`, failing only the same stale assertion; both change-mode cases pass every assertion.
+The full-plan cases score exactly as on `main`, failing only the same stale assertion; both change-mode cases pass every assertion, including the well-formedness check added in review.
 
 ## Live validation (form.test, 2026-10-13)
 
@@ -147,6 +151,7 @@ This branch's server was run over stdio against `https://form.test/sandbox` (Ent
 - **Refusals.** A non-semver tag was refused as `INVALID_ARGUMENT` with no request. A duplicate tag returned `VALIDATION_FAILED` naming it, and an unknown tag `NOT_FOUND`.
 - **Everything else.** `server_status`, `project_get`, `project_set` (to a subdirectory), and `form_list` passed. So did `form_create`, `form_get` (by path and by id), `form_update` (live and draft), `form_publish`, `form_revision_list`, `form_revision_get`, and `form_revert` (to revision 0, plus refusing `draft`). The role tools (`role_list`, `role_create`, `role_update`) passed, as did the action-type tools (`action_type_list`, `action_type_get`). The action tools passed through a full create, get, update, and delete cycle (`action_list`, `action_create`, `action_get`, `action_update`, `action_delete`). `project_import` passed with a one-form template, as did `project_export`.
 - **Clean-up.** The probe forms, role, and tag were deleted afterwards, and sandbox's current version was restored to `1.0.0`.
+- **After the review fixes.** `project_export` with `tag: "1.0.0"` returned the project's eight access entries, identical to the current export, where the stored tag holds `[]`. With the project's version set to `9.9.9`, for which no tag exists, `compare: true` returned the listing with the message "The project is at 9.9.9, which has no stored tag to compare against." and no error. The version was then restored to `1.0.0`.
 
 ## Migration Plan
 

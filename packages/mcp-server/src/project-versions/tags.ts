@@ -21,12 +21,19 @@ export interface TagSummary {
   created?: string;
 }
 
+/** A tag as listed, with the id its template is fetched by. */
+export interface TagEntry extends TagSummary {
+  id?: string;
+}
+
 interface TagDocument extends Record<string, unknown> {
   _id?: unknown;
   tag?: unknown;
   chunk?: unknown;
 }
 
+// Form.io's tag index applies its own projection (leaving the stored template out),
+// so a `select` is not sent: the server would drop it.
 async function tagDocuments(
   config: ResolvedFormioConfig,
   filters: Record<string, string>
@@ -47,51 +54,67 @@ async function tagDocuments(
   return documents.filter((document) => document.chunk !== true);
 }
 
-/** Every tag of the project's family, newest first, without the stored templates. */
-export async function listTags(config: ResolvedFormioConfig): Promise<TagSummary[]> {
-  const documents = await tagDocuments(config, {
-    sort: '-created',
-    select: 'tag,description,created,chunk',
+function entryOf(document: TagDocument): TagEntry | undefined {
+  if (typeof document.tag !== 'string') {
+    return undefined;
+  }
+  return {
+    tag: document.tag,
+    ...(typeof document.description === 'string' ? { description: document.description } : {}),
+    ...(typeof document.created === 'string' ? { created: document.created } : {}),
+    ...(typeof document._id === 'string' ? { id: document._id } : {}),
+  };
+}
+
+/** Every tag of the project's family, newest first, with the ids their templates use. */
+export async function listTagEntries(config: ResolvedFormioConfig): Promise<TagEntry[]> {
+  const documents = await tagDocuments(config, { sort: '-created' });
+  return documents.flatMap((document) => {
+    const entry = entryOf(document);
+    return entry ? [entry] : [];
   });
-  return documents
-    .filter((document) => typeof document.tag === 'string')
-    .map((document) => ({
-      tag: document.tag as string,
-      ...(typeof document.description === 'string' ? { description: document.description } : {}),
-      ...(typeof document.created === 'string' ? { created: document.created } : {}),
-    }));
+}
+
+/** A tag as the tools report it: no id, no template. */
+export const summaryOf = ({ tag, description, created }: TagEntry): TagSummary => ({
+  tag,
+  ...(description !== undefined ? { description } : {}),
+  ...(created !== undefined ? { created } : {}),
+});
+
+/** The project's `tag` as Form.io reports it, untagged or not. */
+export async function readCurrentTag(config: ResolvedFormioConfig): Promise<string | undefined> {
+  const reply = await formioFetch('tag/current', {}, config);
+  return isRecord(reply) && typeof reply.tag === 'string' ? reply.tag : undefined;
 }
 
 /**
  * The tag the project is at, or undefined when it has never been tagged: Form.io
  * reports `0.0.0` for a project with no version, unless a tag of that name exists.
  */
-export async function currentVersion(
-  config: ResolvedFormioConfig,
+export function currentVersion(
+  reported: string | undefined,
   tags: TagSummary[]
-): Promise<string | undefined> {
-  const reply = await formioFetch('tag/current', {}, config);
-  const tag = isRecord(reply) && typeof reply.tag === 'string' ? reply.tag : undefined;
-  if (!tag || (tag === UNTAGGED && !tags.some((summary) => summary.tag === UNTAGGED))) {
+): string | undefined {
+  if (!reported || (reported === UNTAGGED && !tags.some((summary) => summary.tag === UNTAGGED))) {
     return undefined;
   }
-  return tag;
+  return reported;
 }
 
-/** The template a named tag stored. */
-export async function taggedTemplate(
+const notFound = (tag: string): ToolError =>
+  new ToolError({
+    code: 'NOT_FOUND',
+    message: `No version tag "${tag}" exists for this project. List the tags with project_tag_list.`,
+  });
+
+/** The template stored under a tag whose id is already known. */
+export async function templateOfEntry(
   config: ResolvedFormioConfig,
-  tag: string
+  { tag, id }: TagEntry
 ): Promise<Record<string, unknown>> {
-  const [found] = (await tagDocuments(config, { tag, select: '_id,tag,chunk' })).filter(
-    (document) => document.tag === tag
-  );
-  const id = found && typeof found._id === 'string' ? found._id : undefined;
   if (!id) {
-    throw new ToolError({
-      code: 'NOT_FOUND',
-      message: `No version tag "${tag}" exists for this project. List the tags with project_tag_list.`,
-    });
+    throw notFound(tag);
   }
   if (!isMongoId(id)) {
     throw new ToolError({
@@ -110,4 +133,44 @@ export async function taggedTemplate(
     });
   }
   return template;
+}
+
+/** The template a named tag stored, looking the tag up by name. */
+export async function taggedTemplate(
+  config: ResolvedFormioConfig,
+  tag: string
+): Promise<Record<string, unknown>> {
+  const [found] = (await tagDocuments(config, { tag }))
+    .map(entryOf)
+    .filter((entry): entry is TagEntry => entry?.tag === tag);
+  if (!found) {
+    throw notFound(tag);
+  }
+  return templateOfEntry(config, found);
+}
+
+/** The project's current export. */
+export async function exportProject(
+  config: ResolvedFormioConfig
+): Promise<Record<string, unknown>> {
+  const exported = await formioFetch('export', {}, config, {
+    timeoutMs: templateTransferTimeoutMs(config),
+  });
+  return isRecord(exported) ? exported : {};
+}
+
+/**
+ * Form.io stores a tag with its project-level `access` emptied, so a template
+ * refreshed from a tag would carry no project access lists. Where the stored lists
+ * are empty, the project's current ones stand in.
+ */
+export function withProjectAccess(
+  template: Record<string, unknown>,
+  exported: Record<string, unknown>
+): Record<string, unknown> {
+  const stored = template.access;
+  const emptied = Array.isArray(stored) && stored.length === 0;
+  return emptied && Array.isArray(exported.access)
+    ? { ...template, access: exported.access }
+    : template;
 }
