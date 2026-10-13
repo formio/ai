@@ -253,8 +253,9 @@ describe('preflight contract', () => {
   // skills in its Not-for clause, because framework-named builds with no plan used
   // to bounce between it and the framework skills; formio-angular's Not-for sends
   // an unplanned app to formio-application to match, and formio-application's
-  // Not-for hands it only Angular- or React-named work, so a framework-neutral
-  // extension stays with the orchestrator. formio-mcp-setup no longer
+  // Not-for hands it only Angular- or React-named requests — on a planned project or in a
+  // workspace of that framework — and its extend trigger says it holds inside such a
+  // workspace, so a framework-neutral extension stays with the orchestrator. formio-mcp-setup no longer
   // routes logging in to Form.io to formio-auth — the server opens that login on
   // the first tool call, and formio-auth is about an application's own users.
   it('left every existing description byte-identical', () => {

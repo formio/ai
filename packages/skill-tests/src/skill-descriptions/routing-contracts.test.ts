@@ -192,8 +192,15 @@ describe('formio-auth runs once, after import', () => {
 describe('framework-neutral extension stays with formio-application', () => {
   it('the Not-for clause gives framework skills only framework-named work', () => {
     const notFor = description('formio-application/SKILL.md').split('Not for:')[1] ?? '';
-    expect(notFor).toMatch(/Angular- or React-named work/);
-    expect(notFor).not.toMatch(/Not for: Angular or React work/);
+    // Graders split 3-2 on a framework-neutral "also track X" in an Angular workspace
+    // while the clause read "…named work on X, or in an existing workspace": the
+    // second half could stand alone. The framework condition now covers both, and
+    // the extend trigger says it holds inside a framework workspace.
+    expect(notFor).toMatch(/Angular- or React-named requests, whether for/);
+    expect(notFor).not.toMatch(/, or in an existing Angular\/React workspace/);
+    expect(description('formio-application/SKILL.md')).toMatch(
+      /extend one, even in an Angular or React workspace/
+    );
   });
 });
 
