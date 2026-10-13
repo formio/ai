@@ -36,14 +36,12 @@ The `formio-application` `SKILL.md` frontmatter `description` SHALL claim plain-
 - Build-new: "build me an app", "create a CRM", bare domain archetypes ("task manager", "help desk").
 - Extend-existing: "also track X", "add a way to see Y".
 
-The description MUST state that this skill is the library's default build-an-app entry point. The framework-selection behavior (auto-pick with one installed framework, ask with several) is a body concern and is NOT required in the description.
+The description MUST state that this skill is the library's default build-an-app entry point, and MUST claim a build that needs planning whether or not the request names a UI framework ("build me a CRM in React"); the named framework is carried to Step 4, which then asks no framework question. The framework-selection behavior (auto-pick with one installed framework, ask with several) is a body concern and is NOT required in the description. The description and the body's routing table SHALL name only skills a client registers — `formio-angular` and `formio-react`, never the nested sub-skills they load by path.
 
 The description MUST include `Not for:` clauses pointing at:
 
-- `formio-angular` for framework-explicit Angular requests.
-- `formio-angular-resources` for framework-explicit Angular extension requests.
-- `formio-react` for framework-explicit React requests.
-- `formio-react-resources` for framework-explicit React extension requests.
+- `formio-angular` for Angular work on a project that is already planned — an Angular front-end for an imported project, or an Angular extension of an existing workspace.
+- `formio-react` for the same React work.
 - `formio-resource-planner` for data-model-only planning requests without building an app.
 - `formio-api` for endpoint lookups.
 - `formio-form` for embedding or rendering a single form in an existing page or application (no app build or orchestration).
@@ -53,7 +51,7 @@ The description MUST include `Not for:` clauses pointing at:
 
 - **WHEN** the user says "build me a tool to track maintenance requests" (no framework or Form.io terminology)
 - **THEN** the `formio-application` skill activates
-- **AND** none of `formio-angular`, `formio-angular-resources`, `formio-react`, or `formio-react-resources` activates
+- **AND** neither `formio-angular` nor `formio-react` activates
 
 #### Scenario: formio-application claims generic extend triggers
 
@@ -61,11 +59,22 @@ The description MUST include `Not for:` clauses pointing at:
 - **THEN** the `formio-application` skill activates
 - **AND** no framework extend sub-skill activates directly
 
-#### Scenario: Framework-explicit phrasing does NOT route through formio-application
+#### Scenario: A framework-named build with no plan routes through formio-application
 
-- **WHEN** the user says "build it in Angular", "add an Angular module for X", "build it in React", or "add a React route for X"
+- **WHEN** the user says "build me a CRM in React" and no approved planner pair exists
+- **THEN** `formio-application` runs Intent, Plan, and Import
+- **AND** Step 4 routes to `formio-react` without asking which framework
+
+#### Scenario: Framework-explicit work on a planned project routes to the framework skill
+
+- **WHEN** the user says "build it in Angular" for a project whose plan is approved and imported, or "add a React route for X" in an existing React workspace
 - **THEN** the matching framework skill activates directly
 - **AND** `formio-application` does not activate
+
+#### Scenario: The description names no nested sub-skill
+
+- **WHEN** the `formio-application` frontmatter `description` is inspected
+- **THEN** it does not contain `formio-angular-resources`, `formio-react-resources`, `formio-angular-form`, or `formio-react-form`
 
 #### Scenario: Embed-a-form phrasing does NOT route through formio-application
 
@@ -114,7 +123,7 @@ Exactly one row SHALL carry `Default: yes`. It is Angular, because its implement
 - That a workspace matching more than one signal — for example one carrying both `angular.json` and a `react` dependency — is a multi-match, and Step 4 asks the user to pick in one question round rather than guessing from signal order.
 - That each row's Detection signal SHALL be written independently of every other row's, testing only for its own framework's presence. A signal that excludes another framework (`react` AND no `angular.json`) collapses the multi-match case into a single match and makes the tie-break branch unreachable, which puts the table's own routing rule in conflict with itself.
 - The Step 4a `frontend-design` pre-check: detect the skill by name, accepting more than one registered form rather than a single client's prefix; when it is missing, offer the install in one question round, naming where the skill ships and deferring the mechanism to the running client's own skill-install route; on decline, apply the Bootstrap 5 brief from `formio-angular/BOOTSTRAP.md` Step 7d inline, disclose that on each UI approval gate, and hand `frontendDesignStatus` downstream. The document MUST NOT instruct a client-specific plugin-install command, plugin browser, or reload command.
-- How to add a new framework entry — the concrete instruction for whoever is adding a further framework later. Its worked example SHALL name a framework that is NOT already a row (Vue). The shipped document uses React as that example, carrying a detection signal (`vite.config.* with react deps OR next.config.*`) that disagrees with React's real row and names Next.js, which is out of scope; leaving it in place puts two contradictory React signals in one file, one of them in the section a future author copies from.
+- Nothing addressed to a contributor. `FRAMEWORK.md` ships to every installation, where a repository path or a test command means nothing; the checklist for adding a framework lives in `CONTRIBUTING.md`, outside `plugin/`, with a worked example that names a framework not already a row (Vue).
 
 #### Scenario: Multi-framework registry asks the user
 
@@ -125,7 +134,7 @@ Exactly one row SHALL carry `Default: yes`. It is Angular, because its implement
 #### Scenario: React workspace detection routes directly
 
 - **WHEN** intent = modify-existing and the workspace has `react` in `package.json` and no Angular signal
-- **THEN** exactly one row matches, so Step 4 loads `plugin/skills/formio-react/formio-react-resources/SKILL.md` by path without asking the user
+- **THEN** exactly one row matches, so Step 4 loads `../formio-react/formio-react-resources/SKILL.md` by path without asking the user
 
 #### Scenario: Existing Angular workspace still routes directly
 
@@ -137,11 +146,12 @@ Exactly one row SHALL carry `Default: yes`. It is Angular, because its implement
 - **WHEN** intent = modify-existing and the workspace contains both `angular.json` and a `react` dependency
 - **THEN** Step 4 asks the user which framework to extend, in one question round
 
-#### Scenario: The how-to-add example does not name a live framework
+#### Scenario: FRAMEWORK.md carries no contributor instructions
 
-- **WHEN** `FRAMEWORK.md`'s "How to add a new framework" section is inspected
-- **THEN** its worked example names Vue, not React or Angular
+- **WHEN** `FRAMEWORK.md` is inspected
+- **THEN** it contains no "How to add a new framework" section, no `npm test`, and no `formio-vue` path
 - **AND** the file contains no React detection signal other than the one in the registry table
+- **AND** `CONTRIBUTING.md` carries the checklist, with a Vue worked example
 
 #### Scenario: Pre-check degrades when frontend-design is declined
 
@@ -277,7 +287,7 @@ The `formio-application` `SKILL.md` preflight SHALL gate the first step that rea
 
 1. Confirm `form_list` is callable, under whatever name this client exposes it. When it is not, route to `formio-mcp-setup` and stop — there is no server to ask for configuration, so the probe below cannot run. When `project_get` specifically is not callable, the connected server predates that tool: route to `formio-mcp-setup` as well, which moves the pin forward.
 2. Call the `project_get` MCP tool with `cwd` set to the user's current working directory, and branch on the `status` it returns. On `ok`, confirm the resolved Project URL and Base URL in one line and continue. On `not-configured`, ask for the single value the message names, record it with the `project_set` tool, and call again. On `base-url-unresolved`, ask for the Base URL alone and record it with `project_set` passing `baseUrl` and leaving `projectUrl` out — the project is already on record and SHALL NOT be re-asked.
-3. Stash the resolved values as `projectUrl` and `baseUrl` for the Import step and the framework handoff. These are values in the skill's working context, not environment variables: nothing reads them from the environment and nothing writes them there.
+3. Use the resolved values for the Import step only. No handoff carries them: the framework skill and `formio-auth` each call `project_get` for the workspace directory the handoff names, so they read the same record the import used rather than a copy of it. The values are in the skill's working context, not environment variables: nothing reads them from the environment and nothing writes them there.
 
 The skill SHALL NOT shell out to `npx -y @formio/mcp@<pinned> project get` for this. The connected server answers it over the open transport with the same resolver every other tool uses, so a subprocess adds an npm download and the chance of one server version reporting a resolution a different connected version will not honor.
 
@@ -326,6 +336,12 @@ The skill SHALL NOT carry its own URL interview: it asks only for what the serve
 - **WHEN** the user says "also track attendees in each event" in an existing Angular workspace
 - **THEN** the preflight calls `project_get` at Step 3 and completes the configuration from the status it returns
 - **AND** it does not read the URLs out of the workspace and assume the mapping exists
+
+#### Scenario: No handoff carries a URL
+
+- **WHEN** Step 4 hands off to a framework skill or Step 3.5 hands off to `formio-auth`
+- **THEN** the payload names `workspacePath` and carries no `projectUrl`, `baseUrl`, `formioProjectUrl`, or `formioBaseUrl`
+- **AND** the receiving skill resolves the project with `project_get` for that directory
 
 ### Requirement: formio-application runs a four-step orchestration
 
@@ -449,4 +465,25 @@ Step 1 of `plugin/skills/formio-application/SKILL.md` SHALL name what the pipeli
 
 - **WHEN** `INTENT.md` and `formio-angular/SKILL.md` are searched for "Angular today" and "`formio-angular` today"
 - **THEN** no match is found
+
+### Requirement: FRAMEWORK.md holds the one handoff contract
+
+`FRAMEWORK.md`'s handoff reference SHALL be the single statement of what `formio-application` hands each downstream skill, and SHALL define `workspacePath` as the `cwd` the Step 3 Preflight's `project_get` reported — the directory the import ran for. It SHALL state, per branch (build-new, modify-existing) and per receiver (framework entry skill, extend sub-skill, `formio-auth`): the fields passed, that no URL is among them, and which skill calls `project_get`. `SKILL.md`, `INTENT.md`, `IMPORT.md`, `formio-angular/SKILL.md`, `formio-react/SKILL.md`, and both resources sub-skills SHALL link to it rather than restating fields.
+
+#### Scenario: Handoff fields are stated once
+
+- **WHEN** the files above are searched for a list of handoff fields
+- **THEN** only `FRAMEWORK.md` lists them
+- **AND** every other file links to `FRAMEWORK.md`'s handoff reference
+
+### Requirement: formio-auth runs once, after import
+
+In an orchestrated build `formio-auth` SHALL run at Step 3.5, after the project is imported, and nowhere earlier. Step 3.5's trigger SHALL match the planner's auth concerns: a non-`none` SSO field, Custom JWT, or any auth concern beyond resource-backed login with Role and Group Assignment, RBAC tuning included.
+
+#### Scenario: One auth handoff per build
+
+- **WHEN** an approved Resource Map's Users & Auth section names SSO
+- **THEN** `formio-auth` runs at Step 3.5 after the import
+- **AND** the planner does not invoke it at map approval
+- **AND** `formio-auth` calls `project_get` with `cwd` set to the `workspacePath` it was handed
 
