@@ -93,6 +93,7 @@ if (!claims.exp || claims.exp * 1000 < Date.now()) {
 
 ### SSO
 
+<!-- example: fragment -->
 ```ts
 import { Formio } from '@formio/js';
 import { OktaAuth } from '@okta/okta-auth-js';
@@ -140,6 +141,7 @@ await Formio.setToken(null); // empties Formio.tokens and removes the persisted 
 
 ### OAuth bearer-token exchange
 
+<!-- example: fragment -->
 ```ts
 import { Formio } from '@formio/js';
 

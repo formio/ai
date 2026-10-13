@@ -151,12 +151,13 @@ describe('formio-react-form environments', () => {
     expect(reference('environments.md')).toContain('@vitejs/plugin-react');
   });
 
-  // @vitejs/plugin-react 6 peers on Vite 8 only; an unpinned install into a
-  // Vite 4-7 workspace fails peer resolution.
+  // Each @vitejs/plugin-react major peers on a range of Vite majors; an unpinned
+  // install into an older workspace fails peer resolution. The match is read from
+  // the registry, not stated, because the mapping moves with every release.
   it('matches the React plugin major to the workspace Vite major', () => {
     const body = reference('environments.md');
-    expect(body).toContain('@vitejs/plugin-react@^6');
-    expect(body).toContain('@vitejs/plugin-react@^5');
+    expect(body).toMatch(/npm view @vitejs\/plugin-react[^\n]*peerDependencies/);
+    expect(body).toContain('@vitejs/plugin-react@^<PLUGIN_REACT_MAJOR>');
     expect(body).not.toMatch(/add -D @vitejs\/plugin-react\s*$/m);
   });
 

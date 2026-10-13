@@ -10,7 +10,7 @@ Defines the one rule every MCP tool applies to an argument before it becomes par
 
 Every tool argument that is joined into a request path SHALL be checked by one shared rule before the handler resolves a project or makes any request. The rule SHALL be an allowlist: the value is one or more `/`-separated segments, and every segment consists only of ASCII letters, digits, `-` and `_` — the characters Form.io accepts in a form path, plus `_`. A value that is empty, begins with `/`, has an empty segment, or has a segment holding any other character — a scheme's `:`, a `.` or `..` segment, a percent-encoded `%2e%2e`, a `?` or `#`, a backslash — SHALL be refused. A refusal SHALL be returned as a tool error with `isError: true` that names the argument and the value, and SHALL say what shape the argument accepts. No request SHALL be made for a refused value.
 
-The rule applies to: `formIdOrPath` on `form_get`, `form_revisions_list` and `form_revision_get`; `formId` on every `action_*` tool; `actionId` on `action_get`, `action_update` and `action_delete`; `actionName` on `action_type_get`; and `version` on `form_revision_get` and `form_update`. Arguments that already require a 24-character hex ObjectId — `formId` on `form_update` and `roleId` on `role_update` — SHALL keep that check, which this rule does not loosen.
+The rule applies to: `formIdOrPath` on `form_get`, `form_revision_list` and `form_revision_get`; `formId` on every `action_*` tool; `actionId` on `action_get`, `action_update` and `action_delete`; `actionName` on `action_type_get`; and `version` on `form_revision_get` and `form_update`. Arguments that already require a 24-character hex ObjectId — `formId` on `form_update` and `roleId` on `role_update` — SHALL keep that check, which this rule does not loosen.
 
 #### Scenario: A form path with separators is accepted
 
@@ -36,7 +36,7 @@ The rule applies to: `formIdOrPath` on `form_get`, `form_revisions_list` and `fo
 
 #### Scenario: A dot segment is refused
 
-- **WHEN** `form_revisions_list` is called with `formIdOrPath: "user/../../other"`
+- **WHEN** `form_revision_list` is called with `formIdOrPath: "user/../../other"`
 - **THEN** the tool returns `isError: true` naming `formIdOrPath`
 - **AND** no request is made
 

@@ -98,7 +98,7 @@ npx -y @formio/mcp@0.14.1 project set --project-url <url> --base-url <url> --cwd
 npx -y @formio/mcp@0.14.1 project get --cwd <absolute path>
 ```
 
-`project get` prints what the server resolves and which source supplied it. Empty output is not an answer: the `project` command shipped in 0.9.0, and an older `@formio/mcp` ignores these arguments, starts its stdio server, reads end-of-input and exits 0 with no output — a silent no-op that reads as success. Do not invent either URL — if the user has not given them, skip this and let the agent ask when a project is first needed.
+`project get` prints what the server resolves and which source supplied it. Empty output is not an answer: an `@formio/mcp` too old to have the `project` command ignores these arguments, starts its stdio server, reads end-of-input and exits 0 with no output — a silent no-op that reads as success. Do not invent either URL — if the user has not given them, skip this and let the agent ask when a project is first needed.
 
 ## Verifying the install
 

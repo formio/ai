@@ -25,6 +25,7 @@ import { registerRoleCreateTool } from './role_create.js';
 import { registerRoleListTool } from './role_list.js';
 import { registerRoleUpdateTool } from './role_update.js';
 import { registerServerStatusTool } from './server_status.js';
+import { stripSchemaDialect } from '../tool-list-schemas.js';
 
 export interface RegisterAllToolsOptions {
   cwd?: () => string;
@@ -73,4 +74,5 @@ export function registerAllTools(
   registerActionGetTool(server, config);
   registerActionUpdateTool(server, config);
   registerActionDeleteTool(server, config);
+  stripSchemaDialect(server);
 }

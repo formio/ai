@@ -50,7 +50,8 @@
     "lint": "eslint src && tsc --noEmit",
     "clean": "rm -rf dist coverage",
     "prepack": "node -e \"require('fs').copyFileSync('../../LICENSE','LICENSE')\"",
-    "prepublishOnly": "pnpm test && pnpm build"
+    "prepublishOnly": "pnpm test && pnpm build",
+    "test:live": "pnpm build && vitest run --config vitest.live.config.ts"
   },
   "engines": {
     "node": ">=22.12"

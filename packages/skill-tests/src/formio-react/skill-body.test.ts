@@ -119,13 +119,14 @@ describe('formio-react BOOTSTRAP', () => {
     expect(text).toMatch(/no `future` flags/);
   });
 
-  // react-router 8 hard-requires these; an older Node or React fails the
-  // install, and pinning the router back a major is the wrong fix.
-  it('states the Node and React floors react-router 8 needs, and refuses pinning it back', () => {
+  // react-router's newest major hard-requires a Node and React floor; an older
+  // Node or React fails the install, and pinning the router back a major is the
+  // wrong fix. The floors are read from the registry, not stated.
+  it('reads the Node and React floors react-router needs, and refuses pinning it back', () => {
     const text = body();
-    expect(text).toContain('22.22');
-    expect(text).toContain('19.2.7');
-    expect(text).toMatch(/rather than pinning `react-router` 7/);
+    expect(text).toMatch(/npm view react-router engines/);
+    expect(text).toMatch(/npm view react-router peerDependencies/);
+    expect(text).toMatch(/rather than pinning `react-router` to an older major/);
   });
 
   // TypeScript 6+ enables noUncheckedSideEffectImports; a bare CSS import
@@ -233,9 +234,9 @@ describe('formio-react EXISTING', () => {
     expect(text).toMatch(/integrate with what exists|do not replace it/);
   });
 
-  // A router major bump drags React and Node floors with it (v8 needs React
-  // 19.2.7+ and Node 22.22+, and removes react-router-dom), so the version is
-  // an inspection finding, not something to change in passing.
+  // A router major bump drags React and Node floors with it (and v8 removes
+  // react-router-dom), so the version is an inspection finding, not something to
+  // change in passing.
   it('inspects the router package and major, and never bumps it without approval', () => {
     const text = body();
     expect(text).toContain('react-router-dom');

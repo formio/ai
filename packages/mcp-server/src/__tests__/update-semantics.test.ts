@@ -17,6 +17,10 @@ describe('update tools describe what Form.io keeps', () => {
 
       expect(description).not.toMatch(/full replacement|^Replace/i);
       expect(description).toMatch(/left out keep/);
+      // Arrays and objects are replaced whole, said once and briefly: the sentence
+      // repeats on three tools in a list every client reads on connect.
+      expect(description).toMatch(/arrays and objects (are replaced )?whole/i);
+      expect(description).not.toMatch(/stored as given, not merged/);
     }
   );
 });

@@ -90,5 +90,8 @@ describe('project_set registration', () => {
     expect(projectSet?.description).toMatch(/FORMIO_PROJECT_URL/);
     expect(projectSet?.description).toMatch(/weakest/i);
     expect(projectSet?.description).toMatch(/mapping written here DOES override/);
+    // The retired suggestion-only variable is never confused with the environment
+    // variable that is still read.
+    expect(projectSet?.description).not.toMatch(/FORMIO_DEFAULT_PROJECT_URL/);
   });
 });

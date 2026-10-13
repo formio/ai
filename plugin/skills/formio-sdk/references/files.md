@@ -86,6 +86,7 @@ if (fileDescriptor) {
 
 ### Delete a previously uploaded file
 
+<!-- example: fragment -->
 ```ts
 import { Formio } from '@formio/js';
 

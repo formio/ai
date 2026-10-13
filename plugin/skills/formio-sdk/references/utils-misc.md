@@ -93,6 +93,7 @@ console.log(i18n.t('hello')); // "Bonjour"
 
 ### Deep-clone a submission safely
 
+<!-- example: fragment -->
 ```ts
 import { Utils } from '@formio/js/utils';
 

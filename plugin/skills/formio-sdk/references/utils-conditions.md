@@ -79,6 +79,7 @@ console.log(visible); // true
 
 ### Evaluate via the high-level helper
 
+<!-- example: fragment -->
 ```ts
 import { Utils } from '@formio/js/utils';
 

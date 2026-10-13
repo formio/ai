@@ -172,6 +172,23 @@ describe('tool description budget', () => {
     expect(size).toBeLessThanOrEqual(TOOL_LIST_BUDGET);
   });
 
+  // The SDK names the JSON Schema dialect on every input and output schema it emits.
+  // A caller acts on none of them, and across the surface they cost about 2,500
+  // characters of the budget.
+  it('emits no $schema key on any input or output schema', async () => {
+    const carrying = (await listTools()).flatMap((tool) =>
+      [
+        ['inputSchema', tool.inputSchema],
+        ['outputSchema', tool.outputSchema],
+      ]
+        .filter(
+          ([, schema]) => typeof schema === 'object' && schema !== null && '$schema' in schema
+        )
+        .map(([kind]) => `${tool.name}.${kind}`)
+    );
+    expect(carrying).toEqual([]);
+  });
+
   it(`keeps every cwd description within ${CWD_DESCRIPTION_BUDGET} characters`, async () => {
     const tools = await listTools();
     const descriptions = cwdDescriptions(tools);

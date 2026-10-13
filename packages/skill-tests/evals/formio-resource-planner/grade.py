@@ -249,11 +249,39 @@ def grade_run(run_dir: Path, eval_name: str):
             "evidence": f"missing_save_resources={missing_save_resources or 'none'}; save_targets={sorted(save_targets)}",
         })
 
-        missing_save_forms = sorted(n for n in forms_map.keys() if n not in save_targets)
+        # phase-b-emission.md: a form gets Save only when it persists. A login form
+        # (Login and no Role Assignment) carries none — an optional audit-trail Save
+        # never sets settings.resource — and a client-only form (no actions) or a
+        # notification-only form (Email / Webhook only) needs none.
+        def form_action_names(name):
+            return {(a or {}).get("name") for a in actions.values() if (a or {}).get("form") == name} - {None}
+
+        login_forms = sorted(
+            n for n in forms_map.keys()
+            if "login" in form_action_names(n) and "role" not in form_action_names(n)
+        )
+        missing_save_forms = sorted(
+            n for n in forms_map.keys()
+            if n not in save_targets
+            and n not in login_forms
+            and form_action_names(n)
+            and not form_action_names(n) <= {"email", "webhook"}
+        )
         results.append({
-            "text": "Every form in template.json has a Save Submission action in `actions`",
+            "text": "Every persisting form in template.json has a Save Submission action (login, notification-only and client-only forms exempt)",
             "passed": not missing_save_forms,
-            "evidence": f"missing_save_forms={missing_save_forms or 'none'}",
+            "evidence": f"missing_save_forms={missing_save_forms or 'none'}; exempt_login={login_forms}",
+        })
+        bad_login_saves = sorted(
+            k for k, a in actions.items()
+            if (a or {}).get("name") == "save"
+            and (a or {}).get("form") in login_forms
+            and ((a or {}).get("settings") or {}).get("resource")
+        )
+        results.append({
+            "text": "No login form's Save action sets settings.resource",
+            "passed": not bad_login_saves,
+            "evidence": f"offending={bad_login_saves or 'none'}",
         })
 
         # Register forms need Role Assignment + Login chained with Save.

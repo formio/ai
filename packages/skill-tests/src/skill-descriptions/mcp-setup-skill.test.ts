@@ -76,13 +76,12 @@ describe('formio-mcp-setup skill', () => {
     expect(branch).toMatch(/update the plugin/i);
   });
 
-  // The remedy "change the pin to the one the Step 2 blocks carry" is circular in
-  // the window this branch was written for. `sync:pins` restamps those blocks only
-  // at release, and skills install straight off the default branch, so between
-  // merging a tool and publishing it the blocks name the very release that lacks
-  // it — and the user is told to upgrade to what they already run, forever. The
-  // branch has to compare the two and say what to do when they match.
-  it('does not send a matching pin round the upgrade loop', () => {
+  // Every launch block pins a release that ships project_get, so an entry that
+  // already names the blocks' version launches a server that has it: the answer is
+  // to reload and look again, not to edit the pin over itself. The branch written
+  // for the window before project_get was published is gone, with the version
+  // notes that only applied to releases older than every pin.
+  it('sends a matching pin to reload, not round an upgrade loop', () => {
     const text = body(setupSkillMd);
     const branch = text.slice(
       text.indexOf('### Already connected, but too old'),
@@ -90,14 +89,28 @@ describe('formio-mcp-setup skill', () => {
     );
 
     expect(branch.length).toBeGreaterThan(0);
-    // Compare before editing.
-    expect(branch).toMatch(/already (?:names|carries)|same version|matches the (?:pin|version)/i);
-    // And name the state the comparison can find: the release is not out yet.
-    expect(branch).toMatch(
-      /not (?:yet )?(?:been )?published|no published release|not published yet/i
+    expect(branch).toMatch(/already names the same version/i);
+    expect(branch).toMatch(/do not edit/i);
+    expect(branch).toMatch(/Step 5/);
+    expect(branch).not.toMatch(/not (?:yet )?(?:been )?published|no published release/i);
+  });
+
+  it('keeps both upgrade paths', () => {
+    const text = body(setupSkillMd);
+    const branch = text.slice(
+      text.indexOf('### Already connected, but too old'),
+      text.indexOf('## Step 2')
     );
-    // Editing a pin to itself is the outcome this branch must forbid.
-    expect(branch).toMatch(/do not edit|nothing to edit|no edit/i);
+    expect(branch).toMatch(/update the plugin/i);
+    expect(branch).toMatch(/The blocks carry a newer version/);
+  });
+
+  it('carries no version note older than every pin', () => {
+    for (const file of [setupSkillMd, join(repoRoot, 'llms-install.md')]) {
+      const text = readFileSync(file, 'utf8');
+      expect(text, file).not.toMatch(/>=0\.9\.0/);
+      expect(text, file).not.toMatch(/\b0\.9\.0\b/);
+    }
   });
 
   // Every client reads a different file, and two do not use `mcpServers` at all.

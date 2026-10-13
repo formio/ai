@@ -21,17 +21,18 @@ function everyMarkdownUnder(dir: string): string[] {
   });
 }
 
-// `@formio/angular`'s optional zone.js peer is `~0.14.0 || ~0.15.0`; Angular 21
-// accepts 0.16, and installing into a workspace that has it fails with ERESOLVE.
+// `@formio/angular` declares an optional zone.js peer that can lag the range a
+// newer Angular accepts; installing into a workspace outside it fails with
+// ERESOLVE. The range is read from the registry, not stated.
 describe('an installed zone.js outside the peer range is surfaced, not forced', () => {
   for (const [label, rel] of [
     ['BOOTSTRAP existing-workspace path', 'BOOTSTRAP.md'],
     ['embed branch', 'formio-angular-form/SKILL.md'],
   ] as const) {
-    it(`${label} checks zone.js and offers ~0.15.0`, () => {
+    it(`${label} checks zone.js against the peer it reads`, () => {
       const body = doc(rel);
       expect(body).toContain('ERESOLVE');
-      expect(body).toContain('zone.js@~0.15.0');
+      expect(body).toMatch(/npm view zone\.js@/);
       expect(body).toMatch(/never[^.]*`--legacy-peer-deps`[^.]*`--force`/i);
     });
   }
@@ -131,13 +132,12 @@ describe('the CLI fallback and Step 6 describe Angular 21 as it is', () => {
   });
 });
 
-describe('example versions match the current releases', () => {
-  it('cites @formio/angular 11 and the measured stylesheet size', () => {
+describe('example versions are the resolved values, not fixed releases', () => {
+  it('names no example @formio/angular release or measured stylesheet size', () => {
     const body = doc('BOOTSTRAP.md');
-    expect(body).not.toMatch(/@formio\/angular@\^?10\./);
-    expect(body).toContain('verified in `@formio/angular@11.0.6`');
-    expect(body).toContain('~41 KB');
-    expect(body).not.toContain('~44 KB');
+    expect(body).not.toMatch(/@formio\/angular@\^?1\d\./);
+    expect(body).not.toMatch(/verified in `@formio\/angular@/);
+    expect(body).not.toMatch(/~4\d KB/);
   });
 });
 
