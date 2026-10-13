@@ -21,7 +21,7 @@ export function registerFormUpdateTool(server: McpServer, config: FormioConfig) 
     'form_update',
     {
       description: [
-        'Update a form in the project `cwd` resolves to: read it with form_get, apply the change using the formio-schema skill, and send the form. Fields sent overwrite the stored ones (an array or object is stored as given, not merged); top-level fields left out keep their stored value.',
+        'Update a form in the project `cwd` resolves to: read it with form_get, apply the change using the formio-schema skill, and send the form. Sent fields overwrite, arrays and objects whole; top-level fields left out keep their value.',
         'Pass `draft: true` to save a draft instead of the live form; publish it with form_publish, and restore a prior revision with form_revert.',
       ].join(' '),
       inputSchema: {

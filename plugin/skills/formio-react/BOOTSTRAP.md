@@ -27,7 +27,7 @@ Pin what you install and record the resolved versions:
 
 - `@formio/react` — the React renderer wrapper. Capture the resolved version as `FORMIO_REACT_VERSION`.
 - `@formio/js` — the renderer core. Capture the resolved version as `FORMIO_JS_VERSION`.
-- `react-router` — routing, used through its **data-router** API. Version 8 and later require Node 22.22 or newer and React 19.2.7 or newer: check `node -v` and the installed `react` before installing, and report a lower version to the user rather than pinning `react-router` 7 to get round it.
+- `react-router` — routing, used through its **data-router** API. Its newest major can require a newer Node and React than the workspace has: read the floors with `npm view react-router engines` (the `node` range) and `npm view react-router peerDependencies` (the `react` range), check them against `node -v` and the installed `react` before installing, and report a lower version to the user rather than pinning `react-router` to an older major to get round it.
 - `bootstrap` — the Bootstrap 5 stylesheet the renderer's default template is classed for. See step 4.
 
 Both captured labels name resolved npm versions. They are not URLs and not environment variables.
@@ -37,7 +37,7 @@ Both captured labels name resolved npm versions. They are not URLs and not envir
 A rendered form needs **two** stylesheets, and missing either one produces a form that looks broken rather than one that errors — which sends people to debug mounting instead of styling.
 
 1. **A Bootstrap 5 stylesheet.** The renderer's default template emits Bootstrap-classed markup (`form-control`, `btn`, `col-*`) and does not supply those rules.
-2. **`@formio/js/dist/formio.form.css` — the renderer's own stylesheet.** `@formio/js` DOES ship CSS, in `dist/`, and Bootstrap does not substitute for it. It carries ~73 `.formio-*` selectors — datagrid, wizard navigation, file upload, signature, collapse icons, `.formio-errors` — plus every `.choices*` rule the `choicesjs` widget needs. Bootstrap contains none of them. Omit it and each reference select renders as an unstyled list, which is the single most visible symptom because reference selects are how the planner models every relationship.
+2. **`@formio/js/dist/formio.form.css` — the renderer's own stylesheet.** `@formio/js` DOES ship CSS, in `dist/`, and Bootstrap does not substitute for it. It carries the `.formio-*` selectors — datagrid, wizard navigation, file upload, signature, collapse icons, `.formio-errors` — plus every `.choices*` rule the `choicesjs` widget needs. Bootstrap contains none of them. Omit it and each reference select renders as an unstyled list, which is the single most visible symptom because reference selects are how the planner models every relationship.
 
 Import both once at the application entry point, in this order, with the application's own stylesheet last so its overrides win:
 

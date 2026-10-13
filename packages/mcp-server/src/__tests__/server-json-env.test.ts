@@ -29,7 +29,11 @@ function declared(): DeclaredVariable[] {
 // Every FORMIO_* name the source reads from an environment object — the process
 // environment, or the one the CLI is handed in its place.
 function readInSource(): string[] {
-  const sources = fg.sync('**/*.ts', { cwd: SRC, ignore: ['__tests__/**'], absolute: true });
+  const sources = fg.sync('**/*.ts', {
+    cwd: SRC,
+    ignore: ['__tests__/**'],
+    absolute: true,
+  });
   const pattern = /(?:process\.env|\benv)(?:\.|\[['"])(FORMIO_[A-Z0-9_]+)/g;
   const names = sources.flatMap((file) =>
     [...fs.readFileSync(file, 'utf8').matchAll(pattern)].map((match) => match[1])

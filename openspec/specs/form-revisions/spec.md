@@ -1,6 +1,6 @@
 ## Purpose
 
-Defines form revision behavior: the `form_revisions_list` and `form_revision_get` tools, the license gates on draft, publish, and revert, the per-form tracking gate, when a standard update creates a revision, and the field allowlists each write path uses.
+Defines form revision behavior: the `form_revision_list` and `form_revision_get` tools, the license gates on draft, publish, and revert, the per-form tracking gate, when a standard update creates a revision, and the field allowlists each write path uses.
 ## Requirements
 ### Requirement: form_revision_get returns a single revision
 

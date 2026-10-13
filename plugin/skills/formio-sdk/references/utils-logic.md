@@ -55,6 +55,7 @@ Action shapes (see `Utils.LogicAction*` types in `packages/core/src/utils/logic.
 
 ### Run logic for every component in a form
 
+<!-- example: fragment -->
 ```ts
 import { logicProcessSync, logicProcessInfo } from '@formio/core/process';
 
@@ -73,6 +74,7 @@ for (const component of form.components) {
 
 ### Check a single JavaScript trigger
 
+<!-- example: fragment -->
 ```ts
 import { Utils } from '@formio/js/utils';
 

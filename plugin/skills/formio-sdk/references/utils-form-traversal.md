@@ -49,6 +49,7 @@ Mutation helpers:
 
 ### Walk every component
 
+<!-- example: fragment -->
 ```ts
 import { Utils } from '@formio/js/utils';
 
@@ -61,6 +62,7 @@ Utils.eachComponent(form.components, (component, path) => {
 
 The callback receives `(component, contextualData, row, path)`. `contextualData` is the full submission `data` tree; `row` is the contextual row at the current path (e.g., the datagrid row for nested components). To read the value of the current component, index into `row`, not `contextualData`.
 
+<!-- example: fragment -->
 ```ts
 import { Utils } from '@formio/js/utils';
 
@@ -71,6 +73,7 @@ Utils.eachComponentData(form.components, submission.data, (component, _data, row
 
 ### Find a component by key
 
+<!-- example: fragment -->
 ```ts
 import { Utils } from '@formio/js/utils';
 
@@ -80,6 +83,7 @@ if (email) email.label = 'Work Email';
 
 ### Query components by attribute
 
+<!-- example: fragment -->
 ```ts
 import { Utils } from '@formio/js/utils';
 
@@ -92,6 +96,7 @@ console.log(
 
 ### Flatten to a path map
 
+<!-- example: fragment -->
 ```ts
 import { Utils } from '@formio/js/utils';
 
@@ -103,6 +108,7 @@ console.log(Object.keys(map));
 
 `getComponentValue` expects the path **without** the leading `data.` prefix — it indexes from the root of the submission's data object.
 
+<!-- example: fragment -->
 ```ts
 import { Utils } from '@formio/js/utils';
 
@@ -114,6 +120,7 @@ console.log(value);
 
 `component.data.url` is read out of the definition and fetched, so this holds only for definitions the application's own project owns — and the JSON that comes back becomes select options the renderer draws, so validate its shape before assigning it (see [`formio-form`'s external-data reference](../../formio-form/references/external-data.md)).
 
+<!-- example: fragment -->
 ```ts
 import { Utils } from '@formio/js/utils';
 
@@ -128,6 +135,7 @@ await Utils.eachComponentAsync(form.components, async (component, path) => {
 
 `eachComponent` skips layout components (`panel`, `fieldset`, `well`, etc.) by default — pass `true` as the third argument (`includeAll`) so the callback fires for layout components and `return true` can actually short-circuit the descent.
 
+<!-- example: fragment -->
 ```ts
 import { Utils } from '@formio/js/utils';
 

@@ -86,6 +86,19 @@ pnpm test:plugin    # verify the bundle
 
 `examples/` ships copy-paste prompts for exercising the skills library end to end (see `examples/README.md`); the `.claude/skills/` symlinks at the repo root load the live `plugin/skills/` sources, so a fresh Claude Code session here tests uncommitted skill changes directly.
 
+## Testing the tools against a real deployment
+
+`pnpm test` mocks Form.io. `pnpm test:live` builds `@formio/mcp`, starts its stdio server, and calls every registered tool against a real Form.io project — the check that the server's assumptions about Form.io's responses still hold. Run it before a release and after any change to how a tool talks to Form.io. It is never part of `pnpm test` or CI.
+
+The run creates and deletes forms, roles, and version tags, so it only runs against a throwaway project you name:
+
+1. Point the repository folder at that project the way every tool resolves it — `node packages/mcp-server/dist/stdio.js project set --project-url <projectUrl>` from the repository root, after a build (or set the `FORMIO_PROJECT_URL` environment variable).
+2. Set `FORMIO_LIVE_TEST_PROJECT` to the same Project URL. The run refuses, before calling anything that reaches the deployment, when the folder resolves anywhere else.
+3. Certificates: the runner starts the server, and makes its own clean-up requests, with Node's `--use-system-ca` wherever this Node supports it, so a local deployment whose certificate your operating system already trusts — a `*.test` host in the macOS keychain, for example — works with verification on and nothing to set. For a certificate only a CA file vouches for, set `NODE_EXTRA_CA_CERTS=<path to the CA's PEM>` (`$(mkcert -CAROOT)/rootCA.pem` for an mkcert certificate). `FORMIO_INSECURE_TLS=true` skips the check for the target project's and deployment's hosts only; the clean-up requests honour it exactly as the server does.
+4. Run `FORMIO_LIVE_TEST_PROJECT=https://form.test/sandbox pnpm test:live`. On first use the server prints a portal-login URL; open it and log in. Later runs reuse the cached login, or a `FORMIO_API_KEY` bound to that project.
+
+Every entity a run creates carries a per-run prefix (`mcplive<timestamp>`). Clean-up runs after the cases — and on Ctrl-C, bounded so a stalled deployment cannot hold the exit — whether or not they passed: it deletes the run's forms, roles, and tags and restores the project's version, each part running on whatever could be listed, and it reports anything it could not list or remove. It authenticates exactly as the server does for the repository folder: an API key bound to that project (the one the `FORMIO_PROJECT_URL` environment variable names) first, otherwise the cached portal login. A registered tool with no case in `packages/mcp-server/src/__tests__/live/cases.ts` fails `pnpm test`, so a new tool ships with its live case.
+
 ## Versioning and releases
 
 Releases are driven by [changesets](https://github.com/changesets/changesets). If your change affects a published package (`@formio/mcp`, `@formio/ai`), include a changeset:

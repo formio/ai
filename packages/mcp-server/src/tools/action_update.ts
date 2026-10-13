@@ -15,7 +15,7 @@ export function registerActionUpdateTool(server: McpServer, config: FormioConfig
     'action_update',
     {
       description:
-        'Update an existing action on a form; call action_get first if you do not already have it. Fields sent overwrite the stored ones (an array or object is stored as given, not merged); top-level fields left out keep their stored value.',
+        'Update an existing action on a form; call action_get first if you do not already have it. Sent fields overwrite, arrays and objects whole; top-level fields left out keep their value.',
       inputSchema: {
         cwd: cwdSchema,
         formId: formIdArgument(),

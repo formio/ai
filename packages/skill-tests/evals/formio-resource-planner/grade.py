@@ -67,6 +67,40 @@ def load_json(p: Path):
         return None
 
 
+def action_form(key: str, action: dict) -> str:
+    """The form an action belongs to: its `form` field, else the `<form>:` prefix of its key."""
+    return (action or {}).get("form") or (key.rsplit(":", 1)[0] if ":" in key else key)
+
+
+CLIENT_ONLY = re.compile(r"client[- ]only", re.IGNORECASE)
+
+
+def marked_client_only(md: str, name: str, title: str | None) -> bool:
+    """True when template.md's entry for the form calls it client-only.
+
+    The entry is the `- <Name> (type: form)` list item naming the form (by machine
+    name or title) and the lines indented under it, up to the next list item or
+    heading — phase-b-emission.md's "client-only form" is the planner's word for a
+    form that deliberately carries no actions.
+    """
+    names = {n.lower() for n in (name, title) if n}
+    lines = md.split("\n")
+    for i, line in enumerate(lines):
+        stripped = line.strip()
+        if not stripped.startswith("- ") or not any(n in stripped.lower() for n in names):
+            continue
+        indent = len(line) - len(line.lstrip())
+        block = [line]
+        for follow in lines[i + 1:]:
+            follow_indent = len(follow) - len(follow.lstrip())
+            if follow.lstrip().startswith("#") or (follow.strip().startswith("- ") and follow_indent <= indent):
+                break
+            block.append(follow)
+        if CLIENT_ONLY.search("\n".join(block)):
+            return True
+    return False
+
+
 def grade_run(run_dir: Path, eval_name: str):
     outputs = run_dir / "outputs"
     md_path = outputs / "template.md"
@@ -237,10 +271,8 @@ def grade_run(run_dir: Path, eval_name: str):
         forms_map = tmpl.get("forms", {}) or {}
         save_targets: set[str] = set()
         for akey, adef in actions.items():
-            adef = adef or {}
-            if adef.get("name") == "save":
-                form_name = adef.get("form") or (akey.rsplit(":", 1)[0] if ":" in akey else akey)
-                save_targets.add(form_name)
+            if (adef or {}).get("name") == "save":
+                save_targets.add(action_form(akey, adef))
 
         missing_save_resources = sorted(n for n in resources_map.keys() if n not in save_targets)
         results.append({
@@ -249,11 +281,46 @@ def grade_run(run_dir: Path, eval_name: str):
             "evidence": f"missing_save_resources={missing_save_resources or 'none'}; save_targets={sorted(save_targets)}",
         })
 
-        missing_save_forms = sorted(n for n in forms_map.keys() if n not in save_targets)
+        # phase-b-emission.md: a form gets Save only when it persists. A login form
+        # (Login and no Role Assignment) carries none — an optional audit-trail Save
+        # never sets settings.resource — and a notification-only form (Email /
+        # Webhook only) needs none. A form with no actions at all is exempt only when
+        # template.md calls it client-only; otherwise it is a persisting form whose
+        # Save was forgotten.
+        def form_action_names(name):
+            return {(a or {}).get("name") for k, a in actions.items() if action_form(k, a) == name} - {None}
+
+        client_only_forms = sorted(
+            n for n, fdef in forms_map.items()
+            if not form_action_names(n) and marked_client_only(md, n, (fdef or {}).get("title"))
+        )
+
+        login_forms = sorted(
+            n for n in forms_map.keys()
+            if "login" in form_action_names(n) and "role" not in form_action_names(n)
+        )
+        missing_save_forms = sorted(
+            n for n in forms_map.keys()
+            if n not in save_targets
+            and n not in login_forms
+            and n not in client_only_forms
+            and not (form_action_names(n) and form_action_names(n) <= {"email", "webhook"})
+        )
         results.append({
-            "text": "Every form in template.json has a Save Submission action in `actions`",
+            "text": "Every persisting form in template.json has a Save Submission action (login, notification-only and client-only forms exempt)",
             "passed": not missing_save_forms,
-            "evidence": f"missing_save_forms={missing_save_forms or 'none'}",
+            "evidence": f"missing_save_forms={missing_save_forms or 'none'}; exempt_login={login_forms}; exempt_client_only={client_only_forms}",
+        })
+        bad_login_saves = sorted(
+            k for k, a in actions.items()
+            if (a or {}).get("name") == "save"
+            and action_form(k, a) in login_forms
+            and ((a or {}).get("settings") or {}).get("resource")
+        )
+        results.append({
+            "text": "No login form's Save action sets settings.resource",
+            "passed": not bad_login_saves,
+            "evidence": f"offending={bad_login_saves or 'none'}",
         })
 
         # Register forms need Role Assignment + Login chained with Save.
@@ -264,8 +331,8 @@ def grade_run(run_dir: Path, eval_name: str):
         for rf in register_forms:
             rf_action_types = {
                 (a or {}).get("name")
-                for a in actions.values()
-                if (a or {}).get("form") == rf
+                for k, a in actions.items()
+                if action_form(k, a) == rf
             }
             results.append({
                 "text": f"Register form `{rf}` has Save + Role Assignment + Login actions",
@@ -278,8 +345,8 @@ def grade_run(run_dir: Path, eval_name: str):
         for rname, rdef in resources_map.items():
             comps = (rdef or {}).get("components", []) or []
             has_group_assign_action = any(
-                (a or {}).get("form") == rname and (a or {}).get("name") == "group"
-                for a in actions.values()
+                action_form(k, a) == rname and (a or {}).get("name") == "group"
+                for k, a in actions.items()
             )
             # Heuristic: two `select` components pointing at resources AND resource name looks like a join.
             select_resource_refs = [

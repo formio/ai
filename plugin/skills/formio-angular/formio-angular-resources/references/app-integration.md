@@ -338,8 +338,8 @@ Ensure these four are in `dependencies`:
 ```json
 "@formio/angular": "^<FORMIO_ANGULAR_VERSION>",
 "@formio/js":      "^<compatible>",
-"bootstrap":       "^5.3.8",
-"bootstrap-icons": "^1.13.1"
+"bootstrap":       "^<BOOTSTRAP_VERSION>",
+"bootstrap-icons": "^<BOOTSTRAP_ICONS_VERSION>"
 ```
 
 Do not hard-code a version into this document — the user's Angular version dictates the compatible `@formio/angular` major. Resolve it from the npm registry the way [`BOOTSTRAP.md`](../../BOOTSTRAP.md) Step 1 does (`npm view @formio/angular version` and its `peerDependencies`), install that resolved version, and let the committed lockfile pin the rest.

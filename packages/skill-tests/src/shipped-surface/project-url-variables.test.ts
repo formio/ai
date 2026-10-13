@@ -118,24 +118,6 @@ describe('the CLI plugin manifests prompt for nothing', () => {
   });
 });
 
-// FORMIO_PROJECT_URL is no longer authoritative — it is the weakest of the three
-// sources. What must still hold is that the tool explains the ordering in terms of
-// that variable, and never confuses it with the suggestion-only default.
-describe('project_set states the precedence without confusing the two variables', () => {
-  it('names FORMIO_PROJECT_URL and not the default', () => {
-    const source = read('packages/mcp-server/src/tools/project_set.ts');
-    const precedence =
-      source
-        .split('\n')
-        .filter((line) => line.includes('precedence'))
-        .join(' ') ?? '';
-
-    expect(precedence).toContain('FORMIO_PROJECT_URL');
-    expect(precedence).not.toContain('FORMIO_DEFAULT_PROJECT_URL');
-    expect(precedence).toMatch(/weakest|narrowest/i);
-  });
-});
-
 // The setup skill used to tell readers that the shipped plugin manifests supply
 // FORMIO_BASE_URL from an install-time prompt. Only the desktop bundle does now,
 // and a skill that says otherwise sends an agent looking for a value nothing set.

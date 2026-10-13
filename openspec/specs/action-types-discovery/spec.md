@@ -1,6 +1,6 @@
 ## Purpose
 
-Defines the MCP tools that discover what actions a connected deployment supports: `action_types_list` for the catalog and `action_type_get` for one type's settings form, including what the latter returns when the action name is unknown.
+Defines the MCP tools that discover what actions a connected deployment supports: `action_type_list` for the catalog and `action_type_get` for one type's settings form, including what the latter returns when the action name is unknown.
 ## Requirements
 ### Requirement: action_type_get tool is registered
 

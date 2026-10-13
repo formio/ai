@@ -15,7 +15,7 @@ export function registerRoleUpdateTool(server: McpServer, config: FormioConfig) 
     'role_update',
     {
       description:
-        'Update an existing role in the project `cwd` resolves to. Fields sent overwrite the stored ones (an array or object is stored as given, not merged); top-level fields left out keep their stored value.',
+        'Update an existing role in the project `cwd` resolves to. Sent fields overwrite, arrays and objects whole; top-level fields left out keep their value.',
       inputSchema: {
         cwd: cwdSchema,
         roleId: z.string().describe('The _id of the role to update, a 24-character ObjectId'),

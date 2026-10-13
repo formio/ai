@@ -29,7 +29,7 @@ If any of those hit, tell the user in one sentence: "Angular workspace already p
 
 Also check what the existing workspace is missing that a full run would have installed: `@formio/angular` and `@formio/js` in `package.json` (Step 4's "Add the Form.io packages"), and a Bootstrap 5 stylesheet in `angular.json` if the generated screens are to be styled at all (Step 5). Neither is automatic on this path. Add what is absent under the same approval you would ask for on a full run, and say in one line which of the two you found already present — a workspace with `@formio/angular` but no Bootstrap renders correct forms with no styling, and that reads as a rendering bug.
 
-**Those two steps need versions, and Step 1 — which captures them — did not run.** Resolve only the ones you actually need, the same way Step 1 does and from the same registry: `npm view @formio/angular version` and `npm view @formio/js version` for `FORMIO_ANGULAR_VERSION` / `FORMIO_JS_VERSION`, and `npm view bootstrap@5 version` / `npm view bootstrap-icons version` for `BOOTSTRAP_VERSION` / `BOOTSTRAP_ICONS_VERSION` (the `@5` selector prints every 5.x release — take the last line). A package the workspace already has supplies its own version from its installed `package.json` and needs no query. `FORMIO_ANGULAR_TARGET_VERSION` and `FORMIO_ANGULAR_SUPPORTED_MAJOR` are NOT needed here, because nothing on this path scaffolds a workspace — but do check that the `@angular/core` already installed falls inside `@formio/angular`'s peer range before installing, and surface a mismatch rather than installing over it. Check an installed `zone.js` the same way: `@formio/angular` declares an optional `zone.js` peer of `~0.14.0 || ~0.15.0`, while Angular 21 accepts `~0.16.0`, so a zone-based workspace on 0.16 fails the Form.io install with `ERESOLVE`. When `zone.js` is present and outside `@formio/angular`'s range, say so and offer `zone.js@~0.15.0`, which satisfies both — or removing `zone.js` if the workspace can move to zoneless change detection. Never pass `--legacy-peer-deps` or `--force` to get past the conflict: both install a tree whose peer ranges nobody has checked, and the lockfile then records it as though they had. If the registry is unreachable, follow Step 1's offline list: read what is on disk, then ask for what is still unset, and never carry an unresolved `<…>` token into a command.
+**Those two steps need versions, and Step 1 — which captures them — did not run.** Resolve only the ones you actually need, the same way Step 1 does and from the same registry: `npm view @formio/angular version` and `npm view @formio/js version` for `FORMIO_ANGULAR_VERSION` / `FORMIO_JS_VERSION`, and `npm view bootstrap@5 version` / `npm view bootstrap-icons version` for `BOOTSTRAP_VERSION` / `BOOTSTRAP_ICONS_VERSION` (the `@5` selector prints every 5.x release — take the last line). A package the workspace already has supplies its own version from its installed `package.json` and needs no query. `FORMIO_ANGULAR_TARGET_VERSION` and `FORMIO_ANGULAR_SUPPORTED_MAJOR` are NOT needed here, because nothing on this path scaffolds a workspace — but do check that the `@angular/core` already installed falls inside `@formio/angular`'s peer range before installing, and surface a mismatch rather than installing over it. Check an installed `zone.js` the same way: `@formio/angular` declares an optional `zone.js` peer — read it from `npm view @formio/angular@<FORMIO_ANGULAR_VERSION> peerDependencies` — that can trail the range a newer Angular accepts, so a zone-based workspace outside it fails the Form.io install with `ERESOLVE`. When `zone.js` is present and outside `@formio/angular`'s range, say so and offer the newest `zone.js` inside that range — `npm view zone.js@"<that range>" version`, taking the last line — when it also satisfies the installed Angular's own `zone.js` peer, or removing `zone.js` if the workspace can move to zoneless change detection. Never pass `--legacy-peer-deps` or `--force` to get past the conflict: both install a tree whose peer ranges nobody has checked, and the lockfile then records it as though they had. If the registry is unreachable, follow Step 1's offline list: read what is on disk, then ask for what is still unset, and never carry an unresolved `<…>` token into a command.
 
 Otherwise, run BOOTSTRAP.
 
@@ -44,7 +44,7 @@ npm view @formio/angular peerDependencies
 
 What to read from the output:
 
-1. **The resolved `@formio/angular` version.** `npm view @formio/angular version` prints the latest published version (e.g., `11.0.6`). Capture it as `FORMIO_ANGULAR_VERSION` — this is what you will install in Step 4 and cite in the approval summary. Do NOT hard-code a version into the query; resolving the current release is the point.
+1. **The resolved `@formio/angular` version.** `npm view @formio/angular version` prints the latest published version. Capture it as `FORMIO_ANGULAR_VERSION` — this is what you will install in Step 4 and cite in the approval summary. Do NOT hard-code a version into the query; resolving the current release is the point.
 2. **Highest supported Angular major.** In the `peerDependencies` output, find `@angular/core`. The range typically lists several majors (e.g. `^17.0.0 || ^18.0.0 || … || ^N.0.0`). Take the **highest** major in that range — that is the newest Angular `@formio/angular` supports, and always the one to target. Capture it as `FORMIO_ANGULAR_SUPPORTED_MAJOR`. If `peerDependencies` prints nothing, fall back to `npm view @formio/angular dependencies` for the same key; if neither names `@angular/core`, stop and tell the user — do NOT guess. (The goal is always the latest supported Angular — never an older major, and never a major newer than `@formio/angular` declares.)
 3. **Latest patch within that major.** Query the registry for the newest published `@angular/core` in that major:
 
@@ -60,7 +60,7 @@ Then do the same for `@formio/js`, the core Form.io SDK that `@formio/angular` w
 npm view @formio/js version
 ```
 
-Capture it as `FORMIO_JS_VERSION` (e.g., `5.6.1`). You do NOT need to cross-check `@formio/js`'s own peer dependencies against Angular — `@formio/angular` already declares the compatible `@formio/js` range in its own `peerDependencies` / `dependencies`. If the latest `@formio/js` falls outside that range, fall back to the newest version inside the range `@formio/angular` names; if it is inside the range, use the latest.
+Capture it as `FORMIO_JS_VERSION`. You do NOT need to cross-check `@formio/js`'s own peer dependencies against Angular — `@formio/angular` already declares the compatible `@formio/js` range in its own `peerDependencies` / `dependencies`. If the latest `@formio/js` falls outside that range, fall back to the newest version inside the range `@formio/angular` names; if it is inside the range, use the latest.
 
 Do the same for Bootstrap 5 and Bootstrap Icons, because the Form.io renderer defaults to its Bootstrap 5 template and without these stylesheets submission forms render unstyled:
 
@@ -69,7 +69,7 @@ npm view bootstrap@5 version
 npm view bootstrap-icons version
 ```
 
-Capture them as `BOOTSTRAP_VERSION` (e.g., `5.3.8`) and `BOOTSTRAP_ICONS_VERSION` (e.g., `1.13.1`) — again, the `@5` range prints every 5.x release, so take the last line. The `@5` selector keeps Bootstrap on the major the renderer targets; if it resolves nothing, stop and ask the user rather than installing a different major — Form.io's default template targets Bootstrap 5, and silently picking up Bootstrap 6+ would break the renderer.
+Capture them as `BOOTSTRAP_VERSION` and `BOOTSTRAP_ICONS_VERSION` — again, the `@5` range prints every 5.x release, so take the last line. The `@5` selector keeps Bootstrap on the major the renderer targets; if it resolves nothing, stop and ask the user rather than installing a different major — Form.io's default template targets Bootstrap 5, and silently picking up Bootstrap 6+ would break the renderer.
 
 **If the registry is unreachable.** On an air-gapped or proxy-restricted host the queries above fail with a network error rather than an empty answer — the same kind of environment `formio-mcp-setup` keeps a documented offline path for. Do not substitute a CDN or any other URL for the registry, and do not guess a major. Work down this list and stop at the first step that answers:
 
@@ -205,13 +205,13 @@ Also add `@formio/angular` and its peer SDK `@formio/js` to the workspace now so
 npm install --save @formio/angular@^<FORMIO_ANGULAR_VERSION> @formio/js@^<FORMIO_JS_VERSION>
 ```
 
-e.g., `npm install --save @formio/angular@^11.0.6 @formio/js@^5.6.1`. With npm's default save prefix the resulting `package.json` entries come out as follows (a workspace `.npmrc` with `save-exact` or `save-prefix=~` writes them exact or `~`, which is fine):
+With npm's default save prefix the resulting `package.json` entries come out as follows (a workspace `.npmrc` with `save-exact` or `save-prefix=~` writes them exact or `~`, which is fine):
 
 ```json
 {
   "dependencies": {
-    "@formio/angular": "^11.0.6",
-    "@formio/js": "^5.6.1"
+    "@formio/angular": "^<FORMIO_ANGULAR_VERSION>",
+    "@formio/js": "^<FORMIO_JS_VERSION>"
   }
 }
 ```
@@ -228,18 +228,18 @@ Install both packages with the caret prefix so future minor + patch releases in 
 npm install --save bootstrap@^<BOOTSTRAP_VERSION> bootstrap-icons@^<BOOTSTRAP_ICONS_VERSION>
 ```
 
-e.g., `npm install --save bootstrap@^5.3.8 bootstrap-icons@^1.13.1`. With npm's default save prefix the resulting `package.json` entries come out as follows (a workspace `.npmrc` with `save-exact` or `save-prefix=~` writes them exact or `~`, which is fine):
+With npm's default save prefix the resulting `package.json` entries come out as follows (a workspace `.npmrc` with `save-exact` or `save-prefix=~` writes them exact or `~`, which is fine):
 
 ```json
 {
   "dependencies": {
-    "bootstrap": "^5.3.8",
-    "bootstrap-icons": "^1.13.1"
+    "bootstrap": "^<BOOTSTRAP_VERSION>",
+    "bootstrap-icons": "^<BOOTSTRAP_ICONS_VERSION>"
   }
 }
 ```
 
-Then wire the stylesheets into `angular.json` so the Angular build pipeline bundles them. Open `<workspaceRoot>/angular.json`, find the first `projects.<projectName>.architect.build.options.styles` array (and repeat on the matching `test` target only when it has its own `styles` array — a Karma-era workspace does; Angular 21's `@angular/build:unit-test` target has none and reuses the build target's options), and ensure these three entries appear **before** the workspace's own `src/styles.css` / `src/styles.scss` so application styles can override the defaults:
+Then wire the stylesheets into `angular.json` so the Angular build pipeline bundles them. Open `<workspaceRoot>/angular.json`, find the first `projects.<projectName>.architect.build.options.styles` array (and repeat on the matching `test` target only when it has its own `styles` array — a Karma-era workspace does; a target on the `@angular/build:unit-test` builder has none and reuses the build target's options), and ensure these three entries appear **before** the workspace's own `src/styles.css` / `src/styles.scss` so application styles can override the defaults:
 
 ```json
 "styles": [
@@ -253,7 +253,7 @@ Notes on why these exact paths:
 
 - `bootstrap/dist/css/bootstrap.min.css` is the pre-compiled Bootstrap 5 CSS bundle; using the SCSS entry point (`bootstrap/scss/bootstrap`) would require an SCSS workspace, which the user may not have chosen in `angular-new-app`'s stylesheet interview. The compiled CSS works for both CSS and SCSS workspaces.
 - `bootstrap-icons/font/bootstrap-icons.css` registers the `bi bi-*` class family and ships the webfont; this is the same entry point the Bootstrap Icons docs recommend for non-SCSS consumers.
-- **Do NOT add `@formio/js/dist/formio.form.css` here — `@formio/angular` already supplies it.** Its `FormioComponent` declares `styleUrls: ['.../@formio/js/dist/formio.form.min.css']` with `encapsulation: ViewEncapsulation.None`, and ng-packagr inlines that stylesheet into the published FESM bundle (~41 KB, verified in `@formio/angular@11.0.6`). `ViewEncapsulation.None` is what makes it work: the styles are emitted globally, so they reach the DOM the renderer builds imperatively, which scoped component styles never would. Adding the file to `angular.json` would ship a second copy of the same ~41 KB for no benefit. This is a real difference between the frameworks — `@formio/react` ships no CSS at all and its applications must import the stylesheet explicitly, which is why `formio-react/BOOTSTRAP.md` requires exactly what this document forbids.
+- **Do NOT add `@formio/js/dist/formio.form.css` here — `@formio/angular` already supplies it.** Its `FormioComponent` declares `styleUrls: ['.../@formio/js/dist/formio.form.min.css']` with `encapsulation: ViewEncapsulation.None`, and ng-packagr inlines that stylesheet into the published FESM bundle. `ViewEncapsulation.None` is what makes it work: the styles are emitted globally, so they reach the DOM the renderer builds imperatively, which scoped component styles never would. Adding the file to `angular.json` would ship a second copy of the same stylesheet for no benefit. This is a real difference between the frameworks — `@formio/react` ships no CSS at all and its applications must import the stylesheet explicitly, which is why `formio-react/BOOTSTRAP.md` requires exactly what this document forbids.
 - None of these go into `main.ts` or an `@import` in `styles.css` — the `angular.json` `styles` array is the Angular-native place to add workspace-wide stylesheets and is what `angular-new-app` expects.
 
 Do NOT add Bootstrap's JavaScript bundle (`bootstrap.bundle.min.js` via `angular.json`'s `scripts` array). The Form.io renderer does not depend on Bootstrap's JS behaviors (dropdowns, modals, tooltips), and pulling the JS in would conflict with Angular's own DOM management. If a future resource module needs a Bootstrap JS feature, the Resources sub-skill (`./formio-angular-resources/SKILL.md`) can add it on a per-module basis.
@@ -264,7 +264,7 @@ After editing `angular.json`, re-run a clean install (with the workspace's own p
 
 ## Step 6 — pin change detection, then make the build and the tests pass
 
-A generated app must **pin its change-detection mode explicitly** rather than inherit whatever `angular-new-app` / the CLI happened to default to — that default has drifted across Angular releases, which would make generated apps non-deterministic. Because the skill always targets the latest Angular `@formio/angular` supports (Step 1), the app uses **zoneless** change detection. Angular 21 is zoneless by default — `ng new` installs no `zone.js` and writes no `polyfills` entry — so on Angular 21 the provider below states the mode rather than changing it. `@formio/angular` is change-detection-mode agnostic, so pinning zoneless is safe; pinning it _explicitly_ is what makes the result deterministic.
+A generated app must **pin its change-detection mode explicitly** rather than inherit whatever `angular-new-app` / the CLI happened to default to — that default has drifted across Angular releases, which would make generated apps non-deterministic. Because the skill always targets the latest Angular `@formio/angular` supports (Step 1), the app uses **zoneless** change detection. From Angular 21 on, `ng new` is zoneless by default — it installs no `zone.js` and writes no `polyfills` entry — so on Angular 21 and later the provider below states the mode rather than changing it. `@formio/angular` is change-detection-mode agnostic, so pinning zoneless is safe; pinning it _explicitly_ is what makes the result deterministic.
 
 ### 6a. Wire zoneless
 
@@ -276,7 +276,7 @@ import { provideZonelessChangeDetection } from '@angular/core';
 // ...providers: [ provideZonelessChangeDetection(), ... ]
 ```
 
-`zone.js` is not needed. Ensure neither `zone.js` nor `zone.js/testing` appears in any `polyfills` entry in `angular.json`; an Angular 21 workspace has no `polyfills` key at all, and that is the correct state, not one to add an empty array to.
+`zone.js` is not needed. Ensure neither `zone.js` nor `zone.js/testing` appears in any `polyfills` entry in `angular.json`; a workspace created on Angular 21 or later has no `polyfills` key at all, and that is the correct state, not one to add an empty array to.
 
 TestBed runs zoneless whenever `zone.js` is not loaded, so generated specs need no provider of their own. Add `provideZonelessChangeDetection()` to a spec's `TestBed.configureTestingModule({ providers: [...] })` only on a workspace that still loads `zone.js` in its tests.
 
@@ -286,7 +286,7 @@ The Form.io SDK's promises (`loadSubmissions`, `loadForms`, …) resolve outside
 
 ### 6c. Size the production build for the renderer
 
-The CLI's default `initial` budget errors at 1 MB, and an application that bundles `@formio/angular` and `@formio/js` is about 2.1 MB before compression (~480 KB transferred) — so a plain `ng build`, whose default configuration is `production`, fails with `bundle initial exceeded maximum budget` on a workspace that has not changed a line of its own code. A development build has no budgets, which is why the failure first appears on the user's release build rather than anywhere in this flow. In `angular.json`, raise the `initial` budget in `architect.build.configurations.production.budgets`, and allow the two CommonJS dependencies the renderer brings in `architect.build.options`, whose "not ESM" warnings otherwise print on every build:
+The CLI's default `initial` budget errors at 1 MB, and an application that bundles `@formio/angular` and `@formio/js` is well over that before compression — so a plain `ng build`, whose default configuration is `production`, fails with `bundle initial exceeded maximum budget` on a workspace that has not changed a line of its own code. A development build has no budgets, which is why the failure first appears on the user's release build rather than anywhere in this flow. In `angular.json`, raise the `initial` budget in `architect.build.configurations.production.budgets`, and allow the two CommonJS dependencies the renderer brings in `architect.build.options`, whose "not ESM" warnings otherwise print on every build:
 
 ```json
 "options": {
@@ -305,7 +305,7 @@ Merge these into the existing objects rather than replacing them — leave the `
 
 ### 6d. Make `ng test` load the renderer
 
-Angular 21 runs unit tests with Vitest through the `@angular/build:unit-test` builder, and any spec whose imports reach `@formio/angular` fails to load under its defaults — first with `SyntaxError: Named export 'assign' not found. The requested module 'lodash' is a CommonJS module`, because Vitest's Node loader imports `@formio/angular`'s ESM bundle without transforming it, and once that is fixed with `TypeError: matchMedia is not a function`, because jsdom does not implement `matchMedia` and `@formio/js` calls it while rendering. Both are needed; neither alone gets a spec to run. Point the test target at a runner config:
+From Angular 21 on, `ng test` runs unit tests with Vitest through the `@angular/build:unit-test` builder, and any spec whose imports reach `@formio/angular` fails to load under its defaults — first with `SyntaxError: Named export 'assign' not found. The requested module 'lodash' is a CommonJS module`, because Vitest's Node loader imports `@formio/angular`'s ESM bundle without transforming it, and once that is fixed with `TypeError: matchMedia is not a function`, because jsdom does not implement `matchMedia` and `@formio/js` calls it while rendering. Both are needed; neither alone gets a spec to run. Point the test target at a runner config:
 
 ```json
 "test": {
