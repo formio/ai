@@ -28,6 +28,23 @@
       "prompt": "I want to build a full CRM in Form.io. The company uses Teams — each sales rep belongs to one or more Teams, and each Team owns a set of Accounts. Under each Account there are Contacts (people at the company), Deals (sales opportunities), and Activities (calls, emails, meetings, tasks). An Activity can optionally be tied to a specific Deal. Accounts also have a primary contact. Sales reps should only see data (Accounts, Contacts, Deals, Activities) belonging to Teams they are members of. Admins see everything. Self-register with email/password.",
       "expected_output": "Phase B writes template.md + template.json pair. template.md has all required sections in order. Seven resources: User (default), Team (the group), TeamUser (join with Group Assignment action: group=team, user=user), Account (direct child of Team with 'team' select carrying field-based submissionAccess), Contact (grandchild — account select + hidden calculated 'team' mirror with submissionAccess), Deal (same mirror pattern), Activity (same mirror pattern + optional deal ref). Access Matrix rows distinguish administrator (all/all/all/all everywhere) from salesRep (group/group/group/— on Account/Contact/Deal/Activity). Access Flow Diagram calls out the transitive mirror propagation — TeamUser → Team → Account (direct) → Contact/Deal/Activity (via hidden calc mirror). template.json: every grandchild has at least one hidden component whose calculateValue is exactly `value = data.<parent>?.data?.team || value;` (both halves of the guard — no unguarded `data.<parent>.data.team`). Two forms: userLogin, userRegister. Roles: administrator, salesRep, authenticated, anonymous. Phase B template.json is importable.",
       "files": []
+    },
+    {
+      "id": 4,
+      "name": "change-time-entries",
+      "prompt": "My Task Manager project already exists in Form.io. Its current template is the baseline at `packages/skill-tests/evals/formio-resource-planner/fixtures/baseline-task-manager/template.json`, and its `template.md` is in the outputs directory you were given. I also want to track time entries on tasks: each entry records the hours worked and the date, belongs to one task, and is logged by the signed-in user. Members of a project should see and log time on that project's tasks, the same way they see the tasks. Plan this change.",
+      "expected_output": "Change mode: template.md is updated in place with a `## Change — <date> — <title>` section; changes.json is written (no template.json). changes.json creates a `timeEntry` resource with a select referencing the baseline `task` resource, a `timeEntry:save` action, and the group access that reaches it (a hidden calculated mirror of the project, since it sits two levels below the group). It repeats no baseline role, resource, form, or action, carries no top-level `access`, and lists any change to existing forms under `updates`.",
+      "files": [
+        "fixtures/baseline-task-manager/template.json",
+        "fixtures/baseline-task-manager/template.md"
+      ]
+    },
+    {
+      "id": 5,
+      "name": "change-vendor-on-deals",
+      "prompt": "My CRM project already exists in Form.io. Its current template is the baseline at `packages/skill-tests/evals/formio-resource-planner/fixtures/baseline-crm/template.json`, and its `template.md` is in the outputs directory you were given. Add vendors: a Vendor has a name and a contact email, and administrators maintain the vendor list in the portal while sales reps can read it. Each existing Deal should be able to reference one vendor. Plan this change.",
+      "expected_output": "Change mode: template.md is updated in place with a `## Change — <date> — <title>` section; changes.json is written (no template.json). changes.json creates a `vendor` resource with a `vendor:save` action and read access for salesRep, and an `updates` entry for the baseline `deal` resource adding a select whose `data.resource` is `vendor`. It repeats no baseline role, resource, form, or action and carries no top-level `access`.",
+      "files": ["fixtures/baseline-crm/template.json", "fixtures/baseline-crm/template.md"]
     }
   ]
 }

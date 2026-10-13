@@ -12,7 +12,7 @@ Every request to these endpoints MUST include an `x-jwt-token` header holding th
 
 ## MCP Tool Preference
 
-No MCP tool covers this operation — use the HTTP endpoint directly.
+For the project the working directory resolves to, versions have MCP tools: `project_tag_list` (the current version and every tag), `project_tag_create` (a new version), and `project_export` with `tag` (the template a tag stored). Creating stages and deploying a tag to another stage have no MCP tool — they belong to the Form.io portal or the user's own CI/CD; use the HTTP endpoints below only when the user asks for that work.
 
 ## Endpoints
 
@@ -100,7 +100,7 @@ Cross-scope: import a template into an existing stage/project. Documented in ful
 
 ### POST {baseUrl}/project/:projectId/tag (create version)
 
-Tag a version of the project — essentially a named snapshot of the project's template that can be deployed to stages later.
+Tag a version of the project — a named snapshot of the project's template that can be deployed to stages later. Tags are stored under the primary project, so they are shared by every stage of the project family: a tag created on one stage can be deployed to any other. Sent without a `template`, the request makes the server snapshot the project's current export; either way it sets the creating project's `tag` to the new name. Names are unique within the family (at most 32 characters) and the `description` holds at most 256; a tag cannot be edited afterwards.
 
 Request body:
 
@@ -115,6 +115,10 @@ Request body:
 
 Response: the tag document with a server-assigned `_id`, timestamps, and the stored template.
 
+### GET {baseUrl}/project/:projectId/tag/current
+
+The project's current version: `{ "tag": "1.2.0" }` — the tag it was last tagged or deployed at (`0.0.0` when it never was).
+
 ### GET {baseUrl}/project/:projectId/tag
 
 List all versions tagged for a project. Use `sort=-created` to get newest first.
@@ -127,9 +131,18 @@ Get a single tag, including its full template payload.
 
 ### POST {baseUrl}/project/:projectId/deploy
 
-Deploy a tagged version (or an ad-hoc template) to a stage. The destination stage is inferred from the `:projectId` segment (typically the stage's project ID).
+Deploy a tagged version (or an ad-hoc template) to a stage. The destination stage is the project at `:projectId`. Deploy runs the same importer as `/import` — forms in the template are updated in place and their actions recreated — except that it never changes the stage's project-level access; afterwards it sets the stage's `tag` and `lastDeploy`.
 
-Request body:
+Request body, by tag:
+
+```json
+{
+  "type": "tag",
+  "tag": "1.2.0"
+}
+```
+
+or with a template:
 
 ```json
 {
@@ -138,7 +151,7 @@ Request body:
 }
 ```
 
-Response: plain text `Tag Deployed` on success. `400` on template validation errors; `409` if the stage is protected or has a remote lock.
+Response: plain text `Tag Deployed` on success; `400` on template validation errors.
 
 ### DELETE {baseUrl}/project/:projectId/tag/:tagId
 

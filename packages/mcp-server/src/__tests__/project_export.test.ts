@@ -73,4 +73,80 @@ describe('project_export tool', () => {
       timeoutMs: expected,
     });
   });
+
+  describe('with tag', () => {
+    const TAG_ID = '69d68310040fa2cea2572945';
+
+    it('names tag in its description', async () => {
+      const { client } = await createTestClient(registerProjectExportTool);
+      const { tools } = await client.listTools();
+      expect(tools.find((t) => t.name === 'project_export')?.description).toMatch(/`tag`/);
+    });
+
+    it('returns the template the named tag stored', async () => {
+      const template = { forms: { order: {} }, resources: {}, roles: {}, actions: {} };
+      mockFormioFetch.mockImplementation(async (path: string) => {
+        if (path === 'tag') return { data: [{ _id: TAG_ID, tag: '1.2.0' }], total: 1 };
+        if (path === `tag/${TAG_ID}`) return { _id: TAG_ID, tag: '1.2.0', template };
+        throw new Error(`unexpected ${path}`);
+      });
+      const { client } = await createTestClient(registerProjectExportTool);
+
+      const result = await client.callTool({
+        name: 'project_export',
+        arguments: { cwd: TEST_CWD, tag: '1.2.0' },
+      });
+
+      expect(mockFormioFetch).toHaveBeenCalledWith(
+        'tag',
+        expect.objectContaining({ tag: '1.2.0' }),
+        TEST_CONFIG,
+        { withMeta: true }
+      );
+      expect(mockFormioFetch).not.toHaveBeenCalledWith(
+        'export',
+        expect.anything(),
+        expect.anything(),
+        expect.anything()
+      );
+      expect(result.structuredContent).toEqual(template);
+    });
+
+    // Chunk documents carry the same tag name as the tag itself.
+    it('skips the chunk documents that share the tag name', async () => {
+      mockFormioFetch.mockImplementation(async (path: string) => {
+        if (path === 'tag')
+          return {
+            data: [
+              { _id: '69d68310040fa2cea2572946', tag: '1.2.0', chunk: true },
+              { _id: TAG_ID, tag: '1.2.0' },
+            ],
+            total: 2,
+          };
+        if (path === `tag/${TAG_ID}`) return { _id: TAG_ID, tag: '1.2.0', template: { forms: {} } };
+        throw new Error(`unexpected ${path}`);
+      });
+      const { client } = await createTestClient(registerProjectExportTool);
+
+      const result = await client.callTool({
+        name: 'project_export',
+        arguments: { cwd: TEST_CWD, tag: '1.2.0' },
+      });
+
+      expect(result.isError).toBeFalsy();
+    });
+
+    it('reports an unknown tag as NOT_FOUND naming it', async () => {
+      mockFormioFetch.mockResolvedValue({ data: [], total: 0 });
+      const { client } = await createTestClient(registerProjectExportTool);
+
+      const result = await client.callTool({
+        name: 'project_export',
+        arguments: { cwd: TEST_CWD, tag: '9.9.9' },
+      });
+
+      expect(result._meta?.['io.form/error']).toMatchObject({ code: 'NOT_FOUND' });
+      expect(JSON.stringify(result.content)).toMatch(/9\.9\.9/);
+    });
+  });
 });

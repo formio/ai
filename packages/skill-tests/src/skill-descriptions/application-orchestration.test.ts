@@ -76,7 +76,7 @@ describe('formio-application orchestration', () => {
     expect(stepHeadings.map((step) => `${step.number} ${step.title}`)).toEqual([
       '1 Intent',
       '2 Plan',
-      '3 Import',
+      '3 Import or apply',
       '3.5 Auth handoff (conditional)',
       '4 Framework routing',
     ]);
@@ -91,11 +91,11 @@ describe('formio-application orchestration', () => {
     expect(body).not.toMatch(/### Step \d[\w.]* — Deployment/);
   });
 
-  it('links only the three surviving sibling documents', () => {
+  it('links only the four sibling documents', () => {
     const { body } = skillDocument(SKILL_MD);
     const linked = new Set([...body.matchAll(/\(\.\/([A-Z_]+\.md)\)/g)].map((match) => match[1]));
 
-    expect([...linked].sort()).toEqual(['FRAMEWORK.md', 'IMPORT.md', 'INTENT.md']);
+    expect([...linked].sort()).toEqual(['CHANGE.md', 'FRAMEWORK.md', 'IMPORT.md', 'INTENT.md']);
   });
 
   it('states that the mapping and Import run in one invocation, resolved at tool-call time', () => {

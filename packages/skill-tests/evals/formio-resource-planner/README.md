@@ -6,7 +6,7 @@ This directory holds everything a teammate needs to run evals against the skill 
 
 | File | Purpose |
 | --- | --- |
-| `evals.json` | Four test prompts: task-manager-classic, crm-with-company-scoping, minimal-no-auth-feedback, complex-crm-transitive. Each has an `expected_output` summary used to drive the grader's assertions. |
+| `evals.json` | Six test prompts: task-manager-classic, crm-with-company-scoping, minimal-no-auth-feedback, complex-crm-transitive, and the change-mode cases change-time-entries and change-vendor-on-deals. Each has an `expected_output` summary used to drive the grader's assertions. |
 | `grade.py` | Converts subagent outputs → pass/fail grades. Asserts the Phase B artifact pair (`template.md` and `template.json`) exists in `outputs/`, that `template.md` has the required section headings in order (`# Resource Map`, `## Resources`, `## Users & Auth`, `## Roles`, `## Access Matrix`, `## ER Diagram`, `## Access Flow Diagram`, `## Companion artifact`), that the Access Matrix has at least one data row in the token vocabulary, that both ASCII diagrams have bodies, and that `template.json` has the required top-level keys, default roles, and (for the transitive eval) the hidden/calculated group-mirror pattern on grandchildren. |
 | `README.md` | This file. |
 
@@ -82,6 +82,10 @@ Kill with `pkill -f generate_review.py` when done.
 ### 6. Iterate
 
 Read feedback, edit `SKILL.md` / `references/*.md`, bump `N`, repeat.
+
+## Skill-specific: change-mode cases
+
+`change-time-entries` and `change-vendor-on-deals` plan a change to an existing project (see the skill's `references/change-plan.md`). Each has a baseline under `fixtures/` (`baseline-task-manager/`, `baseline-crm/`, copies of the checked-in examples). Before spawning a change-mode run, copy the baseline's `template.md` into the run's `outputs/` — change mode updates `template.md` in place — and give the subagent the baseline `template.json` path from the prompt. `grade.py` grades these runs on `outputs/changes.json` and the dated `## Change —` section in `outputs/template.md`, against the baseline, and fails a run that writes `template.json`. Their outputs are never promoted to `references/examples/`.
 
 ## Skill-specific: refresh the checked-in canonical examples
 

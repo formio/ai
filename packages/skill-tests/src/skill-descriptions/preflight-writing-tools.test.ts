@@ -24,6 +24,7 @@ const WRITING_TOOLS = [
   'action_update',
   'action_delete',
   'project_import',
+  'project_tag_create',
 ];
 
 // The handoff target carries no preflight, and the planner calls no MCP tool.

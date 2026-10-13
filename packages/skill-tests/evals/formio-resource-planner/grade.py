@@ -334,6 +334,106 @@ def grade_run(run_dir: Path, eval_name: str):
     return results
 
 
+# Change-mode cases plan a change to an existing project. They are graded on the
+# change plan — `changes.json` plus the dated section appended to `template.md` —
+# against the baseline the run was handed. Full-plan cases are graded above,
+# unchanged.
+HARNESS = Path(__file__).resolve().parent
+CHANGE_BASELINES = {
+    "change-time-entries": "baseline-task-manager",
+    "change-vendor-on-deals": "baseline-crm",
+}
+CHANGE_SECTION = re.compile(r"^## Change — \d{4}-\d{2}-\d{2} — \S", re.MULTILINE)
+
+
+def resource_references(components):
+    """Every `data.resource` a select names, through nested components."""
+    found = []
+    for c in components or []:
+        if not isinstance(c, dict):
+            continue
+        if c.get("type") == "select" and c.get("dataSrc") == "resource":
+            found.append((c.get("data") or {}).get("resource"))
+        for nested_key in ("components", "columns", "rows"):
+            nested = c.get(nested_key)
+            if isinstance(nested, list):
+                flat = []
+                for item in nested:
+                    if isinstance(item, dict) and isinstance(item.get("components"), list):
+                        flat.extend(item["components"])
+                    elif isinstance(item, list):
+                        for cell in item:
+                            if isinstance(cell, dict):
+                                flat.extend(cell.get("components") or [])
+                    elif isinstance(item, dict):
+                        flat.append(item)
+                found.extend(resource_references(flat))
+    return found
+
+
+def grade_change_run(run_dir: Path, eval_name: str):
+    outputs = run_dir / "outputs"
+    md = read(outputs / "template.md")
+    changes = load_json(outputs / "changes.json")
+    baseline = load_json(HARNESS / "fixtures" / CHANGE_BASELINES[eval_name] / "template.json") or {}
+    results = []
+
+    def check(text, passed, evidence=""):
+        results.append({"text": text, "passed": bool(passed), "evidence": evidence})
+
+    check("template.md carries a dated `## Change — <YYYY-MM-DD> — <title>` section", CHANGE_SECTION.search(md))
+    check("changes.json exists and parses", isinstance(changes, dict))
+    check("template.json was not written in change mode", not (outputs / "template.json").exists())
+    if not isinstance(changes, dict):
+        return results
+
+    check("changes.json has no top-level `access`", "access" not in changes, f"keys: {list(changes)}")
+    check("changes.json has an `updates` list", isinstance(changes.get("updates"), list))
+
+    repeated = [
+        f"{kind}.{name}"
+        for kind in ("roles", "resources", "forms")
+        for name in (changes.get(kind) or {})
+        if name in (baseline.get(kind) or {})
+    ]
+    check("No baseline role, resource, or form is repeated", not repeated, f"repeated: {repeated or 'none'}")
+
+    repeated_actions = [k for k in (changes.get("actions") or {}) if k in (baseline.get("actions") or {})]
+    check("No baseline action is repeated", not repeated_actions, f"repeated: {repeated_actions or 'none'}")
+
+    known = set(baseline.get("resources") or {}) | set(changes.get("resources") or {})
+    new_components = [c for kind in ("resources", "forms") for e in (changes.get(kind) or {}).values() for c in (e.get("components") or [])]
+    added_components = [
+        a.get("component") for u in (changes.get("updates") or []) if isinstance(u, dict)
+        for a in (u.get("addComponents") or []) if isinstance(a, dict)
+    ]
+    references = resource_references(new_components + [c for c in added_components if c])
+    unknown = [r for r in references if r not in known]
+    check("Every resource select names a baseline machine name or a new resource", not unknown, f"unknown: {unknown or 'none'}")
+
+    actions = changes.get("actions") or {}
+    missing_save = [n for n in (changes.get("resources") or {}) if f"{n}:save" not in actions]
+    check("Every new resource has its `<name>:save` action", not missing_save, f"missing: {missing_save or 'none'}")
+
+    baseline_entities = set(baseline.get("resources") or {}) | set(baseline.get("forms") or {})
+    bad_updates = [u.get("form") for u in (changes.get("updates") or []) if isinstance(u, dict) and u.get("form") not in baseline_entities]
+    check("Every `updates` entry names a baseline form or resource", not bad_updates, f"unknown: {bad_updates or 'none'}")
+
+    if eval_name == "change-time-entries":
+        refs_task = [n for n, e in (changes.get("resources") or {}).items() if "task" in resource_references(e.get("components"))]
+        check("A new resource references the baseline `task` resource", refs_task, f"resources referencing task: {refs_task or 'none'}")
+
+    if eval_name == "change-vendor-on-deals":
+        deal_refs = [
+            r for u in (changes.get("updates") or []) if isinstance(u, dict) and u.get("form") == "deal"
+            for r in resource_references([a.get("component") for a in (u.get("addComponents") or []) if isinstance(a, dict)])
+        ]
+        new_names = set(changes.get("resources") or {})
+        check("An update on `deal` adds a select referencing the new vendor resource", any(r in new_names for r in deal_refs), f"deal references: {deal_refs or 'none'}")
+
+    return results
+
+
 def main():
     it_dir = BASE / ITERATION
     if not it_dir.exists():
@@ -350,7 +450,7 @@ def main():
             run_dir = eval_dir / run_name
             if not run_dir.exists():
                 continue
-            results = grade_run(run_dir, eval_name)
+            results = grade_change_run(run_dir, eval_name) if eval_name in CHANGE_BASELINES else grade_run(run_dir, eval_name)
             p = sum(1 for r in results if r["passed"])
             f = sum(1 for r in results if not r["passed"])
             total = p + f

@@ -49,7 +49,7 @@ Either way the UI gets a deliberate visual direction. Do NOT silently emit plain
 Detection path — inspect the workspace to find out which framework is already installed:
 
 1. For each row in the registry, check whether the Detection signal matches the workspace (file exists, dependency present, etc.).
-2. **Exactly one match:** load the file at that row's "Extend sub-skill" path (e.g., `../formio-angular/formio-angular-resources/SKILL.md` for Angular, relative to this file) and follow its instructions inline — do NOT attempt to invoke it by its frontmatter name as if it were a separate top-level skill. Pass the modify-existing payload in "Handoff context reference" below. The Extend sub-skill resolves the project with `project_get` and reconciles it against the workspace's own generated config — `FormioAppConfig` in `src/app/config.ts` for Angular, `src/config.ts` for React — so URLs are NOT in the handoff. The delta template pair IS — the sub-skill needs `template.md` for intent and `template.json` for structured field shapes when scaffolding the new resources.
+2. **Exactly one match:** load the file at that row's "Extend sub-skill" path (e.g., `../formio-angular/formio-angular-resources/SKILL.md` for Angular, relative to this file) and follow its instructions inline — do NOT attempt to invoke it by its frontmatter name as if it were a separate top-level skill. Pass the modify-existing payload in "Handoff context reference" below. The Extend sub-skill resolves the project with `project_get` and reconciles it against the workspace's own generated config — `FormioAppConfig` in `src/app/config.ts` for Angular, `src/config.ts` for React — so URLs are NOT in the handoff. The planner's change plan IS — the sub-skill needs `template.md` for intent and `changes.json` for the structured field shapes of the new resources.
 3. **Multiple matches** (a workspace carrying both `angular.json` and a `react` dependency): ask the user to pick in one question round, same shape as the build-new multi-framework case. Never resolve a multi-match by the table's row order — signal order must not decide which framework a user's existing application is treated as.
 
    The framework-preference question belongs to build-new only. On this branch the framework is a fact about the workspace, detected rather than asked; the multi-match tie-break is a different question with a different cause.
@@ -64,7 +64,7 @@ The one contract for what Step 3.5 and Step 4 hand on; every other file links he
 
 | | Build-new → Entry skill | Modify-existing → Extend sub-skill | Step 3.5 → `formio-auth` |
 | --- | --- | --- | --- |
-| Fields | `workspacePath`, `templateMdPath`, `templateJsonPath`, `importStatus`, `frontendDesignStatus` | `workspacePath`, `userRequest`, `templateMdPath` (delta), `templateJsonPath` (delta), `newResourceNames`, `frontendDesignStatus` | `templateMdPath` (its `Users & Auth` section is the requirements source), `workspacePath` |
+| Fields | `workspacePath`, `templateMdPath`, `templateJsonPath`, `importStatus`, `frontendDesignStatus` | `workspacePath`, `userRequest`, `templateMdPath`, `changesJsonPath`, `newResourceNames`, `frontendDesignStatus` | `templateMdPath` (its `Users & Auth` section is the requirements source), `workspacePath` |
 | URLs | none | none | none |
 | Resolves the project | the Entry skill's SETUP: `project_get` with `cwd` = `workspacePath` | the Extend sub-skill: `project_get` with `cwd` = `workspacePath`, reconciled against the workspace's own config | `formio-auth`'s preflight: `project_get` with `cwd` = `workspacePath` |
 
@@ -88,11 +88,11 @@ The Entry skill uses this to load the template pair (both files on disk — `tem
 {
   workspacePath: string,               // absolute
   userRequest: string,                 // the plain-language request, quoted as a requirements block
-  templateMdPath: string,              // absolute, planner's delta template.md
-  templateJsonPath: string,            // absolute, planner's delta template.json
-  newResourceNames: string[],          // machine names of the resources added by this delta
+  templateMdPath: string,              // absolute, planner's template.md (with the dated change section)
+  changesJsonPath: string,             // absolute, planner's changes.json (new entities + updates to existing forms)
+  newResourceNames: string[],          // machine names of the resources the change adds
   frontendDesignStatus: 'available' | 'declined'  // from Step 4a's frontend-design pre-check
 }
 ```
 
-The Extend sub-skill resolves the project with `project_get` for `workspacePath` and reconciles it against the workspace's own generated config — `src/app/config.ts` for Angular, `src/config.ts` for React, and each framework skill names its own — and interprets the user's request in framework-native terms, using the delta template pair to scaffold exactly the newly-added resources.
+The Extend sub-skill resolves the project with `project_get` for `workspacePath` and reconciles it against the workspace's own generated config — `src/app/config.ts` for Angular, `src/config.ts` for React, and each framework skill names its own — and interprets the user's request in framework-native terms, using `changesJsonPath` for the shapes of exactly the newly-added resources — in the template's own shape, so the planner's canonical JSON applies — and `template.md`'s change section for intent. Step 3 applied the change to the project with the granular tools before this handoff; `template.json` is an export of the newest version tag and is refreshed only when the project is versioned.

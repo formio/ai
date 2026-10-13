@@ -161,7 +161,7 @@ The same run, step by step:
 
 ![Server card for formio-mcp showing Connected and the docker command it runs](https://raw.githubusercontent.com/formio/ai/main/packages/mcp-server/docs/images/inspector-4-connected.jpg)
 
-**5. Open the Tools tab** for the tools this server exposes. Every server lists all 23 — including `project_set` and `project_get`, which are registered for every client.
+**5. Open the Tools tab** for the tools this server exposes. Every server lists all 25 — including `project_set` and `project_get`, which are registered for every client.
 
 ![Tools tab listing the server's Form.io tools](https://raw.githubusercontent.com/formio/ai/main/packages/mcp-server/docs/images/inspector-5-tools.jpg)
 
@@ -175,7 +175,7 @@ Importing writes the server into the inspector's own catalog at `~/.mcp-inspecto
 
 ## MCP server tools
 
-The bundled `@formio/mcp` server exposes these 23 tools. Skills prefer these over raw HTTP whenever an operation is covered.
+The bundled `@formio/mcp` server exposes these 25 tools. Skills prefer these over raw HTTP whenever an operation is covered.
 
 ### Forms
 
@@ -214,8 +214,10 @@ The bundled `@formio/mcp` server exposes these 23 tools. Skills prefer these ove
 
 | Tool | Purpose |
 | --- | --- |
-| `project_export` | Export the project's complete template (roles, resources, forms, actions) as a portable JSON document. Use before `project_import` to snapshot. |
-| `project_import` | Import a template JSON — additively merges roles, resources, forms, and actions in one call. **Same-machine-name items are overwritten in place; everything else is preserved.** |
+| `project_export` | Export the project's complete template (roles, resources, forms, actions) as a portable JSON document. With `tag`, export the template a version tag stored — how a workspace's `template.json` is refreshed. |
+| `project_import` | Import a template JSON for a first build. Each form it names is replaced in place with its actions deleted and recreated, and a template `access` replaces the project's; forms, roles and actions it does not name are kept. Change an existing project with the form, role and action tools. |
+| `project_tag_list` | The project's current version and its version tags, newest first. With `compare: true`, the roles, resources, forms and actions changed since the current version. |
+| `project_tag_create` | Version the project: Form.io snapshots its current state under a semver `tag` with a `description`. |
 | `project_get` | Report which project a directory resolves to, which deployment hosts it, and which layer supplied each. The preflight to run before the first call that reads or writes — it answers from inside the server, with the same resolver every other tool uses, so no shell command is needed to ask it. Returns a `status` of `ok`, `not-configured`, or `base-url-unresolved`. |
 | `project_set` | Persist a Project URL for a directory, in `~/.formio/projects.json`. To record the target with the code instead, write a committed `formio.json` in the application's own folder — the server reads that file and never writes it. One server can serve several workspaces. Registered in every client. A mapping applies to its directory and every subdirectory beneath it, up to the first folder holding `.git` — the same boundary as the `formio.json` search, so a mapping on a parent folder does not reach into a repository cloned beneath it; when several mapped folders contain the working directory, the nearest mapped folder wins. A mapping written here overrides `FORMIO_PROJECT_URL` in the server environment, which is the weakest source. |
 

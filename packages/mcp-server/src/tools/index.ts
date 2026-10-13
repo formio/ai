@@ -19,6 +19,8 @@ import { registerProjectExportTool } from './project_export.js';
 import { registerProjectGetTool } from './project_get.js';
 import { registerProjectImportTool } from './project_import.js';
 import { registerProjectSetTool } from './project_set.js';
+import { registerProjectTagCreateTool } from './project_tag_create.js';
+import { registerProjectTagListTool } from './project_tag_list.js';
 import { registerRoleCreateTool } from './role_create.js';
 import { registerRoleListTool } from './role_list.js';
 import { registerRoleUpdateTool } from './role_update.js';
@@ -48,6 +50,8 @@ export function registerAllTools(
   // and the same cwd fallback project_set writes under.
   registerProjectGetTool(server, config, { cwd: options.cwd });
   registerProjectImportTool(server, config);
+  registerProjectTagListTool(server, config);
+  registerProjectTagCreateTool(server, config);
   // The environment project comes from the already-validated config, not from a
   // second read of the environment: an unusable FORMIO_PROJECT_URL has to be
   // dropped once, in getConfig, or the tool that repairs a directory's mapping is

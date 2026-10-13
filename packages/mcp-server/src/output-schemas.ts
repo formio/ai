@@ -100,6 +100,38 @@ export const templateDocument = z.looseObject({
   actions: z.looseObject({}).optional(),
 });
 
+// A version tag as the tag tools report it: its name, description, and when it was
+// made — never the template it stored, which project_export returns by `tag`.
+export const tagSummaryOutput = z.looseObject({
+  tag: z.string(),
+  description: z.string().optional(),
+  created: z.string().optional(),
+});
+
+const kindChanges = z.looseObject({
+  added: z.array(z.string()),
+  removed: z.array(z.string()),
+  changed: z.array(z.string()),
+});
+
+// `current` is absent for a project never tagged. `comparison` is present only when
+// asked for: per kind, the entities added, removed, and changed since `against`, or
+// a `message` when there is no version to compare against.
+export const tagListOutput = z.looseObject({
+  current: z.string().optional(),
+  tags: z.array(tagSummaryOutput),
+  comparison: z
+    .looseObject({
+      against: z.string().optional(),
+      message: z.string().optional(),
+      roles: kindChanges.optional(),
+      resources: kindChanges.optional(),
+      forms: kindChanges.optional(),
+      actions: kindChanges.optional(),
+    })
+    .optional(),
+});
+
 // List payloads are wrapped in a named field because structuredContent must be an
 // object. `total` is the collection size Form.io reports, not the page length, and
 // is left out when Form.io reports none rather than guessed from the page.

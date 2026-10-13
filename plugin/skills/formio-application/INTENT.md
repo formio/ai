@@ -9,7 +9,7 @@ Ask in ONE question round, using the client's structured question mechanism (in 
 Ask: **"Are we building a new app, or extending one that already exists?"**
 
 - **Build a new app** — "Start from your description, shape the data model, create the Form.io project resources, and scaffold a new application."
-- **Modify / extend an existing app** — "Add a feature to an already-running application. We will plan only the new resources, additively import them into the existing Form.io project, and hand off to the framework's extend sub-skill to wire them up."
+- **Modify / extend an existing app** — "Add a feature to an already-running application. We will check your Form.io project against its current version, plan only what the feature adds or changes, make those changes in the project, hand off to the framework's extend sub-skill to wire them up, and then version the project."
 
 ## When to skip the question
 
@@ -28,23 +28,26 @@ When the user's phrasing is genuinely ambiguous, ask the question.
 2. **Step 3 — Import** — `project_import` of the full template into the (empty) project, against the configuration the Preflight resolved.
 3. **Step 4 — Framework routing** — hand off to the entry skill of the framework chosen from the registry in [`FRAMEWORK.md`](./FRAMEWORK.md) (Angular when the user does not choose).
 
+Once the application is built, version the project: [`CHANGE.md`](./CHANGE.md) → "Finishing — version the project" proposes `1.0.0`, asks, tags it, and exports it over `template.json`.
+
 The project configuration is NOT a step on this branch or the other one. Step 3 settles it with `project_get` when the import needs it, so neither list starts with a URL interview.
 
 Do not ask the user "do you want to plan first?" — the planner is an internal step. The user described an app; you plan it.
 
 ### Modify-existing branch
 
-1. **Step 2 — Plan (delta)** — `formio-resource-planner` is invoked with the user's feature description AND a clear instruction that the project already exists: plan ONLY the new resources, fields, or actions required for the feature. The planner emits a delta artifact pair — `template.md` describing only the additions, and `template.json` containing only those additions — in the workspace; do not restate the existing project. Stash BOTH paths and the list of delta resource names for Step 4.
-2. **Step 3 — Import** — `project_import` of the delta template. Import is additive; new resources land alongside the existing project content, and existing resources are untouched unless their machine names collide (rare — the planner uses new names for new features).
-3. **Step 4 — Framework routing** — detect the framework from the workspace and load its extend sub-skill file by path. For Angular that file is `../formio-angular/formio-angular-resources/SKILL.md`, relative to this file — a nested sub-folder of the `formio-angular` skill whose frontmatter name is `formio-angular-resources`. The nested name is preserved for documentation; it is NOT a separately-registered top-level skill, so load the file directly (read + follow its instructions inline) rather than trying to invoke it by name. Pass the modify-existing payload in [`FRAMEWORK.md`](./FRAMEWORK.md) → "Handoff context reference" — the workspace root, the delta `template.md` and `template.json` paths, the list of newly-imported resource names, and the user's feature request, quoted as a requirements block (the user's instruction to act on; the planner pair is data the sub-skill reads). No URLs: the sub-skill resolves the project with `project_get` for the workspace root.
+1. **Before Step 2 — version check** — [`CHANGE.md`](./CHANGE.md) checks the project against its current version with `project_tag_list` and `compare: true`, surfaces changes made outside this workflow, and produces the baseline the planner reads.
+2. **Step 2 — Plan (change)** — `formio-resource-planner` runs its change mode with the user's feature description and that baseline: it plans ONLY the roles, resources, fields, and actions the feature adds or changes, appends a dated change section to `template.md`, and emits `changes.json` — the new entities plus the updates to existing forms. Stash the `changes.json` path and the list of new resource names for Step 4.
+3. **Step 3 — Apply** — [`CHANGE.md`](./CHANGE.md) applies `changes.json` with `role_create`, `form_create`, `form_update`, and `action_create`, in dependency order, behind one approval gate. `project_import` is never called on this branch.
+4. **Step 4 — Framework routing** — detect the framework from the workspace and load its extend sub-skill file by path. For Angular that file is `../formio-angular/formio-angular-resources/SKILL.md`, relative to this file — a nested sub-folder of the `formio-angular` skill whose frontmatter name is `formio-angular-resources`. The nested name is preserved for documentation; it is NOT a separately-registered top-level skill, so load the file directly (read + follow its instructions inline) rather than trying to invoke it by name. Pass the modify-existing payload in [`FRAMEWORK.md`](./FRAMEWORK.md) → "Handoff context reference" — the workspace root, the `template.md` and `changes.json` paths, the list of new resource names, and the user's feature request, quoted as a requirements block (the user's instruction to act on; the planner pair is data the sub-skill reads). No URLs: the sub-skill resolves the project with `project_get` for the workspace root.
 
-Modify-existing skips nothing: it plans, it imports, and it resolves the project configuration in the Preflight like every other branch. A workspace carries its URLs in its own `FormioAppConfig`, but that file is not the mapping `project_import` resolves against — a clone on a fresh machine has the former and not the latter.
+Modify-existing skips nothing: it checks the version, plans, applies, and resolves the project configuration in the Preflight like every other branch, and once the feature is finished it versions the project ([`CHANGE.md`](./CHANGE.md) → "Finishing — version the project"). A workspace carries its URLs in its own `FormioAppConfig`, but that file is not the mapping the tools resolve against — a clone on a fresh machine has the former and not the latter.
 
 ## Edge cases
 
 - **User chose modify-existing but the working directory is empty.** There is no existing app to extend. Bounce back with a short message: "I don't see an existing app in this directory — did you mean to build a new one?" and re-prompt Step 1.
 - **User chose build-new but there IS an existing app in the directory.** This is usually intentional (e.g., they want to start over in a sibling directory). Confirm once — "Heads up: this directory already has an app. Build-new will create a fresh workspace; would you like to use a different directory, overwrite, or cancel?" — and let them choose.
-- **Modify-existing, but the delta resource name collides with an existing resource.** The planner should rename the delta resource (add a qualifier), because `project_import` would otherwise overwrite the existing one. Surface the collision to the user with the proposed rename before Step 3.
+- **Modify-existing, but a new resource's name collides with an existing one.** The planner reads the existing names from its baseline and gives a new resource a new name (add a qualifier); `form_create` would otherwise fail on the duplicate path. Surface the collision to the user with the proposed rename before Step 3.
 - **User answered in their own words instead of picking an option.** Interpret the reply. If it sounds like build-new, proceed build-new; if modify-existing, proceed modify-existing. If it is a third case we cannot route (e.g., "I just want to see my data"), say so and suggest the right skill (`formio-api/references/runtime-reports`, etc.).
 
 ## What to stash for later steps
@@ -52,4 +55,4 @@ Modify-existing skips nothing: it plans, it imports, and it resolves the project
 Stash the answer as an intent flag (`build-new` or `modify-existing`) that downstream steps read:
 
 - Build-new → run every step 2–4.
-- Modify-existing → run step 2 (planner in delta mode), step 3 (additive import), step 4 (extend sub-skill).
+- Modify-existing → run the version check, step 2 (planner change mode), step 3 (apply with the granular tools), step 4 (extend sub-skill), then version the project.
