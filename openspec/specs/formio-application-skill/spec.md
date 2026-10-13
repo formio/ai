@@ -201,48 +201,6 @@ On the build-new branch, the `formio-application` skill SHALL invoke `formio-res
 - **THEN** the `formio-application` skill runs `formio-resource-planner` before asking for URLs
 - **AND** the user is not asked "have you run the planner yet?"
 
-### Requirement: New `authenticate` MCP tool
-
-The MCP server SHALL register a new tool named `authenticate` at `packages/mcp-server/src/tools/authenticate.ts`, wired into `registerAllTools`. The tool:
-
-- Takes NO parameters — its input schema is an empty object.
-- Invokes the existing `ensureAuthenticated(config)` flow. No new auth code paths are introduced; the login mechanism is unchanged.
-- Is **idempotent**. When the MCP server already has a valid cached JWT for the configured project URL, the tool returns success without opening a browser.
-- Returns a JSON-serialized text content block whose payload is `{ authenticated: boolean, cached: boolean, projectUrl: string, userEmail?: string }`. The JWT MUST NOT appear in the return payload.
-- Reads the project URL from the server's `FormioConfig`. The agent does NOT pass a URL.
-- `cached: true` when the JWT was already present before the call; `cached: false` when the call triggered a fresh login.
-- `userEmail` is best-effort — populated from a `GET {baseUrl}/current` call when the returned submission has an email field. Any error fetching the current user is swallowed; the field is simply omitted.
-- Is the tool Step 4 of `formio-application` calls explicitly to trigger authentication. It is also available to any other skill that wants to pre-authenticate before a sensitive sequence.
-
-#### Scenario: Tool is registered and callable
-
-- **WHEN** the MCP server starts with a valid `FormioConfig`
-- **THEN** the tool `authenticate` appears in the tool registry with an empty input schema
-
-#### Scenario: Cached JWT short-circuits
-
-- **WHEN** `authenticate` is called and `config.jwt` is already set (a valid cached JWT is in memory for the project URL)
-- **THEN** the tool returns `{ authenticated: true, cached: true, projectUrl: <configured> }`
-- **AND** no browser window is opened
-- **AND** the payload does not contain a `jwt` field or any other token field
-
-#### Scenario: No cached JWT triggers login
-
-- **WHEN** `authenticate` is called and no valid JWT is cached
-- **THEN** `ensureAuthenticated` runs, which opens the portal-login browser window
-- **AND** on successful login, the tool returns `{ authenticated: true, cached: false, projectUrl: <configured> }` (optionally with `userEmail`)
-
-#### Scenario: Current-user email included when available
-
-- **WHEN** a successful `authenticate` call finishes and `GET {baseUrl}/current` returns a submission with an email field
-- **THEN** the payload contains `userEmail: <the email>`
-
-#### Scenario: Current-user fetch failure is swallowed
-
-- **WHEN** `authenticate` succeeds but the subsequent `GET /current` call fails (network error, 404, etc.)
-- **THEN** the tool still returns `authenticated: true` with no `userEmail` field
-- **AND** the tool call itself does NOT error
-
 ### Requirement: formio-application hands standalone form creation off to formio-form-builder
 
 When, during or at the start of an orchestration, the user's request turns out to be a standalone FORM — one form to collect responses, not a resource, not a data model, not an app — the `formio-application` skill SHALL hand off to the `formio-form-builder` skill rather than running the planner/import pipeline. A standalone form that may later be embedded in an application still belongs to `formio-form-builder` (its own flow captures embed intent).
