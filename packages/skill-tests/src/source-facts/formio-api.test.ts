@@ -195,3 +195,30 @@ describe('form_create shape check', () => {
     expect(save).toMatch(/`tags`/);
   });
 });
+
+// Tags are stored under the primary project, so every stage of a family shares them
+// (apps/formio-server/src/middleware/tagHandler.js). A tag created with no
+// `template` snapshots the project's current export and sets the project's `tag`;
+// deploy accepts `type: 'tag'` as well as `type: 'template'` and runs the importer.
+// The server answers no 409 for a protected stage.
+describe('platform-staging.md versions and deploy', () => {
+  const staging = reference('platform-staging.md');
+
+  it('claims no 409', () => {
+    expect(staging).not.toMatch(/409/);
+  });
+
+  it('documents family-wide tags, the snapshot, tag/current, and type: tag deploy', () => {
+    expect(staging).toMatch(/shared (by|across) (every stage|the (whole )?project family)/);
+    expect(staging).toMatch(/without a `template`[^.]*snapshot/);
+    expect(staging).toMatch(/### GET \{baseUrl\}\/project\/:projectId\/tag\/current/);
+    expect(staging).toMatch(/"type": "tag"/);
+  });
+
+  it('names the version tools', () => {
+    const preference = section(staging, '## MCP Tool Preference');
+    expect(preference).toMatch(/`project_tag_list`/);
+    expect(preference).toMatch(/`project_tag_create`/);
+    expect(preference).toMatch(/`project_export`[^.]*`tag`/);
+  });
+});

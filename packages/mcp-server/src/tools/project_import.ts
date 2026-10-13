@@ -67,7 +67,7 @@ export function registerProjectImportTool(server: McpServer, config: FormioConfi
     'project_import',
     {
       description:
-        "Merge a template's roles, resources, forms and actions into the existing project `cwd` resolves to, in one call. Build the template with the formio-resource-planner skill, and snapshot first with project_export: the import merges, it does not replace.",
+        "Import a template's roles, resources, forms and actions into the project `cwd` resolves to, for a first build: build it with the formio-resource-planner skill. Each form it names is replaced, its actions deleted and recreated, and its `access` replaces the project's; change an existing project with the form, role and action tools instead.",
       inputSchema: {
         cwd: cwdSchema,
         template: z.looseObject({}).describe('The template JSON object to import'),

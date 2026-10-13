@@ -27,6 +27,18 @@ describe('project_import tool', () => {
     expect(tool!.description).toMatch(/formio-resource-planner/);
   });
 
+  // Import updates each form it names in place, deleting and recreating its actions,
+  // and a template's access replaces the project's — not a merge that keeps them.
+  it('states what the import replaces and that it is for a first build', async () => {
+    const { client } = await createTestClient(registerProjectImportTool);
+    const { tools } = await client.listTools();
+    const description = tools.find((t) => t.name === 'project_import')!.description!;
+    expect(description).not.toMatch(/merges, it does not replace/);
+    expect(description).toMatch(/actions/);
+    expect(description).toMatch(/access/);
+    expect(description).toMatch(/first build/);
+  });
+
   it('wraps the template in { template: ... } and calls POST /import', async () => {
     const template = {
       title: 'My App',

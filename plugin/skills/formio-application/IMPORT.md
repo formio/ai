@@ -8,10 +8,9 @@ This document is loaded by the parent `formio-application` skill during Step 3. 
 
 - **Step 3:** present an import-confirmation preview, invoke the `project_import` MCP tool, handle the three error branches.
 
-Step 3 runs on BOTH branches of the orchestrator:
+The import is for a first build: it runs on the **build-new** branch, directly after Step 2 (Plan), in the same invocation. The Preflight mapped this working directory to the target project, and every tool resolves that mapping on each call, so the project is already live here — there is nothing to reload. Import pushes the full-project `template.json` into a project with no content of its own.
 
-- **Build-new** → directly after Step 2 (Plan), in the same invocation. The Preflight mapped this working directory to the target project, and every tool resolves that mapping on each call, so the project is already live here — there is nothing to reload. Import pushes the full-project `template.json` into a (presumably empty) project.
-- **Modify-existing** → directly after Step 2 (Plan) as well. Import pushes the delta `template.json` (only the new resources / fields / actions) into the existing project, which merges additively on top of what is already there.
+The **modify-existing** branch never imports. An import updates every form the template names in place — its actions are deleted and recreated from the template — and a template's `access` replaces the project's access lists, so re-importing into a project that has content overwrites whatever changed there. That branch applies a change plan with the form, role, and action tools instead: see [`CHANGE.md`](./CHANGE.md).
 
 ## Authentication is implicit
 
@@ -37,21 +36,13 @@ Detection hint: `process.env.DISPLAY === ""` on Linux, or failing `open` / `xdg-
 
 Before any import work, ask whether to import at all.
 
-**Build-new:**
-
 > I have the plan ready — the planner wrote `template.md` (architectural intent) and `template.json` (the Form.io structure). Do you want me to import `template.json` into your Form.io project now? (You can also skip this step and import later yourself, or build the framework app against a project you have already set up. `template.md` stays on disk regardless — it is the seed document the framework skill reads.)
-
-**Modify-existing:**
-
-> I have the delta plan ready — the planner wrote a delta `template.md` (architectural intent for the additions) and a delta `template.json` containing ONLY the new resources and actions for this feature. Do you want me to additively import `template.json` into your existing Form.io project now? (You can also skip this and import manually later; the framework wiring in Step 4 can still proceed, but the wired UI will 404 until the import runs. `template.md` stays on disk regardless — the framework extend sub-skill reads it for intent.)
 
 If the user declines, mark the Import step skipped and advance to Step 4 (Framework routing). Do not call `project_import`.
 
 ### The confirmation preview
 
 If the user accepts, print a preview BEFORE calling the tool.
-
-**Build-new:**
 
 ```
 About to import `template.json` into:
@@ -64,32 +55,13 @@ Template contents:
   - <M> roles:     <role names>
   - <K> forms:     <first-three form names>, ...
 
-WARNING: import merges into the existing project. Any existing resources,
-forms, or actions in this project with the same machine name will be
-overwritten. Consider running `project_export` first to snapshot the
-current state of the project.
+WARNING: import is for a first build. Every form the template names that
+already exists in this project is updated in place — its actions are deleted
+and recreated from the template — and the template's access replaces the
+project's access lists. If this project already has content, cancel and
+change it through CHANGE.md instead.
 
 Proceed with the import?
-```
-
-**Modify-existing:**
-
-```
-About to ADDITIVELY import delta `template.json` into:
-
-  Base URL:    <baseUrl>
-  Project:     <projectUrl>
-
-Delta contents (new resources only):
-  - <N> resources: <names>
-  - <M> actions:   <names>
-
-Import is additive: existing resources, forms, and actions in your project
-are preserved. Same-machine-name items would be overwritten — the planner
-uses new names for new features, so collisions are rare, but review the
-names above before approving.
-
-Proceed with the additive import?
 ```
 
 Wait for explicit approval. Declining returns to the skip path (Step 4 next, no import).
@@ -160,7 +132,6 @@ On successful import, Step 4 receives:
 - Path to `template.md` on disk (planner wrote it; still there — architectural-intent seed for the framework skill).
 - Path to `template.json` on disk (planner wrote it; still there — structured companion).
 - A flag: "import succeeded".
-- For modify-existing: the list of newly-imported resource names (so the framework's extend sub-skill scaffolds modules for exactly those).
 
 On skipped import (user declined or error branch chose skip), Step 4 receives the same paths but with the flag set to "import skipped". Downstream framework SETUP resolves the configuration with `project_get` either way — it never interviews for it, so a skipped import changes nothing about how the framework skill resolves the project.
 

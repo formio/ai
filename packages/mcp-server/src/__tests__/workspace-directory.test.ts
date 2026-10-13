@@ -551,6 +551,8 @@ const PROJECT_SCOPED: Record<string, Record<string, unknown>> = {
   form_revert: { formId: '67890abcdef012345678abcd', version: '1', note: 'n' },
   project_export: {},
   project_import: { template: { forms: {}, resources: {} } },
+  project_tag_list: {},
+  project_tag_create: { tag: '1.0.0', description: 'd' },
   role_create: { role: { title: 'R' } },
   role_list: {},
   role_update: { roleId: '69d68310040fa2cea2572945', role: { title: 'R' } },

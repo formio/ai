@@ -103,10 +103,14 @@ Right before writing `template.json`, run the emission algorithm in [`references
 
 Render the markdown block first, then the JSON block, then the one-line confirmation (`Wrote ./template.md and ./template.json.`, using the collision-aware filenames), then the "Next steps" section. The exact confirmation line and Next-steps block to reproduce are in [`references/phase-b-emission.md`](references/phase-b-emission.md) → "Order in the transcript".
 
+## Change mode — a change to an existing project
+
+When you are handed a **baseline template** — the current tag's template or the current export of a project that already has content — you are planning a change, not an application. Run the same interview and approval gate, scoped to what the change needs, and follow [`references/change-plan.md`](references/change-plan.md): Phase A marks what the change adds `(new)` or alters `(changed)`, and Phase B updates `template.md` with a dated change section and writes `changes.json` — only the entities the change creates, plus the updates to existing forms. In change mode you never write `template.json` and never produce a template to import: an existing project is changed with the form, role, and action tools, because importing into it replaces the forms and access it names.
+
 ## Handoffs
 
 - **`formio-auth`** — when the approved map's `Users & Auth` section has an `SSO` other than `none`, a `Custom JWT: yes`, or any auth concern beyond resource-backed login + Role Assignment + Group Assignment (Token Swap, email-token/passwordless auth, 2FA, reCAPTCHA, RBAC tuning beyond default roles and group permissions), that configuration acts on the project the template creates, so it runs after the import — never from this skill. When `formio-application` invoked you, it runs `formio-auth` at its Step 3.5. When you are running standalone, include the **Configure auth** line in the Next steps menu ([`references/phase-b-emission.md`](references/phase-b-emission.md)).
-- **`formio-application`** — when invoked as the orchestrator's planning step, run the same two phases and gates; the Phase B file paths are what the orchestrator passes to its Import step and the framework-specific scaffolding skill.
+- **`formio-application`** — when invoked as the orchestrator's planning step, run the same two phases and gates; the Phase B file paths are what the orchestrator passes to its Import step (a first build) or its change step (change mode, with `changes.json`) and to the framework-specific scaffolding skill.
 
 ## Worked example
 
@@ -140,3 +144,4 @@ All one hop from here — open the one matching the phase you are in:
 - [`references/phase-b-emission.md`](references/phase-b-emission.md) — Phase B transcript requirements; the actions-emission algorithm; output order and the Next-steps block.
 - [`references/template-md.md`](references/template-md.md) — full `template.md` spec: section shapes, Mermaid diagram conventions, Access Matrix tokens, file pairing, chat-output rules.
 - [`references/template-json.md`](references/template-json.md) — full `template.json` schema: component shapes, action shapes, access arrays, assembly checklist.
+- [`references/change-plan.md`](references/change-plan.md) — change mode: the baseline input, the Phase A marking, the dated change section, the `changes.json` shape, and its self-check.
