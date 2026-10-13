@@ -12,7 +12,7 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { removeProjectEntry } from '../project-map.js';
+import { removeProjectEntry } from '../../project-map.js';
 import { LIVE_CASES, type LiveContext } from './cases.js';
 import { runCleanup } from './cleanup.js';
 import { checkLiveTarget, coverageGaps, runPrefix } from './guards.js';

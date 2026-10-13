@@ -2,8 +2,8 @@
 // fails here, at review time, rather than going untested against a real project.
 
 import { describe, expect, it } from 'vitest';
-import { connectTools, TEST_CONFIG } from '../__tests__/test-helpers.js';
-import { registerAllTools } from '../tools/index.js';
+import { connectTools, TEST_CONFIG } from '../test-helpers.js';
+import { registerAllTools } from '../../tools/index.js';
 import { LIVE_CASES } from './cases.js';
 import { coverageGaps } from './guards.js';
 
@@ -15,7 +15,7 @@ describe('live tool coverage', () => {
       registered: tools.map((tool) => tool.name),
       covered: LIVE_CASES.map((liveCase) => liveCase.tool),
     });
-    expect(gaps, `registered tools with no live case in src/live/cases.ts`).toEqual([]);
+    expect(gaps, `registered tools with no live case in src/__tests__/live/cases.ts`).toEqual([]);
   });
 
   it('names every case uniquely', () => {

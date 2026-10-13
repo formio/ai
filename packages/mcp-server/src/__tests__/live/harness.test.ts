@@ -4,8 +4,8 @@ import { join } from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { deploymentRequest } from './harness.js';
 
-vi.mock('../token-cache.js', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('../token-cache.js')>()),
+vi.mock('../../token-cache.js', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../token-cache.js')>()),
   readToken: vi.fn(() => 'token'),
 }));
 

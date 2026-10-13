@@ -1,12 +1,12 @@
 import { defineConfig } from 'vitest/config';
-import { systemCaArgs } from './src/live/guards.js';
+import { systemCaArgs } from './src/__tests__/live/guards.js';
 
 // `pnpm test:live` only. The default config never matches `*.live.ts`, so a live run —
 // which creates and deletes entities in a real Form.io project — is always opt-in.
 export default defineConfig({
   test: {
     environment: 'node',
-    include: ['src/live/**/*.live.ts'],
+    include: ['src/__tests__/live/**/*.live.ts'],
     // The cases build on one another against one project, so they run in order in a
     // single file and worker.
     fileParallelism: false,

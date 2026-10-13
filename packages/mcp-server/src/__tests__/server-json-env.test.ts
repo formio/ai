@@ -29,11 +29,9 @@ function declared(): DeclaredVariable[] {
 // Every FORMIO_* name the source reads from an environment object — the process
 // environment, or the one the CLI is handed in its place.
 function readInSource(): string[] {
-  // src/live is the opt-in live-test harness, excluded from the build like __tests__;
-  // the variables it reads (FORMIO_LIVE_TEST_PROJECT) are the runner's, not the server's.
   const sources = fg.sync('**/*.ts', {
     cwd: SRC,
-    ignore: ['__tests__/**', 'live/**'],
+    ignore: ['__tests__/**'],
     absolute: true,
   });
   const pattern = /(?:process\.env|\benv)(?:\.|\[['"])(FORMIO_[A-Z0-9_]+)/g;

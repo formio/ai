@@ -8,16 +8,16 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
-import { readToken } from '../token-cache.js';
+import { readToken } from '../../token-cache.js';
 import { systemCaArgs } from './guards.js';
-import { getConfig, readBooleanEnv } from '../config.js';
-import { resolveProjectConfig } from '../project-resolver.js';
-import { selectDispatcher } from '../formio-client.js';
+import { getConfig, readBooleanEnv } from '../../config.js';
+import { resolveProjectConfig } from '../../project-resolver.js';
+import { selectDispatcher } from '../../formio-client.js';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 
-/** The package root, whichever of `src/live` or `dist/live` this file runs from. */
-export const PACKAGE_ROOT = path.resolve(here, '..', '..');
+/** The package root: this file runs from `src/__tests__/live`, which the build never emits. */
+export const PACKAGE_ROOT = path.resolve(here, '..', '..', '..');
 export const REPO_ROOT = path.resolve(PACKAGE_ROOT, '..', '..');
 export const SERVER_ENTRY = path.join(PACKAGE_ROOT, 'dist', 'stdio.js');
 
