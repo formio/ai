@@ -10,7 +10,8 @@ import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
 import { readToken } from '../token-cache.js';
 import { systemCaArgs } from './guards.js';
-import { readBooleanEnv } from '../config.js';
+import { getConfig, readBooleanEnv } from '../config.js';
+import { resolveProjectConfig } from '../project-resolver.js';
 import { selectDispatcher } from '../formio-client.js';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -86,37 +87,62 @@ export async function startLiveSession({
 }
 
 /**
- * The credential the server itself uses for this deployment: the cached portal-login
- * token, else the project API key from the environment.
+ * The credential the server itself sends for the project `cwd` resolves to, chosen by
+ * the server's own resolver: FORMIO_API_KEY when it is bound to that project (the
+ * project FORMIO_PROJECT_URL names), used in preference to a login exactly as the
+ * server does; otherwise the cached portal-login token for its deployment.
  */
-async function authHeader(baseUrl: string): Promise<Record<string, string>> {
+async function authHeader({
+  cwd,
+  baseUrl,
+}: {
+  cwd: string;
+  baseUrl: string;
+}): Promise<Record<string, string>> {
+  // With no resolvable project the server applies no key either, so the cached
+  // login is the credential that remains.
+  const apiKey = (() => {
+    try {
+      return resolveProjectConfig(cwd, getConfig(), { onNote: () => undefined }).apiKey;
+    } catch {
+      return undefined;
+    }
+  })();
+  if (apiKey) {
+    return { 'x-token': apiKey };
+  }
   const token = await readToken(baseUrl);
   if (token) {
     return { 'x-jwt-token': token };
   }
-  if (process.env.FORMIO_API_KEY) {
-    return { 'x-token': process.env.FORMIO_API_KEY };
-  }
   throw new Error(
-    `No cached login for ${baseUrl} and no FORMIO_API_KEY; clean-up cannot authenticate.`
+    `No API key bound to this project and no cached login for ${baseUrl}; clean-up cannot authenticate.`
   );
 }
 
+/** How long one clean-up request may take before it is abandoned. */
+export const DEPLOYMENT_REQUEST_TIMEOUT_MS = 30_000;
+
 export interface DeploymentRequest {
+  /** The folder whose resolution chooses the credential; the repository root by default. */
+  cwd?: string;
   projectUrl: string;
   baseUrl: string;
   method: 'GET' | 'PUT' | 'DELETE';
   /** Path under the Project URL, starting with `/` or empty for the project itself. */
   path: string;
   body?: unknown;
+  timeoutMs?: number;
 }
 
 export async function deploymentRequest({
+  cwd = REPO_ROOT,
   projectUrl,
   baseUrl,
   method,
   path: requestPath,
   body,
+  timeoutMs = DEPLOYMENT_REQUEST_TIMEOUT_MS,
 }: DeploymentRequest): Promise<unknown> {
   const url = new URL(`${projectUrl}${requestPath}`);
   // Trust the deployment exactly as the server does, so clean-up reaches every host
@@ -128,8 +154,9 @@ export async function deploymentRequest({
   });
   const response = await fetch(url, {
     method,
-    headers: { 'content-type': 'application/json', ...(await authHeader(baseUrl)) },
+    headers: { 'content-type': 'application/json', ...(await authHeader({ cwd, baseUrl })) },
     body: body === undefined ? undefined : JSON.stringify(body),
+    signal: AbortSignal.timeout(timeoutMs),
     ...(dispatcher ? { dispatcher } : {}),
   } as RequestInit);
   const text = await response.text();

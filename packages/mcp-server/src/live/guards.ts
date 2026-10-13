@@ -18,30 +18,45 @@ const withoutTrailingSlash = (url: string): string => url.replace(/\/+$/, '');
  */
 export function checkLiveTarget({
   resolvedProjectUrl,
+  resolveError,
   allowedProjectUrl,
 }: {
   resolvedProjectUrl: string | undefined;
+  /** project_get's own error text, when it failed outright rather than reporting. */
+  resolveError?: string;
   allowedProjectUrl: string | undefined;
 }): LiveTargetCheck {
-  if (!allowedProjectUrl) {
-    return {
-      ok: false,
-      message: `${LIVE_TARGET_VARIABLE} is not set. Set it to the Project URL of a throwaway project; the live run creates and deletes forms, roles, and version tags there.`,
-    };
+  const resolved = resolvedProjectUrl ? withoutTrailingSlash(resolvedProjectUrl) : undefined;
+  const allowed = allowedProjectUrl ? withoutTrailingSlash(allowedProjectUrl) : undefined;
+  // Both sides are named in every refusal, so the person running the suite sees what
+  // the folder resolves to and what the allowlist permits without another command.
+  const resolvedPart = resolveError
+    ? `The repository folder's project could not be resolved: ${resolveError}`
+    : resolved
+      ? `The repository folder resolves to ${resolved}`
+      : 'The repository folder resolves to no project';
+  const allowedPart = allowed
+    ? `${LIVE_TARGET_VARIABLE} allows only ${allowed}`
+    : `${LIVE_TARGET_VARIABLE} is not set`;
+  const refuse = (remedy: string): LiveTargetCheck => ({
+    ok: false,
+    message: `${resolvedPart}; ${allowedPart}. Nothing was called. ${remedy}`,
+  });
+  if (resolveError) {
+    return refuse('Repair what that error names, then run again.');
   }
-  if (!resolvedProjectUrl) {
-    return {
-      ok: false,
-      message: `The repository folder resolves to no project. Record one with project_set (or set FORMIO_PROJECT_URL) and set ${LIVE_TARGET_VARIABLE} to the same URL.`,
-    };
+  if (!allowed) {
+    return refuse(
+      `Set ${LIVE_TARGET_VARIABLE} to the Project URL of a throwaway project; the live run creates and deletes forms, roles, and version tags there.`
+    );
   }
-  const resolved = withoutTrailingSlash(resolvedProjectUrl);
-  const allowed = withoutTrailingSlash(allowedProjectUrl);
+  if (!resolved) {
+    return refuse(
+      `Record a project for the folder with project_set (or set FORMIO_PROJECT_URL) and set ${LIVE_TARGET_VARIABLE} to the same URL.`
+    );
+  }
   if (resolved !== allowed) {
-    return {
-      ok: false,
-      message: `The repository folder resolves to ${resolved}, but ${LIVE_TARGET_VARIABLE} allows only ${allowed}. Nothing was called; point the folder at the allowed project or change ${LIVE_TARGET_VARIABLE}.`,
-    };
+    return refuse(`Point the folder at the allowed project or change ${LIVE_TARGET_VARIABLE}.`);
   }
   return { ok: true, projectUrl: resolved };
 }

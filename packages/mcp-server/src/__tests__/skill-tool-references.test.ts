@@ -50,6 +50,23 @@ const FIXTURE_SCHEMAS: ToolSchemas = new Map<string, object>([
 ]);
 
 describe('the scanner (seeded fixtures)', () => {
+  // `=>` and `<` are not brackets: an arrow function or a comparison in a call
+  // example must not end the scan or swallow the arguments after it.
+  it('checks arguments after an arrow function', () => {
+    expect(
+      referenceProblems(
+        '`form_update({ formId, onDone: () => x, publish: true })`',
+        FIXTURE_SCHEMAS
+      )
+    ).toContain('`form_update` takes no argument `publish`');
+  });
+
+  it('checks arguments after a comparison', () => {
+    expect(
+      referenceProblems('`form_update({ formId, draft: a < b, publish: true })`', FIXTURE_SCHEMAS)
+    ).toContain('`form_update` takes no argument `publish`');
+  });
+
   it('flags a tool the server does not register', () => {
     expect(referenceProblems('Call `form_revisions_list` first.', FIXTURE_SCHEMAS)).toEqual([
       'unregistered tool `form_revisions_list`',

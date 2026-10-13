@@ -60,8 +60,10 @@ function objectEntries(text: string): Argument[] {
       continue;
     }
     if (char === '"' || char === "'" || char === '`') quote = char;
-    if ('{[(<'.includes(char)) depth += 1;
-    if ('}])>'.includes(char)) {
+    // Only (), [] and {} nest; `<` and `>` are as often a comparison or an arrow
+    // function's `=>` as a type argument.
+    if ('{[('.includes(char)) depth += 1;
+    if ('}])'.includes(char)) {
       if (depth === 0) break;
       depth -= 1;
     }

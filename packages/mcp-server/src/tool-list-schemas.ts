@@ -30,16 +30,24 @@ export function withoutSchemaDialect(result: ListToolsResult): ListToolsResult {
 /**
  * Wraps the tools/list handler McpServer installed when the first tool was
  * registered, so every list it answers carries no `$schema` keys. The SDK exposes no
- * option for the conversion it runs, so the wrapper reads its handler table — the
- * budget test fails if an SDK update moves it.
+ * option for the conversion it runs, so the wrapper reads its private handler table.
+ * The SDK is a caret dependency, so a newer release may move that table: when it is
+ * not a Map holding a tools/list handler, the wrapper does nothing and the list is
+ * answered as the SDK emits it. Trimming the list never stops the server; the budget
+ * test fails if stripping stops working under the installed SDK.
  */
 export function stripSchemaDialect(server: McpServer): void {
-  const handlers = server.server['_requestHandlers'] as unknown as Map<string, ListHandler>;
-  const original = handlers.get(LIST_TOOLS);
-  if (!original) {
-    throw new Error('stripSchemaDialect must run after at least one tool is registered');
+  const handlers: unknown = (server.server as unknown as Record<string, unknown>)?.[
+    '_requestHandlers'
+  ];
+  if (!(handlers instanceof Map)) {
+    return;
   }
-  handlers.set(LIST_TOOLS, async (request, extra) =>
+  const original = handlers.get(LIST_TOOLS) as ListHandler | undefined;
+  if (typeof original !== 'function') {
+    return;
+  }
+  handlers.set(LIST_TOOLS, async (request: unknown, extra: unknown) =>
     withoutSchemaDialect(await original(request, extra))
   );
 }

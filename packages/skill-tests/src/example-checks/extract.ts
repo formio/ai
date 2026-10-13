@@ -39,7 +39,23 @@ const LANGS: Record<string, Example['lang']> = {
   tsx: 'tsx',
 };
 
-const FENCE = /^(`{3,})([A-Za-z]*)[^\n]*$/;
+// An opening fence: three or more backticks or tildes, after any indentation (a
+// fence nested under a list item is indented by the item, not the three spaces
+// CommonMark allows at the top level), then an optional info string.
+const FENCE = /^( *)(`{3,}|~{3,})([A-Za-z]*)[^\n]*$/;
+
+// A closing fence repeats the opening character at least as many times, with
+// nothing after it but spaces.
+function closesFence(line: string, fence: string): boolean {
+  const trimmed = line.trim();
+  return trimmed.length >= fence.length && trimmed === fence[0].repeat(trimmed.length);
+}
+
+// Content lines lose up to the opening fence's indentation.
+function dedent(line: string, indent: number): string {
+  const leading = line.length - line.trimStart().length;
+  return line.slice(Math.min(leading, indent));
+}
 
 export function extractExamples(doc: string, markdown: string): Example[] {
   const lines = markdown.split('\n');
@@ -51,18 +67,21 @@ export function extractExamples(doc: string, markdown: string): Example[] {
       i += 1;
       continue;
     }
-    const close = lines.findIndex(
-      (line, at) => at > i && line.startsWith(open[1]) && line.trim() === open[1]
-    );
+    const [, indent, fence, info] = open;
+    const close = lines.findIndex((line, at) => at > i && closesFence(line, fence));
     const end = close === -1 ? lines.length : close;
-    const lang = LANGS[open[2].toLowerCase()];
+    const lang = LANGS[info.toLowerCase()];
     if (lang) {
       examples.push({
         doc,
         index: examples.length,
         lang,
         line: i + 1,
-        code: lines.slice(i + 1, end).join('\n') + '\n',
+        code:
+          lines
+            .slice(i + 1, end)
+            .map((line) => dedent(line, indent.length))
+            .join('\n') + '\n',
         fragment: markedAsFragment(lines, i),
       });
     }

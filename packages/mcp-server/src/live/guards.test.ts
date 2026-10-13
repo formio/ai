@@ -27,7 +27,9 @@ describe('checkLiveTarget', () => {
       allowedProjectUrl: undefined,
     });
     expect(result.ok).toBe(false);
-    expect(!result.ok && result.message).toMatch(/FORMIO_LIVE_TEST_PROJECT/);
+    expect(!result.ok && result.message).toMatch(/FORMIO_LIVE_TEST_PROJECT is not set/);
+    // Both URLs are always named: the resolved one, and the allowlist (here unset).
+    expect(!result.ok && result.message).toMatch(/resolves to https:\/\/form\.test\/sandbox/);
   });
 
   it('refuses when the folder resolves to no project', () => {
@@ -37,6 +39,22 @@ describe('checkLiveTarget', () => {
     });
     expect(result.ok).toBe(false);
     expect(!result.ok && result.message).toMatch(/no project/i);
+    expect(!result.ok && result.message).toMatch(/allows only https:\/\/form\.test\/sandbox/);
+  });
+
+  // A project_get that failed outright reports a broken record, not an absent one:
+  // its own error is relayed, and project_set — which would fail for the same
+  // reason — is not offered as the remedy.
+  it('relays a resolution error instead of reporting no project', () => {
+    const result = checkLiveTarget({
+      resolvedProjectUrl: undefined,
+      resolveError: '[CONFIG_UNREADABLE] formio.json at /repo/formio.json is not valid JSON',
+      allowedProjectUrl: 'https://form.test/sandbox',
+    });
+    expect(result.ok).toBe(false);
+    expect(!result.ok && result.message).toMatch(/CONFIG_UNREADABLE/);
+    expect(!result.ok && result.message).not.toMatch(/project_set/);
+    expect(!result.ok && result.message).toMatch(/https:\/\/form\.test\/sandbox/);
   });
 
   it('does not treat a longer path as the same project', () => {
