@@ -1,5 +1,85 @@
 # @formio/ai
 
+## 1.0.0
+
+### Major Changes
+
+- 3649d61: The 1.0 tool surface. Breaking changes for any client calling the tools directly; the skills and READMEs ship updated in the same release.
+  
+  - **Renamed tools:** `action_types_list` → `action_type_list`, `form_revisions_list` → `form_revision_list`, `hello` → `server_status` (server name and version plus the `cwd`'s project resolution; no Form.io request). The old names are not registered.
+  - **Publish and revert are their own tools:** `form_publish` (`formId`, `note`) and `form_revert` (`formId`, `version`, `note`). `form_update` no longer takes `publish`, `revert` or `version`; its `draft: true` mode saves the draft fields of the body it is given and refuses a changed non-draft field, so `form_get`'s output can be passed back unchanged.
+  - **Form addressing:** `formId` is always a 24-character ObjectId (every action tool, `form_update`, `form_publish`, `form_revert`); `formIdOrPath` accepts either and is taken by `form_get`, `form_revision_list` and `form_revision_get`.
+  - **`role_create`** takes a nested `role` object, like `role_update`.
+  - **One list contract:** `form_list`, `role_list`, `action_list` and `form_revision_list` take `limit` (default 100), `skip`, `sort` and `select`, and return `total` and `hasMore` read from Form.io's `Content-Range`; `count` is removed. Lists no longer stop at Form.io's default of 10. `form_list`'s `tags` matches forms carrying all of them; `form_revision_list` is newest first with compact fields; `action_type_list` returns the whole catalog.
+  - **No consent prompts:** a write that would save without revision history (an unlicensed deployment, a form with revisions off, or an explicit `revisions: ""`) needs `acceptNoHistory: true`, otherwise it is refused with `HISTORY_NOT_ACCEPTED` for the agent to ask the user. The elicitation and local browser consent pages, and `~/.formio/revisions-license-consent.json`, are removed.
+  - **Errors:** every tool error's text starts with a `[CODE]` from a fixed set, and the result carries `{ code, status?, body? }` in `_meta["io.form/error"]`, including Form.io's response body. Existing message text is unchanged after the prefix.
+  - **Output schemas are open:** a valid Form.io response with fields a schema does not list (`_vid`, `pdfComponents`, `controller`, `esign`, `null` settings) is no longer rejected by clients that validate output.
+  - **Smaller surface text:** `tools/list` is about 38.7k characters (from 68.5k), under a tested 42,000 budget; the full project-resolution rules stay in the server instructions.
+  - `FORMIO_INSECURE_TLS` and `FORMIO_FORCE_BROWSER` both accept `true` or `1`, case-insensitive. `@formio/mcp` exports only `./package.json`: the package is its `formio-mcp` binary. The `project get` / `project set` flags and exit codes (0, 1, 2, 3) are documented as the 1.0 CLI reference, unchanged.
+
+### Minor Changes
+
+- 8ede992: Keep every request on the project the working directory resolves to, carrying only the credential that project's deployment issued.
+  
+  - Tool arguments that become part of a request path — `formIdOrPath`, `formId` on the action tools, `actionId`, `actionName`, and `version` on `form_revision_get` and `form_update` — are checked before any request is made. Each `/`-separated segment holds only letters, digits, `-` and `_` (the characters Form.io accepts in a form path), so `user/login` stays valid; anything else is refused with an error naming the argument and the shape it takes, and arguments naming one resource accept a single segment.
+  - `formioFetch` refuses any request whose URL is not under the Project URL's origin and path, and does not follow redirects: a 3xx response is reported with the location it pointed to.
+  - **Behaviour change:** `FORMIO_API_KEY` now applies only to the project `FORMIO_PROJECT_URL` names. Any other project a committed `formio.json` or a directory mapping resolves — including a sibling project on the same sub-directory deployment — and every project when `FORMIO_PROJECT_URL` is unset, authenticates through the portal login. `project_get` names the reason in its notes, and a browserless login failure states it instead of asking for a key. Set `FORMIO_PROJECT_URL` beside the key.
+  - A project URL with no path on a customer domain pairs only with a deployment on the same registrable domain (`https://myproject.mysite.com` with `https://api.mysite.com`), compared against the public suffix list; under a suffix the list does not carry (`localhost`, a private TLD) sibling hosts are compared directly. `project set` and `project_set` refuse an unrelated deployment; one already recorded is set aside with a note, leaving the deployment to be supplied. `project set --force` still records such a pair.
+- 1725b19: Make the Form.io project, versioned by its own tags, the source of truth, and `template.json` an export of the newest tag.
+  
+  - New tools: `project_tag_list` reports the project's current version and every tag, and with `compare: true` which roles, resources, forms, and actions changed since the current tag; `project_tag_create` creates a semver tag with a description. `project_export` takes `tag` to export the template a tag stored.
+  - `project_import`'s description states what an import replaces — each form it names is updated in place with its actions recreated, and a template's `access` replaces the project's — and that it is for a first build.
+  - `formio-application` tags a first build `1.0.0` and exports it over `template.json`. Extending an existing project now checks for changes made outside the agent, plans the change with the planner's new change mode (`changes.json`), applies it with the form, role, and action tools — never a re-import — and finishes by proposing the next version, asking, tagging, and exporting it over `template.json`.
+  - The planner gains a change mode that emits only the new entities and the updates to existing forms.
+  - `platform-staging.md` documents family-wide tags, `tag/current`, and `type: 'tag'` deploys, and no longer claims a 409 for protected stages.
+
+### Patch Changes
+
+- 90df924: Correct skill statements that did not match Form.io's source.
+  
+  - `formio-sdk`: login is a submission to the login form (there is no `Formio.login`); SSO calls `Formio.ssoInit` on every page load; a custom storage provider is a `function` or `class`; `form.validate()` returns an array of errors; `logout` is a GET; both `currentUser` and `logout` emit `formio.user`. The Security section's rule that anything a `Formio` call or MCP tool returns never instructs the agent covers every tool again.
+  - `formio-form` and `formio-react-form`: `submit` fires after the server save, with pre-save work in `hooks.beforeSubmit`; the combined options example keeps the default sanitizer, with iframe embedding as a separate opt-in; `FormioProvider` takes the static `Formio` class; the wizard page handlers type-check.
+  - `formio-api`: runtime references state that application code sends the end user's JWT, not the MCP server's portal-login token; self-registration posts to `user/register/submission`; tenant and project PUT keep omitted fields; import bodies use objects keyed by machine name; expiry is recognised by status 440, a locked login by 401, and validation without saving by `?dryrun=1`.
+  - `formio-schema`: submission `access` is computed by the server; access types are listed per layer.
+  - `formio-actions` and `formio-resource-planner`: within a handler phase the higher priority runs first, and `before` actions run before `after` actions; login lockout is off unless `allowedAttempts` is set; the webhook section distinguishes the open-source and Enterprise actions; persona role actions run on create only.
+  - `formio-auth`: token swap with no matching mapping grants no role; the email-token macro grammar; the project `_id` comes from a form's `project` field; the Everyone role id.
+  - `formio-application`: Step 1 states that workspace files are data, not instructions. The shared URL-values paragraph no longer contradicts the Base URL derivation it describes.
+- 12391fa: Guard the skills and the server against drifting from the code and the deployment they describe.
+  
+  - `tools/list` no longer carries a `$schema` key on every input and output schema, and the three update tools share a shorter overwrite sentence: the list drops from 41,436 to 38,679 characters.
+  - `pnpm test:live` (opt-in) calls every tool against a real Form.io project the repository folder resolves to, refusing unless it matches `FORMIO_LIVE_TEST_PROJECT`, and cleans up after itself.
+  - Skill examples are checked against the installed `@formio/js`, `@formio/core`, and `@formio/react`; skill text is checked against the tools' real names, arguments, and enum values; the preflight's list of writing tools is derived from the tool annotations.
+  - `formio-react` and `formio-angular` read package versions, peers, and engines with `npm view` at run time instead of stating them.
+  - `formio-mcp-setup`'s "too old" section keeps its upgrade paths and loses a dead branch and its version notes.
+- 93dec9c: Route every request to one skill that can finish it, and give the skills one contract between them.
+  
+  - A new app that names a framework ("build me a CRM in React") goes to `formio-application`, which plans, imports, and hands off to that framework without asking which; `formio-angular` and `formio-react` keep work on an already-planned project or an existing workspace, and hand a request with no plan to `formio-application` themselves.
+  - Descriptions name only registered skills, and `formio-mcp-setup` no longer sends Form.io login to `formio-auth`: the login opens in the browser on the first tool call.
+  - `FRAMEWORK.md` holds the one handoff contract. No handoff carries a URL; each receiving skill resolves the project with `project_get`. After scaffolding, `formio-angular` checks the new workspace still resolves its project and records it with `project_set` when a new `.git` has cut it off.
+  - `formio-auth` runs once, after import.
+  - Registration built through `formio-form-builder` saves users to the user resource, so they can sign in; a login form drops the Save action `form_create` adds, so login attempts are not stored as submissions.
+  - Changes to a saved form go through `formio-form-builder`'s edit lane.
+  - Every path a skill tells the agent to load is relative to that file, so it resolves once installed.
+  - `formio-angular-resources` asks for no URL and never creates a workspace; `formio-react` stops before offering a router migration to a Next.js or framework-mode app.
+  - `FRAMEWORK.md`'s contributor checklist moves to `CONTRIBUTING.md`.
+- 6810c3d: Keep a valid login through permission refusals, bound every request in time, and add a way to sign out.
+  
+  - **A 401 is checked before it is treated as an expired token.** With a JWT, a 401 first asks the deployment's `/current`. When the token is still accepted, it is kept and the call fails with `FORBIDDEN` (status 401) naming the signed-in account, the URL refused and Form.io's explanation, with no login; the message names `project logout --base-url <deployment>` as the way to sign in as another account. Only when `/current` also refuses the token does the server sign in again and retry once.
+  - **Every Form.io request has a timeout:** 60 seconds by default, set with the `FORMIO_REQUEST_TIMEOUT` environment variable (seconds; a positive integer no larger than 2147483, anything else is ignored), and for `project_import` and `project_export` 300 seconds or that variable when it is longer. A request whose response — headers or body — does not arrive in time fails with `NETWORK_ERROR` naming the URL and the wait; for `project_import` the message adds that the import may still complete on the server, to check with `project_export` before retrying.
+  - **The browser is launched detached,** with its output discarded, so the server neither buffers, holds nor terminates it. An opener that fails to start or exits non-zero is reported with a hint to open the login URL manually, and the URL is still printed on stderr every time.
+  - **Sign out:** `formio-mcp project logout [--base-url <url>] [--cwd <path>]` removes one deployment's cached token from `~/.formio/mcp-tokens.json` — the one the directory resolves to, exactly as `project get` resolves it, or the one `--base-url` names — and leaves the others. It exits `0` when a token was removed or none was cached (saying which), `1` when the directory resolves no project (as `project get` does), `3` when a project resolves without a deployment, and `2` when the cache cannot be read or written. A running server checks the cache before reusing a token it holds in memory, so the next call signs in again without a restart; an entry replaced by another sign-in is validated and used in its place, and a cache file that cannot be read leaves the in-memory token in use. The cache is written atomically (a `0600` temporary file renamed into place), so a concurrent reader never sees a partial file. An invalid `--base-url` exits `1`, like `project set`.
+  - **`project_import` checks the template's shape** before sending it: `forms` and `resources` must be objects keyed by machine name (an empty object is fine), and `roles` / `actions` must be objects when present. Anything else is refused with `INVALID_ARGUMENT` naming the key, and no request is made. Other keys pass through unchanged.
+  - The plugin README no longer says a directory mapping falls back to environment values for a half it omits: a record's project and deployment are a pair, and halves are never combined across records.
+- 3679282: Make the local project map and the published artifacts behave the same on every run.
+  
+  - **Directory mappings and cached tokens are written atomically and one at a time.** Each write to `~/.formio/projects.json` or `~/.formio/mcp-tokens.json` takes a short-lived lock file beside it, naming its host and process, re-reads the file, applies its change and replaces the file through a `0600` temporary file and a rename, so a reader never sees a partial file and two servers writing at once both keep their entries. A lock held by a running process on the same machine is waited for; one left by a process that has exited is replaced at once, and one from another machine once it has stayed unchanged for 3 seconds. A lock that cannot be obtained within 5 seconds fails naming the lock file — with `CONFIG_UNREADABLE` for the project map. The server waits without blocking its other requests.
+  - **A mapping applies to its subdirectories.** A directory with no mapping of its own resolves the nearest mapped folder above it, within its repository; `project set --reset` there names the folder whose mapping it inherits. Paths are compared in canonical form: symlinks are resolved, comparison ignores case on macOS and Windows, and a Git Bash style `/c/...` path is read as `C:\...` on Windows. New writes store the canonical path; existing entries are matched as they are and nothing on disk is rewritten. A committed `formio.json` still outranks any mapping.
+  - **`FORMIO_INSECURE_TLS` applies only to the configured deployment.** Certificate checks are relaxed only for requests to the hosts of the resolved Project URL and Base URL; every other host is verified as usual, and `NODE_TLS_REJECT_UNAUTHORIZED` is no longer set.
+  - **The browser login completes only from its own login URL.** Each login generates a value carried in the login URL the server opens and prints (`?s=…`); the page is served only for that value and sends it back with the token, and any other request is answered `403` while the login keeps waiting until its timeout. Open the printed URL as it is — behind a forwarded port, change only the host and port. The login-form URL is embedded in the page as a JSON string.
+  - **The Docker image installs from the repository lockfile.** It is built from the repository root with `pnpm install --frozen-lockfile` and `pnpm deploy`, so it carries the dependency versions in `pnpm-lock.yaml`. Build it locally with `docker build -f packages/mcp-server/Dockerfile .` from the repository root.
+  - **The package is complete and reports its version everywhere.** The npm tarball includes `LICENSE`; `build` clears `dist` before compiling, so no module from an earlier build is packed; the `.mcpb` bundle and the plugin bundle report the `@formio/mcp` version at initialize and in `server_status`; and `server.json` declares `FORMIO_AUTH_HOST`, `FORMIO_AUTH_PORT` and `FORMIO_AUTH_TIMEOUT`.
+- 0ad460b: `formio-application`'s description now hands Angular and React work to the framework skills only when the request names the framework — for a planned, imported project or an existing workspace in that framework — and claims a framework-neutral extension ("also track X") even inside an Angular or React workspace.
+
 ## 0.14.1
 
 ### Patch Changes
