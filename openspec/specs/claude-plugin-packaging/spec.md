@@ -8,7 +8,7 @@ The repository SHALL publish a plugin marketplace manifest at `.claude-plugin/ma
 
 Three consequences make the path form the better source. Claude Code clones the marketplace repository, so `./plugin` resolves there and an install no longer waits on an npm publish. The `skills` CLI reads skill paths declared in a plugin marketplace manifest, so declaring the path is what makes `npx skills add formio/ai` discover the Form.io skills instead of the repository's internal tooling. And GitHub Copilot CLI reads a marketplace from `.claude-plugin/marketplace.json` as well as `.github/plugin/marketplace.json`, so one file serves both.
 
-Because a cloned repository contains no build output, the manifests reachable from this path SHALL launch the MCP server from npm rather than from a bundled file — see the MCP server declaration requirement below.
+Because a cloned repository contains only committed files, a manifest reachable from this path SHALL launch the MCP server either from npm or from a file committed under `plugin/` — never from build output the clone lacks. The Claude Code manifest launches the committed `plugin/server/` (see the `plugin-vendored-server` capability); every other manifest launches from npm — see the MCP server declaration requirement below.
 
 #### Scenario: Marketplace manifest is valid
 
@@ -27,13 +27,19 @@ Because a cloned repository contains no build output, the manifests reachable fr
 
 ### Requirement: Plugin manifest declares stdio MCP server
 
-The plugin SHALL provide a `plugin/.claude-plugin/plugin.json` manifest that declares a single MCP server named `formio-mcp` launched by `npx -y @formio/mcp@<MAJOR.MINOR.PATCH>`, pinned to the exact `version` in `packages/mcp-server/package.json`. The launch SHALL NOT be unpinned and SHALL NOT carry a range, a caret, or a dist-tag. An unpinned `npx` resolves whatever the registry serves at the moment a client starts the server, so the code that gains tool access to the user's Form.io deployment is chosen at run time rather than reviewed once — the "runtime URL that controls the agent" pattern skill scanners rate Medium — and it leaves a plugin release describing a server nobody can name. A range is no better: `@formio/mcp` is a 0.x line where every minor may break, so a floor goes stale at the next release while a ceiling would freeze installed plugins on an old server, and a scanner reads either as resolving whatever the registry serves.
+The plugin SHALL provide a `plugin/.claude-plugin/plugin.json` manifest that declares a single MCP server named `formio-mcp` launched as `node` with the single argument `${CLAUDE_PLUGIN_ROOT}/server/stdio.js` — the server compiled from this commit and committed under `plugin/server/`, whose dependencies Claude Code installs from `plugin/package.json` and `plugin/package-lock.json` when it installs, updates, or first caches the plugin. The launch SHALL NOT go through a shell or a package-manager script.
 
-The pin SHALL be stamped rather than hand-typed. `pnpm sync:pins` reads the server's `package.json` and rewrites every launch it owns — the three client manifests, the MCP Registry entry, the install docs, and every skill that prints the command — and runs during `changeset:version`, so the Version Packages PR carries the restamped pins and a release cannot ship a manifest launching one server version while the skills describe another. The pin SHALL therefore be written in a form the stamper can restamp.
+A pinned `npx` launch fixes the package but not its dependencies, which resolve at install time: a fresh `npx -y @formio/mcp@1.0.0` installed 29 of its 98 packages at versions no test had run against. Running the committed server against a lockfile generated from `pnpm-lock.yaml` makes the code and the dependency tree a user runs the ones this repository tested and a reviewer can read, and it is the form the Anthropic plugin directory asks a launcher to take.
 
-The cost of an exact pin is one window, which the spec accepts rather than closes by unpinning: `.claude-plugin/marketplace.json` installs from `./plugin`, so between the pin landing on main and npm accepting the publish, a fresh install names a version npm does not have yet and `npx` fails with `E404`. That window is one Release run, every step of which is idempotent, so a failed run is re-run; when it stays broken, publishing the server is the fix. `formio-mcp-setup` documents the `E404` for anyone who installs inside the window, and a client that does resolve a server too old to serve `project_set` surfaces it as missing tools, which every skill's preflight already routes to `formio-mcp-setup`.
+The cost is a network that cannot reach `https://registry.npmjs.org/` directly: Claude Code's dependency install does not read `.npmrc`, so on a network that routes npm through a private mirror the plugin's server cannot install and does not start. The manual `npx` connection `formio-mcp-setup` documents reads `.npmrc` and stays the route there.
 
-The bundled `server/stdio.mjs` remains built for the smoke test, which spawns it and sends `tools/list`, but it SHALL NOT be published in the `@formio/ai` tarball (`files` omits `server/`) and SHALL NOT be the command in a manifest reachable by a git clone, where the file does not exist. The `.mcpb` desktop bundle builds its own copy at `dist/mcpb/server/index.mjs`.
+Every other launch this repository ships — `plugin/.cursor-plugin/plugin.json`, `plugin/mcp.json`, the MCP Registry entry, the install docs, and every skill that prints the command — SHALL keep `npx -y @formio/mcp@<MAJOR.MINOR.PATCH>`, pinned to the exact `version` in `packages/mcp-server/package.json`, because those clients perform no dependency install from the plugin folder. Such a launch SHALL NOT be unpinned and SHALL NOT carry a range, a caret, or a dist-tag. An unpinned `npx` resolves whatever the registry serves at the moment a client starts the server, so the code that gains tool access to the user's Form.io deployment is chosen at run time rather than reviewed once, and a range is no better: a floor goes stale at the next release while a ceiling would freeze installed plugins on an old server.
+
+The pin SHALL be stamped rather than hand-typed. `pnpm sync:pins` reads the server's `package.json` and rewrites every launch it owns and runs during `changeset:version`, so the Version Packages PR carries the restamped pins and a release cannot ship a manifest launching one server version while the skills describe another. The pin SHALL therefore be written in a form the stamper can restamp.
+
+The cost of an exact `npx` pin is one window, which the spec accepts rather than closes by unpinning: between the pin landing on main and npm accepting the publish, a fresh `npx` install names a version npm does not have yet and fails with `E404`. That window is one Release run, every step of which is idempotent, so a failed run is re-run. `formio-mcp-setup` documents the `E404` for anyone who installs inside the window. The Claude Code manifest has no such window, because the server it launches is in the commit.
+
+The `.mcpb` desktop bundle builds its own bundled copy at `dist/mcpb/server/index.mjs`.
 
 The manifest SHALL declare no `userConfig` and SHALL pass no `env` block to the server. It launches with `command` and `args` alone. An install-time `FORMIO_BASE_URL` prompt is one global value answering a per-project question: the base URL is derived from the project URL wherever it can be, and the environment is the weakest resolution source — so it cannot override a committed `formio.json` or a working-directory mapping. Its only effect was on directories with nothing recorded, where per-project derivation is the better answer, and on a self-hosted install it silently satisfied the base URL for every project including ones on another deployment.
 
@@ -44,23 +50,30 @@ The `.mcpb` desktop bundle is the exception and SHALL keep its prompts, because 
 #### Scenario: Plugin manifest is loaded
 
 - **WHEN** Claude Code installs the `formio-ai` plugin
-- **THEN** it reads `plugin.json`, registers the `formio-mcp` MCP server, and launches it over stdio via `npx -y @formio/mcp@<MAJOR.MINOR.PATCH>` at the version in `packages/mcp-server/package.json`
+- **THEN** it installs the dependencies `plugin/package-lock.json` pins, reads `plugin.json`, registers the `formio-mcp` MCP server, and launches it over stdio as `node ${CLAUDE_PLUGIN_ROOT}/server/stdio.js`
+
+#### Scenario: The Claude Code launch runs a committed file
+
+- **WHEN** `plugin/.claude-plugin/plugin.json` is parsed
+- **THEN** the `formio-mcp` entry's `command` is `node`
+- **AND** its `args` are exactly `["${CLAUDE_PLUGIN_ROOT}/server/stdio.js"]`
+- **AND** `plugin/server/stdio.js` exists in the committed tree
 
 #### Scenario: Unpinned or ranged launch fails review
 
 - **WHEN** any manifest under `plugin/` declares an MCP server whose args contain the bare string `@formio/mcp`, a range or caret, or a dist-tag such as `latest`
 - **THEN** the change fails review and the launch is restamped by `pnpm sync:pins`
 
-#### Scenario: Every source manifest agrees with the published server version
+#### Scenario: Every npx launch agrees with the published server version
 
-- **WHEN** `plugin/.claude-plugin/plugin.json`, `plugin/.cursor-plugin/plugin.json`, and `plugin/mcp.json` are parsed
+- **WHEN** `plugin/.cursor-plugin/plugin.json` and `plugin/mcp.json` are parsed
 - **THEN** every `formio-mcp` launch names `@formio/mcp@<version>` for the `version` in `packages/mcp-server/package.json`
 - **AND** `pnpm sync:pins --check` reports agreement and leaves every file it could rewrite byte-identical
 
 #### Scenario: No manifest points at a file a clone lacks
 
-- **WHEN** every manifest under `plugin/` is scanned for `${CLAUDE_PLUGIN_ROOT}` or `${PLUGIN_ROOT}` paths used as an MCP `command`
-- **THEN** none is found
+- **WHEN** every manifest under `plugin/` is scanned for `${CLAUDE_PLUGIN_ROOT}` or `${PLUGIN_ROOT}` paths in an MCP `command` or `args`
+- **THEN** each path names a file committed under `plugin/`
 
 #### Scenario: The manifest prompts for nothing and passes no environment
 
@@ -75,14 +88,15 @@ The `.mcpb` desktop bundle is the exception and SHALL keep its prompts, because 
 - **THEN** it declares a project user-config field mapped to `FORMIO_PROJECT_URL`
 - **AND** it does not reference `FORMIO_DEFAULT_PROJECT_URL`
 - **AND** it still declares a `formio_base_url` field, because a desktop host has no working directory to interview in
+
 ### Requirement: Plugin npm package publishes the built tree
 
-The `plugin/package.json` SHALL set `name` to `@formio/ai`, `publishConfig.access` to `public`, and `publishConfig.directory` to `../dist/plugin` so that `npm publish` uploads the built plugin tree rather than the source tree.
+The `plugin/package.json` SHALL set `name` to `@formio/ai`, `publishConfig.access` to `public`, and `publishConfig.directory` to `../dist/plugin` so that `npm publish` uploads the built plugin tree rather than the source tree. Its `files` SHALL include `server`, so the published package carries the vendored server the Claude Code manifest launches. It also lists `package-lock.json`, which places the lockfile in the built tree; npm omits a file of that name from every tarball it publishes, so the npm package declares its five direct dependencies at exact versions without the transitive pins. Claude Code and the Anthropic plugin directory install from the repository, where the lockfile is committed, so neither is affected.
 
 #### Scenario: Publishing uploads the built tree
 
 - **WHEN** `pnpm release:plugin` runs from `plugin/`
-- **THEN** npm publishes the contents of `dist/plugin/` (bundled server, manifest, skills) under the `@formio/ai` package name with public access
+- **THEN** npm publishes the contents of `dist/plugin/` (vendored server, manifests, skills) under the `@formio/ai` package name with public access
 
 ### Requirement: Plugin bundles the skills library
 
@@ -106,21 +120,22 @@ The plugin source tree SHALL include, and the build SHALL copy to `dist/plugin/s
 
 ### Requirement: Build script produces a self-contained plugin tree
 
-A `scripts/build-plugin.ts` script SHALL clean `dist/plugin/`, copy the `plugin/` source tree into it, sync the plugin manifest `version` field from `plugin/package.json`, and bundle `packages/mcp-server/src/stdio.ts` into `dist/plugin/server/stdio.mjs` as an executable ESM Node.js bundle targeting Node 22 with a CommonJS-compatibility banner that provides `require`, `__filename`, and `__dirname`.
+A `scripts/build-plugin.ts` script SHALL clean `dist/plugin/`, copy the `plugin/` source tree into it — including the committed `server/`, `package.json`, and `package-lock.json` — and verify, without writing, that the plugin manifests' `version` fields agree with `plugin/package.json` and that `pnpm sync:plugin-server --check` reports no drift. It SHALL NOT bundle the server, because the plugin runs the committed `server/` modules against its installed dependencies.
 
 #### Scenario: Build produces the expected layout
 
 - **WHEN** `pnpm build:plugin` runs
-- **THEN** `dist/plugin/.claude-plugin/plugin.json`, `dist/plugin/package.json`, `dist/plugin/skills/`, and an executable `dist/plugin/server/stdio.mjs` all exist, and the manifest `version` matches `plugin/package.json`
+- **THEN** `dist/plugin/.claude-plugin/plugin.json`, `dist/plugin/package.json`, `dist/plugin/package-lock.json`, `dist/plugin/skills/`, and `dist/plugin/server/stdio.js` all exist, and the manifest `version` matches `plugin/package.json`
+- **AND** `dist/plugin/server/stdio.mjs` does not exist
 
-#### Scenario: Bundled server resolves CommonJS dependencies
+#### Scenario: A stale vendored server fails the build
 
-- **WHEN** `dist/plugin/server/stdio.mjs` is executed with `node`
-- **THEN** CommonJS dependencies bundled into the ESM output (e.g. `express`) resolve successfully via the banner-provided `require`, and the MCP server starts on stdio
+- **WHEN** `pnpm build:plugin` runs while `pnpm sync:plugin-server --check` reports drift
+- **THEN** the build exits non-zero naming `pnpm sync:plugin-server`
 
 ### Requirement: Smoke test validates the built plugin over stdio
 
-A `scripts/test-plugin.ts` script SHALL validate that `dist/plugin/` exists, that `plugin.json` contains required fields (`name`, `version`, `description`, at least one `mcpServers` entry), that required skill directories (at minimum `formio-api` and `formio-schema`) are present, and that spawning the bundled server and sending a JSON-RPC `tools/list` request returns a well-formed response.
+A `scripts/test-plugin.ts` script SHALL validate that `dist/plugin/` exists, that `plugin.json` contains required fields (`name`, `version`, `description`, at least one `mcpServers` entry), that required skill directories (at minimum `formio-api` and `formio-schema`) are present, and that installing the plugin's dependencies the way Claude Code does — `npm ci --ignore-scripts` from `package-lock.json`, in a copy of the built tree — and then spawning the Claude Code manifest's launch returns a well-formed response to a JSON-RPC `tools/list` request.
 
 #### Scenario: Smoke test fails when build is missing
 
@@ -129,7 +144,7 @@ A `scripts/test-plugin.ts` script SHALL validate that `dist/plugin/` exists, tha
 
 #### Scenario: Smoke test verifies live MCP server
 
-- **WHEN** the smoke test spawns `dist/plugin/server/stdio.mjs` and sends a `tools/list` JSON-RPC request
+- **WHEN** the smoke test installs the plugin's locked dependencies, spawns `node <plugin>/server/stdio.js`, and sends a `tools/list` JSON-RPC request
 - **THEN** the server responds with a `result.tools` array and the test exits zero
 
 #### Scenario: Smoke test asserts on the consolidated schema skill
@@ -194,7 +209,7 @@ Vitest suites under `packages/mcp-server/src/__tests__/` SHALL include `plugin-b
 
 ### Requirement: Smoke test validates every layout
 
-`scripts/test-plugin.ts` SHALL validate each manifest that ships: required fields present, the Agent Plugins manifests valid against their declared `$schema` version, the Cursor manifest's `variables` matching its `${VAR}` placeholders, and the MCP command from `mcp.json` answering a `tools/list` request. A layout that ships unvalidated is a layout that breaks silently in a client nobody on the team runs.
+`scripts/test-plugin.ts` SHALL validate each manifest that ships: required fields present, the Agent Plugins manifests valid against their declared `$schema` version, the Cursor manifest's `variables` matching its `${VAR}` placeholders, and the MCP server answering a `tools/list` request. A layout that ships unvalidated is a layout that breaks silently in a client nobody on the team runs.
 
 #### Scenario: Smoke test covers all three manifests
 
@@ -205,7 +220,7 @@ Vitest suites under `packages/mcp-server/src/__tests__/` SHALL include `plugin-b
 #### Scenario: The server is exercised over stdio
 
 - **WHEN** `pnpm test:plugin` runs
-- **THEN** it spawns the locally built `server/stdio.mjs` and asserts a well-formed `tools/list` response
+- **THEN** it spawns the vendored `server/stdio.js` against dependencies installed from the plugin's lockfile and asserts a well-formed `tools/list` response
 - **AND** it does not spawn `npx` against the public registry, which would exercise the last published version rather than this tree
 
 ### Requirement: Shipped npm metadata describes a multi-client bundle
@@ -237,4 +252,13 @@ Its `files[]` SHALL list only directories that exist in the built tree and are m
 - **WHEN** `dist/plugin/` is assembled by the build script
 - **THEN** it contains no `hooks/` directory
 - **AND** no manifest inside it declares a `hooks` component
+
+### Requirement: The Claude Code manifest names the plugin icon
+
+`plugin/.claude-plugin/plugin.json` SHALL set `icon` to `./assets/formio-logo.png`, a square PNG of 512 to 2048 pixels per side and under 2 MB, which the Anthropic plugin directory reads for its listing.
+
+#### Scenario: The icon is a square PNG in range
+
+- **WHEN** the file `icon` names is read
+- **THEN** it exists under `plugin/`, is a PNG, its width equals its height, each is between 512 and 2048 pixels, and it is smaller than 2 MB
 

@@ -29,7 +29,7 @@
 
 ### Refactor
 
-- [ ] 2.3 Review implementation and refactor as needed
+- [x] 2.3 Review implementation and refactor as needed
 
 ## 3. Release verification
 
@@ -54,13 +54,13 @@
 
 ### Red
 
-- [ ] 4.1 Merge this change (Definition of Done: `pnpm test`, `pnpm lint`, `pnpm format`, `pnpm check:releases`, `openspec validate release-1-0 --strict`)
+- [x] 4.1 Merge this change (Definition of Done: `pnpm test`, `pnpm lint`, `pnpm format`, `pnpm check:releases`, `openspec validate release-1-0 --strict`) — merged as #105
 
 ### Green
 
-- [ ] 4.2 Maintainer merges #89; the release workflow publishes; confirm npm, MCP Registry, bundles, Smithery, Docker Hub, and the GitHub release at 1.0.0
-- [ ] 4.3 Maintainer publishes 1.0.0 in the Anthropic plugin directory (claude.ai/directory/manage)
+- [x] 4.2 Maintainer merges #89; the release workflow publishes; confirm npm, MCP Registry, bundles, Smithery, Docker Hub, and the GitHub release at 1.0.0 — 1.0.0 published 2026-10-14 after #107 fixed the prepublish suite under npm 12; npm, MCP Registry, mcpb, Smithery, Docker Hub, and the GitHub release confirmed
+- [x] 4.3 Maintainer publishes 1.0.0 in the Anthropic plugin directory (claude.ai/directory/manage) — submitted; the directory held it for a pinned npx launch, which `vendor-server-into-plugin` (1.0.1) replaced with a lockfile install that a reviewer clears
 
 ### Refactor
 
-- [ ] 4.4 Review implementation and refactor as needed
+- [x] 4.4 Review implementation and refactor as needed
