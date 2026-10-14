@@ -6,6 +6,7 @@
   "scripts": {
     "build": "turbo run build",
     "build:plugin": "tsx scripts/build-plugin.ts",
+    "build:plugin:local": "tsx scripts/build-plugin-local.ts",
     "build:mcpb": "tsx scripts/build-mcpb.ts",
     "dev": "turbo run dev",
     "test": "turbo run test",
