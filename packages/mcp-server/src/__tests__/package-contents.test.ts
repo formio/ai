@@ -20,11 +20,15 @@ interface PackResult {
 }
 
 // npm writes lifecycle-script output to stdout ahead of the JSON report, so the
-// report is read from the line that opens it.
+// report is read from the line that opens it. npm 10 and 11 report an array of
+// packages; npm 12 reports an object keyed by package name. The release
+// workflow publishes with whichever npm it installs, and this suite runs inside
+// that publish, so both shapes are read.
 function packedFiles(stdout: string): string[] {
-  const start = stdout.search(/^\[/m);
+  const start = stdout.search(/^[[{]/m);
   expect(start, `npm pack printed no JSON report:\n${stdout}`).toBeGreaterThan(-1);
-  const [result] = JSON.parse(stdout.slice(start)) as PackResult[];
+  const report = JSON.parse(stdout.slice(start)) as PackResult[] | Record<string, PackResult>;
+  const [result] = Array.isArray(report) ? report : Object.values(report);
   return result.files.map((file) => file.path);
 }
 
