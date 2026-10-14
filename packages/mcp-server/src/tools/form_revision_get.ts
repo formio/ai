@@ -1,4 +1,5 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import { z } from 'zod';
 import { FormioConfig } from '../config.js';
 import { formioFetch, isMongoId } from '../formio-client.js';
 import { toMcpStructuredResult, toMcpError } from '../mcp-responses.js';
@@ -14,7 +15,7 @@ export function registerFormRevisionGetTool(server: McpServer, config: FormioCon
     {
       description:
         'Fetch one immutable form revision from the project `cwd` resolves to. Restore it with form_revert, passing its `_vid`.',
-      inputSchema: {
+      inputSchema: z.strictObject({
         cwd: cwdSchema,
         formIdOrPath: projectPathArgument('formIdOrPath').describe(
           'Form ID (_id) or path alias (e.g. "user/login")'
@@ -22,7 +23,7 @@ export function registerFormRevisionGetTool(server: McpServer, config: FormioCon
         version: resourceSegmentArgument('version').describe(
           'Revision _vid (e.g. "3") or revision document _id'
         ),
-      },
+      }),
       // A revision body is a form definition, plus the revision fields the schema
       // passes through.
       outputSchema: formDocument,

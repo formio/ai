@@ -30,7 +30,7 @@ export function registerFormListTool(server: McpServer, config: FormioConfig) {
     {
       description:
         'List forms from the project `cwd` resolves to, one page at a time, optionally filtered by type and tags.',
-      inputSchema: {
+      inputSchema: z.strictObject({
         cwd: cwdSchema,
         type: z.enum(['form', 'resource']).optional().describe('Filter by form type'),
         tags: z
@@ -38,7 +38,7 @@ export function registerFormListTool(server: McpServer, config: FormioConfig) {
           .optional()
           .describe('Return only forms carrying every one of these tags'),
         ...listArguments(DEFAULTS),
-      },
+      }),
       outputSchema: formsListOutput,
       annotations: reads('List forms'),
     },

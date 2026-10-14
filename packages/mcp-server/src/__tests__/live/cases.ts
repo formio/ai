@@ -376,6 +376,35 @@ export const LIVE_CASES: readonly LiveCase[] = [
     },
   },
   {
+    // The portal stores a condition as `{conjunction: '', conditions: [], custom}`;
+    // an action read back must survive an update unchanged, its custom script kept.
+    tool: 'action_update',
+    name: 'round-trips a portal-shaped custom condition',
+    async run(ctx) {
+      const formId = required<string>(ctx, 'formId');
+      const custom = 'show = true;';
+      const created = ok(
+        ctx,
+        await ctx.call('action_create', {
+          formId,
+          action: {
+            ...emailAction('Live probe condition'),
+            condition: { conjunction: '', conditions: [], custom },
+          },
+        })
+      );
+      const actionId = created._id as string;
+      try {
+        const read = ok(ctx, await ctx.call('action_get', { formId, actionId }));
+        ok(ctx, await ctx.call('action_update', { formId, actionId, action: read }));
+        const reread = ok(ctx, await ctx.call('action_get', { formId, actionId }));
+        ctx.expect((reread.condition as Record<string, unknown> | undefined)?.custom).toBe(custom);
+      } finally {
+        await ctx.call('action_delete', { formId, actionId });
+      }
+    },
+  },
+  {
     tool: 'action_delete',
     name: 'deletes the email action',
     async run(ctx) {

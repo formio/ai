@@ -1,4 +1,5 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import { z } from 'zod';
 import { FormioConfig } from '../config.js';
 import { toMcpStructuredResult, toMcpError } from '../mcp-responses.js';
 import { rolesListOutput } from '../output-schemas.js';
@@ -12,10 +13,10 @@ export function registerRoleListTool(server: McpServer, config: FormioConfig) {
     'role_list',
     {
       description: 'List the roles defined in the project `cwd` resolves to, one page at a time.',
-      inputSchema: {
+      inputSchema: z.strictObject({
         cwd: cwdSchema,
         ...listArguments(),
-      },
+      }),
       outputSchema: rolesListOutput,
       annotations: reads('List roles'),
     },

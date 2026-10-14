@@ -1,4 +1,5 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import { z } from 'zod';
 import { SERVER_NAME, SERVER_VERSION } from '../cli-launch.js';
 import { FormioConfig } from '../config.js';
 import { toMcpError, toMcpStructuredResult } from '../mcp-responses.js';
@@ -27,7 +28,7 @@ export function registerServerStatusTool(
     {
       description:
         "Report this server's name and version and how `cwd` resolves to a project, as project_get does. It makes no Form.io request and needs no credentials: call it first when other tools fail.",
-      inputSchema: { cwd: cwdSchema },
+      inputSchema: z.strictObject({ cwd: cwdSchema }),
       outputSchema: serverStatusOutput,
       annotations: local('Report server status', true),
     },

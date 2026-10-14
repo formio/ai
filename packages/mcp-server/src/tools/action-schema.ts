@@ -22,17 +22,25 @@ const conditionOperator = z.enum([
   'dateLessThanOrEqual',
 ]);
 
+// Every shape Form.io stores passes through unchanged: the portal saves
+// `{conjunction: '', conditions: [], custom: ''}`, older actions carry
+// `{field, eq, value}`, and a cleared condition is `null`. Only a row's
+// operator is checked, because the server silently never matches one it lacks.
 const actionCondition = z
-  .object({
-    conjunction: z.enum(['all', 'any']),
-    conditions: z.array(
-      z.object({
-        component: z.string(),
-        operator: conditionOperator,
-        value: z.unknown().optional(),
-      })
-    ),
+  .looseObject({
+    conjunction: z.enum(['all', 'any', '']).optional(),
+    conditions: z
+      .array(
+        z.looseObject({
+          component: z.string().optional(),
+          operator: conditionOperator.optional(),
+          value: z.unknown().optional(),
+        })
+      )
+      .optional(),
+    custom: z.string().optional(),
   })
+  .nullable()
   .optional();
 
 // Form.io's own fields, documented by the formio-actions skill, so they carry no
@@ -44,7 +52,7 @@ export const actionDefinitionSchema = z
     title: z.string(),
     handler: z.array(z.string()),
     method: z.array(z.string()),
-    settings: z.record(z.string(), z.unknown()).optional(),
+    settings: z.record(z.string(), z.unknown()).nullable().optional(),
     condition: actionCondition,
     priority: z.number().optional(),
   })

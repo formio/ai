@@ -15,7 +15,7 @@ export function registerFormPublishTool(server: McpServer, config: FormioConfig)
     {
       description:
         "Publish a form's draft as its live version in the project `cwd` resolves to. Save the draft first with form_update and `draft: true`; a form with no draft fails with NO_DRAFT. Needs the revisions licence (Security Module).",
-      inputSchema: {
+      inputSchema: z.strictObject({
         cwd: cwdSchema,
         formId: formIdArgument(),
         note: z
@@ -23,7 +23,7 @@ export function registerFormPublishTool(server: McpServer, config: FormioConfig)
           .describe(
             'Revision note describing what the draft changes against the live form (e.g. "Add phone field")'
           ),
-      },
+      }),
       outputSchema: formDocument,
       annotations: overwrites('Publish a form draft'),
     },

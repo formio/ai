@@ -1,4 +1,5 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import { z } from 'zod';
 import { FormioConfig } from '../config.js';
 import { isMongoId } from '../formio-client.js';
 import { toMcpStructuredResult, toMcpError } from '../mcp-responses.js';
@@ -23,13 +24,13 @@ export function registerFormRevisionListTool(server: McpServer, config: FormioCo
     {
       description:
         "List a form's published revision summaries in the project `cwd` resolves to, newest first, one page at a time. Read one with form_revision_get, or restore one with form_revert, passing its `_vid`.",
-      inputSchema: {
+      inputSchema: z.strictObject({
         cwd: cwdSchema,
         formIdOrPath: projectPathArgument('formIdOrPath').describe(
           'Form ID (_id) or path alias (e.g. "user/login")'
         ),
         ...listArguments(DEFAULTS),
-      },
+      }),
       outputSchema: revisionsListOutput,
       annotations: reads('List form revisions'),
     },

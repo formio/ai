@@ -1,4 +1,5 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import { z } from 'zod';
 import { FormioConfig } from '../config.js';
 import { formioFetch } from '../formio-client.js';
 import { toMcpStructuredResult, toMcpError } from '../mcp-responses.js';
@@ -15,11 +16,11 @@ export function registerActionGetTool(server: McpServer, config: FormioConfig) {
     {
       description:
         'Get a single action by ID from a form, including its handler, method, condition, and type-specific settings. Call action_list first to find the action ID.',
-      inputSchema: {
+      inputSchema: z.strictObject({
         cwd: cwdSchema,
         formId: formIdArgument(),
         actionId: resourceSegmentArgument('actionId').describe('The action ID to retrieve'),
-      },
+      }),
       outputSchema: actionDocument,
       annotations: reads('Get a form action'),
     },

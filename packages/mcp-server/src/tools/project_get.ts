@@ -1,4 +1,5 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import { z } from 'zod';
 import { FormioConfig } from '../config.js';
 import { toMcpError, toMcpStructuredResult } from '../mcp-responses.js';
 import { projectResolutionOutput } from '../output-schemas.js';
@@ -29,7 +30,7 @@ export function registerProjectGetTool(
         'Branch on `status`: "ok" — proceed. "not-configured" — relay the message, ask the user for the one value it names, record it with project_set, and call this again. "base-url-unresolved" — the project IS recorded: ask for the Base URL alone, never the Project URL again.',
         'Reads only; project_set records a choice.',
       ].join(' '),
-      inputSchema: { cwd: cwdSchema },
+      inputSchema: z.strictObject({ cwd: cwdSchema }),
       outputSchema: projectResolutionOutput,
       annotations: local('Report the active project', true),
     },

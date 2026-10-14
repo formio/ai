@@ -24,7 +24,7 @@ export function registerFormUpdateTool(server: McpServer, config: FormioConfig) 
         'Update a form in the project `cwd` resolves to: read it with form_get, apply the change using the formio-schema skill, and send the form. Sent fields overwrite, arrays and objects whole; top-level fields left out keep their value.',
         'Pass `draft: true` to save a draft instead of the live form; publish it with form_publish, and restore a prior revision with form_revert.',
       ].join(' '),
-      inputSchema: {
+      inputSchema: z.strictObject({
         cwd: cwdSchema,
         formId: formIdArgument(),
         form: z
@@ -62,7 +62,7 @@ export function registerFormUpdateTool(server: McpServer, config: FormioConfig) 
           .describe(
             'Set true only after the user agrees to save without revision history. Without it, such a save (no revisions licence, or the form has revisions off) is refused with HISTORY_NOT_ACCEPTED and nothing is written.'
           ),
-      },
+      }),
       outputSchema: formDocument,
       annotations: overwrites('Update a form'),
     },

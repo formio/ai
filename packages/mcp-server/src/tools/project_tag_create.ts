@@ -35,11 +35,11 @@ export function registerProjectTagCreateTool(server: McpServer, config: FormioCo
     {
       description:
         'Version the project `cwd` resolves to: Form.io snapshots its current state under a semver `tag` with a `description`, and the project is then at that version. Ask the user before calling. Export the version with project_export `tag`.',
-      inputSchema: {
+      inputSchema: z.strictObject({
         cwd: cwdSchema,
         tag: z.string().describe('The next semver version, e.g. 1.3.0 (at most 32 characters)'),
         description: z.string().describe('What changed in this version (at most 256 characters)'),
-      },
+      }),
       outputSchema: tagSummaryOutput,
       annotations: creates('Create a project version'),
     },

@@ -1,4 +1,5 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import { z } from 'zod';
 import { FormioConfig } from '../config.js';
 import { formioFetch } from '../formio-client.js';
 import { toMcpStructuredResult, toMcpError } from '../mcp-responses.js';
@@ -15,11 +16,11 @@ export function registerActionCreateTool(server: McpServer, config: FormioConfig
     {
       description:
         'Create a new action on a form. Call action_type_get first to discover the required settings schema for the action type.',
-      inputSchema: {
+      inputSchema: z.strictObject({
         cwd: cwdSchema,
         formId: formIdArgument(),
         action: actionDefinitionSchema,
-      },
+      }),
       outputSchema: actionDocument,
       annotations: creates('Create a form action'),
     },

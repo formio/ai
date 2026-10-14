@@ -28,7 +28,7 @@ export function registerFormRevertTool(server: McpServer, config: FormioConfig) 
     {
       description:
         "Revert a form in the project `cwd` resolves to back to a prior revision: its components, tags, properties and display replace the live form's. Find it with form_revision_list. Needs the revisions licence (Security Module).",
-      inputSchema: {
+      inputSchema: z.strictObject({
         cwd: cwdSchema,
         formId: formIdArgument(),
         version: resourceSegmentArgument('version').describe(
@@ -39,7 +39,7 @@ export function registerFormRevertTool(server: McpServer, config: FormioConfig) 
           .describe(
             'Revision note; use "Reverted to version {version}" unless the user gives another'
           ),
-      },
+      }),
       outputSchema: formDocument,
       annotations: overwrites('Revert a form'),
     },

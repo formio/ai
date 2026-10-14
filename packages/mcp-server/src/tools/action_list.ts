@@ -1,4 +1,5 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import { z } from 'zod';
 import { FormioConfig } from '../config.js';
 import { toMcpStructuredResult, toMcpError } from '../mcp-responses.js';
 import { actionsListOutput } from '../output-schemas.js';
@@ -14,11 +15,11 @@ export function registerActionListTool(server: McpServer, config: FormioConfig) 
     {
       description:
         'List the actions configured on a form, one page at a time — the server-side handlers that run when a submission is saved, such as save-to-resource, email, login, and role assignment.',
-      inputSchema: {
+      inputSchema: z.strictObject({
         cwd: cwdSchema,
         formId: formIdArgument(),
         ...listArguments(),
-      },
+      }),
       outputSchema: actionsListOutput,
       annotations: reads('List form actions'),
     },

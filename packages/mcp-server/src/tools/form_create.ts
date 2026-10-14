@@ -15,7 +15,7 @@ export function registerFormCreateTool(server: McpServer, config: FormioConfig) 
     {
       description:
         'Create a form in the project `cwd` resolves to. Build the form JSON with the formio-schema skill first. On a deployment licensed for revisions, `revisions` defaults to "original". Not for a draft of an existing form ("save a draft", "draft <change>"): use form_update with `draft: true`.',
-      inputSchema: {
+      inputSchema: z.strictObject({
         cwd: cwdSchema,
         form: z
           .looseObject({
@@ -42,7 +42,7 @@ export function registerFormCreateTool(server: McpServer, config: FormioConfig) 
           .describe(
             'Set true only after the user agrees to save without revision history. Without it, such a save (no revisions licence, or the form has revisions off) is refused with HISTORY_NOT_ACCEPTED and nothing is written.'
           ),
-      },
+      }),
       outputSchema: formDocument,
       annotations: creates('Create a form'),
     },

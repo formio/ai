@@ -1,4 +1,5 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import { z } from 'zod';
 import { FormioConfig } from '../config.js';
 import { formioFetch } from '../formio-client.js';
 import { toMcpStructuredResult, toMcpError } from '../mcp-responses.js';
@@ -14,10 +15,10 @@ export function registerActionTypeListTool(server: McpServer, config: FormioConf
     {
       description:
         'List the action types available for a form. Returns the whole catalog the server supports in one result.',
-      inputSchema: {
+      inputSchema: z.strictObject({
         cwd: cwdSchema,
         formId: formIdArgument(),
-      },
+      }),
       outputSchema: actionTypesListOutput,
       annotations: reads('List action types'),
     },

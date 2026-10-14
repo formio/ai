@@ -1,4 +1,5 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import { z } from 'zod';
 import { FormioConfig } from '../config.js';
 import { formioFetch } from '../formio-client.js';
 import { toMcpStructuredResult, toMcpError } from '../mcp-responses.js';
@@ -13,10 +14,10 @@ export function registerRoleCreateTool(server: McpServer, config: FormioConfig) 
     'role_create',
     {
       description: 'Create a new role in the project `cwd` resolves to.',
-      inputSchema: {
+      inputSchema: z.strictObject({
         cwd: cwdSchema,
         role: newRoleSchema.describe('The role to create'),
-      },
+      }),
       outputSchema: roleDocument,
       annotations: creates('Create a role'),
     },

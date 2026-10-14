@@ -68,12 +68,13 @@ export function registerProjectImportTool(server: McpServer, config: FormioConfi
     {
       description:
         "Import a template's roles, resources, forms and actions into the project `cwd` resolves to, for a first build: build it with the formio-resource-planner skill. Each form it names is replaced, its actions deleted and recreated, and its `access` replaces the project's; change an existing project with the form, role and action tools instead.",
-      inputSchema: {
+      inputSchema: z.strictObject({
         cwd: cwdSchema,
         template: z.looseObject({}).describe('The template JSON object to import'),
-      },
+      }),
       outputSchema: acknowledgementOutput,
-      annotations: overwrites('Import a project template'),
+      // Overwrites, but a repeat recreates each named form's actions under new ids.
+      annotations: { ...overwrites('Import a project template'), idempotentHint: false },
     },
     async ({ cwd, template }) => {
       try {

@@ -16,7 +16,7 @@ export function registerFormGetTool(server: McpServer, config: FormioConfig) {
     {
       description:
         'Fetch a form definition, by _id or path, from the project `cwd` resolves to. `draft: true` fetches its in-flight draft instead of the published form.',
-      inputSchema: {
+      inputSchema: z.strictObject({
         cwd: cwdSchema,
         formIdOrPath: projectPathArgument('formIdOrPath').describe(
           'Form ID (_id) or path (e.g. "user/login")'
@@ -29,7 +29,7 @@ export function registerFormGetTool(server: McpServer, config: FormioConfig) {
           .boolean()
           .optional()
           .describe("When true, fetch the form's current draft (GET /<form>/draft)"),
-      },
+      }),
       outputSchema: formDocument,
       annotations: reads('Get a form'),
     },
