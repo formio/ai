@@ -105,10 +105,10 @@
 
 ### Green
 
-- [ ] 7.2 Add a changeset: `@formio/mcp` patch and `@formio/ai` patch; run the Definition of Done (`pnpm test`, `pnpm lint`, `pnpm format`, `pnpm test:plugin`, `pnpm check:releases`, `openspec validate vendor-server-into-plugin --strict`)
-- [ ] 7.3 Install the plugin in Claude Code from this branch through a GitHub marketplace (not `--plugin-dir`), confirm Claude Code installs the dependencies, the `formio-mcp` server starts, `project_get` answers, and the install takes well under 60 seconds
+- [x] 7.2 Add a changeset: `@formio/mcp` patch and `@formio/ai` patch; run the Definition of Done (`pnpm test`, `pnpm lint`, `pnpm format`, `pnpm test:plugin`, `pnpm check:releases`, `openspec validate vendor-server-into-plugin --strict`)
+- [x] 7.3 Install the plugin in Claude Code from this branch through a GitHub marketplace (not `--plugin-dir`), confirm Claude Code installs the dependencies, the `formio-mcp` server starts, `project_get` answers, and the install takes well under 60 seconds
 - [ ] 7.4 After release, the maintainer rescans in the directory; record which findings remain
 
 ### Refactor
 
-- [ ] 7.5 Review implementation and refactor as needed
+- [x] 7.5 Review implementation and refactor as needed
