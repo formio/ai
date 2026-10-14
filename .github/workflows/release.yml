@@ -37,8 +37,11 @@ jobs:
           registry-url: 'https://registry.npmjs.org'
 
       # Trusted Publishing needs npm >= 11.5.1; Node 22 still bundles npm 10.x,
-      # and `pnpm publish` delegates the upload to the npm CLI.
-      - run: npm install -g npm@latest
+      # and `pnpm publish` delegates the upload to the npm CLI. Pinned to a major
+      # rather than `latest`, so a new npm major cannot change a publish between
+      # releases: npm 12 changed `npm pack --json`'s output shape, and the
+      # prepublish suite failed on it before anything was published.
+      - run: npm install -g npm@11
 
       - run: pnpm install --frozen-lockfile
 
