@@ -22,13 +22,13 @@ export function registerProjectTagListTool(server: McpServer, config: FormioConf
     {
       description:
         'Report the version the project `cwd` resolves to is at (`current`) and its version tags, newest first. With `compare: true`, also report the roles, resources, forms and actions changed since `current` — changes made outside the agent.',
-      inputSchema: {
+      inputSchema: z.strictObject({
         cwd: cwdSchema,
         compare: z
           .boolean()
           .optional()
           .describe('Compare the project with its current tag (two template transfers)'),
-      },
+      }),
       outputSchema: tagListOutput,
       annotations: reads('List project versions'),
     },

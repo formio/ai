@@ -1,4 +1,5 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import { z } from 'zod';
 import { FormioConfig } from '../config.js';
 import { formioFetch } from '../formio-client.js';
 import { toMcpError, toMcpStructuredResult } from '../mcp-responses.js';
@@ -15,11 +16,11 @@ export function registerActionDeleteTool(server: McpServer, config: FormioConfig
     {
       description:
         'Delete an action from a form. The action stops running on submissions immediately and is not recoverable — call action_get first if the settings may be needed again.',
-      inputSchema: {
+      inputSchema: z.strictObject({
         cwd: cwdSchema,
         formId: formIdArgument(),
         actionId: resourceSegmentArgument('actionId').describe('The action ID to delete'),
-      },
+      }),
       outputSchema: acknowledgementOutput,
       annotations: removes('Delete a form action'),
     },

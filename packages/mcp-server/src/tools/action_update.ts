@@ -1,4 +1,5 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import { z } from 'zod';
 import { FormioConfig } from '../config.js';
 import { formioFetch } from '../formio-client.js';
 import { toMcpStructuredResult, toMcpError } from '../mcp-responses.js';
@@ -16,12 +17,12 @@ export function registerActionUpdateTool(server: McpServer, config: FormioConfig
     {
       description:
         'Update an existing action on a form; call action_get first if you do not already have it. Sent fields overwrite, arrays and objects whole; top-level fields left out keep their value.',
-      inputSchema: {
+      inputSchema: z.strictObject({
         cwd: cwdSchema,
         formId: formIdArgument(),
         actionId: resourceSegmentArgument('actionId').describe('The action ID to update'),
         action: actionDefinitionSchema,
-      },
+      }),
       outputSchema: actionDocument,
       annotations: overwrites('Update a form action'),
     },

@@ -1,4 +1,5 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import { z } from 'zod';
 import { FormioConfig } from '../config.js';
 import { formioFetch } from '../formio-client.js';
 import { toMcpStructuredResult, toMcpError } from '../mcp-responses.js';
@@ -16,13 +17,13 @@ export function registerActionTypeGetTool(server: McpServer, config: FormioConfi
     {
       description:
         'Get action type info and settings form schema. Call this before action_create to discover the required settings for the action type.',
-      inputSchema: {
+      inputSchema: z.strictObject({
         cwd: cwdSchema,
         formId: formIdArgument(),
         actionName: resourceSegmentArgument('actionName').describe(
           'The action type name (e.g. "email", "save", "login")'
         ),
-      },
+      }),
       outputSchema: actionTypeInfoDocument,
       annotations: reads('Get an action type'),
     },

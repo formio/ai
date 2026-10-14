@@ -39,6 +39,16 @@ describe('project_import tool', () => {
     expect(description).toMatch(/first build/);
   });
 
+  // Import deletes and recreates each named form's actions, so a repeat leaves new
+  // action ids behind: a client must not retry it as if it were a no-op.
+  it('is destructive and not idempotent', async () => {
+    const { client } = await createTestClient(registerProjectImportTool);
+    const { tools } = await client.listTools();
+    const annotations = tools.find((t) => t.name === 'project_import')!.annotations;
+    expect(annotations?.destructiveHint).toBe(true);
+    expect(annotations?.idempotentHint).toBe(false);
+  });
+
   it('wraps the template in { template: ... } and calls POST /import', async () => {
     const template = {
       title: 'My App',
