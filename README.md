@@ -71,10 +71,10 @@ Neither install route asks for a URL. Both are resolved per working directory, s
 
 ```bash
 # What does this directory resolve to?
-npx -y @formio/mcp@1.0.0 project get --cwd "$(pwd)"
+npx -y @formio/mcp@1.0.1 project get --cwd "$(pwd)"
 
 # Record it for this machine…
-npx -y @formio/mcp@1.0.0 project set --project-url "<project url>" --cwd "$(pwd)"
+npx -y @formio/mcp@1.0.1 project set --project-url "<project url>" --cwd "$(pwd)"
 
 # …or commit it with the application, tracked in git and shared with everyone who clones it:
 # write a formio.json in the application's own folder (the server reads it, never writes it)
@@ -91,7 +91,7 @@ You usually only supply the first. The Base URL is worked out from the Project U
 Those derivations are also enforced: a `*.form.io` project paired with anything but `https://api.form.io` is refused, because for every project on our SaaS environment that pairing is a mistake that surfaces later as unexplained 404s or a portal login sent to a deployment you do not use. One deployment shape is indistinguishable from that mistake — an internal, non-SaaS deployment served from a `*.form.io` domain, which our QA team tests — so `project set` takes a `--force` flag for it:
 
 ```bash
-npx -y @formio/mcp@1.0.0 project set --force \
+npx -y @formio/mcp@1.0.1 project set --force \
   --project-url "https://myproject.form.io" --base-url "https://api.internal.example" --cwd "$(pwd)"
 ```
 
@@ -100,7 +100,7 @@ npx -y @formio/mcp@1.0.0 project set --force \
 The override belongs to the pair, not to the directory. Re-pointing the directory at a different project drops it and the checks apply again, while a write that leaves both halves untouched keeps it — an agent re-recording the project it already resolved must not undo your decision. That also means re-recording the same pair without `--force` changes nothing, so clearing the record is the way back:
 
 ```bash
-npx -y @formio/mcp@1.0.0 project set --reset --cwd "$(pwd)"
+npx -y @formio/mcp@1.0.1 project set --reset --cwd "$(pwd)"
 ```
 
 `--reset` removes this directory's entry from `~/.formio/projects.json` — nothing else — and prints what the directory resolves to afterwards, which may still be a committed `formio.json` or the environment. It takes no URLs, exits `0` whenever the record was cleared (run `project get` to see whether the directory is serviceable), and is what every forced report names as the way to put the checks back.
@@ -108,7 +108,7 @@ npx -y @formio/mcp@1.0.0 project set --reset --cwd "$(pwd)"
 To sign out, or to switch accounts, remove the cached login for the directory's deployment:
 
 ```bash
-npx -y @formio/mcp@1.0.0 project logout --cwd "$(pwd)"
+npx -y @formio/mcp@1.0.1 project logout --cwd "$(pwd)"
 ```
 
 `project logout` removes one deployment's token from `~/.formio/mcp-tokens.json` — the deployment the directory resolves to, exactly as `project get` resolves it, or the one `--base-url <url>` names — and leaves every other entry in place. A running server notices on its next call there and opens the login page again, so no restart is needed. It exits `0` whether a token was removed or none was cached, and says which; `2` when the command could not answer, including a token cache it cannot read or write; `1` when nothing is mapped for the directory, as `project get` reports it, or when `--base-url` is not a valid URL; and `3` when a project resolved but its deployment could not be determined. In both of those cases `--base-url` names the deployment directly.
@@ -219,7 +219,7 @@ It is also listed in the [official MCP Registry](https://registry.modelcontextpr
   "mcpServers": {
     "formio-mcp": {
       "command": "npx",
-      "args": ["-y", "@formio/mcp@1.0.0"]
+      "args": ["-y", "@formio/mcp@1.0.1"]
     }
   }
 }
@@ -234,7 +234,7 @@ That is the **JSON `mcpServers`** shape — what Claude Code (`.mcp.json`), Curs
   "servers": {
     "formio-mcp": {
       "command": "npx",
-      "args": ["-y", "@formio/mcp@1.0.0"]
+      "args": ["-y", "@formio/mcp@1.0.1"]
     }
   }
 }
@@ -245,7 +245,7 @@ That is the **JSON `mcpServers`** shape — what Claude Code (`.mcp.json`), Curs
 ```toml
 [mcp_servers.formio-mcp]
 command = "npx"
-args = ["-y", "@formio/mcp@1.0.0"]
+args = ["-y", "@formio/mcp@1.0.1"]
 ```
 
 Authentication is the same everywhere: the first authenticated tool call opens the browser portal-login flow, or set the `FORMIO_API_KEY` environment variable beside `FORMIO_PROJECT_URL` — the key applies only to that project — to skip the browser entirely — required on any host with no browser, such as a cloud agent, a container, or CI.
@@ -361,7 +361,7 @@ The probe runs lazily — only when the local auth page is actually served.
 | `FORMIO_INSECURE_TLS` | no | `false` | When `true`, skips TLS certificate verification only for requests to the configured deployment (the hosts of the resolved Project URL and Base URL) — for self-hosted deployments behind self-signed certs. Every other host is verified as usual. Do not use against production. | — | `true` |
 | `FORMIO_REQUEST_TIMEOUT` | no | `60` | Seconds a Form.io request may go unanswered before the call fails with `NETWORK_ERROR` naming the URL and the wait. A positive integer no larger than `2147483`; any other value is ignored. `project_import` and `project_export` wait 300 seconds, or this value when it is longer. | — | `120` |
 
-<sub>\* Not at startup — the server starts and lists every tool without it, and only errors when a tool actually needs a project. The alternative is the `project_set` tool, which maps a working directory to a project in `~/.formio/projects.json` so one server can serve several workspaces. Resolution runs by scope, narrowest first: a committed `formio.json` found by walking up from the caller's `cwd`, then the mapping for that `cwd` or its nearest mapped ancestor, then `FORMIO_PROJECT_URL` in the environment as the weakest source, then the error. Map a directory before any client connects with `npx -y @formio/mcp@1.0.0 project set --project-url <url> --cwd <path>` — the deployment is derived from the project URL wherever it can be, so add `--base-url <url>` only when the server says it cannot be determined. Add `--force` beside both URLs to record a pair the domain rules refuse — the one shape they cannot tell from a mistake is an internal deployment served from a `*.form.io` domain; it takes both URLs in the same call, is honoured on every later read, and is a shell-only flag the `project_set` tool does not have. `project set --reset --cwd <path>` clears a directory's entry, which is how a forced pair is un-forced: a write that leaves both halves untouched keeps the override, so there is nothing for an unforced re-record to change. `project get --cwd <path>` prints what resolves and which source won, exiting `0` when it resolved, `1` when nothing is mapped, `2` when the command itself failed, and `3` when a project resolved but its Base URL could not be determined — the half-configured directory, repaired by supplying that one value. `project set --cwd <path>` exits `0` when the directory is ready to serve a call, `1` when a named value is still missing, `2` when the command could not answer, and `3` when the record WAS written and the directory still resolves no Base URL — a committed `formio.json` governs it and supplies none, so the remedy is an edit to that file rather than another write.</sub>
+<sub>\* Not at startup — the server starts and lists every tool without it, and only errors when a tool actually needs a project. The alternative is the `project_set` tool, which maps a working directory to a project in `~/.formio/projects.json` so one server can serve several workspaces. Resolution runs by scope, narrowest first: a committed `formio.json` found by walking up from the caller's `cwd`, then the mapping for that `cwd` or its nearest mapped ancestor, then `FORMIO_PROJECT_URL` in the environment as the weakest source, then the error. Map a directory before any client connects with `npx -y @formio/mcp@1.0.1 project set --project-url <url> --cwd <path>` — the deployment is derived from the project URL wherever it can be, so add `--base-url <url>` only when the server says it cannot be determined. Add `--force` beside both URLs to record a pair the domain rules refuse — the one shape they cannot tell from a mistake is an internal deployment served from a `*.form.io` domain; it takes both URLs in the same call, is honoured on every later read, and is a shell-only flag the `project_set` tool does not have. `project set --reset --cwd <path>` clears a directory's entry, which is how a forced pair is un-forced: a write that leaves both halves untouched keeps the override, so there is nothing for an unforced re-record to change. `project get --cwd <path>` prints what resolves and which source won, exiting `0` when it resolved, `1` when nothing is mapped, `2` when the command itself failed, and `3` when a project resolved but its Base URL could not be determined — the half-configured directory, repaired by supplying that one value. `project set --cwd <path>` exits `0` when the directory is ready to serve a call, `1` when a named value is still missing, `2` when the command could not answer, and `3` when the record WAS written and the directory still resolves no Base URL — a committed `formio.json` governs it and supplies none, so the remedy is an edit to that file rather than another write.</sub>
 
 ---
 
