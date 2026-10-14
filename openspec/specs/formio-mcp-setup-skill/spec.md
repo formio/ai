@@ -153,6 +153,8 @@ The skill SHALL then stop and ask the user to re-issue their original request, r
 
 The skill SHALL also cover: whether to commit or ignore the written files, and what to do where `npx` cannot reach the public registry (a global install of `@formio/mcp@<MAJOR.MINOR.PATCH>` at the same pinned version, or the `.mcpb` desktop bundle).
 
+The skill SHALL also cover a Claude Code install of the `formio-ai` plugin whose Form.io tools are missing because the plugin's server did not start. Claude Code installs that server's dependencies directly from `https://registry.npmjs.org/` without reading `.npmrc`, so on a network that reaches npm only through a private mirror the install fails. The skill SHALL route that case to the same manual connection it writes for any client — an `npx` launch, which reads `.npmrc` — and SHALL NOT tell the user to work around the install by editing the plugin's files.
+
 #### Scenario: Approval precedes any write
 
 - **WHEN** the skill's instructions are inspected
@@ -173,6 +175,13 @@ The skill SHALL also cover: whether to commit or ignore the written files, and w
 
 - **WHEN** the skill's instructions are inspected
 - **THEN** they describe an alternative for an environment where `npx` cannot fetch from the public registry
+
+#### Scenario: The plugin's server cannot install
+
+- **WHEN** the skill's instructions are inspected for a Claude Code session where the `formio-ai` plugin is installed but its Form.io tools are missing
+- **THEN** they name a network that reaches npm only through a private mirror as the likely cause
+- **AND** they route to the manual `npx` connection
+- **AND** they do not instruct editing files inside the installed plugin
 
 ### Requirement: Setup offers to configure the project before the reload
 

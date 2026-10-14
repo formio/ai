@@ -89,12 +89,12 @@ The `.mcpb` desktop bundle is the exception and SHALL keep its prompts, because 
 
 ### Requirement: Plugin npm package publishes the built tree
 
-The `plugin/package.json` SHALL set `name` to `@formio/ai`, `publishConfig.access` to `public`, and `publishConfig.directory` to `../dist/plugin` so that `npm publish` uploads the built plugin tree rather than the source tree. Its `files` SHALL include `server` and `package-lock.json`, so the published package carries the same vendored server and lockfile the Claude Code manifest depends on.
+The `plugin/package.json` SHALL set `name` to `@formio/ai`, `publishConfig.access` to `public`, and `publishConfig.directory` to `../dist/plugin` so that `npm publish` uploads the built plugin tree rather than the source tree. Its `files` SHALL include `server`, so the published package carries the vendored server the Claude Code manifest launches. It also lists `package-lock.json`, which places the lockfile in the built tree; npm omits a file of that name from every tarball it publishes, so the npm package declares its five direct dependencies at exact versions without the transitive pins. Claude Code and the Anthropic plugin directory install from the repository, where the lockfile is committed, so neither is affected.
 
 #### Scenario: Publishing uploads the built tree
 
 - **WHEN** `pnpm release:plugin` runs from `plugin/`
-- **THEN** npm publishes the contents of `dist/plugin/` (vendored server, lockfile, manifests, skills) under the `@formio/ai` package name with public access
+- **THEN** npm publishes the contents of `dist/plugin/` (vendored server, manifests, skills) under the `@formio/ai` package name with public access
 
 ### Requirement: Build script produces a self-contained plugin tree
 
