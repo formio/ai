@@ -44,7 +44,7 @@ Every step has an approval gate before any file is written or any MCP call hits 
 
 - **MCP server** (`@formio/mcp`) — first-party Form.io operations as 25 MCP tools (`form_*`, `role_*`, `action_*`, `project_*`, and `server_status`, which reports the server version and project resolution without credentials).
 - **Skills library** — twelve activatable skills (app orchestration, form building, form embedding, planner, Angular and React framework implementors, schema, actions, auth, SDK, API router, MCP setup) plus a reference library under `formio-api/references/` covering every endpoint in the Form.io API Postman collection.
-- **Per-directory project routing** — `project_set` maps a working directory to a Form.io project in `~/.formio/projects.json`, so each directory can target a different project. The server resolves that mapping on every tool call; `npx -y @formio/mcp@0.14.1 project get --cwd "$(pwd)"` prints what it resolves and why.
+- **Per-directory project routing** — `project_set` maps a working directory to a Form.io project in `~/.formio/projects.json`, so each directory can target a different project. The server resolves that mapping on every tool call; `npx -y @formio/mcp@1.0.0 project get --cwd "$(pwd)"` prints what it resolves and why.
 
 | Skill | Purpose |
 | --- | --- |
@@ -76,7 +76,7 @@ No client prompts for anything at install time. Both URLs are resolved per direc
 | `FORMIO_FORCE_BROWSER` | no | `0` | Set to `1` to attempt the browser login even where the server detects no browser (CI, a container, SSH with no display). |
 | `FORMIO_INSECURE_TLS` | no | `false` | When `true`, skips TLS certificate verification only for requests to the configured deployment (the hosts of the resolved Project URL and Base URL) — for self-hosted deployments behind self-signed certs. Do not use against production. |
 
-\* Per-directory mappings are persisted to `~/.formio/projects.json` by the `project_set` tool, or by `npx -y @formio/mcp@0.14.1 project set --project-url <url> --cwd <path>` before any client has connected. A mapping holds a project URL and its base URL as a pair — the base URL derived from the project URL wherever it can be, and recorded beside it only when it cannot — and the server resolves both from that one entry. Halves are never combined across records: a mapping that names a project never takes its base URL from the environment, which is a separate, weaker record that applies only when no committed `formio.json` or mapping names a project for the directory.
+\* Per-directory mappings are persisted to `~/.formio/projects.json` by the `project_set` tool, or by `npx -y @formio/mcp@1.0.0 project set --project-url <url> --cwd <path>` before any client has connected. A mapping holds a project URL and its base URL as a pair — the base URL derived from the project URL wherever it can be, and recorded beside it only when it cannot — and the server resolves both from that one entry. Halves are never combined across records: a mapping that names a project never takes its base URL from the environment, which is a separate, weaker record that applies only when no committed `formio.json` or mapping names a project for the directory.
 
 ### Authentication modes
 
