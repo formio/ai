@@ -1,0 +1,3 @@
+# Written by `pnpm sync:plugin-server` from packages/mcp-server and pnpm-lock.yaml.
+plugin/server/** linguist-generated=true
+plugin/package-lock.json linguist-generated=true

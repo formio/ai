@@ -42,8 +42,9 @@ describe('the Node floor', () => {
     expect(read('scripts/build-mcpb.ts')).toContain(`runtimes: { node: '${floor}.0' }`);
   });
 
-  it('is the esbuild target of both bundles', () => {
-    for (const script of ['scripts/build-mcpb.ts', 'scripts/build-plugin.ts']) {
+  // The plugin bundles nothing: Claude Code runs its vendored tsc output.
+  it('is the esbuild target of the desktop bundle', () => {
+    for (const script of ['scripts/build-mcpb.ts']) {
       const targets = [...read(script).matchAll(/target: 'node(\d+)'/g)].map((m) => Number(m[1]));
       expect(targets.length, script).toBeGreaterThan(0);
       expect(

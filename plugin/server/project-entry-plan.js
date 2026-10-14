@@ -1,0 +1,273 @@
+import { normalizeRequestedUrl, readHttpUrlEnv } from './config.js';
+import { classifyPair, deriveBaseUrl } from './pair-rule.js';
+export function planProjectEntry({ cwd, requested, record, elsewhere = {}, }) {
+    if (!requested.projectUrl && !requested.baseUrl) {
+        return { outcome: 'no-values', cwd };
+    }
+    // Asked of the ARGUMENTS, before any record is read. The override is about the pair
+    // in this call, so nothing on disk can complete it — and answering "which half is
+    // missing?" from the record would let a forced write inherit a value the force was
+    // meant to replace.
+    if (requested.force && !(requested.projectUrl && requested.baseUrl)) {
+        return {
+            outcome: 'force-requires-both',
+            cwd,
+            missing: requested.projectUrl ? 'baseUrl' : 'projectUrl',
+        };
+    }
+    // The stored project is hand-editable DATA, not the caller's typing, and this write
+    // is what repairs an entry the resolver refuses. Read tolerantly so it cannot fail
+    // on the value it is replacing; an unusable one is not a project, so it also cannot
+    // stand in for one a deployment-only call is missing.
+    const previousProjectUrl = record.projectUrl;
+    const recordProjectUrl = readHttpUrlEnv({
+        raw: previousProjectUrl,
+        name: `the project URL recorded for ${cwd}`,
+        onIgnored: () => { },
+    });
+    const recordBaseUrl = readHttpUrlEnv({
+        raw: record.baseUrl,
+        name: `the base URL recorded for ${cwd}`,
+        onIgnored: () => { },
+    });
+    // Marked as the caller's own typing, so the entry points can answer it as a value
+    // to re-ask for rather than as a command that could not run.
+    const requestedProjectUrl = requested.projectUrl
+        ? normalizeRequestedUrl(requested.projectUrl, 'projectUrl')
+        : undefined;
+    const requestedBaseUrl = requested.baseUrl
+        ? normalizeRequestedUrl(requested.baseUrl, 'baseUrl')
+        : undefined;
+    // A deployment alone amends the pair where the project already is. The mapping is
+    // the only record this write can reach, so a project held anywhere else is a
+    // different write — named, not attempted, because writing the deployment here would
+    // put it in one record and its project in another.
+    if (!requestedProjectUrl) {
+        // The pair this call WOULD form, judged before any remedy is named. The
+        // deferral below tells the caller to record the offered deployment beside a
+        // project held elsewhere — so if that pair is one the resolver refuses, the
+        // instruction is to write a record that breaks the directory (a committed edit
+        // making every later call fail) or to run a command this same writer rejects.
+        // Returning here without asking was the one path around the chokepoint, and it
+        // was the path whose answer a human carries out by hand.
+        // WHICH project this call would defer to, decided once. The branches below and
+        // the pair check above each worked it out for themselves and disagreed: the check
+        // asked only when this record had no project, while the committed branch fires
+        // whenever the committed file names a DIFFERENT one — so a directory holding both
+        // a mapping project and a committed project skipped the check entirely and was
+        // told to hand-write a pair that makes every later call fail. One expression, used
+        // by both, cannot drift.
+        const deferral = elsewhere.committed && elsewhere.committed.projectUrl !== recordProjectUrl
+            ? { projectUrl: elsewhere.committed.projectUrl, record: 'committed' }
+            : !recordProjectUrl && elsewhere.environment
+                ? { projectUrl: elsewhere.environment, record: 'environment' }
+                : undefined;
+        const elsewhereProject = deferral?.projectUrl;
+        if (requestedBaseUrl && elsewhereProject) {
+            // EVERY non-ok verdict, not the two that were in front of me: a project URL
+            // that is the API root fell through, so the deferral named a command the
+            // writer refuses and an edit that leaves the file unusable — with the actual
+            // fault, the project URL, never mentioned.
+            const offered = classifyPair(elsewhereProject, requestedBaseUrl);
+            if (offered === 'not-a-project-url' || offered === 'not-a-hosted-project') {
+                return { outcome: offered, cwd, url: elsewhereProject };
+            }
+            if (offered === 'open-source-deployment') {
+                return { outcome: 'open-source-deployment', cwd, url: elsewhereProject };
+            }
+            if (offered !== 'ok') {
+                return {
+                    outcome: offered,
+                    cwd,
+                    projectUrl: elsewhereProject,
+                    baseUrl: requestedBaseUrl,
+                };
+            }
+        }
+        // A committed file GOVERNS the directory, so a deployment supplied with no project
+        // answers a report about ITS project. Amending this record instead would record that
+        // deployment for a project the directory does not resolve — UNLESS both records name
+        // the same project, where there is nothing ambiguous to refuse and the mapping is
+        // this project's own fallback if that file goes away.
+        if (deferral?.record === 'committed' && elsewhere.committed) {
+            return {
+                outcome: 'wrong-record',
+                cwd,
+                record: 'committed',
+                projectUrl: elsewhere.committed.projectUrl,
+                filePath: elsewhere.committed.filePath,
+            };
+        }
+        if (!recordProjectUrl) {
+            return elsewhere.environment
+                ? { outcome: 'wrong-record', cwd, record: 'environment', projectUrl: elsewhere.environment }
+                : { outcome: 'project-required', cwd };
+        }
+    }
+    const projectUrl = (requestedProjectUrl ?? recordProjectUrl);
+    // Derived at save time, from the project it is about to be stored beside. The one
+    // shape that derives nothing has to arrive with its deployment: recording the
+    // project alone would leave a record naming a project and no deployment, and the
+    // caller answering that report already holds the project URL, so asking for both in
+    // the call still asks the user for one value.
+    // The record's own deployment survives a call that does not change its project —
+    // an idempotent re-set, or a user re-confirming what is already there. Ignoring it
+    // asked for a Base URL the record already held, and for the one shape that derives
+    // nothing that refusal was a hard error. A call that changes the project keeps
+    // nothing: the deployment belonged to the project being replaced.
+    const keptBaseUrl = recordProjectUrl === projectUrl ? recordBaseUrl : undefined;
+    let baseUrl = requestedBaseUrl ?? keptBaseUrl ?? deriveBaseUrl(projectUrl);
+    // Forced by this call, or forced earlier and left exactly as it was. An unforced call
+    // that reaches the same pair — an agent re-stating the project it already resolved,
+    // a user re-confirming what is on disk — must not undo a developer's override, and a
+    // call that moves either half forms a pair nobody vouched for, so the rules decide it
+    // again.
+    //
+    // `Boolean(recordBaseUrl)` is not redundant beside the equality: both halves are
+    // undefined for a record holding a project alone, so the comparison alone called
+    // that record forced — and the reader does not, because force licenses a PAIR
+    // (see classifyPair). The writer then skipped the verdicts that record's own
+    // project URL fails and answered with a demand for a Base URL for something that
+    // is not a project at all.
+    const forced = Boolean(requested.force) ||
+        (Boolean(record.forced) &&
+            recordProjectUrl === projectUrl &&
+            Boolean(recordBaseUrl) &&
+            recordBaseUrl === baseUrl);
+    // A forced pair is not judged AT ALL, and it is answered here — before the three
+    // classifications below — so the override is one branch rather than a `forced` term
+    // carried into each of them. Carried into each, it held for two and lapsed for the
+    // third, which is the "one rule, several copies" shape every defect on this surface
+    // has had.
+    //
+    // `baseUrl` is guaranteed here: a call carrying the flag must state both halves (see
+    // the force-requires-both outcome above), and a preserved override requires the
+    // record's own deployment. The condition says so rather than asserting it, so a
+    // forced record that somehow holds no deployment falls through to the ordinary
+    // demand for one instead of writing an entry with half a pair in it.
+    if (forced && baseUrl) {
+        return {
+            // Adding the override to a pair already on disk is a WRITE. Compared on the pair
+            // alone, `project set --force` over the pair it was already targeting reported
+            // "no change" and left the entry unforced, so the very next read refused it.
+            //
+            // An inherited forced pair restated is unchanged too, so the ancestor's flag is
+            // never written onto this directory's entry — unless this call forces the pair
+            // for this directory, which is what records a forced entry of its own.
+            ...unchangedOrWrite({
+                unchanged: recordProjectUrl === projectUrl &&
+                    recordBaseUrl === baseUrl &&
+                    record.forced &&
+                    !(requested.force && record.inheritedFrom),
+                inheritedFrom: record.inheritedFrom,
+            }),
+            cwd,
+            entry: { env: { FORMIO_PROJECT_URL: projectUrl, FORMIO_BASE_URL: baseUrl }, forced: true },
+            projectUrl,
+            baseUrl,
+            ...(previousProjectUrl ? { previousProjectUrl } : {}),
+            setAProject: Boolean(requestedProjectUrl),
+        };
+    }
+    // A KEPT deployment that the pair rule rejects is stale data, not an answer the
+    // caller just gave — so it is dropped and the derived value used, exactly as the
+    // reader does with the same record. Refusing instead produced a remedy that named
+    // the very call that had just failed: re-recording a hosted project whose stored
+    // deployment was foreign inherited that value, was refused, and the refusal said
+    // "call project_set again with projectUrl alone", which is what had been called.
+    // Only a value the CALLER supplied is worth refusing, because only that one is
+    // something they can correct.
+    // The project half, judged on its own, before anything about deployments. A
+    // verdict that faults the PROJECT does not depend on which deployment is or is not
+    // beside it, and asking it only once a deployment exists left the shapes that
+    // derive nothing to be diagnosed by the base-URL branch instead.
+    const projectHalf = classifyPair(projectUrl, undefined);
+    if (projectHalf === 'not-a-project-url' || projectHalf === 'not-a-hosted-project') {
+        return { outcome: projectHalf, cwd, url: projectUrl };
+    }
+    let droppedBaseUrl;
+    if (baseUrl && !requestedBaseUrl && keptBaseUrl && classifyPair(projectUrl, baseUrl) !== 'ok') {
+        droppedBaseUrl = keptBaseUrl;
+        baseUrl = deriveBaseUrl(projectUrl);
+    }
+    if (!baseUrl) {
+        // A stored deployment that could not be adopted is named rather than dropped in
+        // silence. The commonest way here is repairing an entry whose stored project URL
+        // is unusable: it is not a project, so it cannot vouch for the deployment beside
+        // it, and the refusal would otherwise demand a value the user can see on disk.
+        // Why the deployment sitting in this record was not adopted — and whether the
+        // caller could answer with it after all. That second question is asked of the
+        // PAIR RULE rather than inferred from how the value came to be stranded: a
+        // directory moving from the hosted cloud to a self-hosted deployment strands
+        // https://api.form.io, which is a perfectly ordinary "recorded for a different
+        // project" — and also a value that cannot serve the new one, so inviting the user
+        // to re-supply it names an answer refused every time it is given.
+        const stranded = droppedBaseUrl ?? (!keptBaseUrl && recordBaseUrl ? recordBaseUrl : undefined);
+        const reason = stranded && classifyPair(projectUrl, stranded) !== 'ok'
+            ? 'cannot-serve'
+            : !previousProjectUrl
+                ? 'no-project'
+                : !recordProjectUrl
+                    ? 'unusable-project'
+                    : 'different-project';
+        return {
+            outcome: 'base-url-required',
+            cwd,
+            projectUrl,
+            ...(stranded ? { recordedBaseUrl: stranded, strandedReason: reason } : {}),
+            ...(stranded && reason === 'unusable-project'
+                ? { unusableRecordedProjectUrl: previousProjectUrl }
+                : {}),
+        };
+    }
+    // The pair rule, asked of the pair about to be recorded — the same classification
+    // the resolver applies at the point of use, so a write can never record what the
+    // next read refuses. 'not-a-project-url' is the hosted cloud's own API root pasted
+    // where a project URL belongs; 'open-source-deployment' is a pair collapsed onto
+    // one server, which names an install with no project layer. Refused where the pair
+    // is formed, rather than left to surface later as unexplained 404s.
+    const validity = classifyPair(projectUrl, baseUrl);
+    if (validity === 'not-a-project-url' || validity === 'not-a-hosted-project') {
+        return { outcome: validity, cwd, url: projectUrl };
+    }
+    if (validity === 'open-source-deployment') {
+        return { outcome: 'open-source-deployment', cwd, url: projectUrl };
+    }
+    // Refused rather than corrected: this value is a user's live answer, and a write is
+    // where a wrong one is worth teaching. The reader, which meets the same pair already
+    // on disk, supplies the derived deployment instead — the right value is knowable
+    // there, so failing every tool call over it would be gratuitous.
+    if (validity === 'hosted-project-foreign-deployment' ||
+        validity === 'api-root-deployment' ||
+        validity === 'underivable-mismatch' ||
+        validity === 'unrelated-deployment') {
+        return { outcome: validity, cwd, projectUrl, baseUrl };
+    }
+    // Nothing forced reaches here, so this entry never carries the flag — which is also
+    // how the override is CLEARED for a pair the rules accept: the map stores what a
+    // write hands it, whole.
+    const entry = {
+        env: { FORMIO_PROJECT_URL: projectUrl, FORMIO_BASE_URL: baseUrl },
+    };
+    return {
+        // A record that holds the override and a pair the rules accept still changes when
+        // this write drops the flag, so `record.forced` counts as a difference.
+        ...unchangedOrWrite({
+            unchanged: recordProjectUrl === projectUrl && recordBaseUrl === baseUrl && !record.forced,
+            inheritedFrom: record.inheritedFrom,
+        }),
+        cwd,
+        entry,
+        projectUrl,
+        baseUrl,
+        ...(previousProjectUrl ? { previousProjectUrl } : {}),
+        ...(droppedBaseUrl ? { droppedBaseUrl } : {}),
+        setAProject: Boolean(requestedProjectUrl),
+    };
+}
+// Whether the pair the record supplies already is the pair being recorded. A record
+// inherited from an ancestor counts: it is what resolves here, and a child entry
+// restating it would change nothing but the number of records holding one pair.
+const unchangedOrWrite = ({ unchanged, inheritedFrom, }) => unchanged
+    ? { outcome: 'unchanged', ...(inheritedFrom ? { inheritedFrom } : {}) }
+    : { outcome: 'write' };

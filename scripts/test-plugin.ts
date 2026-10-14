@@ -1,5 +1,6 @@
-import { spawn } from 'node:child_process';
+import { spawn, spawnSync } from 'node:child_process';
 import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -11,7 +12,7 @@ const AGENT_PLUGIN_JSON = path.join(DIST_PLUGIN, 'plugin.json');
 const CURSOR_PLUGIN_JSON = path.join(DIST_PLUGIN, '.cursor-plugin/plugin.json');
 const MCP_JSON = path.join(DIST_PLUGIN, 'mcp.json');
 const AGENT_PLUGINS_SPEC = '1.0.0';
-const SERVER_BUNDLE = path.join(DIST_PLUGIN, 'server/stdio.mjs');
+const SERVER_PACKAGE_JSON = path.join(REPO_ROOT, 'packages/mcp-server/package.json');
 const SKILLS_DIR = path.join(DIST_PLUGIN, 'skills');
 const REQUIRED_SKILL_DIRS = ['formio-api', 'formio-schema'];
 const REQUIRED_MANIFEST_FIELDS = ['name', 'version', 'description'] as const;
@@ -23,11 +24,13 @@ type Manifest = {
   mcpServers?: Record<string, { command?: unknown }>;
 };
 
-type ToolsListResponse = {
-  id: number;
-  result?: { tools?: Array<{ name: string }> };
+type RpcResponse = {
+  id?: number;
+  result?: { tools?: Array<{ name: string }>; serverInfo?: { version?: string } };
   error?: { message: string };
 };
+
+type LockEntry = { version?: string };
 
 function fail(message: string): never {
   console.error(`smoke-test failed: ${message}`);
@@ -177,61 +180,149 @@ function validateSkills() {
   console.log(`✓ skills present: ${REQUIRED_SKILL_DIRS.join(', ')}`);
 }
 
-async function exerciseToolsList() {
-  if (!fs.existsSync(SERVER_BUNDLE)) fail(`server bundle missing at ${SERVER_BUNDLE}`);
-  const child = spawn('node', [SERVER_BUNDLE], {
+/**
+ * Installs the plugin's dependencies the way Claude Code does — from the
+ * lockfile, frozen, with no lifecycle scripts and no user `.npmrc` — into a copy
+ * of the built tree, and checks every installed version against its lockfile
+ * entry. A lockfile that installs only through a contributor's own mirror, or
+ * that installs something other than what it pins, fails here.
+ */
+function installLikeClaudeCode(): string {
+  const copy = fs.mkdtempSync(path.join(os.tmpdir(), 'formio-plugin-smoke-'));
+  fs.cpSync(DIST_PLUGIN, copy, { recursive: true });
+  const userConfig = path.join(copy, '.smoke-npmrc');
+  fs.writeFileSync(userConfig, '');
+  const started = Date.now();
+  const install = spawnSync(
+    'npm',
+    ['ci', '--ignore-scripts', '--no-audit', '--no-fund', '--prefer-offline'],
+    {
+      cwd: copy,
+      encoding: 'utf8',
+      env: {
+        ...process.env,
+        npm_config_userconfig: userConfig,
+        npm_config_registry: 'https://registry.npmjs.org/',
+      },
+    }
+  );
+  fs.rmSync(userConfig);
+  if (install.status !== 0) {
+    fail(`npm ci from package-lock.json failed:\n${install.stdout}${install.stderr}`);
+  }
+  const seconds = ((Date.now() - started) / 1000).toFixed(1);
+
+  const lock = JSON.parse(fs.readFileSync(path.join(copy, 'package-lock.json'), 'utf8')) as {
+    packages: Record<string, LockEntry>;
+  };
+  const locked = Object.entries(lock.packages).filter(([key]) => key !== '');
+  const mismatched = locked.filter(([key, entry]) => {
+    const manifest = path.join(copy, key, 'package.json');
+    return (
+      !fs.existsSync(manifest) ||
+      (JSON.parse(fs.readFileSync(manifest, 'utf8')) as LockEntry).version !== entry.version
+    );
+  });
+  if (mismatched.length > 0) {
+    fail(
+      `installed versions differ from the lockfile: ${mismatched.map(([key]) => key).join(', ')}`
+    );
+  }
+  console.log(`✓ installed ${locked.length} locked packages in ${seconds}s`);
+  return copy;
+}
+
+/** Sends `initialize` then `tools/list` to the Claude manifest's server; resolves both replies. */
+async function exchange(serverPath: string): Promise<Map<number, RpcResponse>> {
+  const child = spawn('node', [serverPath], {
     stdio: ['pipe', 'pipe', 'pipe'],
     env: { ...process.env, FORMIO_PROJECT_URL: 'https://smoke-test.invalid' },
   });
-
+  const replies = new Map<number, RpcResponse>();
   let buffer = '';
-  const response = await new Promise<ToolsListResponse>((resolve, reject) => {
+  await new Promise<void>((resolve, reject) => {
     const timer = setTimeout(() => {
       child.kill();
-      reject(new Error('timed out waiting for tools/list response after 10s'));
+      reject(new Error('timed out waiting for initialize and tools/list after 10s'));
     }, 10_000);
-
     child.stdout.on('data', (chunk: Buffer) => {
       buffer += chunk.toString();
-      let newlineIdx = buffer.indexOf('\n');
-      while (newlineIdx !== -1) {
-        const line = buffer.slice(0, newlineIdx).trim();
-        buffer = buffer.slice(newlineIdx + 1);
-        if (line) {
-          try {
-            const parsed = JSON.parse(line) as ToolsListResponse;
-            clearTimeout(timer);
-            child.kill();
-            resolve(parsed);
-            return;
-          } catch {
-            // Not a JSON-RPC frame (e.g., stray log line); keep scanning.
-          }
+      const lines = buffer.split('\n');
+      buffer = lines.pop() ?? '';
+      for (const line of lines.map((l) => l.trim()).filter(Boolean)) {
+        try {
+          const parsed = JSON.parse(line) as RpcResponse;
+          if (typeof parsed.id === 'number') replies.set(parsed.id, parsed);
+        } catch {
+          // Not a JSON-RPC frame (e.g., stray log line); keep scanning.
         }
-        newlineIdx = buffer.indexOf('\n');
+      }
+      if (replies.has(1) && replies.has(2)) {
+        clearTimeout(timer);
+        child.kill();
+        resolve();
       }
     });
-
     child.on('error', (err) => {
       clearTimeout(timer);
       reject(err);
     });
-
-    const request = {
-      jsonrpc: '2.0',
-      id: 1,
-      method: 'tools/list',
-      params: {},
-    };
-    child.stdin.write(`${JSON.stringify(request)}\n`);
+    const frames = [
+      {
+        jsonrpc: '2.0',
+        id: 1,
+        method: 'initialize',
+        params: {
+          protocolVersion: '2025-06-18',
+          capabilities: {},
+          clientInfo: { name: 'plugin-smoke-test', version: '0.0.0' },
+        },
+      },
+      { jsonrpc: '2.0', method: 'notifications/initialized' },
+      { jsonrpc: '2.0', id: 2, method: 'tools/list', params: {} },
+    ];
+    child.stdin.write(frames.map((frame) => `${JSON.stringify(frame)}\n`).join(''));
   });
+  return replies;
+}
 
-  if (response.error) fail(`tools/list returned error: ${response.error.message}`);
-  const tools = response.result?.tools;
-  if (!Array.isArray(tools) || tools.length === 0) {
-    fail('tools/list returned no tools');
+async function exerciseVendoredServer() {
+  const manifest = JSON.parse(fs.readFileSync(PLUGIN_JSON, 'utf8')) as {
+    mcpServers?: Record<string, { args?: string[] }>;
+  };
+  const launched = manifest.mcpServers?.['formio-mcp']?.args?.[0] ?? '';
+  const relative = launched.replace(/^\$\{CLAUDE_PLUGIN_ROOT\}\//, '');
+  if (!relative || relative === launched) {
+    fail(
+      `plugin.json formio-mcp must launch a file under \${CLAUDE_PLUGIN_ROOT} (found ${launched})`
+    );
   }
-  console.log(`✓ tools/list responded with ${tools.length} tool(s)`);
+
+  const copy = installLikeClaudeCode();
+  try {
+    const replies = await exchange(path.join(copy, relative));
+    const initialize = replies.get(1);
+    const list = replies.get(2);
+    if (initialize?.error) fail(`initialize returned error: ${initialize.error.message}`);
+    if (list?.error) fail(`tools/list returned error: ${list.error.message}`);
+
+    const { version } = JSON.parse(fs.readFileSync(SERVER_PACKAGE_JSON, 'utf8')) as {
+      version: string;
+    };
+    const reported = initialize?.result?.serverInfo?.version;
+    if (reported !== version) {
+      fail(`the vendored server reports ${String(reported)}, not @formio/mcp ${version}`);
+    }
+    console.log(`✓ the vendored server reports @formio/mcp ${version}`);
+
+    const tools = list?.result?.tools ?? [];
+    if (!tools.some((tool) => tool.name === 'project_set')) {
+      fail('tools/list returned no project_set tool');
+    }
+    console.log(`✓ tools/list responded with ${tools.length} tool(s)`);
+  } finally {
+    fs.rmSync(copy, { recursive: true, force: true });
+  }
 }
 
 async function main() {
@@ -241,7 +332,7 @@ async function main() {
   validateCursorManifest();
   validateManifestVersionsAgree();
   validateSkills();
-  await exerciseToolsList();
+  await exerciseVendoredServer();
   console.log('plugin smoke-test passed');
 }
 

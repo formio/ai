@@ -1,0 +1,27 @@
+import { z } from 'zod';
+import { toMcpStructuredResult, toMcpError } from '../mcp-responses.js';
+import { rolesListOutput } from '../output-schemas.js';
+import { reads } from '../tool-annotations.js';
+import { cwdSchema } from '../project-resolver.js';
+import { resolveToolConfig } from './project-resolution.js';
+import { fetchListPage, listArguments, listResult } from './list-contract.js';
+export function registerRoleListTool(server, config) {
+    server.registerTool('role_list', {
+        description: 'List the roles defined in the project `cwd` resolves to, one page at a time.',
+        inputSchema: z.strictObject({
+            cwd: cwdSchema,
+            ...listArguments(),
+        }),
+        outputSchema: rolesListOutput,
+        annotations: reads('List roles'),
+    }, async ({ cwd, ...query }) => {
+        try {
+            const cfg = await resolveToolConfig({ server, cwd, config });
+            const page = await fetchListPage({ path: 'role', query, config: cfg });
+            return toMcpStructuredResult(listResult('roles', page));
+        }
+        catch (error) {
+            return toMcpError(error);
+        }
+    });
+}

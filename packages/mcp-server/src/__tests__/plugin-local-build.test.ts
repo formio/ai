@@ -34,7 +34,7 @@ function scratchPlugin(): string {
   write('mcp.json', { mcpServers: { 'formio-mcp': { type: 'stdio', ...PUBLISHED } } });
   write('plugin.json', { name: 'formio-ai', version: '9.9.9' });
   fs.mkdirSync(path.join(dir, 'server'));
-  fs.writeFileSync(path.join(dir, 'server/stdio.mjs'), '// bundled server');
+  fs.writeFileSync(path.join(dir, 'server/stdio.js'), '// vendored server');
   return dir;
 }
 
@@ -45,6 +45,7 @@ function run(source: string, out: string) {
       path.join(REPO_ROOT, 'node_modules/tsx/dist/cli.mjs'),
       SCRIPT,
       '--skip-build',
+      '--skip-install',
       '--source',
       source,
       '--out',
@@ -57,7 +58,7 @@ function run(source: string, out: string) {
 const read = (file: string) => JSON.parse(fs.readFileSync(file, 'utf8')) as Record<string, unknown>;
 
 describe('build:plugin:local', () => {
-  it('launches the bundled server from every formio-mcp manifest entry', () => {
+  it('launches the vendored server from every formio-mcp manifest entry', () => {
     const source = scratchPlugin();
     const out = path.join(
       fs.mkdtempSync(path.join(os.tmpdir(), 'plugin-local-out-')),
@@ -66,7 +67,7 @@ describe('build:plugin:local', () => {
     const result = run(source, out);
     expect(result.status, result.stderr).toBe(0);
 
-    const server = path.join(out, 'server/stdio.mjs');
+    const server = path.join(out, 'server/stdio.js');
     const expected = { command: 'node', args: [...SYSTEM_CA, server] };
     const claude = read(path.join(out, '.claude-plugin/plugin.json')) as {
       mcpServers: Record<string, unknown>;
@@ -99,7 +100,7 @@ describe('build:plugin:local', () => {
     expect(fs.readFileSync(path.join(source, '.claude-plugin/plugin.json'), 'utf8')).toBe(before);
   });
 
-  it('refuses a source with no bundled server', () => {
+  it('refuses a source with no vendored server', () => {
     const source = scratchPlugin();
     fs.rmSync(path.join(source, 'server'), { recursive: true });
     const out = path.join(
@@ -108,6 +109,6 @@ describe('build:plugin:local', () => {
     );
     const result = run(source, out);
     expect(result.status).not.toBe(0);
-    expect(result.stderr).toMatch(/server\/stdio\.mjs/);
+    expect(result.stderr).toMatch(/server\/stdio\.js/);
   });
 });

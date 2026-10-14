@@ -1,4 +1,4 @@
-import { build } from 'esbuild';
+import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -18,16 +18,10 @@ const MANIFESTS_OUT = [
   path.join(DIST_PLUGIN, '.cursor-plugin/plugin.json'),
   path.join(DIST_PLUGIN, 'plugin.json'),
 ];
-const SERVER_ENTRY = path.join(REPO_ROOT, 'packages/mcp-server/src/stdio.ts');
-// Built, not published: `plugin/package.json`'s `files` omits `server/`, because
-// every manifest launches `npx -y @formio/mcp@…` and a second copy in the tarball
-// would invite the reading that an install runs it. What the bundle is for is the
-// smoke test — `pnpm test:plugin` spawns it and sends `tools/list`, which catches
-// bundling regressions (a missing CJS shim, a wrong entry point) that no
-// module-level test sees. The `.mcpb` desktop bundle builds its own copy at
-// dist/mcpb/server/index.mjs.
-const SERVER_OUT = path.join(DIST_PLUGIN, 'server/stdio.mjs');
-const SERVER_PACKAGE_JSON = path.join(REPO_ROOT, 'packages/mcp-server/package.json');
+// Never copied: pnpm installs the plugin's dependencies into plugin/node_modules
+// because plugin/ is a workspace package, but a consumer installs them from the
+// lockfile, so the built tree carries none.
+const NOT_SHIPPED = new Set(['__pycache__', 'node_modules']);
 
 function cleanDist() {
   fs.rmSync(DIST_PLUGIN, { recursive: true, force: true });
@@ -37,7 +31,7 @@ function copyStatic() {
   fs.mkdirSync(path.dirname(DIST_PLUGIN), { recursive: true });
   fs.cpSync(PLUGIN_SRC, DIST_PLUGIN, {
     recursive: true,
-    filter: (src: string) => path.basename(src) !== '__pycache__',
+    filter: (src: string) => !NOT_SHIPPED.has(path.basename(src)),
   });
 }
 
@@ -64,41 +58,22 @@ function syncManifestVersions() {
   }
 }
 
-function serverVersion(): string {
-  const { version } = JSON.parse(fs.readFileSync(SERVER_PACKAGE_JSON, 'utf8')) as {
-    version: string;
-  };
-  return version;
-}
-
-async function bundleServer() {
-  fs.mkdirSync(path.dirname(SERVER_OUT), { recursive: true });
-  await build({
-    entryPoints: [SERVER_ENTRY],
-    outfile: SERVER_OUT,
-    bundle: true,
-    platform: 'node',
-    format: 'esm',
-    target: 'node22',
-    // The server's own version, written in at build time: the nearest
-    // package.json to this bundle is @formio/ai's, not @formio/mcp's (see
-    // cli-launch.ts).
-    define: { __FORMIO_MCP_VERSION__: JSON.stringify(serverVersion()) },
-    banner: {
-      // Shim CommonJS globals for ESM output so bundled CJS deps (e.g. express) resolve correctly.
-      // The source file's own `#!/usr/bin/env node` shebang is preserved by esbuild above this.
-      js: [
-        "import { createRequire as __createRequire } from 'node:module';",
-        "import { fileURLToPath as __fileURLToPath } from 'node:url';",
-        "import { dirname as __dirname_fn } from 'node:path';",
-        'const require = __createRequire(import.meta.url);',
-        'const __filename = __fileURLToPath(import.meta.url);',
-        'const __dirname = __dirname_fn(__filename);',
-      ].join('\n'),
-    },
-    logLevel: 'warning',
+/**
+ * Throws unless plugin/server/, the plugin's dependency block, and its lockfile
+ * match this commit's server: the Claude manifest launches that copy, so a
+ * drifted one would publish a server other than the one this commit tested.
+ */
+function assertVendoredServerCurrent() {
+  const check = spawnSync('pnpm', ['-s', 'sync:plugin-server', '--check'], {
+    cwd: REPO_ROOT,
+    encoding: 'utf8',
   });
-  fs.chmodSync(SERVER_OUT, 0o755);
+  if (check.status !== 0) {
+    throw new Error(
+      `${check.stdout}${check.stderr}`.trim() ||
+        'plugin/server/ is out of date; run `pnpm sync:plugin-server`.'
+    );
+  }
 }
 
 export async function buildPlugin() {
@@ -117,9 +92,11 @@ export async function buildPlugin() {
   // without this a stale or hand-edited pin publishes in the plugin tarball
   // with nothing having looked at it.
   assertServerPinsAgree();
+  // Same rule for the server the Claude manifest launches, whose writer is
+  // `pnpm sync:plugin-server`.
+  assertVendoredServerCurrent();
   copyStatic();
   syncManifestVersions();
-  await bundleServer();
 }
 
 if (process.argv[1] && __filename === path.resolve(process.argv[1])) {

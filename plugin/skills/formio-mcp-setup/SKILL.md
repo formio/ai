@@ -232,6 +232,12 @@ Some environments block the public npm registry — an air-gapped network, a loc
 
 If neither is possible, say so plainly rather than leaving the user with a configuration that cannot start.
 
+## When the formio-ai plugin's server does not start
+
+In Claude Code, the `formio-ai` plugin runs the server it carries rather than launching it through `npx`, and Claude Code installs that server's dependencies itself, from the plugin's lockfile, when the plugin is installed or updated. That install downloads straight from the public npm registry and does not read `.npmrc`, so on a network that reaches npm only through a private mirror it fails, and the plugin's skills arrive with no Form.io tools.
+
+If the plugin is installed and the tools are still missing, run Steps 2 to 5 for Claude Code exactly as you would without the plugin, writing the `.mcp.json` Step 2 previews. Its `npx` launch reads `.npmrc`, so it installs through the mirror; if `npx` cannot reach any registry either, the section above applies. Keep the plugin enabled — it still supplies the skills — and tell the user that if the plugin's own server later starts, they can delete the `.mcp.json` entry so the tools are not listed twice. Do not edit, patch, or install anything inside the installed plugin's directory: Claude Code replaces that directory on every update.
+
 ## Never work around missing tools
 
 If the user declines setup, or setup cannot complete, stop. Do **not** fall back to direct HTTP requests against a Form.io deployment, and do not write a throwaway script that makes them for you. The skills document the full REST surface, which makes hand-rolling requests tempting and wrong: it bypasses the guardrails the tools enforce, and it can write to a live deployment in ways nobody reviewed. Report what is blocking and let the user decide.

@@ -14,7 +14,7 @@ The plugin directory carries three manifests over one `skills/` tree and one `mc
 | --- | --- | --- |
 | `plugin.json` (Agent Plugins 1.0.0) | Codex/ChatGPT, Kiro, VS Code | `skills/`, `mcp.json` |
 | `.cursor-plugin/plugin.json` | Cursor | `skills/` and its own `mcpServers`; no install-time prompt |
-| `.claude-plugin/plugin.json` | Claude Code | `skills/` and its own `mcpServers`; no install-time prompt |
+| `.claude-plugin/plugin.json` | Claude Code | `skills/` and its own `mcpServers`, which runs the server under `server/` against dependencies Claude Code installs from `package-lock.json`; no install-time prompt |
 
 
 Installing without a plugin also works: `npx skills add formio/ai` installs `skills/` into any agent, and the bundled `formio-mcp-setup` skill connects the server on first use.
@@ -28,7 +28,7 @@ From inside Claude Code:
 /plugin install formio-ai@formio
 ```
 
-Claude Code prompts for `formio_base_url` on install; every client can set the project per directory afterwards with `project_set`. Then describe what you want — the agent picks the right skill:
+Nothing is prompted on install; every client sets the project per directory with `project_set`. Claude Code installs the server's dependencies from the plugin's `package-lock.json` straight from the public npm registry, without reading `.npmrc` — on a network that reaches npm only through a private mirror, connect the server with the `formio-mcp-setup` skill's `npx` configuration instead. Then describe what you want — the agent picks the right skill:
 
 - *Plan a model* → "Plan the resources for a help desk with tickets, agents, and SLA tiers."
 - *Build a whole app* → "Build me a task manager where users only see tasks in projects they belong to."

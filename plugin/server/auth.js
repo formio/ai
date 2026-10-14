@@ -1,0 +1,350 @@
+import { randomBytes, timingSafeEqual } from 'node:crypto';
+import express from 'express';
+import { browserlessReason, currentBrowserEnvironment } from './browser-availability.js';
+import { openInBrowser } from './browser-launch.js';
+import { formioRawFetch } from './formio-client.js';
+import { ToolError } from './tool-errors.js';
+const DEFAULT_AUTH_HOST = '127.0.0.1';
+// A login that cannot complete — no browser, or none before the timeout — leaves the
+// call without a credential: AUTH_REQUIRED, with the message saying which and its remedy.
+function loginFailed(message) {
+    return new ToolError({ code: 'AUTH_REQUIRED', message });
+}
+/**
+ * A login form that could not be resolved keeps the code of what went wrong — a
+ * deployment that did not answer is NETWORK_ERROR, not a missing credential — and
+ * anything that is not a ToolError is INTERNAL.
+ */
+export function loginFormFailed(error) {
+    const reason = error instanceof Error ? error.message : String(error);
+    return new ToolError({
+        code: error instanceof ToolError ? error.code : 'INTERNAL',
+        message: `Could not resolve the Form.io login form: ${reason}`,
+        cause: error,
+    });
+}
+// Generous on purpose. The point of the timeout is to stop an unattended hang
+// from lasting forever, not to hurry an interactive login — an SSO redirect, a
+// 2FA prompt or a password-manager detour can all take minutes. Anyone actually
+// signing in will finish well inside this.
+const DEFAULT_AUTH_TIMEOUT_MS = 15 * 60 * 1000;
+/**
+ * Every CDN asset the login page loads, with the Subresource Integrity digest of
+ * the exact bytes each URL is expected to serve. This page handles the user's
+ * portal credentials, so a third-party script on it is pinned twice: to a version
+ * (jsDelivr serves that release forever) and to a hash (the browser refuses the
+ * file if the bytes differ).
+ *
+ * The digests are data, not decoration — nothing here recomputes them at run time,
+ * and no test can tell a correct hash from a plausible one by looking. A wrong or
+ * stale digest costs the whole login flow: the browser blocks the renderer,
+ * `Formio.createForm` throws `ReferenceError: Formio is not defined`, nothing is
+ * ever POSTed to /callback, and `authenticate` hangs on a blank page until it
+ * times out. So the pairs live in one list with one job — `pnpm sync:sri` fetches
+ * each URL, digests what it gets, and rewrites this list when a bump changes it;
+ * `pnpm sync:sri --check` verifies it, and login-asset-integrity.test.ts runs that
+ * check whenever the network is reachable.
+ *
+ * The Open Sans stylesheet is deliberately absent. Google Fonts serves
+ * per-browser CSS, so its bytes vary by request and no fixed digest can match;
+ * it also carries no script and only chooses a typeface.
+ */
+export const LOGIN_PAGE_ASSETS = {
+    bootstrapCss: {
+        url: 'https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/css/bootstrap.min.css',
+        integrity: 'sha384-sRIl4kxILFvY47J16cr9ZwB07vP4J8+LH7qKQnuqkuIAvNWLzeN8tE5YBujZqJLB',
+    },
+    bootstrapIconsCss: {
+        url: 'https://cdn.jsdelivr.net/npm/bootstrap-icons@1.13.1/font/bootstrap-icons.css',
+        integrity: 'sha384-Bk5cbLkZQ5raZ0+H2/+VbfYx3WpvxvQK4zqXZr7sYODuaX7bKXoSOnipQxkaS8sv',
+    },
+    formioCss: {
+        url: 'https://cdn.jsdelivr.net/npm/@formio/js@5.6.1/dist/formio.form.min.css',
+        integrity: 'sha384-CDJBIuRSWFUjn67g4RLBnTRWt0v/jq5zmdffuJwNAcr1gu1w5usg4kgSb7YwOdoT',
+    },
+    formioJs: {
+        url: 'https://cdn.jsdelivr.net/npm/@formio/js@5.6.1/dist/formio.form.min.js',
+        integrity: 'sha384-02IWn2JDOme2EHjjVyKXaq/GEA9QTvhupMICCjJpSUDP9DrL8ON8Zpw3U2JGPn+U',
+    },
+};
+function styleTag(asset) {
+    return `<link rel="stylesheet" href="${asset.url}" integrity="${asset.integrity}" crossorigin="anonymous">`;
+}
+function scriptTag(asset) {
+    return `<script src="${asset.url}" integrity="${asset.integrity}" crossorigin="anonymous"></script>`;
+}
+// A string as a script literal: its JSON form, with `<` escaped so the value cannot
+// close the script element it sits in. Any character the value carries stays part
+// of the string.
+function scriptString(value) {
+    return JSON.stringify(value).replace(/</g, '\\u003c');
+}
+function buildLoginPage({ loginFormUrl, state }) {
+    const domain = new URL(loginFormUrl).hostname;
+    return `<!DOCTYPE html>
+<html>
+<head>
+<title>Form.IO Login</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Open+Sans:400,400italic,700">
+${styleTag(LOGIN_PAGE_ASSETS.bootstrapCss)}
+${styleTag(LOGIN_PAGE_ASSETS.bootstrapIconsCss)}
+${styleTag(LOGIN_PAGE_ASSETS.formioCss)}
+<style>
+  body { font-family: 'Open Sans', 'Helvetica Neue', Helvetica, Arial, sans-serif; background: #fff; margin: 0; padding: 2rem 1rem; color: #333; }
+  .logo-wrap { text-align: center; margin-bottom: 1rem; }
+  .logo-wrap img { max-width: 300px; height: auto; }
+  .page-title { text-align: center; margin-bottom: 2rem; font-weight: 300; color: #333; }
+  .auth-card { max-width: 480px; margin: 0 auto; background: #fff; padding: 2rem; border: 1px solid #e5e5e5; border-radius: 4px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
+  .auth-title { text-align: center; margin-bottom: 1.5rem; font-size: 1.1rem; letter-spacing: 0.5px; color: #555; }
+  .btn-primary, .btn-success { background-color: #67b346; border-color: #67b346; }
+  .btn-primary:hover, .btn-success:hover { background-color: #57a036; border-color: #57a036; }
+  #status { text-align: center; margin-top: 1rem; color: #666; font-size: 0.9rem; }
+</style>
+</head>
+<body>
+<div class="logo-wrap">
+  <img src="https://portal.form.io/template/images/formio-logo-with-slogan.png" alt="Form.io">
+</div>
+<h2 class="page-title">Logging in to ${domain}</h2>
+<div class="auth-card">
+  <h4 class="auth-title">RETURNING USER LOGIN</h4>
+  <div id="formio"></div>
+  <div id="status"></div>
+</div>
+${scriptTag(LOGIN_PAGE_ASSETS.formioJs)}
+<script>
+var statusEl = document.getElementById('status');
+var state = ${scriptString(state)};
+Formio.createForm(document.getElementById('formio'), ${scriptString(loginFormUrl)}).then(function(form) {
+  // Suppress only Formio's default success alert (to avoid a UI flash); keep login error alerts intact.
+  const baseSetAlert = form.setAlert.bind(form);
+  form.setAlert = function(type, message, options) {
+    if (type === 'success') return;
+    return baseSetAlert(type, message, options);
+  };
+  form.on('submit', function(submission) {
+    var token = Formio.getToken();
+    statusEl.innerHTML = token ? 'Token captured, completing login...' : 'Error: No token received from Form.io SDK';
+    if (!token) return;
+    fetch('/callback', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ token: token, state: state })
+    }).then(function() {
+      document.querySelector('.auth-card').innerHTML =
+        '<div class="alert alert-success text-center mb-0" role="alert">' +
+        '<i class="bi bi-check-circle-fill me-2"></i>Login successful. You may close this window.' +
+        '</div>';
+    }).catch(function(err) {
+      statusEl.innerHTML = 'Error sending token: ' + err.message;
+    });
+  });
+}).catch(function(err) {
+  statusEl.innerHTML = 'Error loading form: ' + err.message;
+});
+</script>
+</body>
+</html>`;
+}
+const LOGIN_FORM_PROBE_TIMEOUT_MS = 1500;
+const resolvedLoginFormCache = new Map();
+function loginFormCacheKey(config) {
+    return `${config.baseUrl ?? ''}|${config.projectUrl}`;
+}
+export function resetLoginFormCache() {
+    resolvedLoginFormCache.clear();
+}
+async function checkLoginForm(loginFormUrl, config) {
+    const url = new URL(loginFormUrl);
+    url.searchParams.set('select', '_id');
+    const loginForm = await formioRawFetch(url, config, {
+        timeoutMs: LOGIN_FORM_PROBE_TIMEOUT_MS,
+    }).catch(() => null);
+    return loginForm?._id ? true : false;
+}
+// Exported for the same reason `resetLoginFormCache` is: the URL this returns is the
+// page a user types credentials into, and which host it names is the difference
+// between logging in to their deployment and logging in to one they do not use.
+// Reaching it through `authenticate` means standing up a local server and a browser
+// launch, so the one behaviour worth pinning would go untested.
+export async function resolveDefaultLoginFormUrl(config) {
+    const cacheKey = loginFormCacheKey(config);
+    const cached = resolvedLoginFormCache.get(cacheKey);
+    if (cached) {
+        return cached;
+    }
+    const candidates = [];
+    if (config.baseUrl) {
+        candidates.push(`${config.baseUrl}/formio/user/login`);
+    }
+    candidates.push(`${config.projectUrl}/admin/login`);
+    candidates.push(`${config.projectUrl}/user/login`);
+    for (const candidate of candidates) {
+        if (await checkLoginForm(candidate, config)) {
+            resolvedLoginFormCache.set(cacheKey, candidate);
+            return candidate;
+        }
+    }
+    return candidates[0];
+}
+// Checked before anything is bound or launched: on a host with no browser the
+// login can never complete, and the whole login timeout would be spent
+// discovering that.
+// The API-key half of every "no browser" remedy. A key the resolver withheld for this
+// project is not missing, so asking for one would send the user after a value they
+// already have; the reason it was withheld is the remedy instead.
+function apiKeyRemedy(config) {
+    return config.apiKeyNotApplied
+        ? `${config.apiKeyNotApplied} `
+        : `Set FORMIO_API_KEY beside FORMIO_PROJECT_URL to authenticate without a browser. `;
+}
+function assertBrowserAvailable(config) {
+    if (config.forceBrowser) {
+        return;
+    }
+    // Configuring both a host and a port is the user saying the login page is
+    // reachable from their machine. Ignoring that would make the remedy this very
+    // error recommends return the identical error — and would newly block
+    // devcontainer and Codespaces users whose ports are forwarded.
+    const publishedLoginEndpoint = Boolean(config.authHost && config.authPort);
+    const reason = browserlessReason(currentBrowserEnvironment(), { publishedLoginEndpoint });
+    if (!reason) {
+        return;
+    }
+    throw loginFailed(`Cannot complete the Form.io browser login: ${reason}. ` +
+        apiKeyRemedy(config) +
+        `If the host running your browser can reach this machine, set both FORMIO_AUTH_HOST=0.0.0.0 and ` +
+        `FORMIO_AUTH_PORT to a published port so the login page is reachable from it. ` +
+        `Set FORMIO_FORCE_BROWSER=1 to attempt the browser login anyway.`);
+}
+// What `GET /` answers when the request does not carry this login's value. It names
+// where to find the right URL and nothing about the value itself.
+const LOGIN_PAGE_REFUSED = `<!DOCTYPE html>
+<html>
+<head><title>Form.IO Login</title></head>
+<body>
+<p>This page answers only the login URL the Form.io MCP server opened and printed for this sign-in. Open that URL to sign in.</p>
+</body>
+</html>`;
+/** A new value for one login: 128 random bits, as hex. */
+function newLoginState() {
+    return randomBytes(16).toString('hex');
+}
+// Whether a request carries this login's value — the `s` query parameter of the login
+// URL, or the `state` the page posts back. Lengths are compared first, since
+// timingSafeEqual accepts only buffers of equal length. A repeated parameter arrives
+// as an array and is not a match.
+function carriesState(expected, received) {
+    if (typeof received !== 'string') {
+        return false;
+    }
+    const want = Buffer.from(expected);
+    const got = Buffer.from(received);
+    return want.length === got.length && timingSafeEqual(want, got);
+}
+export async function authenticate(config, options) {
+    assertBrowserAvailable(config);
+    const app = express();
+    app.use(express.json());
+    // This login's value. It travels in the login URL the server opens and prints, so
+    // only that URL loads the page — whatever host name and port it reaches the server
+    // under, as a forwarded port does — and the page posts it back with the token.
+    const state = newLoginState();
+    let resolveJwt;
+    let rejectJwt;
+    const jwtPromise = new Promise((resolve, reject) => {
+        resolveJwt = resolve;
+        rejectJwt = reject;
+    });
+    app.get('/', async (req, res) => {
+        // Any other request is answered without the page, and the login keeps waiting.
+        if (!carriesState(state, req.query.s)) {
+            res.status(403).send(LOGIN_PAGE_REFUSED);
+            return;
+        }
+        try {
+            const loginFormUrl = config.loginFormUrl ?? (await resolveDefaultLoginFormUrl(config));
+            res.send(buildLoginPage({ loginFormUrl, state }));
+        }
+        catch (err) {
+            const message = err instanceof Error ? err.message : String(err);
+            res.status(500).send(`Login form resolution failed: ${message}`);
+            rejectJwt(loginFormFailed(err));
+        }
+    });
+    app.post('/callback', (req, res) => {
+        // Express 5 leaves `req.body` undefined when no parser matched the request's
+        // content type, so a POST that is not JSON arrives with no body at all.
+        const body = req.body;
+        // Only the page this login served knows its value; any other post is refused
+        // and the login keeps waiting for that page.
+        if (!carriesState(state, body?.state)) {
+            process.stderr.write("Auth callback refused: the post did not carry this login's value\n");
+            res.status(403).send('This post is not from the login page this server served');
+            return;
+        }
+        const token = body?.token;
+        if (typeof token !== 'string' || !token) {
+            process.stderr.write('Auth callback received but token is empty\n');
+            res.status(400).send('No token received');
+            return;
+        }
+        process.stderr.write('Auth callback received token successfully\n');
+        res.send('Login successful. You can close this tab.');
+        resolveJwt(token);
+    });
+    const host = config.authHost ?? DEFAULT_AUTH_HOST;
+    // Captured so the timeout error can name it. stderr reaches logs, but the
+    // error reaches the user, and the URL is the one thing they need.
+    let loginUrl;
+    const server = app.listen(config.authPort ?? 0, host, (err) => {
+        // Express 5 passes a bind failure here rather than raising it on the server.
+        // A fixed FORMIO_AUTH_PORT that is already taken is the usual one; ignoring
+        // it would leave the caller waiting out the whole login timeout.
+        if (err) {
+            // Not a credential problem: the server could not start, so the cause is named.
+            rejectJwt(new ToolError({
+                code: 'INTERNAL',
+                message: `Could not start the Form.io login server on ${host}:${config.authPort ?? 0}: ${err.message}. ` +
+                    `Free that port, or set FORMIO_AUTH_PORT to one that is available.`,
+                cause: err,
+            }));
+            return;
+        }
+        const addr = server.address();
+        if (addr && typeof addr !== 'string') {
+            const port = addr.port;
+            // A wildcard bind is not a usable address to visit, so advertise loopback.
+            const reachableHost = host === '0.0.0.0' || host === '::' ? '127.0.0.1' : host;
+            const url = `http://${reachableHost}:${port}/?s=${state}`;
+            loginUrl = url;
+            // Always print the URL. It is the only recourse where no browser can be
+            // launched — a container, an SSH session, CI — and without it the user has
+            // no way to reach the login page.
+            process.stderr.write(`Form.io login required: ${url}\n`);
+            openInBrowser(url, (err) => {
+                process.stderr.write(`Could not open a browser automatically (${err.message}). ` +
+                    `Open ${url} manually to finish signing in.\n`);
+            });
+            options?.onReady?.({ port, url });
+        }
+    });
+    const timeoutMs = config.authTimeoutMs ?? DEFAULT_AUTH_TIMEOUT_MS;
+    const timer = setTimeout(() => {
+        rejectJwt(loginFailed(`Timed out after ${Math.round(timeoutMs / 1000)}s waiting for the Form.io login to complete. ` +
+            (loginUrl ? `Open ${loginUrl} to sign in, then retry. ` : '') +
+            `If this environment has no browser — a container, a remote shell, or CI: ` +
+            apiKeyRemedy(config) +
+            `Or set FORMIO_AUTH_HOST=0.0.0.0 and FORMIO_AUTH_PORT to a published port so the login ` +
+            `page is reachable from your machine.`));
+    }, timeoutMs);
+    // Do not hold the event loop open on this timer alone.
+    timer.unref();
+    try {
+        return await jwtPromise;
+    }
+    finally {
+        clearTimeout(timer);
+        server.close();
+    }
+}

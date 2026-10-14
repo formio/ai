@@ -83,9 +83,13 @@ describe('the CLI plugin manifests prompt for nothing', () => {
     }
   });
 
-  it('references no placeholder at all', () => {
+  // The Claude manifest names its own install directory to launch the committed
+  // server; that locates a file, it supplies no value.
+  it('references no placeholder but the plugin root', () => {
     for (const file of CLI_MANIFESTS) {
-      const placeholders = [...read(file).matchAll(/\$\{([A-Z_a-z.]+)\}/g)].map((m) => m[1]);
+      const placeholders = [...read(file).matchAll(/\$\{([A-Z_a-z.]+)\}/g)]
+        .map((m) => m[1])
+        .filter((name) => name !== 'CLAUDE_PLUGIN_ROOT');
 
       expect(placeholders, file).toEqual([]);
     }

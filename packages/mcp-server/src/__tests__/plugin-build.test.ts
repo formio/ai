@@ -1,12 +1,13 @@
 import { execSync, spawnSync } from 'node:child_process';
 import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import { beforeAll, describe, expect, it } from 'vitest';
 
 const REPO_ROOT = path.resolve(__dirname, '../../../..');
 const DIST_PLUGIN = path.join(REPO_ROOT, 'dist/plugin');
 const PLUGIN_JSON = path.join(DIST_PLUGIN, '.claude-plugin/plugin.json');
-const SERVER_BUNDLE = path.join(DIST_PLUGIN, 'server/stdio.mjs');
+const VENDORED_SERVER = path.join(DIST_PLUGIN, 'server/stdio.js');
 const SKILLS_DIR = path.join(DIST_PLUGIN, 'skills');
 const PLUGIN_SRC_README = path.join(REPO_ROOT, 'plugin/README.md');
 const DIST_README = path.join(DIST_PLUGIN, 'README.md');
@@ -22,6 +23,21 @@ const REQUIRED_ENV_VARS = [
 
 function runBuild() {
   execSync('pnpm build:plugin', { cwd: REPO_ROOT, stdio: 'pipe' });
+}
+
+// The vendored server needs its dependencies, which Claude Code installs from the
+// lockfile. One install, the way Claude Code does it, serves every spawn here.
+let installed: string | undefined;
+function installedCopy(): string {
+  if (!installed) {
+    installed = fs.mkdtempSync(path.join(os.tmpdir(), 'plugin-build-installed-'));
+    fs.cpSync(DIST_PLUGIN, installed, { recursive: true });
+    execSync('npm ci --ignore-scripts --no-audit --no-fund --prefer-offline', {
+      cwd: installed,
+      stdio: 'pipe',
+    });
+  }
+  return installed;
 }
 
 function runSmokeTest(): { status: number; stdout: string; stderr: string } {
@@ -58,13 +74,24 @@ describe('pnpm build:plugin', () => {
     }
   });
 
-  it('1.2 writes dist/plugin/server/stdio.mjs that parses as valid JavaScript', () => {
-    expect(fs.existsSync(SERVER_BUNDLE)).toBe(true);
-    const source = fs.readFileSync(SERVER_BUNDLE, 'utf8');
-    expect(source.length).toBeGreaterThan(0);
+  // The Claude manifest runs the committed server against dependencies Claude
+  // Code installs from the lockfile, so the build ships both and bundles nothing.
+  it('1.2 copies the vendored server and its lockfile, and writes no bundle', () => {
+    expect(fs.existsSync(VENDORED_SERVER)).toBe(true);
     expect(() =>
-      execSync(`node --check ${JSON.stringify(SERVER_BUNDLE)}`, { stdio: 'pipe' })
+      execSync(`node --check ${JSON.stringify(VENDORED_SERVER)}`, { stdio: 'pipe' })
     ).not.toThrow();
+    expect(fs.existsSync(path.join(DIST_PLUGIN, 'package-lock.json'))).toBe(true);
+    expect(fs.existsSync(path.join(DIST_PLUGIN, 'server/stdio.mjs'))).toBe(false);
+    expect(fs.existsSync(path.join(DIST_PLUGIN, 'node_modules'))).toBe(false);
+  });
+
+  // A drifted copy would ship a server other than this commit's. Asserted on the
+  // script rather than by editing plugin/server/, which every other suite reads.
+  it('1.2b refuses to build a plugin whose vendored server has drifted', () => {
+    const script = fs.readFileSync(path.join(REPO_ROOT, 'scripts/build-plugin.ts'), 'utf8');
+
+    expect(script).toMatch(/sync:plugin-server['"],\s*['"]--check/);
   });
 
   it('1.3 includes formio-api/, formio-schema/, formio-form/, and formio-form-builder/ but excludes openspec-* and tdd-* skills', () => {
@@ -135,7 +162,7 @@ describe('pnpm build:plugin', () => {
       },
     })}\n${JSON.stringify({ jsonrpc: '2.0', id: 2, method: 'tools/list' })}\n`;
 
-    const result = spawnSync('node', [SERVER_BUNDLE], {
+    const result = spawnSync('node', [path.join(installedCopy(), 'server/stdio.js')], {
       input: request,
       encoding: 'utf8',
       env: {
@@ -149,9 +176,9 @@ describe('pnpm build:plugin', () => {
     expect(result.stdout).toContain('form_list');
   }, 60_000);
 
-  // The bundle sits beside plugin/package.json — @formio/ai's manifest, not the
-  // server's — so a version read from the nearest package.json at run time is the
-  // plugin's. The server's own version is written in at build time instead.
+  // The vendored server sits beside plugin/package.json — @formio/ai's manifest,
+  // not the server's — so a version read from the nearest package.json at run time
+  // would be the plugin's. The server's own version is a stamped module instead.
   it('1.13 reports the @formio/mcp package version from server_status', () => {
     const { version } = JSON.parse(
       fs.readFileSync(path.join(REPO_ROOT, 'packages/mcp-server/package.json'), 'utf8')
@@ -177,7 +204,7 @@ describe('pnpm build:plugin', () => {
       '',
     ].join('\n');
 
-    const result = spawnSync('node', [SERVER_BUNDLE], {
+    const result = spawnSync('node', [path.join(installedCopy(), 'server/stdio.js')], {
       input: request,
       encoding: 'utf8',
       env: { PATH: process.env.PATH, HOME: process.env.HOME } as NodeJS.ProcessEnv,
@@ -300,15 +327,15 @@ describe('plugin/package.json files list', () => {
     }
   });
 
-  // Every manifest launches `npx -y @formio/mcp`, so the bundled server file is
-  // dead weight in the tarball — and shipping it invites the reading that an
-  // install runs it. The build still writes it for the smoke test.
-  it('4.5c ships no server bundle no manifest launches', () => {
+  // The Claude manifest launches the committed server against dependencies
+  // installed from the lockfile, so a package installed from npm needs both.
+  it('4.5c ships the vendored server and the lockfile it installs from', () => {
     const { files } = JSON.parse(
       fs.readFileSync(path.join(REPO_ROOT, 'plugin/package.json'), 'utf8')
     ) as { files: string[] };
 
-    expect(files).not.toContain('server');
+    expect(files).toContain('server');
+    expect(files).toContain('package-lock.json');
   });
 
   // `files` is a closed list, so the changelog only reaches npm by being named.
@@ -342,11 +369,13 @@ describe('pnpm test:plugin — smoke test', () => {
       expect(status).toBe(0);
     }, 60_000);
 
-    it('3.2 exercises tools/list against the bundled MCP server and exits 0', () => {
+    it('3.2 installs from the lockfile, then exercises tools/list against the vendored server', () => {
       const { status, stdout } = runSmokeTest();
       expect(status).toBe(0);
+      expect(stdout).toMatch(/installed \d+ locked packages/);
       expect(stdout).toMatch(/tools\/list|tools-list|tools list/i);
-    }, 60_000);
+      expect(stdout).toMatch(/reports @formio\/mcp \d+\.\d+\.\d+/);
+    }, 120_000);
 
     it('3.5 validates every manifest and exits non-zero when one is missing', () => {
       const target = path.join(DIST_PLUGIN, 'mcp.json');
