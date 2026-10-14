@@ -94,12 +94,14 @@ describe('the published file list matches the tree', () => {
   });
 
   it('publishes nothing that is absent from the source tree', () => {
-    // `server` is produced by the build rather than committed, so it is the one
-    // entry legitimately absent from plugin/ before a build runs.
-    const missing = packageJson()
-      .files.filter((entry) => entry !== 'server')
-      .filter((entry) => !existsSync(join(pluginRoot, entry)));
+    const missing = packageJson().files.filter((entry) => !existsSync(join(pluginRoot, entry)));
 
     expect(missing).toEqual([]);
+  });
+
+  // The Claude Code manifest launches the committed server against dependencies
+  // installed from the lockfile, so the published package carries both.
+  it('publishes the vendored server and its lockfile', () => {
+    expect(packageJson().files).toEqual(expect.arrayContaining(['server', 'package-lock.json']));
   });
 });

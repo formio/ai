@@ -1,0 +1,45 @@
+import { z } from 'zod';
+import { formioFetch, isMongoId } from '../formio-client.js';
+import { toMcpStructuredResult, toMcpError } from '../mcp-responses.js';
+import { formDocument } from '../output-schemas.js';
+import { reads } from '../tool-annotations.js';
+import { cwdSchema } from '../project-resolver.js';
+import { resolveToolConfig } from './project-resolution.js';
+import { noDraft } from '../revisions/index.js';
+import { projectPathArgument } from './path-arguments.js';
+export function registerFormGetTool(server, config) {
+    server.registerTool('form_get', {
+        description: 'Fetch a form definition, by _id or path, from the project `cwd` resolves to. `draft: true` fetches its in-flight draft instead of the published form.',
+        inputSchema: z.strictObject({
+            cwd: cwdSchema,
+            formIdOrPath: projectPathArgument('formIdOrPath').describe('Form ID (_id) or path (e.g. "user/login")'),
+            select: z
+                .string()
+                .optional()
+                .describe('Comma-separated fields to return (omit for full form JSON)'),
+            draft: z
+                .boolean()
+                .optional()
+                .describe("When true, fetch the form's current draft (GET /<form>/draft)"),
+        }),
+        outputSchema: formDocument,
+        annotations: reads('Get a form'),
+    }, async ({ cwd, formIdOrPath, select, draft }) => {
+        try {
+            const cfg = await resolveToolConfig({ server, cwd, config });
+            const params = { select };
+            const base = isMongoId(formIdOrPath) ? `form/${formIdOrPath}` : formIdOrPath;
+            const path = draft ? `${base}/draft` : base;
+            const form = (await formioFetch(path, params, cfg));
+            // GET /draft falls back to the live form when no draft exists, so
+            // distinguish by _vid: only the draft revision has _vid === 'draft'.
+            if (draft && form._vid !== 'draft') {
+                throw noDraft(formIdOrPath);
+            }
+            return toMcpStructuredResult(form);
+        }
+        catch (error) {
+            return toMcpError(error);
+        }
+    });
+}

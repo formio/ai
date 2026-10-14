@@ -82,10 +82,10 @@ Adding a framework is a row: no edit to the orchestrator's `SKILL.md`, `INTENT.m
 ```sh
 pnpm build:plugin         # build the plugin bundle into dist/plugin/
 pnpm test:plugin          # verify the bundle
-pnpm build:plugin:local   # dist/plugin-local/: the same plugin, launching its own bundled server
+pnpm build:plugin:local   # dist/plugin-local/: the same plugin, every client launching its own server
 ```
 
-To try this commit's skills and server together in a real session, build the local copy and load it from any folder outside this repository: `claude --plugin-dir <repo>/dist/plugin-local`. Its manifests launch `dist/plugin-local/server/stdio.mjs` — the server built from this commit, with Node's `--use-system-ca` where supported — instead of the published `npx @formio/mcp@<version>`, so unreleased tools are there. Disable an installed `formio-ai` plugin for that session, or you load the skills and the `formio-mcp` server twice. `dist/plugin` itself is unchanged and is still what `pnpm test:plugin` verifies.
+To try this commit's skills and server together in a real session, build the local copy and load it from any folder outside this repository: `claude --plugin-dir <repo>/dist/plugin-local`. Its manifests all launch `dist/plugin-local/server/stdio.js` — the server compiled from this commit, with Node's `--use-system-ca` where supported — and the script installs that server's locked dependencies there, because Claude Code skips its dependency install for a plugin loaded in place. Disable an installed `formio-ai` plugin for that session, or you load the skills and the `formio-mcp` server twice. `dist/plugin` itself is unchanged and is still what `pnpm test:plugin` verifies.
 
 `examples/` ships copy-paste prompts for exercising the skills library end to end (see `examples/README.md`); the `.claude/skills/` symlinks at the repo root load the live `plugin/skills/` sources, so a fresh Claude Code session here tests uncommitted skill changes directly.
 
@@ -112,11 +112,12 @@ pnpm changeset
 
 Pick the bump level and describe the change. On merge to `main`, the release workflow opens/updates a "Version Packages" PR; merging that PR publishes to npm.
 
-Three steps run inside `pnpm changeset:version` — which is what the release workflow invokes to build the Version Packages PR — so that PR carries their output and merging it is the only action needed:
+Four steps run inside `pnpm changeset:version` — which is what the release workflow invokes to build the Version Packages PR — so that PR carries their output and merging it is the only action needed:
 
 1. `pnpm changeset:follow` adds a patch changeset for `@formio/ai` when the pending release bumps `@formio/mcp` without it. The pins below live in files that ship inside the plugin, so a server-only release would otherwise change plugin content that never republishes, leaving the published plugin launching the previous server. The coupling is one-directional: a plugin-only release leaves the server alone.
 2. `pnpm sync:versions` writes `plugin/package.json`'s version into the three client manifests.
-3. `pnpm sync:pins` writes `packages/mcp-server/package.json`'s version — already bumped by `changeset version` at this point, so it is the version about to publish — into every launch of the server: the manifests' `npx` args, the install docs, and every skill that prints the command.
+3. `pnpm sync:pins` writes `packages/mcp-server/package.json`'s version — already bumped by `changeset version` at this point, so it is the version about to publish — into every `npx` launch of the server (the Cursor and Agent Plugins manifests, the install docs, and every skill that prints the command) and into `packages/mcp-server/src/version.ts`, the version the server reports.
+4. `pnpm sync:plugin-server` writes the server the Claude Code manifest runs: `plugin/server/` (the server's `tsc` output, compiled without source maps or declarations), the server's runtime dependencies into `plugin/package.json` at the exact versions `pnpm-lock.yaml` resolves, and `plugin/package-lock.json` — the full runtime closure read from `pnpm-lock.yaml`, each package with its registry URL and integrity hash, so the tree Claude Code installs is the one CI tested. It runs offline. Run it yourself after changing the server or its dependencies: `pnpm test` runs `pnpm sync:plugin-server --check`, and `pnpm build:plugin` refuses a drifted copy.
 
 Launches are pinned (`npx -y @formio/mcp@<version>`) rather than floating so an install runs the server the release was tested against instead of whatever the registry serves at that moment. Never hand-edit a pin or hand-write the follow-on changeset; the release PR is where both appear. `pnpm sync:pins --check` shows drift without writing, and `plugin-manifests.test.ts`, `plugin-follows-server.test.ts`, and `mcp-setup-project-config.test.ts` fail when either is stale.
 

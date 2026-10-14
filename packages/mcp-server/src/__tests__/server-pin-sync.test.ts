@@ -205,3 +205,45 @@ describe('sync:pins --check', () => {
     }
   }, 30_000);
 });
+
+// The server reports its version from a module sync:pins stamps, because every
+// form it ships in reads a different package.json — none in the .mcpb bundle,
+// @formio/ai's from inside the plugin — and a bundler define reached only the bundles.
+describe('the stamped version module', () => {
+  it('is one of the targets sync:pins owns', () => {
+    const result = spawnSync('pnpm', ['-s', 'sync:pins', '--list'], {
+      cwd: REPO_ROOT,
+      encoding: 'utf8',
+    });
+
+    expect(result.stdout.split('\n')).toContain('packages/mcp-server/src/version.ts');
+  }, 30_000);
+
+  it('fails --check naming a module that states another version, and writes nothing', () => {
+    const body = "export const SERVER_VERSION = '0.0.1';\n";
+    const file = scratch('version.ts', body);
+
+    try {
+      const { status, stdout } = sync(file, '--check');
+
+      expect(status).not.toBe(0);
+      expect(stdout).toContain('version.ts');
+      expect(fs.readFileSync(file, 'utf8')).toBe(body);
+    } finally {
+      fs.rmSync(path.dirname(file), { recursive: true, force: true });
+    }
+  }, 30_000);
+
+  it('restamps the module to the published version', () => {
+    const file = scratch('version.ts', "export const SERVER_VERSION = '0.0.1';\n");
+
+    try {
+      expect(sync(file).status).toBe(0);
+      expect(fs.readFileSync(file, 'utf8')).toBe(
+        `export const SERVER_VERSION = '${SERVER_VERSION}';\n`
+      );
+    } finally {
+      fs.rmSync(path.dirname(file), { recursive: true, force: true });
+    }
+  }, 30_000);
+});

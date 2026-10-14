@@ -249,9 +249,6 @@ async function bundleServer(version: string) {
     platform: 'node',
     format: 'esm',
     target: 'node22',
-    // The bundle carries no package.json, so the version it reports at initialize
-    // and in server_status is written in here (see cli-launch.ts).
-    define: { __FORMIO_MCP_VERSION__: JSON.stringify(version) },
     banner: {
       // Same shim as the plugin build: bundled CJS deps (express) need these globals
       // to resolve inside ESM output.

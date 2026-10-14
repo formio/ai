@@ -1,32 +1,9 @@
-import { readFileSync } from 'fs';
-import { createRequire } from 'module';
+// Stamped from package.json by `pnpm sync:pins`: clients show this in their
+// server list, and a hand-maintained literal drifts silently — it had been
+// reporting 0.1.0 since the first release.
+import { SERVER_VERSION } from './version.js';
 
-// Written in by esbuild's `define` when the server is bundled (the .mcpb and the
-// plugin): a bundle carries no package.json of its own, so a run-time read found
-// none in the .mcpb and reported 0.0.0, and in the plugin found @formio/ai's. The
-// `tsc` build leaves it undeclared, and `typeof` reads an undeclared name safely.
-declare const __FORMIO_MCP_VERSION__: string | undefined;
-
-// Read from package.json rather than repeating the version here: clients show
-// this in their server list, and a hand-maintained literal drifts silently —
-// it had been reporting 0.1.0 since the first release.
-function readPackageVersion(): string {
-  if (typeof __FORMIO_MCP_VERSION__ === 'string') {
-    return __FORMIO_MCP_VERSION__;
-  }
-  try {
-    const require = createRequire(import.meta.url);
-    const pkg = JSON.parse(readFileSync(require.resolve('../package.json'), 'utf-8')) as {
-      version?: string;
-    };
-    return pkg.version ?? '0.0.0';
-  } catch {
-    // Version reporting must never stop the server from starting.
-    return '0.0.0';
-  }
-}
-
-export const SERVER_VERSION = readPackageVersion();
+export { SERVER_VERSION };
 
 // The name this server reports at initialize and in server_status.
 export const SERVER_NAME = 'formio-mcp';

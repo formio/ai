@@ -1,0 +1,230 @@
+import { getAuthHeader } from './auth-header.js';
+import { ensureAuthenticated, invalidateJwtCache } from './ensure-auth.js';
+import { clearToken } from './token-cache.js';
+import { requireBaseUrl } from './project-resolver.js';
+import { checkCurrentUser } from './token-validation.js';
+import { FormioApiError, FormioNetworkError, FormioPermissionError, ToolError, } from './tool-errors.js';
+export const MONGO_ID_PATTERN = /^[0-9a-fA-F]{24}$/;
+export function isMongoId(value) {
+    return MONGO_ID_PATTERN.test(value);
+}
+/** How long a Form.io request may go unanswered, unless FORMIO_REQUEST_TIMEOUT says otherwise. */
+export const DEFAULT_REQUEST_TIMEOUT_MS = 60_000;
+/**
+ * The least `project_import` and `project_export` wait: a large template legitimately
+ * takes minutes, so FORMIO_REQUEST_TIMEOUT does not shorten these.
+ */
+const TEMPLATE_TRANSFER_TIMEOUT_MS = 300_000;
+/**
+ * How long a template transfer waits: TEMPLATE_TRANSFER_TIMEOUT_MS, or the configured
+ * request timeout when that is longer — so FORMIO_REQUEST_TIMEOUT can lengthen a
+ * transfer but never shorten one.
+ */
+export function templateTransferTimeoutMs(config) {
+    return Math.max(TEMPLATE_TRANSFER_TIMEOUT_MS, config.requestTimeoutMs ?? DEFAULT_REQUEST_TIMEOUT_MS);
+}
+// Form.io's index routes report the collection size as `{from}-{to}/{total}`, or
+// `*/{total}` for an empty page; a total of `*` means it is not known.
+function contentRangeTotal(header) {
+    const match = header?.trim().match(/^(?:items\s+)?(?:\d+-\d+|\*)\/(\d+)$/);
+    return match ? Number(match[1]) : undefined;
+}
+// A `skip` at or past the total is answered 416 with `*/{total}`: that is an empty
+// page past the end, not a failure. Any other error status stays an error.
+async function readPage(response, url) {
+    const total = contentRangeTotal(response.headers?.get('content-range'));
+    if (response.status === 416 && total !== undefined) {
+        return { data: [], total };
+    }
+    if (!response.ok) {
+        throw await apiError(response, url);
+    }
+    return { data: await response.json(), total };
+}
+async function readResponse({ response, url, options }) {
+    if (options?.withMeta) {
+        return readPage(response, url);
+    }
+    if (!response.ok) {
+        throw await apiError(response, url);
+    }
+    return options?.responseType === 'text' ? response.text() : response.json();
+}
+// Whether a body read was cut off by the request's own timeout: the abort rejects the
+// read with the timeout's TimeoutError. A caller's signal can carry a TimeoutError of
+// its own, and that abort keeps it.
+function isTimeoutAbort(error, signal) {
+    const callerAborted = signal?.aborted === true && signal.reason === error;
+    return error instanceof DOMException && error.name === 'TimeoutError' && !callerAborted;
+}
+// The timeout keeps running once the headers arrive, so it can cut off the body read
+// as well; that is reported exactly like a request that received no response.
+async function readInTime(request) {
+    try {
+        return await readResponse(request);
+    }
+    catch (error) {
+        if (isTimeoutAbort(error, request.options?.signal)) {
+            throw new FormioNetworkError({
+                url: request.url.toString(),
+                cause: error,
+                timeoutMs: request.timeoutMs,
+            });
+        }
+        throw error;
+    }
+}
+// A redirect is reported rather than followed: fetch would re-send the request, with
+// its x-jwt-token or x-token header, to wherever the Location header points.
+async function apiError(response, url) {
+    const location = response.status >= 300 && response.status < 400 ? response.headers?.get('location') : null;
+    return new FormioApiError({
+        status: response.status,
+        url: url.toString(),
+        body: await readBody(response),
+        location: location ?? undefined,
+    });
+}
+// The body explains the failure, but reading it can fail too (a dropped connection,
+// a stream already consumed); the status alone is still worth reporting then.
+async function readBody(response) {
+    try {
+        return await response.text();
+    }
+    catch {
+        return undefined;
+    }
+}
+function hostOf(raw) {
+    return raw && URL.canParse(raw) ? new URL(raw).host : undefined;
+}
+// Created on first use, so a server that never relaxes a certificate check never
+// loads undici, and every relaxed request shares one connection pool.
+let relaxedDispatcher;
+function getRelaxedDispatcher() {
+    relaxedDispatcher ??= import('undici').then(({ Agent }) => new Agent({ connect: { rejectUnauthorized: false } }));
+    return relaxedDispatcher;
+}
+/**
+ * The dispatcher a request is sent with: one that accepts a self-signed certificate
+ * when FORMIO_INSECURE_TLS is on and the request's host is the project URL's or the
+ * Base URL's host; otherwise none, and fetch verifies the certificate as usual.
+ */
+export async function selectDispatcher(url, scope) {
+    if (!scope?.insecureTls) {
+        return undefined;
+    }
+    const hosts = [hostOf(scope.projectUrl), hostOf(scope.baseUrl)];
+    return hosts.includes(url.host) ? getRelaxedDispatcher() : undefined;
+}
+/**
+ * `fetch`, with a request that received no response raised as a FormioNetworkError
+ * naming the cause and the URL — the one wrapper every Form.io request goes through,
+ * and so the one place every request is given a timeout. A caller's own `signal`
+ * still aborts it, and that abort keeps its own reason rather than reading as a
+ * timeout.
+ */
+export async function send(url, { timeoutMs = DEFAULT_REQUEST_TIMEOUT_MS, certificateScope, ...init }) {
+    const dispatcher = await selectDispatcher(url, certificateScope);
+    const timeout = AbortSignal.timeout(timeoutMs);
+    const signal = init.signal ? AbortSignal.any([init.signal, timeout]) : timeout;
+    try {
+        return await fetch(url, { ...init, signal, ...(dispatcher ? { dispatcher } : {}) });
+    }
+    catch (cause) {
+        const timedOut = timeout.aborted && signal.reason === timeout.reason;
+        throw new FormioNetworkError({
+            url: url.toString(),
+            cause,
+            ...(timedOut ? { timeoutMs } : {}),
+        });
+    }
+}
+function requestTimeoutMs(config, options) {
+    return options?.timeoutMs ?? config.requestTimeoutMs ?? DEFAULT_REQUEST_TIMEOUT_MS;
+}
+function buildFetchInit(config, options) {
+    const hasBody = options?.body !== undefined;
+    const headers = {
+        ...getAuthHeader(config),
+        ...(hasBody ? { 'Content-Type': 'application/json' } : {}),
+    };
+    const init = {
+        headers,
+        redirect: 'manual',
+        timeoutMs: requestTimeoutMs(config, options),
+        certificateScope: config,
+    };
+    if (options?.method) {
+        init.method = options.method;
+    }
+    if (hasBody) {
+        init.body = JSON.stringify(options.body);
+    }
+    if (options?.signal) {
+        init.signal = options.signal;
+    }
+    return init;
+}
+export async function formioRawFetch(url, config, options) {
+    const timeoutMs = requestTimeoutMs(config, options);
+    const response = await send(url, buildFetchInit(config, options));
+    if (response.status === 401 && config.jwt) {
+        // A jwt in hand means the auth path already ran, which means it already
+        // demanded a base URL — so this is a re-read of a resolved value, not a
+        // new requirement. Funnelled through the same guard rather than asserted,
+        // so an unreachable state raises the actionable error instead of keying
+        // the cache under "undefined".
+        const baseUrl = requireBaseUrl(config);
+        // Form.io also answers 401 to a signed-in account it refuses, so the token is
+        // checked before it is discarded: one /current still accepts is kept, and the
+        // refusal is reported rather than answered with a login that cannot change it.
+        const current = await checkCurrentUser({ ...config, baseUrl });
+        if (current.accepted) {
+            throw new FormioPermissionError({
+                url: url.toString(),
+                account: current.account,
+                body: await readBody(response),
+                baseUrl,
+            });
+        }
+        invalidateJwtCache(baseUrl);
+        await clearToken(baseUrl);
+        config.jwt = undefined;
+        await ensureAuthenticated(config);
+        return readInTime({
+            response: await send(url, buildFetchInit(config, options)),
+            url,
+            options,
+            timeoutMs,
+        });
+    }
+    return readInTime({ response, url, options, timeoutMs });
+}
+// Whether a built URL addresses the project: the same origin, and a path that IS
+// the project's path or continues it at a segment boundary — so a sibling project
+// sharing a prefix (`/myproject2` beside `/myproject`) is not under it.
+function isUnderProject(url, projectUrl) {
+    const prefix = projectUrl.pathname.replace(/\/+$/, '');
+    return (url.origin === projectUrl.origin &&
+        (url.pathname === prefix || url.pathname.startsWith(`${prefix}/`)));
+}
+export async function formioFetch(path, params, config, options) {
+    const base = config.projectUrl.replace(/\/*$/, '/');
+    const url = new URL(path.replace(/^\//, ''), base);
+    const entries = Object.entries(params).filter((entry) => entry[1] !== undefined);
+    for (const [key, value] of entries) {
+        url.searchParams.set(key, value);
+    }
+    // Checked before the auth gate, so a request that would leave the project never
+    // reaches a credential. The tool-argument rule refuses these values first and names
+    // the argument; this holds for every caller, including ones that bypass it.
+    if (!isUnderProject(url, new URL(base))) {
+        throw new ToolError({
+            code: 'INVALID_ARGUMENT',
+            message: `Refusing the Form.io request for path ${JSON.stringify(path)}: it resolves to ${url.origin}${url.pathname}, which is not under the Project URL ${config.projectUrl}. Every request addresses the project this directory resolves to.`,
+        });
+    }
+    await ensureAuthenticated(config);
+    return formioRawFetch(url, config, options);
+}

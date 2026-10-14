@@ -33,11 +33,14 @@ const SKILLS_ROOT = path.join(REPO_ROOT, 'plugin/skills');
 const FIXED_TARGETS = [
   'plugin/mcp.json',
   'plugin/.cursor-plugin/plugin.json',
-  'plugin/.claude-plugin/plugin.json',
+  // plugin/.claude-plugin/plugin.json is absent on purpose: it launches the server
+  // committed under plugin/server/, which `pnpm sync:plugin-server` keeps current.
   // No `mcpServers` block today, so nothing to stamp — listed so the day one is
   // added it is already covered rather than silently unpinned.
   'plugin/plugin.json',
   'server.json',
+  // The version the server reports at initialize and in server_status.
+  'packages/mcp-server/src/version.ts',
   'README.md',
   'plugin/README.md',
   'packages/mcp-server/README.md',
@@ -52,6 +55,12 @@ const FIXED_TARGETS = [
 // reach it.
 const REGISTRY_ENTRY = path.join(REPO_ROOT, 'server.json');
 const REGISTRY_VERSION_FIELD = /("version":\s*")[^"]*(")/g;
+
+// The stamped module the server reads its own version from (see version.ts). It
+// states the version rather than launching the package, so it gets a rewrite of
+// its own; the pattern matches only that declaration, so it is applied to every
+// target without touching anything else.
+const VERSION_MODULE_DECLARATION = /(export const SERVER_VERSION = ')[^']*(')/g;
 
 // A launch is a command that resolves the package at run time, or the package
 // string inside a manifest's args array. A prose mention of the package name —
@@ -131,9 +140,15 @@ function launchPinned(text: string, version: string): string {
   );
 }
 
-/** How one target names the server: a launch command, or the registry's version fields. */
+function moduleStamped(text: string, version: string): string {
+  return text.replace(VERSION_MODULE_DECLARATION, `$1${version}$2`);
+}
+
+/** How one target names the server: a launch command, the version module, or the registry's version fields. */
 function pinned(file: string, text: string, version: string): string {
-  return file === REGISTRY_ENTRY ? registryPinned(text, version) : launchPinned(text, version);
+  return file === REGISTRY_ENTRY
+    ? registryPinned(text, version)
+    : moduleStamped(launchPinned(text, version), version);
 }
 
 /** Files whose launches name a version other than the published one. */

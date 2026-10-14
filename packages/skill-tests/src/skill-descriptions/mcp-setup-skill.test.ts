@@ -174,6 +174,23 @@ describe('formio-mcp-setup skill', () => {
     expect(text).toMatch(/re-?ask|re-?issue|ask again|repeat your request/);
   });
 
+  // The Claude Code plugin runs a server it carries, whose dependencies Claude Code
+  // installs straight from the public npm registry without reading .npmrc. On a
+  // network that reaches npm only through a mirror that install fails, and the
+  // manual npx connection — which reads .npmrc — is the route that still works.
+  it('routes a Claude Code plugin whose server could not install to the npx connection', () => {
+    const text = body(setupSkillMd);
+    const start = text.search(/^## When the formio-ai plugin's server does not start$/m);
+    expect(start, 'section heading').toBeGreaterThan(-1);
+    const section = text.slice(start, text.indexOf('\n## ', start + 1)).toLowerCase();
+
+    expect(section).toContain('claude code');
+    expect(section).toMatch(/mirror/);
+    expect(section).toContain('.npmrc');
+    expect(section).toMatch(/npx/);
+    expect(section).toMatch(/do not edit|never edit/);
+  });
+
   it('offers a path where npx cannot reach the registry', () => {
     const text = body(setupSkillMd).toLowerCase();
 

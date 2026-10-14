@@ -268,17 +268,39 @@ describe('the Claude manifest and the marketplace source', () => {
     expect(entry?.source).toBe('./plugin');
   });
 
-  it('launches the published server with npx and prompts for nothing', () => {
+  // A pinned `npx` fixes the package but not its dependencies, which resolve at
+  // install time — a fresh install of 1.0.0 resolved 29 of its 98 packages to
+  // versions no test had run against. Claude Code installs a plugin's dependencies
+  // from the package.json and lockfile at its root, so the Claude manifest runs
+  // the server committed under plugin/server/ against the tree pnpm-lock.yaml
+  // records (see `pnpm sync:plugin-server`).
+  it('launches the committed server with node and prompts for nothing', () => {
     const manifest = readJson(CLAUDE_MANIFEST) as {
       mcpServers: Record<string, McpServer>;
       userConfig?: Record<string, unknown>;
     };
     const server = manifest.mcpServers['formio-mcp'];
 
-    expect(server.command).toBe('npx');
-    expect(server.args?.some((arg) => arg.startsWith('@formio/mcp@'))).toBe(true);
-    expect(server.env).toBeUndefined();
+    expect(server).toEqual({ command: 'node', args: ['${CLAUDE_PLUGIN_ROOT}/server/stdio.js'] });
+    expect(fs.existsSync(path.join(PLUGIN_SRC, 'server/stdio.js'))).toBe(true);
     expect(manifest.userConfig).toBeUndefined();
+  });
+
+  // The Anthropic plugin directory reads this for its listing: a square PNG of
+  // 512 to 2048 pixels a side, under 2 MB.
+  it('names a square PNG icon the directory accepts', () => {
+    const icon = (readJson(CLAUDE_MANIFEST) as { icon?: string }).icon ?? '';
+    const file = path.join(PLUGIN_SRC, icon);
+    const bytes = fs.readFileSync(file);
+    const width = bytes.readUInt32BE(16);
+    const height = bytes.readUInt32BE(20);
+
+    expect(icon).toBe('./assets/formio-logo.png');
+    expect(bytes.subarray(1, 4).toString('ascii')).toBe('PNG');
+    expect(width).toBe(height);
+    expect(width).toBeGreaterThanOrEqual(512);
+    expect(width).toBeLessThanOrEqual(2048);
+    expect(bytes.length).toBeLessThan(2 * 1024 * 1024);
   });
 
   // An unpinned `npx -y @formio/mcp` resolves whatever the registry serves at
@@ -301,10 +323,12 @@ describe('the Claude manifest and the marketplace source', () => {
   // idempotent, so a failed run is re-run rather than worked around. When it
   // stays broken, publishing the server is the fix, not unpinning the manifests;
   // formio-mcp-setup documents the E404 for anyone who installs inside the window.
+  // Every client but Claude Code performs no install from the plugin folder, so
+  // its manifest keeps the npx launch.
   it('launches the package pinned to the published server version', () => {
     const { version } = readJson(SERVER_PACKAGE_JSON) as { version: string };
 
-    for (const manifest of [MCP_MANIFEST, CURSOR_MANIFEST, CLAUDE_MANIFEST]) {
+    for (const manifest of [MCP_MANIFEST, CURSOR_MANIFEST]) {
       const servers = (readJson(manifest).mcpServers ?? {}) as Record<string, McpServer>;
 
       for (const [name, server] of Object.entries(servers)) {
@@ -332,8 +356,9 @@ describe('the Claude manifest and the marketplace source', () => {
   });
 
   // Every manifest reachable by a git clone must avoid build output: dist/ does
-  // not exist in a clone.
-  it('has no manifest launching an MCP server from a path inside the plugin', () => {
+  // not exist in a clone. A path into the plugin is fine only when it names a
+  // file the repository commits.
+  it('launches from inside the plugin only a committed file', () => {
     for (const manifest of [
       AGENT_PLUGIN_MANIFEST,
       CURSOR_MANIFEST,
@@ -342,10 +367,19 @@ describe('the Claude manifest and the marketplace source', () => {
     ]) {
       const servers = (readJson(manifest).mcpServers ?? {}) as Record<string, McpServer>;
       for (const [name, server] of Object.entries(servers)) {
-        const launch = [server.command ?? '', ...(server.args ?? [])].join(' ');
-        expect(launch, `${path.basename(manifest)} → ${name}`).not.toMatch(
-          /\$\{CLAUDE_PLUGIN_ROOT\}|\$\{PLUGIN_ROOT\}/
+        const paths = [server.command ?? '', ...(server.args ?? [])].flatMap((part) =>
+          [...part.matchAll(/\$\{(?:CLAUDE_)?PLUGIN_ROOT\}\/(\S+)/g)].map((match) => match[1])
         );
+        for (const rel of paths) {
+          const ignored = spawnSync('git', ['check-ignore', '-q', path.join('plugin', rel)], {
+            cwd: REPO_ROOT,
+          });
+          expect(
+            fs.existsSync(path.join(PLUGIN_SRC, rel)),
+            `${path.basename(manifest)} → ${name}`
+          ).toBe(true);
+          expect(ignored.status, `${rel} is ignored by git`).not.toBe(0);
+        }
       }
     }
   });
@@ -459,8 +493,8 @@ describe('the Claude manifest and the marketplace source', () => {
 describe('the @formio/mcp launch pin', () => {
   const serverVersion = () => (readJson(SERVER_PACKAGE_JSON) as { version: string }).version;
 
-  it('agrees with the published server version in every source manifest', () => {
-    for (const manifest of [MCP_MANIFEST, CURSOR_MANIFEST, CLAUDE_MANIFEST]) {
+  it('agrees with the published server version in every npx manifest', () => {
+    for (const manifest of [MCP_MANIFEST, CURSOR_MANIFEST]) {
       const servers = (readJson(manifest).mcpServers ?? {}) as Record<string, McpServer>;
 
       for (const [name, server] of Object.entries(servers)) {

@@ -8,10 +8,11 @@
     "name": "Form.io"
   },
   "homepage": "https://form.io",
+  "icon": "./assets/formio-logo.png",
   "mcpServers": {
     "formio-mcp": {
-      "command": "npx",
-      "args": ["-y", "@formio/mcp@1.0.0"]
+      "command": "node",
+      "args": ["${CLAUDE_PLUGIN_ROOT}/server/stdio.js"]
     }
   }
 }
