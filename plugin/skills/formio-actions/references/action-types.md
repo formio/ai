@@ -11,15 +11,14 @@
 3. [Role Assignment](#role-assignment)
 4. [Email](#email)
 5. [Webhook](#webhook)
-6. [Reset Password](#reset-password)
 
 ### Enterprise
 
-7. [OAuth](#oauth)
-8. [Group Assignment](#group-assignment)
-9. [LDAP Login](#ldap-login)
-10. [2FA Login](#2fa-login)
-11. [2FA Recovery Login](#2fa-recovery-login)
+6. [OAuth](#oauth)
+7. [Group Assignment](#group-assignment)
+8. [LDAP Login](#ldap-login)
+9. [2FA Login](#2fa-login)
+10. [2FA Recovery Login](#2fa-recovery-login)
 
 ---
 
@@ -304,52 +303,6 @@ Keep the scheme and host literal. A submitter controls every interpolated field 
 
 ---
 
-## Reset Password
-
-**Name:** `resetpass` | **Handler:** `before`+`after` | **Method:** `form`, `create`
-
-Implements a two-phase password reset flow using temporary JWT tokens.
-
-### Settings
-
-| Field | Key | Type | Required | Default | Description |
-| --- | --- | --- | --- | --- | --- |
-| Resources | `resources` | string[] | Yes | — | Resource forms containing user submissions |
-| Username Field | `username` | string | Yes | — | Component API key for username/email |
-| Password Field | `password` | string | Yes | — | Component API key for password |
-| Reset Link URL | `url` | string | Yes | — | Base URL for the reset page |
-| Transport | `transport` | string | Yes | — | Email transport |
-| From | `from` | string | No | Server default | Sender email |
-| Subject | `subject` | string | No | `You requested a password reset` | Email subject |
-| Message | `message` | string | No | Default template | Email body with `{{ resetlink }}` |
-| Button Label | `label` | string | No | `Email Reset Password Link` | Submit button text shown on the form |
-
-### Two-Phase Flow
-
-**Phase 1 — Request reset (user submits email):**
-
-1. The `before` + `form` handler modifies the form display: hides password field, shows only username, changes submit button label
-2. User submits their email/username
-3. Server looks up the user across configured resources
-4. Generates a temporary JWT (5-minute expiry) with `type: "resetpass"`
-5. Sends email with `{{ resetlink }}` expanded to `{url}?x-jwt-token={token}`
-
-**Phase 2 — Set new password (user clicks link):**
-
-1. The `before` + `form` handler modifies the form: hides username, shows password field
-2. User enters new password and submits
-3. Server validates the JWT token type is `"resetpass"`
-4. Encrypts the new password with bcrypt and saves
-5. Maximum password length: 200 characters (configurable)
-
-### Template Variables
-
-| Variable          | Description                                         |
-| ----------------- | --------------------------------------------------- |
-| `{{ resetlink }}` | Full URL with JWT token appended as query parameter |
-
----
-
 # Enterprise Action Types
 
 The following actions are available on enterprise Form.io servers.
@@ -493,4 +446,4 @@ Handles login with a 2FA recovery code when the user has lost access to their au
 
 ## Action types this reference does not cover
 
-Some Enterprise deployments expose action types beyond the eleven above — a server's catalog is dynamic, so `action_type_list` may return names documented nowhere here. Action types whose job is to copy submissions into an external system of record — a database, a spreadsheet, a third-party SaaS — are deliberately out of scope for this skill: configuring one is a server-administration task that needs credentials, a target schema, and grants belonging to whoever owns that system, not to a form-configuration flow. When a user asks for one, say it is not covered here and point them at their Form.io administrator or the Form.io documentation. Do not infer its settings from `action_type_get` output and configure it anyway.
+Some Enterprise deployments expose action types beyond the ten above — a server's catalog is dynamic, so `action_type_list` may return names documented nowhere here. Action types whose job is to copy submissions into an external system of record — a database, a spreadsheet, a third-party SaaS — are deliberately out of scope for this skill: configuring one is a server-administration task that needs credentials, a target schema, and grants belonging to whoever owns that system, not to a form-configuration flow. When a user asks for one, say it is not covered here and point them at their Form.io administrator or the Form.io documentation. Do not infer its settings from `action_type_get` output and configure it anyway.

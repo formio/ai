@@ -275,6 +275,10 @@ describe('preflight contract', () => {
   // workspace, so a framework-neutral extension stays with the orchestrator. formio-mcp-setup no longer
   // routes logging in to Form.io to formio-auth — the server opens that login on
   // the first tool call, and formio-auth is about an application's own users.
+  //
+  // Two entries moved when password reset left the Reset Password action for the
+  // email-token macro: formio-actions no longer claims reset-password actions, and
+  // formio-auth claims password reset beside its email-token auth.
   it('left every existing description byte-identical', () => {
     const before = JSON.parse(readFileSync(descriptionSnapshot, 'utf8')) as Record<string, string>;
     const now = Object.fromEntries(

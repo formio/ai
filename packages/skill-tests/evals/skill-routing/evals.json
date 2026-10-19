@@ -191,6 +191,13 @@
       "id": "unrelated-code",
       "prompt": "Refactor this Python function to use a list comprehension.",
       "expected_skill": "none"
+    },
+    {
+      "id": "password-reset-flow",
+      "prompt": "Add a forgot-password flow so users can reset their password from an emailed link.",
+      "context": "A web application already wired to a Form.io project that has a user resource and a login form.",
+      "expected_skill": "formio-auth",
+      "must_not": ["formio-actions"]
     }
   ]
 }

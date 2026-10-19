@@ -304,6 +304,10 @@
         {
           "type": "update_own",
           "roles": ["authenticated"]
+        },
+        {
+          "type": "self",
+          "roles": []
         }
       ]
     },

@@ -1,7 +1,7 @@
 ---
 name: formio-auth
 description: >-
-  Form.io authentication and authorization specialist — resource-backed login (Login plus Role Assignment Actions), role-based access control and group permissions, SSO via OIDC/OAuth/SAML/LDAP with provider role mapping, Token Swap, Custom JWT for Enterprise/on-prem (signed with `JWT_SECRET`), email-token (passwordless) auth, and JWT/session mechanics (the `x-jwt-token` header, `jti` Session ID, logout, 2FA, reCAPTCHA). Use when the user asks to configure how users authenticate — SSO, OIDC, OAuth, SAML, LDAP, Token Swap, Custom JWT, passwordless auth, JWT, sessions, roles, permissions, RBAC, group permissions, 2FA, or reCAPTCHA in Form.io. Not for: designing the resource map or data model (see `formio-resource-planner`); orchestrating an app build (see `formio-application`); adding a Login or Role Assignment Action to one form — per-form action settings, priorities, conditions (see `formio-actions`); REST endpoint lookups (see `formio-api`); wiring a login screen into Angular (see `formio-angular`).
+  Form.io authentication and authorization specialist — resource-backed login (Login plus Role Assignment Actions), role-based access control and group permissions, SSO via OIDC/OAuth/SAML/LDAP with provider role mapping, Token Swap, Custom JWT for Enterprise/on-prem, email-token auth (magic links, password reset), and JWT/session mechanics (the `x-jwt-token` header, `jti` Session ID, logout, 2FA, reCAPTCHA). Use when the user asks to configure how users authenticate — SSO, OIDC, OAuth, SAML, LDAP, Token Swap, Custom JWT, passwordless auth, password reset, JWT, sessions, roles, permissions, RBAC, group permissions, 2FA, or reCAPTCHA in Form.io. Not for: designing the resource map or data model (see `formio-resource-planner`); orchestrating an app build (see `formio-application`); adding a Login or Role Assignment Action to one form — per-form action settings, priorities, conditions (see `formio-actions`); REST endpoint lookups (see `formio-api`); wiring a login screen into Angular (see `formio-angular`).
 ---
 
 ## Preflight — the Form.io MCP server
@@ -67,7 +67,7 @@ Each reference doc is self-contained and follows the section layout `Overview` �
 - [`references/sso-ldap.md`](./references/sso-ldap.md) — LDAP directory setup plus LDAP Role Mapping.
 - [`references/token-swap.md`](./references/token-swap.md) — Exchanging an external OIDC/OAuth bearer token for a Form.io JWT.
 - [`references/custom-jwt.md`](./references/custom-jwt.md) — Enterprise/on-prem Custom JWT signed with `JWT_SECRET`, required payload shape, and `localStorage.formioToken` injection.
-- [`references/email-auth.md`](./references/email-auth.md) — Email-token (passwordless) authentication through the standard Email action and its `[[token(...)]]` macro (Enterprise).
+- [`references/email-auth.md`](./references/email-auth.md) — Email-token (passwordless) authentication through the standard Email action and its `[[token(...)]]` macro (Enterprise), the token lifetime, and password reset built on it with Self Access.
 - [`references/jwt-and-sessions.md`](./references/jwt-and-sessions.md) — JWT payload, `x-jwt-token` header, `jti` Session ID, logout semantics, 2FA, and reCAPTCHA.
 
 ## Handoff with formio-resource-planner

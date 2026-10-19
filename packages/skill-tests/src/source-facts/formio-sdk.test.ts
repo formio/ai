@@ -91,6 +91,23 @@ describe('current user and logout', () => {
     expect(example).toMatch(/!claims\.exp/);
   });
 
+  // setToken installs the token and returns currentUser(), so it resolves the user
+  // the token signs in; an empty token resolves null (packages/core/src/sdk/Formio.ts).
+  it.each(['references/auth.md', 'references/setup.md'])(
+    '%s says setToken resolves the user, and null when clearing',
+    (path) => {
+      const body = read(path);
+
+      expect(body).toMatch(/setToken\(token: string[^)]*\): Promise<User \| null>/);
+      expect(body).toMatch(/setToken\(null\): Promise<null>/);
+      expect(body).not.toMatch(/setToken\([^)]*\): Promise<void>/);
+    }
+  );
+
+  it('setToken with an empty token resolves null', async () => {
+    await expect(Formio.setToken('')).resolves.toBeNull();
+  });
+
   it('pathType is documented without a default', () => {
     const setup = read('references/setup.md');
     expect(setup).not.toMatch(/default to `Subdirectories`/);
