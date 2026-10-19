@@ -1,5 +1,20 @@
 # @formio/ai
 
+## 1.0.2
+
+### Patch Changes
+
+- 5ad42f1: Document Self Access for applications that onboard users or create accounts on a user's behalf.
+  
+  - `formio-auth`: Self Access is the `{ "type": "self" }` entry in the user resource's `submissionAccess`; with it, a user signed in as a record can read and update that record whatever its `owner` holds, provided the record's role grants `read_own` / `update_own`. The email-token onboarding workflow adds Self Access and a Role Assignment.
+  - `formio-resource-planner`: the canonical `user` resource and the example templates carry Self Access; a plan that creates users directly on the user resource also gives it a `user:role` Role Assignment.
+  - `formio-schema`: the `self` access type is described.
+- 5ad42f1: Build password reset from the email-token macro and Self Access instead of the Reset Password action.
+  
+  - `formio-auth`: `email-auth.md` documents the token lifetime (`[[token(data.email=user),30]]`, default 120 minutes, counted from when the email is sent) and a password-reset recipe — a one-field request form with an Email action, and a reset page that signs in with `Formio.setToken()`, saves the new password to the user's own record, and logs out so the link cannot be reused. The description names password reset.
+  - `formio-actions`: the Reset Password action is no longer documented; password reset points to `formio-auth`.
+  - `formio-sdk`: `Formio.setToken(token)` resolves the signed-in user and `setToken(null)` resolves `null`.
+
 ## 1.0.1
 
 ### Patch Changes
