@@ -524,10 +524,13 @@ The credential fields are whatever the plan needs, not a fixed pair. Form.io aut
     { "type": "update_all", "roles": ["administrator"] },
     { "type": "delete_all", "roles": ["administrator"] },
     { "type": "read_own",   "roles": ["authenticated"] },
-    { "type": "update_own", "roles": ["authenticated"] }
+    { "type": "update_own", "roles": ["authenticated"] },
+    { "type": "self", "roles": [] }
   ]
 }
 ```
+
+**Keep `{ "type": "self", "roles": [] }` whenever the user resource grants `update_own`.** It is Self Access — the portal's "Self Access" checkbox — and it lets a user signed in as a record of this resource exercise their `*_own` permissions on that record even when someone else created it: an administrator adding an account, or an onboarding step that creates the account before the user has set a password. Drop it only together with `update_own`. When the plan has the application create user records directly on this resource (admin-invite, or onboarding that posts straight to `user`), the resource also carries its own unconditional Role Assignment, `user:role` (`association: "new"`) — a register form's Role Assignment does not run for those creates. No `owner` value is needed on any create; `formio-auth`'s `references/roles-and-permissions.md` → "Self Access and user onboarding" has the rule. A multi-role user resource's conditional `user:role<Persona>` actions already cover the role.
 
 Add extra fields (firstName, lastName, profile photo, etc.) after the identifier/secret pair and before `submit` if the user described a custom user shape. If the plan uses a different credential pair than `email`/`password` (e.g. `userId`/`pin`), swap the first two components accordingly and set the Login action's `settings.username`/`settings.password` to match those component keys.
 
@@ -789,6 +792,7 @@ Before emitting the Phase B JSON, walk through this list:
 - [ ] **Every resource an end user creates at runtime can actually be created by that user.** For an owner-scoped resource that means `create_own` for their role in its own `submissionAccess`. For a group-scoped child it means the field-based block carries `create`, `write`, or `admin` AND the group reference is populated in the payload at submit time — do not also add `create_own`, which would authorize creating rows outside the group. Walk the app's primary flow and confirm every POST the user makes is covered by one of the two.
 - [ ] **Every resource 2+ levels below the group has a hidden, calculated mirror of the group select** (`hidden: true`, `calculateValue: "value = data.<parent>?.data?.<group> || value;"` — both halves of the guard, verbatim, `refreshOn: "<parent>"`, `reference: true`) carrying the same field-based `submissionAccess` block as the direct child's group-reference select — same entry types, same Access Matrix row. Without the mirror, group access stops at the direct child and grandchildren are invisible to group members.
 - [ ] The `user` resource is present if the plan has any authentication.
+- [ ] **A `user` resource that grants `update_own` carries `{ "type": "self", "roles": [] }` in its `submissionAccess`**, and when the plan creates user records directly on it (admin-invite, or onboarding that posts straight to `user`), it carries a Role Assignment of its own (`user:role`, or the multi-role `user:role<Persona>` set). Without both, a user whose account someone else created cannot update it.
 - [ ] **No login form has a `save` action that sets `settings.resource`.** A login-form `save` pointing to any underlying resource is always wrong (it tries to create a new record in that resource on every login — e.g. a new user). A login form emits ONLY `<name>:login` by default; a plain `save` (empty `settings`, no `resource`) is allowed ONLY when the user asked for a login audit trail.
 - [ ] **Every form/resource meant to be submitted from the UI ends its `components` array with a submit button** (`{ "type": "button", "key": "submit", "action": "submit", ... }`). Exceptions: a `display: "wizard"` form (the wizard renders its own submit — never add a manual one) and an embedded/client-only or programmatically-submitted form (no user-facing submit).
 - [ ] `path` values are kebab-case; `name` and `key` values are camelCase; neither contains collision-avoidance integer suffixes (no `user-123`, no `Employee 775`).

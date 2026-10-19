@@ -1,7 +1,7 @@
 ---
 name: formio-actions
 description: >-
-  Deep reference for configuring Form.io actions — the server-side behavior layer that powers email notifications, authentication, webhooks, role assignment, and form-to-form saves. Use this skill whenever the user wants to add, configure, or troubleshoot an action on a form, choose the right action type for a use case, understand the action execution lifecycle, set up conditions or handler/method combinations, or wire up authentication flows. Also use when the user mentions action settings, action priorities, action conditions, email actions, login actions, webhook actions, role actions, save actions, or reset password actions — even if they don't say "action" explicitly (e.g., "send an email when someone submits", "add login to this form", "assign a role after registration"). Not for: auth architecture — SSO (OIDC/OAuth/SAML/LDAP), Token Swap, Custom JWT, JWT/session mechanics, 2FA, or RBAC tuning (see `formio-auth`); REST endpoint lookups (see `formio-api`).
+  Deep reference for configuring Form.io actions — the server-side behavior layer that powers email notifications, authentication, webhooks, role assignment, and form-to-form saves. Use this skill whenever the user wants to add, configure, or troubleshoot an action on a form, choose the right action type for a use case, understand the action execution lifecycle, set up conditions or handler/method combinations, or wire up authentication flows. Also use when the user mentions action settings, action priorities, action conditions, email actions, login actions, webhook actions, role actions, or save actions — even if they don't say "action" explicitly (e.g., "send an email when someone submits", "add login to this form", "assign a role after registration"). Not for: auth architecture — SSO (OIDC/OAuth/SAML/LDAP), Token Swap, Custom JWT, JWT/session mechanics, 2FA, or RBAC tuning (see `formio-auth`); REST endpoint lookups (see `formio-api`).
 ---
 
 # Form.io Actions Reference
@@ -134,7 +134,7 @@ When multiple actions share the same priority, execution order is not guaranteed
 
 ## Action Types
 
-Form.io ships 6 action types in the open-source server. Enterprise servers add more, of which this skill documents 5. The action type catalog is dynamic — always call `action_type_get` or `action_type_list` to discover what's available on the connected server.
+Form.io ships 6 action types in the open-source server, of which this skill documents 5 — the sixth, the Reset Password action, is not used (build password reset as described in "Password reset" below). Enterprise servers add more, of which this skill documents 5. The action type catalog is dynamic — always call `action_type_get` or `action_type_list` to discover what's available on the connected server.
 
 ### Quick Reference — Open Source
 
@@ -145,7 +145,6 @@ Form.io ships 6 action types in the open-source server. Enterprise servers add m
 | `role` | Add or remove a role from a user | `after` | `create` |
 | `email` | Send email notification | `after` | `create` |
 | `webhook` | Call an external URL | `after` | `create`, `update`, `delete` |
-| `resetpass` | Password reset flow | `before`+`after` | `form`, `create` |
 
 ### Quick Reference — Enterprise
 
@@ -324,33 +323,9 @@ The open-source server sends the payload below with the incoming request's metho
 }
 ```
 
-### Password reset flow
+### Password reset
 
-The reset password action is unique — it uses both `before` and `after` handlers and operates in two phases:
-
-1. **Phase 1 (user submits email)**: Looks up user, generates a temporary JWT token, emails a reset link
-2. **Phase 2 (user clicks link with token)**: Validates token, accepts new password, encrypts and saves
-
-```json
-{
-  "name": "resetpass",
-  "title": "Reset Password",
-  "handler": ["before", "after"],
-  "method": ["form", "create"],
-  "settings": {
-    "resources": ["<user-resource-id>"],
-    "username": "email",
-    "password": "password",
-    "url": "https://myapp.com/reset-password",
-    "transport": "default",
-    "from": "no-reply@example.com",
-    "subject": "Password Reset Request",
-    "message": "<p>Click the link to reset your password: {{ resetlink }}</p>"
-  }
-}
-```
-
-The `{{ resetlink }}` template variable is replaced with the full URL including the temporary JWT token. The token expires in 5 minutes.
+Password reset is built from the Email action, not from an action of its own: an Email action on a one-field "forgot password" form sends a link carrying the `[[token(...)]]` macro, the link signs the user in, and the application saves the new password to the user's own record, which Self Access on the user resource allows. The link lifetime is set in the macro. [`formio-auth/references/email-auth.md`](../formio-auth/references/email-auth.md) → "Password reset" has the forms, the action settings, and the reset page.
 
 ## Troubleshooting
 

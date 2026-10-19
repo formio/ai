@@ -255,7 +255,7 @@ export class AuthModule {}
 
 **`FormioAuthRoutes()` is what maps the URLs — importing `FormioAuth` does not.** That module is imports-only: it brings the login, register, and reset-password components into scope and contributes no routes of its own. Mount the function's result or `/auth/login` resolves to nothing, which is the failure the parent's `AUTH.md` describes under "Why `FormioAuthRoutes()` matters".
 
-`FormioAuthRoutes()` supplies the `login`, `register`, and `resetpass` child paths; they are wired to the form paths in the root `FormioAuthConfig` provider. Note this module is reached only through the `/auth` `loadChildren` route — it is never added to an `imports` array.
+`FormioAuthRoutes()` supplies the `login`, `register`, and `resetpass` child paths; `login` and `register` are wired to the form paths in the root `FormioAuthConfig` provider. Do not link to the stock `resetpass` page — no form backs it; for password reset, pass the email-token reset page as `FormioAuthRoutes({ resetpass: ResetPasswordComponent })` as `formio-angular`'s [`AUTH.md`](../../AUTH.md) describes. Note this module is reached only through the `/auth` `loadChildren` route — it is never added to an `imports` array.
 
 `src/app/auth/logout.component.ts`:
 

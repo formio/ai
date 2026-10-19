@@ -81,10 +81,34 @@ The planner reference at `../../formio-resource-planner/references/template-json
 
 Beyond the role-keyed `access` / `submissionAccess` arrays, Form.io supports four overlay models:
 
-1. **Self Access Permissions** — write the submission's own `_id` into its `owner` property. The submission becomes its own owner; useful for "users see only their own records" patterns without a separate user lookup.
+1. **Self Access Permissions** — a user authenticated as a record of a user-type resource gets owner-level access to that record, so they can change their own password and profile whoever created the account. See "Self Access and user onboarding" below.
 2. **Field Match-Based Access** — submission access gated on field values. Configured as described at `https://help.form.io/developers/roles-and-permissions/field-match-based-access`.
 3. **Field-Based Resource Access** — permissions assigned via Resource references inside a form. Configured as described at `https://help.form.io/developers/roles-and-permissions/field-based-resource-access`.
 4. **Group Permissions** — an extension of Field-Based Resource Access where permissions derive from group associations. See [`group-permissions.md`](./group-permissions.md).
+
+### Self Access and user onboarding
+
+Use this whenever an application's users must update their own user record — set a password after an emailed onboarding link, reset it later, or edit their profile. It holds however the account was created: by the user through a register form, by an administrator in the portal, or by application code. Two things are needed, and nothing about the record's `owner`.
+
+**1. Turn on Self Access on the user resource.** It is one entry in the user-type resource's `submissionAccess` — the "Self Access" checkbox on the resource's Access tab in the portal:
+
+```json
+"submissionAccess": [
+  { "type": "create_all", "roles": ["<administrator-id>"] },
+  { "type": "read_all",   "roles": ["<administrator-id>"] },
+  { "type": "update_all", "roles": ["<administrator-id>"] },
+  { "type": "delete_all", "roles": ["<administrator-id>"] },
+  { "type": "read_own",   "roles": ["<authenticated-id>"] },
+  { "type": "update_own", "roles": ["<authenticated-id>"] },
+  { "type": "self" }
+]
+```
+
+In a project template, write the entry as `{ "type": "self", "roles": [] }` (the planner's `../../formio-resource-planner/references/template-json.md` → "The canonical `user` resource").
+
+**2. Give each user record a role that holds `read_own` / `update_own`.** Self Access grants nothing on its own: it lets a user signed in as a record of this resource exercise their role's `*_own` permissions on that record. A record gets its role from a Role Assignment action (`association: "new"`). A record created directly on the user resource — by an administrator or application code — gets one only from a Role Assignment on the user resource itself; a register form's Role Assignment runs only for records created through that form. The shape is in the planner's `template-json.md` → "Role Assignment".
+
+With both in place, a user signed in as a record can read and update that record whatever the record's `owner` holds, and it appears in their own list of the resource's submissions. A create therefore needs no `owner` field. This was checked against the server source and live: user records an administrator created with `owner` left out, set to `null`, or set to the empty string — stored as the administrator's id, an unrelated id, and the record's own id respectively — could each be read and updated by their own user with Self Access on. With it off, only the record whose `owner` was its own id could; the others answered 401.
 
 ### Worked examples
 

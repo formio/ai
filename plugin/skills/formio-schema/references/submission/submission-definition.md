@@ -12,7 +12,7 @@ A submission is a discrete record of values submitted to a single form or resour
 | `_fvid` | `number` | No | Form-revision ID this submission was captured against. Tracks which form-definition revision the `data` shape was validated under. |
 | `form` | `string` | No | Form ID this submission belongs to. Server-populated from the request path. |
 | `project` | `string` | No | Project ID containing the parent form. Server-populated. |
-| `owner` | `string` | No | Submission ID of the user that created this submission — the foreign key to a user-resource submission in the same project. |
+| `owner` | `string` | No | Submission ID of the user that created this submission — the foreign key to a user-resource submission in the same project. A user's access to their own user record comes from Self Access, not from this field — see [`formio-auth/references/roles-and-permissions.md`](../../../formio-auth/references/roles-and-permissions.md) → "Self Access and user onboarding". |
 | `externalOwner` | `{ sub, iss, customIdClaim? }` | No | OIDC SSO external owner — `sub` (subject) and `iss` (issuer) of the external identity, with optional `customIdClaim: { key, value }` for the `idPath` resolution. Server-only — not in the upstream TypeScript declaration. |
 | `roles` | `string[]` | No | Role IDs assigned to this submission when the submission represents a user (i.e., when the parent form is a user resource). See `submission-access.md`. |
 | `state` | `'draft' \| 'submitted'` | No | Lifecycle state of the submission. See `submission-state.md` for when each value is written. |
