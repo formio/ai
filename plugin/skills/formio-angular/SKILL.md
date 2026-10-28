@@ -1,7 +1,7 @@
 ---
 name: formio-angular
 description: >-
-  Angular framework implementor for the Form.io skill library — a router over two branches: build or extend an Angular application around a Form.io project with `@formio/angular` (a five-phase gated flow: setup, bootstrap, config, auth, resources), or embed a single Form.io form in an Angular page. Invoked as the handoff from `formio-application`, or directly when the user explicitly names Angular. Claims ONLY Angular-explicit triggers. Use when the user says "build it in Angular", "Angular front-end for this Form.io project", "use `@formio/angular`", "wire up `FormioAppConfig`", "embed a Form.io form in Angular", or "render a form in my Angular app". Not for: a new app whose data model is not yet planned, Angular-named or not (see `formio-application`); framework-agnostic embed/render-a-form requests (see `formio-form`); planning a data model (see `formio-resource-planner`); React work (see `formio-react`); REST endpoint lookups (see `formio-api`).
+  Angular implementor: build or extend an Angular app around a Form.io project with `@formio/angular` (setup, bootstrap, config, auth, resources), or embed one form in an Angular page. Claims only Angular-named requests. Use when the user says "build it in Angular", "Angular front-end for this Form.io project", "use `@formio/angular`", "wire up `FormioAppConfig`", "embed a Form.io form in Angular", or "render a form in my Angular app". Not for: a new app whose data model is not yet planned, Angular-named or not (see `formio-application`); framework-agnostic embedding (see `formio-form`); planning a data model (see `formio-resource-planner`); React work (see `formio-react`).
 ---
 
 # Form.io + Angular — Framework Implementor

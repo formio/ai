@@ -4,6 +4,19 @@ Canonical shape for a Form.io project export. Same document you get from `GET /{
 
 When emitting Phase B of the `formio-resource-planner` skill, follow this reference verbatim. The shapes, defaults, and ordering are not negotiable — Form.io parses strictly.
 
+## Contents
+
+- [Top-level](#top-level)
+- [Roles](#roles)
+- [Top-level access](#top-level-access)
+- [Resources & Forms — shared shape](#resources--forms--shared-shape)
+- [access vs submissionAccess — keep these straight](#access-vs-submissionaccess--keep-these-straight)
+- [Component shapes](#component-shapes)
+- [The canonical user resource](#the-canonical-user-resource)
+- [Actions](#actions)
+- [Assembly checklist](#assembly-checklist)
+- [Verification](#verification)
+
 ## Top-level
 
 ```jsonc

@@ -1,7 +1,7 @@
 ---
 name: formio-react-form
 description: >-
-  Embed a Form.io form in a React application with `@formio/react`'s `Form` component — mounting, the event surface, the live instance, the lifecycle traps, provider configuration, anonymous versus authenticated submission, and the Vite and Next.js requirements. Reached by handoff from `formio-react`'s embed branch. Use when the user says "embed a Form.io form in React", "render a form in my React app", "use `@formio/react`'s `Form` component", or "add a Form.io form to this React page". Not for: framework-agnostic embedding and every field-behaviour question — conditionals, calculated values, validation, cascading selects (see `formio-form`); resource CRUD screens (see `formio-react`'s CRUD branches, which load `formio-react-resources`); creating a form that does not exist yet (see `formio-form-builder`); the raw SDK reference (see `formio-sdk`).
+  Embed a Form.io form in a React app with `@formio/react`'s `Form` component — mounting, events, the live instance, lifecycle traps, provider configuration, anonymous versus signed-in submission, and Vite and Next.js requirements. Reached from `formio-react`'s embed branch. Use when the user says "embed a Form.io form in React", "render a form in my React app", or "use `@formio/react`'s `Form` component". Not for: framework-agnostic embedding and field behavior (see `formio-form`); CRUD screens (see `formio-react`, which loads `formio-react-resources`); creating a new form (see `formio-form-builder`).
 ---
 
 # Embedding a Form.io form in React

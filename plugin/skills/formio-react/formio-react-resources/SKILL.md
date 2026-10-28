@@ -1,7 +1,7 @@
 ---
 name: formio-react-resources
 description: >-
-  Nested React sub-skill that generates Form.io resource CRUD screens into a React application — the resource kernel, route composition, and hierarchical parent/child resources through React Router data routers. Reached by handoff from `formio-react` (itself possibly from `formio-application`), or by phrasing that names React or `@formio/react` verbatim. Use when the user says "add a React route for X", "regenerate the React `Participant` resource", "in my React app, wire `X`'s children to `Y`", or "add a bidirectional React join between `Team` and `User`". Not for: initial React app creation or a workspace with no `FormioProvider` — see `formio-react`; extension requests that never name React — see `formio-application`; shaping a data model — see `formio-resource-planner`; embedding one form — see `formio-form`; REST endpoint lookups — see `formio-api`.
+  React sub-skill that generates Form.io resource CRUD screens — the resource kernel, routes, and parent/child resources over React Router data routers. Reached from `formio-react`, or by phrasing that names React or `@formio/react`: "add a React route for X", "regenerate the React `Participant` resource", "in my React app, wire `X`'s children to `Y`". Not for: creating the React app or a workspace with no `FormioProvider` (see `formio-react`); extension requests that never name React (see `formio-application`); data modelling (see `formio-resource-planner`); embedding one form (see `formio-form`).
 ---
 
 # Form.io Resource → React CRUD

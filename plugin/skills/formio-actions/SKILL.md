@@ -1,7 +1,7 @@
 ---
 name: formio-actions
 description: >-
-  Deep reference for configuring Form.io actions — the server-side behavior layer that powers email notifications, authentication, webhooks, role assignment, and form-to-form saves. Use this skill whenever the user wants to add, configure, or troubleshoot an action on a form, choose the right action type for a use case, understand the action execution lifecycle, set up conditions or handler/method combinations, or wire up authentication flows. Also use when the user mentions action settings, action priorities, action conditions, email actions, login actions, webhook actions, role actions, or save actions — even if they don't say "action" explicitly (e.g., "send an email when someone submits", "add login to this form", "assign a role after registration"). Not for: auth architecture — SSO (OIDC/OAuth/SAML/LDAP), Token Swap, Custom JWT, JWT/session mechanics, 2FA, or RBAC tuning (see `formio-auth`); REST endpoint lookups (see `formio-api`).
+  Configure Form.io actions — the server-side layer for email notifications, login, webhooks, role assignment, and form-to-form saves: types, settings, handler/method, priorities, conditions. Use when the user wants to add, configure, or troubleshoot an action on a form, even without saying "action": "send an email when someone submits", "add login to this form", "assign a role after registration", "call a webhook on update". Not for: SSO, Token Swap, Custom JWT, sessions, 2FA, or RBAC (see `formio-auth`); REST endpoint lookups (see `formio-api`); the UAG's "Agent: Run task" action (see `formio-uag`).
 ---
 
 # Form.io Actions Reference
@@ -157,6 +157,8 @@ Form.io ships 6 action types in the open-source server, of which this skill docu
 | `twofarecoverylogin` | 2FA recovery code login | `before` | `create` |
 
 For detailed settings and configuration for each action type, read `references/action-types.md`. A server's catalog is dynamic and may expose action types beyond these — types that copy submissions into an external system of record are out of scope for this skill; see "Action types this reference does not cover" in that file.
+
+The Universal Agent Gateway (UAG) adds one action of its own, **"Agent: Run task"** (`agentRunTask`), which runs a form's agent task on submissions sent to the UAG. Form.io's own catalog does not list it, so `action_type_list` will not show it and `action_create` refuses it. It belongs to `formio-uag`, which documents its settings and the ways to add it.
 
 ## Conditions
 

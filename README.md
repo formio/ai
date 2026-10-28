@@ -20,6 +20,7 @@
   - [Build complete applications](#build-complete-applications)
   - [Build forms and wizards](#build-forms-and-wizards)
   - [Embed forms in existing applications](#embed-forms-in-existing-applications)
+  - [Make forms agent-ready](#make-forms-agent-ready)
   - [Work the REST API via prompt](#work-the-rest-api-via-prompt)
 - [Using the MCP server without the skills](#using-the-mcp-server-without-the-skills)
 - [MCP server tools](#mcp-server-tools)
@@ -153,6 +154,7 @@ Orchestration skills are special skills that serve as the **entry point** for mo
 | `formio-application` | Orchestration entry point for building or extending an application on the Form.io platform (see above). |
 | `formio-form-builder` | Orchestration entry point for building a single form — webform or wizard — end to end (see above). |
 | `formio-form` | Embeds and renders Form.io forms in any web application with the `@formio/js` renderer — pre-fill, conditional fields, calculated values, custom validation, and conditional wizard pages. |
+| `formio-uag` | Makes forms agent-ready with the Form.io Universal Agent Gateway (UAG) 2.0 — designs tasks and their `uag*` properties, deploys the UAG and its model engines, and wires applications to it: conversation forms over MCP, the chat widget, Agentic Formflow (the Agent API and `@formio/uag-js`), and agentic workflows with the "Agent: Run task" action. |
 | `formio-resource-planner` | Plans the resource structure, field configuration, and access/permission model from high-level requirements, then emits a ready-to-import `template.json`. |
 | `formio-schema` | Reference for Form.io JSON schema — the document shapes for projects, forms/resources, and submissions. Used when constructing, editing, or interpreting any Form.io JSON. |
 | `formio-actions` | Reference for configuring Form.io actions — the server-side behavior layer for email notifications, authentication, webhooks, role assignment, and form-to-form saves. |
@@ -162,6 +164,8 @@ Orchestration skills are special skills that serve as the **entry point** for mo
 | `formio-mcp-setup` | Connects the Form.io MCP server to whichever coding agent is running, and captures the project URL, when the skills were installed without it. |
 | `formio-angular` | Angular framework implementor. Turns an approved `template.json` plus a target project into a working Angular app using `@formio/angular`. Delegated to by `formio-application`. |
 | `formio-react` | React framework implementor. A router over three branches — greenfield build, add CRUD to an existing app, and embed a form — generating a resource kernel over React Router data routers with `@formio/react`. Delegated to by `formio-application`. |
+
+> **Many skills installed?** Claude Code lists every installed skill's description within a budget of 1% of the model's context window (about 8,000 characters on a 200k-token model) and, over it, keeps only the names of the skills you use least, so it is less likely to choose them on its own. This library keeps its descriptions to about 9,000 characters combined, but every other skill and plugin you have installed shares that budget. If Form.io requests stop reaching the right skill, check the Skills row in `/context`, and raise the budget with the `skillListingBudgetFraction` setting (for example `0.02`) or the `SLASH_COMMAND_TOOL_CHAR_BUDGET` environment variable.
 
 ## Examples and Use Cases
 
@@ -199,6 +203,14 @@ Create complex forms and multi-page conditional wizards with the `formio-form-bu
 Embed an existing form or wizard within any HTML-based application using the `formio-form` skill.
 
 - [Embed an Existing Form](./examples/embed/render-existing-form.md) — render a saved form with `@formio/js`, pre-fill it, and handle submit events.
+
+### Make forms agent-ready
+
+Put AI agents in front of your forms with the [Form.io Universal Agent Gateway (UAG)](https://github.com/formio/uag) using the `formio-uag` skill. The agent tags and configures your forms for agents, designs their tasks, deploys the UAG and its model engines, and wires your application to it: conversation forms over MCP, a chat widget, forms that fill themselves in from a description, and agents that work on every submission.
+
+- [A claim wizard that fills itself in](./examples/agents/claim-formflow.md) — Agent Input decides the wizard's pages and prefills them; the server re-decides before the save.
+- [Two agents that review every application](./examples/agents/admissions-workflow.md) — chained "Agent: Run task" actions with an agent role and owned fields.
+- [A chat that files service requests](./examples/agents/service-chat.md) — the chat widget on a public form, on Form.io Open Source with no license.
 
 ### Work the REST API via prompt
 

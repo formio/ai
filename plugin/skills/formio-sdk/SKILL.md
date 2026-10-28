@@ -1,7 +1,7 @@
 ---
 name: formio-sdk
 description: >-
-  Source-derived reference for the Form.io JavaScript SDK (`@formio/js`), the Utilities (`@formio/js/utils`), and the `@formio/core`-only helpers — authored from the Form.io source code. Covers static methods (`setBaseUrl`, `setProjectUrl`, `setToken`, `currentUser`, `logout`), instance methods on `new Formio(url)` (forms, submissions, files), the VanillaJS rendering entry point (`Formio.createForm`), the plugin lifecycle, and the `Utils` surface (Evaluator, traversal, conditions, JSONLogic, mask/sanitize). Use when the user asks to call a `Formio.*` static method, work with a `new Formio(...)` instance, invoke a `Utils.*` helper, evaluate JSONLogic, register a plugin, traverse component trees, or decode the JWT. Not for: REST endpoint shapes (see formio-api); orchestrating an app build (see formio-application); planning Resource schemas (see formio-resource-planner); `@formio/angular` wrappers (see formio-angular); embed/render-a-form tasks (see formio-form — this stays the raw API reference).
+  Source-derived reference for the Form.io JavaScript SDK (`@formio/js`) and its Utilities (`@formio/js/utils`): `Formio.*` statics (`setBaseUrl`, `setProjectUrl`, `setToken`, `currentUser`, `logout`), `new Formio(url)` instances, `Formio.createForm`, plugins, and `Utils` (Evaluator, traversal, conditions, JSONLogic, mask/sanitize). Use when the user asks to call a `Formio.*` method, use a `new Formio(...)` instance, invoke a `Utils.*` helper, evaluate JSONLogic, register a plugin, or decode the JWT. Not for: REST endpoints (see `formio-api`); app builds (see `formio-application`); `@formio/angular` wrappers (see `formio-angular`); embedding a form (see `formio-form`).
 ---
 
 # Form.io SDK Skills

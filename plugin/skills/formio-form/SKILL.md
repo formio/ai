@@ -1,7 +1,7 @@
 ---
 name: formio-form
 description: >-
-  Embed and render Form.io forms in any web application with the Vanilla JS renderer `@formio/js` — render by URL or JSON, pre-fill with submissions, JavaScript control, renderer options, conditional fields, calculated values, JSON Logic validation, cascading selects, and conditional wizard pages. The library's default "embed a form" entry point. Use when the user asks to "embed a form", "render a form", "add this form to my page/site/app", "pre-fill a form", "show or hide a field based on another field", "calculate a field value", or "add custom validation to a field" — field behavior inside ANY framework's rendered form stays here. Not for: Angular embedding and app builds (see `formio-angular`); React-named embedding (see `formio-react`); building an app around data (see `formio-application`); designing the data model (see `formio-resource-planner`); REST endpoints (see `formio-api`); the raw SDK/Utils API reference (see `formio-sdk`); creating a NEW form — embed-only skill (see `formio-form-builder`).
+  Embed and render Form.io forms in any web app with the `@formio/js` renderer — by URL or JSON, pre-filled, controlled from JavaScript — and own field behavior: conditionals, calculated values, JSON Logic validation, cascading selects. The default "embed a form" entry point. Use when the user asks to "embed a form", "render a form", "add this form to my page", "pre-fill a form", "show or hide a field based on another field", "calculate a field value", "add custom validation to a field", or add conditional wizard pages — field behavior in ANY framework's form stays here. Not for: Angular (see `formio-angular`) or React-named (see `formio-react`) embedding; building an app (see `formio-application`) or its data model (see `formio-resource-planner`); REST endpoints (see `formio-api`); the raw SDK (see `formio-sdk`); creating a new form (see `formio-form-builder`); agent-filled forms or chats (see `formio-uag`).
 ---
 
 # Embedding Form.io Forms (Vanilla JS renderer)
@@ -79,6 +79,10 @@ A form definition is not inert data. `calculateValue`, `validate.custom`, `logic
 ## When the form does not exist yet
 
 This skill embeds forms that already exist. If the embed request reveals the form is not in the user's project yet (`form_get` misses, or the user is describing a form from scratch — "embed a multi-step intake wizard on my page"), route to `formio-form-builder` first: it determines the form type (webform vs wizard vs PDF form), authors the definition, and saves it. When it finishes, embedding resumes here with the saved form URL.
+
+## When the form should work with an agent
+
+Rendering a form for a person stays here. When the request is for the form to fill itself in from what the person describes, to be filled in through a chat, or to be used by an AI agent (Agent Input, `Formio.createChat`, the Universal Agent Gateway), hand off to `formio-uag`: it makes the form agent-ready and registers `@formio/uag-js` beside the `Formio.createForm` call this skill writes.
 
 ## URL terminology
 

@@ -1,7 +1,7 @@
 ---
 name: formio-api
 description: >-
-  Comprehensive Form.io API reference — every endpoint in the Form.io API Postman collection across platform admin, project admin, runtime/end-user, and PDF scopes. Use when the user asks to call, script, inspect, or document any Form.io REST endpoint: platform/project auth; projects, stages, tenants, teams; forms, resources, and revisions (create, list, update, import, export); actions; roles; end-user registration and login; submissions (submit, query, patch, delete); aggregation reports; PDF template uploads and submission downloads; health/status. Also for x-jwt-token auth questions and the base URL vs project URL distinction. Not for: building a whole application around Form.io (see formio-application); planning a data model (see formio-resource-planner); authoring Form.io JSON schemas (see formio-schema); calling the JavaScript SDK — `Formio.*` statics, `new Formio(...)` instances, `Utils.*` helpers (see formio-sdk).
+  Form.io REST API reference — every endpoint across platform admin, project admin, runtime (end-user), and PDF scopes. Use when the user asks to call, script, inspect, or document a Form.io REST endpoint — projects, stages, teams, forms, revisions, actions, roles, registration and login, submissions, reports, PDFs, status — or about the `x-jwt-token` header and base URL vs project URL. Not for: building an app (see `formio-application`); planning a data model (see `formio-resource-planner`); Form.io JSON schemas (see `formio-schema`); the JavaScript SDK — `Formio.*`, `new Formio(...)`, `Utils.*` (see `formio-sdk`).
 ---
 
 # Form.io API Skills

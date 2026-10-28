@@ -1,7 +1,7 @@
 ---
 name: formio-schema
 description: >-
-  Form.io JSON schema reference covering the document shapes for projects, forms (and resources), and submissions. Use whenever constructing, editing, or interpreting Form.io JSON — form definitions returned by `form_get` / `form_create` / `form_update`; submission bodies (decoding `data`, row-level `access`, draft state, `metadata`); and project documents (settings, integrations, auth providers (OAuth/LDAP/SAML), stages, tenants, and template envelopes for `project_import` / `project_export`). Trigger for schema-level questions about form components, wizards, resources, submissions, project templates, conditional logic, validation rules, or any component `type` (textfield, select, datagrid, panel) when the work involves Form.io JSON. Not for: calling Form.io REST endpoints (see `formio-api`); configuring server-side actions on a form (see `formio-actions`); planning a new app's resource model from scratch (see `formio-resource-planner`); orchestrating an entire app build (see `formio-application`).
+  Form.io JSON schema reference — the shapes of projects, forms and resources, and submissions. Use when constructing, editing, or interpreting Form.io JSON: form definitions from `form_get` / `form_create` / `form_update`, components (textfield, select, datagrid, panel), wizards, conditional logic, validation, submission bodies (`data`, `access`, `metadata`), and project templates for `project_import` / `project_export`. Not for: REST endpoints (see `formio-api`); server-side actions (see `formio-actions`); planning a new app's resources (see `formio-resource-planner`); orchestrating an app build (see `formio-application`).
 
 
 license: MIT

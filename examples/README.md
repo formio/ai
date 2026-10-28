@@ -5,6 +5,7 @@ Copy-paste prompts for exercising the Form.io skills library in a Claude Code se
 - [`apps/`](./apps/) — full application builds and extensions through the `formio-application` orchestrator (plan → import → framework scaffold).
 - [`forms/`](./forms/) — single-form and wizard builds through the `formio-form-builder` orchestrator (intent → schema → saved form, optional embed handoff).
 - [`embed/`](./embed/) — embedding already-saved forms with the `formio-form` skill and the `@formio/js` renderer.
+- [`agents/`](./agents/) — agentic forms with the Form.io Universal Agent Gateway through the `formio-uag` skill (tasks, the chat widget, Agentic Formflow, Run task workflows).
 - [`api/`](./api/) — direct REST-surface work through the `formio-api` skill (backed by the MCP server's first-party tools).
 - [`mcp/`](./mcp/) — raw MCP tool calls with NO skill involved; verifies the `@formio/mcp` server standalone (plain `.mcp.json`, no plugin).
 

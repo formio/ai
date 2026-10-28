@@ -1,7 +1,7 @@
 ---
 name: formio-resource-planner
 description: >-
-  Plan the Resource structure, field configurations, and access/permission model for a Form.io application, then emit a ready-to-import project `template.json` (Phase A: a human-readable Resource Map for approval; Phase B: the full template with roles, resources, forms, and actions). Interview-driven — infers resources and asks about relationships, auth, and access before committing. Use when the user asks to design, architect, model, or plan the resources, schema, data model, or access model — "design the resources for...", "plan the schema for...", "model <domain> in Form.io". Not for: building or standing up the app itself — "build me a task manager / CRM" (see `formio-application`, which invokes this planner internally as its planning step); standalone single-form creation — one survey, contact form, or questionnaire with no data model (see `formio-form-builder`); SSO, Token Swap, Custom JWT, 2FA, or RBAC tuning beyond default roles (see `formio-auth`); endpoint lookups (see `formio-api`).
+  Plans a Form.io application's resources, fields, and access model, then emits a ready-to-import `template.json` — a Resource Map for approval, then the full template of roles, resources, forms, and actions. Interview-driven. Use when the user asks to design, model, or plan the resources, schema, data model, or permissions — "design the resources for...", "plan the schema for...", "model <domain> in Form.io". Not for: building the app itself — "build me a task manager" (see `formio-application`, which runs this planner); one standalone form (see `formio-form-builder`); SSO, Custom JWT, 2FA, or RBAC tuning beyond default roles (see `formio-auth`).
 ---
 
 # Form.io Resource Planner

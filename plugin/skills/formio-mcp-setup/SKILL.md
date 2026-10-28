@@ -1,7 +1,7 @@
 ---
 name: formio-mcp-setup
 description: >-
-  Connects the Form.io MCP server (`@formio/mcp`) to whatever coding agent is running, so the Form.io skills have tools to call. Use when a Form.io skill's preflight finds the MCP tools missing, when Form.io tool calls fail because no Form.io tools are available, or when the user asks to install, connect, configure, or fix the Form.io MCP server. Also use when the user has installed the Form.io skills on their own but nothing has wired the server yet. Writes the MCP configuration for the client it is running in — Claude Code, Cursor, VS Code, or Codex — behind an approval gate, then asks the server which Form.io project this directory resolves to and captures only whichever URL it reports missing, and tells the user how to reload. Not for: logging in to Form.io — the server opens that in the browser on the first tool call; an application's end-user auth (see `formio-auth`); building anything with Form.io — return to the skill that sent you here once the server is connected.
+  Connects the Form.io MCP server (`@formio/mcp`) to the running coding agent — Claude Code, Cursor, VS Code, or Codex — so the Form.io skills have tools to call, then records which Form.io project this directory uses. Use when a Form.io skill finds the MCP tools missing, when no Form.io tools are available, or when the user asks to install, connect, configure, or fix the Form.io MCP server. Not for: logging in to Form.io — the server opens that in the browser on the first tool call; an application's end-user auth (see `formio-auth`); building anything with Form.io — return to the skill that sent you here.
 ---
 
 # Connect the Form.io MCP server

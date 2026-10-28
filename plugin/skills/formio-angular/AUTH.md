@@ -6,6 +6,21 @@ This document is loaded by the parent `formio-angular` skill during Phase 4. It 
 
 **Every path in this document is relative to `workspaceRoot`** — the absolute path Pre-flight captured and SETUP stashed. Read and write them as `<workspaceRoot>/src/app/auth/auth.module.ts`, never against wherever the shell happens to stand. Shell working directories persist between commands in an agent session, and BOOTSTRAP's own commands are written `cd "<workspaceRoot>" && <command>`, which does not carry into this phase — so a bare relative path read here can land in a different tree, report that the file is missing, and write the whole Form.io wiring into a tree nobody will look in.
 
+## Contents
+
+- [Skip-if-already-wired detection](#skip-if-already-wired-detection)
+- [Source of auth values: the planner's template.md + template.json](#source-of-auth-values-the-planners-templatemd--templatejson)
+- [No-artifact-pair fallback](#no-artifact-pair-fallback)
+- [src/app/auth/auth.module.ts template](#srcappauthauthmodulets-template)
+- [src/app/app-module.ts edits](#srcappapp-modulets-edits)
+- [src/app/app-routing-module.ts edits — mount AuthModule under /auth](#srcappapp-routing-modulets-edits--mount-authmodule-under-auth)
+- [src/app/app.ts (or src/app/app.component.ts on legacy naming) edits — subscribe to authentication events and redirect](#srcappappts-or-srcappappcomponentts-on-legacy-naming-edits--subscribe-to-authentication-events-and-redirect)
+- [src/app/app.html (or src/app/app.component.html on legacy naming) — shell layout (REQUIRED) + auth-aware nav chrome (recommended)](#srcappapphtml-or-srcappappcomponenthtml-on-legacy-naming--shell-layout-required--auth-aware-nav-chrome-recommended)
+- [Customizing the login and register components (optional)](#customizing-the-login-and-register-components-optional)
+- [src/app/auth/auth.guard.ts — REQUIRED route guard for authenticated routes](#srcappauthauthguardts--required-route-guard-for-authenticated-routes)
+- [The approval gate — preview then approve](#the-approval-gate--preview-then-approve)
+- [After approval](#after-approval)
+
 ## Skip-if-already-wired detection
 
 Before generating anything, inspect the target workspace at `workspaceRoot`:
