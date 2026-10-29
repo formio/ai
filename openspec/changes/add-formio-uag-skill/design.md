@@ -1,6 +1,6 @@
 ## Context
 
-The source of truth is the UAG 2.0 repository (`formio/uag`, branch `uag-2.0`): `demo/content/developers/*.md`, `README.md`, `MIGRATING-2.0.md` and `packages/uag-js`. The skill restates what an application team needs and points at `https://ai.onform.io/developers` for the Engine SDK, the engine server and the Node.js API in full.
+The source of truth is the UAG 2.0 repository (`formio/uag`, branch `uag-2.0`): `demo/content/developers/*.md`, `README.md`, `MIGRATING-2.0.md` and `packages/uag-js`. The skill restates what an application team needs and points at `https://ai.form.io/developers` for the Engine SDK, the engine server and the Node.js API in full.
 
 ## Decisions
 

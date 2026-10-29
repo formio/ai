@@ -2,6 +2,8 @@
 
 A conversation form with no license. Exercises the `formio-uag` skill: tagging a form `uag`, writing its fields for a model, the chat widget, anonymous use with rate limits, and a Compose stack for Form.io Open Source.
 
+See it running at https://ai.form.io/examples/conversation (source: https://github.com/formio/uag/tree/main/demo).
+
 ## Prompt
 
 ```

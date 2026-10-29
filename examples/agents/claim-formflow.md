@@ -2,6 +2,8 @@
 
 Agentic Formflow end to end. Exercises the `formio-uag` skill: designing a task with an input, decision fields that choose the wizard's pages and value fields that prefill them, registering `@formio/uag-js` with the `next` trigger, and re-deciding the routing fields on the server with an "Agent: Run task" action before the save.
 
+See it running at https://ai.form.io/examples/formflow (source: https://github.com/formio/uag/tree/main/demo).
+
 ## Prompt
 
 ```

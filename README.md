@@ -1,4 +1,4 @@
-# The Form.io Agentic Coding Toolset <!-- omit from toc -->
+# The Form.io Agentic Coding Plugin <!-- omit from toc -->
 
 [![CI](https://github.com/formio/ai/actions/workflows/ci.yml/badge.svg)](https://github.com/formio/ai/actions/workflows/ci.yml)
 [![npm: @formio/ai](https://img.shields.io/npm/v/%40formio%2Fai?label=%40formio%2Fai)](https://www.npmjs.com/package/@formio/ai)
@@ -206,11 +206,11 @@ Embed an existing form or wizard within any HTML-based application using the `fo
 
 ### Make forms agent-ready
 
-Put AI agents in front of your forms with the [Form.io Universal Agent Gateway (UAG)](https://github.com/formio/uag) using the `formio-uag` skill. The agent tags and configures your forms for agents, designs their tasks, deploys the UAG and its model engines, and wires your application to it: conversation forms over MCP, a chat widget, forms that fill themselves in from a description, and agents that work on every submission.
+Put AI agents in front of your forms with the [Form.io Universal Agent Gateway (UAG)](https://github.com/formio/uag) using the `formio-uag` skill. The agent tags and configures your forms for agents, designs their tasks, deploys the UAG and its model engines, and wires your application to it: conversation forms over MCP, a chat widget, forms that fill themselves in from a description, and agents that work on every submission. Each prompt below builds one of the [live demos](https://ai.form.io/examples) on the UAG's site, the UAG's own documentation is at [ai.form.io/developers](https://ai.form.io/developers), and [ai.form.io/developers/agentic-coding](https://ai.form.io/developers/agentic-coding) walks through building with this plugin.
 
-- [A claim wizard that fills itself in](./examples/agents/claim-formflow.md) — Agent Input decides the wizard's pages and prefills them; the server re-decides before the save.
-- [Two agents that review every application](./examples/agents/admissions-workflow.md) — chained "Agent: Run task" actions with an agent role and owned fields.
-- [A chat that files service requests](./examples/agents/service-chat.md) — the chat widget on a public form, on Form.io Open Source with no license.
+- [A claim wizard that fills itself in](./examples/agents/claim-formflow.md) — Agent Input decides the wizard's pages and prefills them; the server re-decides before the save. [Live demo](https://ai.form.io/examples/formflow)
+- [Two agents that review every application](./examples/agents/admissions-workflow.md) — chained "Agent: Run task" actions with an agent role and owned fields. [Live demo](https://ai.form.io/examples/workflow)
+- [A chat that files service requests](./examples/agents/service-chat.md) — the chat widget on a public form, on Form.io Open Source with no license. [Live demo](https://ai.form.io/examples/conversation)
 
 ### Work the REST API via prompt
 

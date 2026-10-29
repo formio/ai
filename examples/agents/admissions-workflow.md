@@ -2,6 +2,8 @@
 
 An agentic workflow with chained tasks. Exercises the `formio-uag` skill: two tasks on one form, "Agent: Run task" after the save on create and on update, the condition that stops the chain, owned fields, and an agent role on self-hosted Form.io Enterprise.
 
+See it running at https://ai.form.io/examples/workflow (source: https://github.com/formio/uag/tree/main/demo). The live demo's actions name no agent role; this prompt asks for the stricter setup, with an agent role on self-hosted Form.io Enterprise.
+
 ## Prompt
 
 ```
