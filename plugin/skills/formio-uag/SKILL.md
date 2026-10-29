@@ -82,6 +82,17 @@ What the UAG serves under its URL depends on the edition of the project behind i
 
 Map the request to one or more surfaces from the table at the top, and say which need a license before going further.
 
+### First build
+
+When the user wants a new application or project whose forms carry agents — "a help desk where an agent triages every ticket" — and the target project has no content of its own yet, put the UAG's pieces into the first build itself rather than adding them afterwards. `formio-application` and `formio-resource-planner` know nothing of the UAG; this skill adds what it needs to their template before anything is imported:
+
+1. **Plan the data model.** Invoke `formio-resource-planner` with the user's description to get its approved `template.md` + `template.json` pair. The planner calls no MCP tool, so this needs no project yet.
+2. **Add the UAG's pieces to the pair.** In `template.json`, make each agent form agent-ready as Step 2 describes — the `uag` tag, `properties.description`, field descriptions, and each task's criteria, agent fields and input — and add each `agentRunTask` action to `template.json`'s `actions`, keyed `<formName>:<actionKey>` with its form named in `form`, as [`references/workflows.md`](./references/workflows.md) shows. In `template.md`, add each "Agent: Run task (task name)" to that form's `Actions:` list, so the pair still agrees.
+3. **Show the additions at one approval gate**, with the access- and cost-widening settings the Stance names each on its own line and confirmed on its own.
+4. **On approval, hand the pair to `formio-application`**, which takes an approved planner pair already in scope straight to its import and framework steps. When the user wants the project only, with no application, import the pair yourself with `project_import` behind that same approval. Then continue at Step 3 for the server and Step 4 for the application code.
+
+Once the template is imported, or when the project already has content, this lane is closed: `project_import` replaces every form it names and the project's `access`. Make forms agent-ready through Step 2 and add Run task by Step 3's other routes. A build `formio-application` ran on its own has already been imported without the UAG, so it is extended the same way.
+
 ### Step 2 — FORM
 
 Make each form agent-ready:
@@ -94,7 +105,7 @@ Make each form agent-ready:
 
 ### Step 3 — SERVER
 
-Make sure a UAG serves the project, with what the pattern needs. [`references/deployment.md`](./references/deployment.md) has a Compose stack for each edition, every environment variable, the engines and their routing, the UAG's optional database, and the production checklist. For workflows, add the "Agent: Run task" action as [`references/workflows.md`](./references/workflows.md) describes: in the template of a first build imported with `project_import`, in a Form.io Enterprise portal stage connected to the UAG, in a UAG module's project template, or with Form.io's action API run by the user. The template route is open only while this run is building the project from a template that has not been imported yet: `project_import` replaces every form it names and the project's `access`, so once a form exists — including one `formio-form-builder` just created in Step 2 — use one of the other routes. Do not call `action_create` for it, because that tool would refuse it: it checks the action name against the catalog Form.io itself serves, which does not list the UAG's `agentRunTask`. When a task decides something a user must not decide for themselves, set up an agent role and form permissions as `workflows.md` describes, and hand the role and access work to `formio-auth`.
+Make sure a UAG serves the project, with what the pattern needs. [`references/deployment.md`](./references/deployment.md) has a Compose stack for each edition, every environment variable, the engines and their routing, the UAG's optional database, and the production checklist. For workflows, add the "Agent: Run task" action as [`references/workflows.md`](./references/workflows.md) describes: in a first build's template, which the [First build](#first-build) lane edits before import, in a Form.io Enterprise portal stage connected to the UAG, in a UAG module's project template, or with Form.io's action API run by the user. Once a form exists — including one `formio-form-builder` just created in Step 2 — the template route is closed; use one of the others. Do not call `action_create` for it, because that tool would refuse it: it checks the action name against the catalog Form.io itself serves, which does not list the UAG's `agentRunTask`. When a task decides something a user must not decide for themselves, set up an agent role and form permissions as `workflows.md` describes, and hand the role and access work to `formio-auth`.
 
 Write deployment artifacts (a `docker-compose.yml`, a Kubernetes manifest, a module folder, an `.env.example`) into the working directory, with every secret as a placeholder the user fills from their own secret store.
 
@@ -129,7 +140,7 @@ Prefer the Form.io MCP server's first-party tools over ad-hoc HTTP requests for 
 - `form_list` / `form_get` — find the form and read its components, tags, tasks and properties.
 - `action_list` / `action_get` — check which actions, including "Agent: Run task", a form already has.
 - `role_list` — find the role an agent role or a submitter role should be.
-- `project_import` — install a first build's template, including its `agentRunTask` actions (Step 3).
+- `project_import` — install a first build's template, including its `agentRunTask` actions, when the user wants the project without an application ([First build](#first-build)).
 - Writing a saved form runs through `formio-form-builder`'s edit lane, and roles and permissions through `formio-auth`; this skill supplies the JSON they write. The server authenticates implicitly via its browser-based portal-login flow: the first authenticated tool call triggers it on a cache miss, captures a portal JWT, and attaches it to every request as the `x-jwt-token` header. There is no explicit authenticate tool.
 
 The UAG is also an MCP server, at `{uagUrl}/mcp`, with tools such as `get_forms` and `submit_completed_form`. Those are for the user's agents at runtime, not for this session: do not connect to it or call its tools from here.

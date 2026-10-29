@@ -208,6 +208,20 @@ describe('formio-uag build-time rules', () => {
     expect(reference('workflows.md')).toMatch(/`action_create`[^.]*refuse/);
   });
 
+  // A first build gets its Run task actions from this skill, which edits the planner's
+  // template before import; the orchestrator and planner stay unaware of the UAG.
+  it('adds Run task to a first build template itself, leaving the orchestrator unaware', () => {
+    const firstBuild = skill.match(/^### First build\n([\s\S]*?)(?=^#)/m)?.[1] ?? '';
+    expect(firstBuild).toMatch(/`formio-resource-planner`/);
+    expect(firstBuild).toMatch(/`agentRunTask`[^.]*`template\.json`/);
+    expect(firstBuild).toMatch(/`template\.md`/);
+    expect(firstBuild).toMatch(/hand the pair to `formio-application`/);
+    for (const owner of ['formio-application', 'formio-resource-planner']) {
+      const text = read(join(skillsRoot, owner, 'SKILL.md'));
+      expect(text, owner).not.toMatch(/agentRunTask|formio-uag/);
+    }
+  });
+
   it('treats the UAG URL as a value the user supplies, never one project_get reports', () => {
     expect(skill).toMatch(/\*\*UAG URL\*\*/);
     expect(skill).toMatch(/never[^.]*`project_set`/i);

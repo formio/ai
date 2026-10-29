@@ -26,3 +26,8 @@ The library SHALL contain `plugin/skills/formio-uag/SKILL.md` with frontmatter `
 
 - **WHEN** an agent reaches the step that adds "Agent: Run task"
 - **THEN** the skill tells it not to call `action_create` and offers a template, a connected portal stage, a module template, or Form.io's action API run by the user
+
+#### Scenario: A first build carries agents
+
+- **WHEN** the user wants a new application whose forms carry agents and the target project has no content
+- **THEN** the skill runs `formio-resource-planner`, adds the UAG's tags, tasks and `agentRunTask` actions to the unimported `template.json` and `template.md` behind its own approval gate, and hands the pair to `formio-application`, whose skill text names neither the UAG nor `agentRunTask`
