@@ -56,18 +56,23 @@ Register the module once at startup ([uag-js.md](./uag-js.md#in-react-and-angula
 
 ```tsx
 import { useEffect, useRef } from 'react';
-import { Formio } from '@formio/js';
+import { createChat, type ChatForm } from '@formio/uag-js';
 
 export function ServiceRequestChat({ formUrl, onSaved }: { formUrl: string; onSaved: (id: string) => void }) {
   const host = useRef<HTMLDivElement>(null);
+  const saved = useRef(onSaved);
+  saved.current = onSaved;   // the latest callback, without re-creating the chat
   useEffect(() => {
-    let chat: any;
+    if (!host.current) return;
+    let chat: ChatForm | undefined;
     let cancelled = false;
-    (Formio as any).createChat(host.current, formUrl).then((created: any) => {
-      if (cancelled) { created.destroy(true); return; }
-      chat = created;
-      chat.on('submitDone', (submission: any) => onSaved(submission._id));
-    });
+    createChat(host.current, formUrl)
+      .then((created) => {
+        if (cancelled) { created.destroy(true); return; }
+        chat = created;
+        chat.on('submitDone', (submission: { _id: string }) => saved.current(submission._id));
+      })
+      .catch((error: unknown) => console.error('The chat could not be created.', error));
     return () => { cancelled = true; chat?.destroy(true); };
   }, [formUrl]);
   return <div ref={host} />;
@@ -138,7 +143,7 @@ Every formio.js form option applies too: `templates`, `i18n`, `language`, `readO
 
 ## Templates, translations and styles
 
-The chat renders through formio.js templates: `uagChat`, `uagChatMessage`, `uagChatTyping`, `uagChatSuggestions`, `uagChatComposer`, `uagChatSummary`, `uagChatNotice` (the built-ins are exported as `CHAT_TEMPLATES`). Replace one for a chat with `options.templates`, or for every chat with `Formio.use({ templates: { bootstrap5: { ... } } })`. Keep the `ref` attributes the replaced template held (`uagChat`, `uagChatLog`, `uagChatComposer`, `uagChatForm`, `uagChatOpen`, `uagChatClose`, `uagChatReset`, `uagChatInput`, `uagChatSend`, `uagChatSuggestion`, `uagChatSubmit`, `uagChatEdit`). In a string template, insert a message with `{{ ctx.html }}` (escaped, or sanitized markdown) — never `{{ ctx.text }}`, which `{{ }}` inserts as is.
+The chat renders through formio.js templates: `uagChat`, `uagChatMessage`, `uagChatTyping`, `uagChatSuggestions`, `uagChatComposer`, `uagChatSummary`, `uagChatNotice` (the built-ins are exported as `CHAT_TEMPLATES`). Replace one for a chat with `options.templates`, or for every chat with `Formio.use({ templates: { bootstrap5: { ... } } })`. Keep the `ref` attributes the replaced template held (`uagChat`, `uagChatLog`, `uagChatComposer`, `uagChatForm`, `uagChatOpen`, `uagChatClose`, `uagChatReset`, `uagChatInput`, `uagChatSend`, `uagChatSuggestion`, `uagChatSubmit`, `uagChatEdit`). In a string template, insert a message with `{{ ctx.html }}` (escaped, or sanitized markdown) — never `{{ ctx.text }}`, which `{{ }}` inserts as is. A notice is the one template with no `html`: its `text` may carry a server's error message, so the example below relies on the chat sanitizing every template's output before it is inserted; a function template should escape it, as the built-in one does.
 
 ```js
 Formio.createChat(element, formUrl, {

@@ -8,11 +8,11 @@
 
 import { describe, expect, it } from 'vitest';
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
-import { dirname, join, resolve } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { join } from 'node:path';
+import { skillsRoot } from '../source-facts/skill-text.js';
+import { descriptionOf } from '../skill-descriptions/helpers.js';
 
-const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../../../..');
-const skillDir = join(repoRoot, 'plugin/skills/formio-uag');
+const skillDir = join(skillsRoot, 'formio-uag');
 const skillMdPath = join(skillDir, 'SKILL.md');
 const referencesDir = join(skillDir, 'references');
 
@@ -65,14 +65,6 @@ function frontmatterOf(markdown: string): string {
   return match[1];
 }
 
-function descriptionOf(markdown: string): string {
-  return frontmatterOf(markdown)
-    .replace(/^name:.*$/m, '')
-    .replace(/^description:\s*>-?\s*/m, '')
-    .replace(/\s+/g, ' ')
-    .trim();
-}
-
 function allSkillDocs(): string[] {
   return [skillMdPath, ...readdirSync(referencesDir).map((name) => join(referencesDir, name))];
 }
@@ -108,7 +100,7 @@ describe('formio-uag directory layout', () => {
 });
 
 describe('formio-uag description', () => {
-  const description = descriptionOf(read(skillMdPath));
+  const description = descriptionOf('formio-uag');
 
   it('states the capability, then a trigger clause, then a Not for clause', () => {
     const triggers = description.indexOf('Use when the user asks to');
@@ -221,10 +213,16 @@ describe('formio-uag build-time rules', () => {
     expect(skill).toMatch(/never[^.]*`project_set`/i);
   });
 
+  // HTML samples anywhere, and every sample in the two references whose code runs only
+  // in the browser (the server-side relay that legitimately holds a key is in agent-api.md).
   it('keeps project and admin keys out of browser code', () => {
+    const browserOnly = ['uag-js.md', 'chat-widget.md'].map((name) => join(referencesDir, name));
     for (const path of allSkillDocs()) {
-      const html = [...read(path).matchAll(/```html\n([\s\S]*?)```/g)].map((m) => m[1]);
-      const leaking = html.filter((block) =>
+      const fence = browserOnly.includes(path)
+        ? /```\w*\n([\s\S]*?)```/g
+        : /```html\n([\s\S]*?)```/g;
+      const samples = [...read(path).matchAll(fence)].map((m) => m[1]);
+      const leaking = samples.filter((block) =>
         /x-admin-key|x-token|ADMIN_KEY|PROJECT_KEY/.test(block)
       );
       expect(leaking, path).toEqual([]);

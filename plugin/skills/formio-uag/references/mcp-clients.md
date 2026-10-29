@@ -139,9 +139,9 @@ const SYSTEM = `You help a customer complete a request over chat, using the tool
 5. When every required field is collected, call confirm_form_submission, show the summary and ask to confirm.
 6. Only after the customer confirms, call submit_completed_form.`;
 
-let token = null;
+// One token for this one-shot run. A long-running client renews it before `expires_in`
+// runs out and reconnects with the new one, because the transport's headers are fixed.
 async function getToken() {
-  if (token && Date.now() < token.expiresAt - 60_000) return token.value;
   const response = await fetch(`${UAG_URL}/auth/token`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -149,8 +149,7 @@ async function getToken() {
   });
   if (!response.ok) throw new Error(`Token request failed (${response.status}). Check the client id and secret.`);
   const body = await response.json();
-  token = { value: body.access_token, expiresAt: Date.now() + body.expires_in * 1000 };
-  return token.value;
+  return body.access_token;
 }
 
 async function turn(anthropic, mcp, tools, messages, userText) {

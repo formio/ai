@@ -6,7 +6,7 @@
 - **Agent Input is attached** when one of the form's tasks has an input. The user describes something in their own words, and the form fills itself from `{form}/agent/extract`: decisions first, so conditional pages react at once, then extracted values. It never overwrites what the user entered.
 - **It can be rendered as a chat** with `Formio.createChat` ([chat-widget.md](./chat-widget.md)).
 
-Tagging a form `uag` is then all it takes to move it onto the UAG; the application does not change. Agent Input calls `extract`, which is Agentic Formflow (a license or a hosted project); submission routing and the chat need no license.
+Tagging a form `uag` is then all it takes to move it onto the UAG; the application does not change. Agent Input calls `extract`, which is Agentic Formflow (a license or a hosted project); submission routing and the chat need no license on Form.io Open Source or the hosted service (a self-hosted Enterprise project needs a license that includes the UAG to be served at all).
 
 ## Contents
 

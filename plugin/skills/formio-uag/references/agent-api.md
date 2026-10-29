@@ -157,10 +157,11 @@ export async function extract({ formUrl, token, task, data, onResult }) {
       const event = /^event: (.*)$/m.exec(block)?.[1];
       const payload = JSON.parse(/^data: (.*)$/m.exec(block)?.[1] || 'null');
       if (event === 'result') onResult?.(payload);              // apply payload.patch
-      if (event === 'error' && !payload.kind) throw new Error(payload.error);
+      if (event === 'error' && !payload?.kind) throw new Error(payload?.error || 'The extraction failed.');
       if (event === 'done') return payload;                     // the full result object
     }
   }
+  throw new Error('The stream ended before its result.');
 }
 ```
 
