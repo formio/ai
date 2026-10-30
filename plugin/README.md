@@ -43,7 +43,7 @@ Every step has an approval gate before any file is written or any MCP call hits 
 ## What's in the box
 
 - **MCP server** (`@formio/mcp`) — first-party Form.io operations as 25 MCP tools (`form_*`, `role_*`, `action_*`, `project_*`, and `server_status`, which reports the server version and project resolution without credentials).
-- **Skills library** — twelve activatable skills (app orchestration, form building, form embedding, planner, Angular and React framework implementors, schema, actions, auth, SDK, API router, MCP setup) plus a reference library under `formio-api/references/` covering every endpoint in the Form.io API Postman collection.
+- **Skills library** — thirteen activatable skills (app orchestration, form building, form embedding, agentic forms with the UAG, planner, Angular and React framework implementors, schema, actions, auth, SDK, API router, MCP setup) plus a reference library under `formio-api/references/` covering every endpoint in the Form.io API Postman collection.
 - **Per-directory project routing** — `project_set` maps a working directory to a Form.io project in `~/.formio/projects.json`, so each directory can target a different project. The server resolves that mapping on every tool call; `npx -y @formio/mcp@1.0.1 project get --cwd "$(pwd)"` prints what it resolves and why.
 
 | Skill | Purpose |
@@ -51,6 +51,7 @@ Every step has an approval gate before any file is written or any MCP call hits 
 | `formio-application` | Default "build me an app" orchestrator. Four-step pipeline (Intent → Plan → Import → Framework), start to finish in one invocation. |
 | `formio-form-builder` | Default "build me a form" orchestrator — webform or wizard from intent to a saved form, plus field edits to existing forms. |
 | `formio-form` | Embeds and renders forms in any web application with `@formio/js` — pre-fill, conditionals, calculated values, custom validation. |
+| `formio-uag` | Agentic forms with the Form.io Universal Agent Gateway (UAG) 2.0 — tasks and `uag*` properties, deployment and engines, MCP clients, the chat widget, Agentic Formflow, and "Agent: Run task" workflows. |
 | `formio-resource-planner` | Plans resources, fields, roles, actions, access — emits paired `template.md` + `template.json`. |
 | `formio-angular` | Angular framework implementor. Five-phase scaffold flow over `@formio/angular`. |
 | `formio-react` | React framework implementor. Routes between a greenfield build, extending an existing app, and embedding a single form; generates a resource kernel over React Router data routers. |
@@ -60,6 +61,8 @@ Every step has an approval gate before any file is written or any MCP call hits 
 | `formio-sdk` | Source-derived reference for the `@formio/js` SDK and `@formio/js/utils` Utilities. |
 | `formio-api` | Router into the full Form.io REST API surface (platform, project, runtime, PDF). |
 | `formio-mcp-setup` | Connects the MCP server to whichever agent is running, and captures the project, when the skills were installed on their own. |
+
+> **Many skills installed?** Claude Code lists every installed skill's description within a budget of 1% of the model's context window (about 8,000 characters on a 200k-token model) and, over it, keeps only the names of the skills you use least, so it is less likely to choose them on its own. This library keeps its descriptions to about 9,000 characters combined, but every other skill and plugin you have installed shares that budget. If Form.io requests stop reaching the right skill, check the Skills row in `/context`, and raise the budget with the `skillListingBudgetFraction` setting (for example `0.02`) or the `SLASH_COMMAND_TOOL_CHAR_BUDGET` environment variable.
 
 See the [root README's "How it works"](https://github.com/formio/ai#how-it-works) for the orchestrator, planner, and Angular flow diagrams, plus full sample resource maps.
 

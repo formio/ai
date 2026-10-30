@@ -1,7 +1,7 @@
 ---
 name: formio-angular-form
 description: >-
-  Embed a Form.io form in an Angular application with `@formio/angular`'s `<formio>` component — mounting, the event surface, the live `Webform` instance, change detection under zone.js and zoneless, project URLs, styling, the server-rendering limit, and when to drop to the renderer directly. Reached by handoff from `formio-angular`'s embed branch. Use when the user says "embed a Form.io form in Angular", "render a form in my Angular app", "add a `<formio>` component to this page", or "control an embedded Form.io form from Angular". Not for: framework-agnostic embedding and every field-behaviour question — conditionals, calculated values, validation, cascading selects (see `formio-form`); resource CRUD screens (see `formio-angular`'s application branch, which loads `formio-angular-resources`); creating a form that does not exist yet (see `formio-form-builder`); the raw SDK reference (see `formio-sdk`).
+  Embed a Form.io form in an Angular app with `@formio/angular`'s `<formio>` component — mounting, events, the live `Webform`, change detection (zone.js and zoneless), styling, and when to use the renderer directly. Reached from `formio-angular`'s embed branch. Use when the user says "embed a Form.io form in Angular", "render a form in my Angular app", or "add a `<formio>` component to this page". Not for: framework-agnostic embedding and field behavior (see `formio-form`); CRUD screens (see `formio-angular`, which loads `formio-angular-resources`); creating a new form (see `formio-form-builder`).
 ---
 
 # Embedding a Form.io form in Angular

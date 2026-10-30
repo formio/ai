@@ -22,6 +22,10 @@ const LOOK_ALIKES = new Set([
   // The snake_case spelling of the Project URL variable, in the naming tables of
   // formio-api and formio-sdk.
   'project_url',
+  // Arguments of the UAG's own MCP tools (`get_form_fields`, `collect_field_data`, ...),
+  // which formio-uag documents for the user's agents; this server registers no such tool.
+  'form_name',
+  'form_data',
 ]);
 
 interface Argument {

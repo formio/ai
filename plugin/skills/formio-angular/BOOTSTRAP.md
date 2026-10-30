@@ -2,6 +2,19 @@
 
 This document is loaded by the parent `formio-angular` skill during Phase 2. It is **not** a standalone skill — no frontmatter, no independent trigger. The parent reads it after SETUP has been approved and before CONFIG.
 
+## Contents
+
+- [Why this phase exists](#why-this-phase-exists)
+- [When to skip this phase](#when-to-skip-this-phase)
+- [Step 1 — resolve the target Angular version from @formio/angular](#step-1--resolve-the-target-angular-version-from-formioangular)
+- [Step 2 — offer the Angular angular-new-app skill, then install it if the user agrees](#step-2--offer-the-angular-angular-new-app-skill-then-install-it-if-the-user-agrees)
+- [Step 3 — delegate to angular-new-app](#step-3--delegate-to-angular-new-app)
+- [Step 4 — confirm the workspace is ready for CONFIG](#step-4--confirm-the-workspace-is-ready-for-config)
+- [Step 5 — add Bootstrap 5 and Bootstrap Icons](#step-5--add-bootstrap-5-and-bootstrap-icons)
+- [Step 6 — pin change detection, then make the build and the tests pass](#step-6--pin-change-detection-then-make-the-build-and-the-tests-pass)
+- [Step 7 — confirm the frontend-design skill is available](#step-7--confirm-the-frontend-design-skill-is-available)
+- [The approval gate](#the-approval-gate)
+
 ## Why this phase exists
 
 `formio-angular` does not know how to scaffold an Angular workspace on its own, and it should not try. The Angular team ships a maintained skill library at [`angular/skills`](https://github.com/angular/skills) that already encodes the current best practices for `ng new`, workspace layout, build configuration, and CLI options. The preferred move is to offer to install one skill from it — `angular-new-app`, by name, never the whole repository — the first time `formio-angular` runs; the user decides, because an installed skill adds instructions this session follows. Workspace creation is then delegated to that skill. A user who declines gets the local `@angular/cli` fallback in Step 2 instead; either way the workspace exists before CONFIG. `formio-angular` picks the story back up at CONFIG, where it writes the Form.io-specific files (`config.ts`, `AuthModule`, resource NgModules) into the workspace the Angular skill just created.

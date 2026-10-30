@@ -10,6 +10,15 @@
 import { describe, expect, it } from 'vitest';
 import { DESCRIPTION_BUDGET, allSkills, descriptionOf, topLevelSkills } from './helpers.js';
 
+// The combined budget. Claude Code loads every registered skill's name and description
+// into one listing whose budget is 1% of the context window (about 8,000 characters on a
+// 200k-token model), and over it drops the descriptions of the least-used skills, which
+// is what routing depends on. Every installed skill and plugin shares that listing, so
+// this library cannot fit it alone; it keeps its own share bounded instead, and a new
+// skill pays for its description by tightening the others rather than growing the total.
+// Measured over the top-level skills, which are the ones Claude Code registers.
+export const LIBRARY_LISTING_BUDGET = 9_600;
+
 describe('skill description budget', () => {
   // Every skill in the library, nested ones included: the budget is also the
   // Agent Skills specification's hard maximum, and clients other than Claude
@@ -35,5 +44,13 @@ describe('skill description budget', () => {
     expect(description, `${skill} description narrates numbered phases`).not.toMatch(
       /\(\d\)\s+[A-Z]{2,}/
     );
+  });
+
+  it(`keeps the top-level descriptions within ${LIBRARY_LISTING_BUDGET} characters combined`, () => {
+    const total = topLevelSkills().reduce((sum, skill) => sum + descriptionOf(skill).length, 0);
+    expect(
+      total,
+      `top-level descriptions total ${total} chars (library budget ${LIBRARY_LISTING_BUDGET})`
+    ).toBeLessThanOrEqual(LIBRARY_LISTING_BUDGET);
   });
 });

@@ -279,6 +279,10 @@ describe('preflight contract', () => {
   // Two entries moved when password reset left the Reset Password action for the
   // email-token macro: formio-actions no longer claims reset-password actions, and
   // formio-auth claims password reset beside its email-token auth.
+  //
+  // When formio-uag joined the library every description was shortened, so the
+  // library's combined listing stays near Claude Code's skill-listing budget; the
+  // snapshot was re-taken from those, with the routing eval run before and after.
   it('left every existing description byte-identical', () => {
     const before = JSON.parse(readFileSync(descriptionSnapshot, 'utf8')) as Record<string, string>;
     const now = Object.fromEntries(

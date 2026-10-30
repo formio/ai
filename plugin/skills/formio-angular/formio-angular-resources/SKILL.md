@@ -1,7 +1,7 @@
 ---
 name: formio-angular-resources
 description: >-
-  Angular-explicit extension sub-skill for the Form.io skill library — adds, regenerates, or repairs one resource NgModule in an Angular workspace whose `AppModule` already has `FormioAppConfig` wired. Invoked by user phrasing that names Angular verbatim, or by handoff from `formio-angular` (itself possibly invoked by `formio-application`). Claims ONLY triggers naming Angular or `@formio/angular`: "add an Angular module for X", "regenerate the Angular `Participant` resource module", "in my Angular app, wire `X`'s children to `Y`", "add a bidirectional Angular join between `Team` and `User`". Does NOT claim framework-agnostic extension phrasing. Not for: initial Angular-app creation, or a workspace where `FormioAppConfig` is not yet wired into `AppModule` — see `formio-angular`; extension requests that never name Angular — see `formio-application`, which routes here when the framework is Angular; shaping a data model in isolation — see `formio-resource-planner`; REST endpoint lookups — see `formio-api`.
+  Angular-only sub-skill: adds, regenerates, or repairs one resource NgModule in an Angular workspace whose `AppModule` already wires `FormioAppConfig`. Reached from `formio-angular`, or by phrasing that names Angular: "add an Angular module for X", "regenerate the Angular `Participant` resource module", "in my Angular app, wire `X`'s children to `Y`". Not for: creating the Angular app or wiring `FormioAppConfig` (see `formio-angular`); extension requests that never name Angular (see `formio-application`); data modelling alone (see `formio-resource-planner`).
 ---
 
 # Form.io Resource → Angular CRUD

@@ -4,6 +4,22 @@ Canonical shape for the Resource Map artifact emitted by `formio-resource-planne
 
 Treat the two files as a pair: same basename, same timestamp on collision (`template-20260423T153000Z.md` + `template-20260423T153000Z.json`).
 
+## Contents
+
+- [Why markdown in addition to JSON](#why-markdown-in-addition-to-json)
+- [Required section order](#required-section-order)
+- [Resources section](#resources-section)
+- [Forms section (conditional)](#forms-section-conditional)
+- [Users & Auth section](#users--auth-section)
+- [Roles section](#roles-section)
+- [Access Matrix section](#access-matrix-section)
+- [ER Diagram section](#er-diagram-section)
+- [Access Flow Diagram section](#access-flow-diagram-section)
+- [Why Mermaid in the file (and ASCII in the chat)](#why-mermaid-in-the-file-and-ascii-in-the-chat)
+- [Companion artifact section](#companion-artifact-section)
+- [File pairing rules](#file-pairing-rules)
+- [Chat-output rules](#chat-output-rules)
+
 ## Why markdown in addition to JSON
 
 `template.json` is structurally complete but expensively flat. A consumer reading it has to reassemble the story by walking reference selects, decoding action settings, and pattern-matching `submissionAccess` blocks. `template.md` captures the same story in the form the planner already reasoned in — named resources, labelled relationships, access story prose, and two ASCII diagrams — so downstream skills do not re-derive intent from raw JSON.

@@ -1,7 +1,7 @@
 ---
 name: formio-form-builder
 description: >-
-  Default "build me a form" orchestrator — builds a single Form.io form end to end: determines the form type (webform, wizard, or PDF form), delegates schema authoring to `formio-schema`, saves the form via the MCP server, and optionally hands off to embedding. Use when the user asks to "build a form", "create a form", make a "multi-page form", or create a "survey", "contact form", "intake form", "registration form", "questionnaire", or "pdf form" — or to edit an existing form's fields: "add a phone field to my registration form". Boundary: "build a form to collect X" (a standalone form) belongs to this skill; "track X / manage X / build an app around X" (a data model, CRUD, resources) belongs to `formio-application` / `formio-resource-planner`. Not for: embedding an EXISTING form (see `formio-form`); building an app (see `formio-application`); designing resources or permissions (see `formio-resource-planner`); raw JSON schema lookups (see `formio-schema`); REST endpoint lookups (see `formio-api`).
+  Default "build me a form" orchestrator — builds one Form.io form end to end (webform, wizard, or PDF form) and saves it via the MCP server, optionally handing off to embedding. Use when the user asks to "build a form", "create a form", make a "multi-page form", a "survey", "contact form", "intake form", "registration form", "questionnaire", or "pdf form", or to edit an existing form: "add a phone field to my registration form". Boundary: "build a form to collect X" is this skill; "track X / manage X" (a data model) is `formio-application`. Not for: embedding an existing form (see `formio-form`); building an app (see `formio-application`); designing resources (see `formio-resource-planner`); raw schema lookups (see `formio-schema`); REST endpoints (see `formio-api`).
 ---
 
 # Form.io Form Builder Orchestrator
@@ -59,6 +59,8 @@ Only if the user answered an explicit yes to embed intent at INTENT: hand off to
 ## Edit lane — changing an existing form
 
 When the trigger is a field change on an existing form ("add a phone field to my registration form", "remove a question", "make this field required"), run a shortened pipeline instead of the four steps: fetch the current definition with `form_get` (use `form_list` when the user names the form loosely), invoke `formio-schema` to author the component change against the fetched JSON, then persist with `form_update` behind the same approval gate as SAVE — show what will change before writing. Skip INTENT's form-type interview (the saved form already fixes the type); EMBED still fires only on an explicit yes.
+
+The edit lane also takes a prepared change from another skill — `formio-uag` hands it component JSON plus form-level `tags` and `properties` that make a form agent-ready. Apply that change to the fetched definition as given rather than re-authoring it, and when the handing skill names settings to confirm on their own (for `formio-uag`: `uagAnonymous: "true"`, tools added to `uagTools`, `uagAuthoritative` removed from a field, or create access granted to the Anonymous role), show each on its own line at the approval gate and get a separate yes for each before writing.
 
 ## Forms with behavior — login, registration, email notifications
 

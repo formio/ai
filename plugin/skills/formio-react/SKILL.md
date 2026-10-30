@@ -1,7 +1,7 @@
 ---
 name: formio-react
 description: >-
-  React framework implementor for the Form.io skill library — a router over three branches: build a greenfield React application around a Form.io project, add Form.io resource CRUD to a React application that already exists, or embed a single form. Targets Vite, React Router data routers, and `@formio/react`. Claims ONLY React-explicit triggers. Use when the user says "build it in React", "React front-end for this Form.io project", "use React", "use `@formio/react`", "the React skill", "add Form.io CRUD to my React app", "wire this Form.io project into my existing React app", or "embed a Form.io form in React". Not for: a new app whose data model is not yet planned, React-named or not (see `formio-application`); planning a data model (see `formio-resource-planner`); framework-agnostic embed/render-a-form requests (see `formio-form`); Angular work (see `formio-angular`); REST endpoint lookups (see `formio-api`).
+  React implementor: build a greenfield React app around a Form.io project, add Form.io resource CRUD to an existing React app, or embed one form — Vite, React Router data routers, `@formio/react`. Claims only React-named requests. Use when the user says "build it in React", "React front-end for this Form.io project", "use `@formio/react`", "add Form.io CRUD to my React app", "wire this Form.io project into my existing React app", or "embed a Form.io form in React". Not for: a new app whose data model is not yet planned, React-named or not (see `formio-application`); planning a data model (see `formio-resource-planner`); framework-agnostic embedding (see `formio-form`); Angular work (see `formio-angular`).
 ---
 
 # Form.io + React — Framework Implementor

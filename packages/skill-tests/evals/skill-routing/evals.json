@@ -198,6 +198,61 @@
       "context": "A web application already wired to a Form.io project that has a user resource and a login form.",
       "expected_skill": "formio-auth",
       "must_not": ["formio-actions"]
+    },
+    {
+      "id": "uag-mcp-claude",
+      "prompt": "Let our support staff use Claude Desktop to file and look up service requests in our Form.io project.",
+      "context": "A web application wired to a Form.io project. The Form.io MCP tools are connected.",
+      "expected_skill": "formio-uag",
+      "must_not": ["formio-mcp-setup", "formio-auth"]
+    },
+    {
+      "id": "uag-chat-widget",
+      "prompt": "Add a chat to our service request page so customers can fill in the form by just talking to it.",
+      "context": "A web application wired to a Form.io project. The Form.io MCP tools are connected.",
+      "expected_skill": "formio-uag",
+      "must_not": ["formio-form", "formio-form-builder"]
+    },
+    {
+      "id": "uag-formflow-prefill",
+      "prompt": "When a policyholder describes the accident in the first box, fill in the rest of the claim wizard for them automatically.",
+      "context": "A web application wired to a Form.io project. The Form.io MCP tools are connected.",
+      "expected_skill": "formio-uag",
+      "must_not": ["formio-form"]
+    },
+    {
+      "id": "uag-workflow-score",
+      "prompt": "Have an AI agent score every college application as soon as it is submitted, and save its decision on the submission.",
+      "context": "A web application wired to a Form.io project. The Form.io MCP tools are connected.",
+      "expected_skill": "formio-uag",
+      "must_not": ["formio-actions", "formio-application"]
+    },
+    {
+      "id": "uag-run-task-action",
+      "prompt": "Add an Agent: Run task action to the claim form that re-decides the triage fields before the save.",
+      "context": "A web application wired to a Form.io project. The Form.io MCP tools are connected.",
+      "expected_skill": "formio-uag",
+      "must_not": ["formio-actions"]
+    },
+    {
+      "id": "uag-deploy",
+      "prompt": "Set up the Universal Agent Gateway in Docker in front of our self-hosted Form.io server, with Claude as the model.",
+      "context": "A repository holding the docker-compose.yml that runs the team's self-hosted Form.io server.",
+      "expected_skill": "formio-uag"
+    },
+    {
+      "id": "uag-negative-embed",
+      "prompt": "Embed our contact form on the homepage.",
+      "context": "A plain HTML website with no framework.",
+      "expected_skill": "formio-form",
+      "must_not": ["formio-uag"]
+    },
+    {
+      "id": "uag-negative-email",
+      "prompt": "Send me an email whenever someone submits the contact form.",
+      "context": "A web application wired to a Form.io project. The Form.io MCP tools are connected.",
+      "expected_skill": "formio-actions",
+      "must_not": ["formio-uag"]
     }
   ]
 }
