@@ -26,6 +26,8 @@ const LOOK_ALIKES = new Set([
   // which formio-uag documents for the user's agents; this server registers no such tool.
   'form_name',
   'form_data',
+  // An error code of the UAG's Agent API, in formio-uag's agent-api reference.
+  'form_not_found',
 ]);
 
 interface Argument {
