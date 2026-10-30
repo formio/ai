@@ -17,7 +17,7 @@ Chat is part of conversation forms: it needs an agent engine on the UAG and **no
 
 ## Embed a chat
 
-The chat is part of `@formio/uag-js` 2.x, with `@formio/js` 5. Registering the module adds `Formio.createChat`:
+The chat is part of `@formio/uag-js` 2.x, with `@formio/js` 5; install the exact version resolved as [patterns-and-licensing.md](./patterns-and-licensing.md#versions) describes. Registering the module adds `Formio.createChat`:
 
 ```js
 import { Formio } from '@formio/js';
@@ -29,14 +29,14 @@ const chat = await Formio.createChat(document.getElementById('chat'), `${config.
 chat.on('submitDone', (submission) => console.log('Saved', submission._id));
 ```
 
-With script tags:
+With script tags, pinned to that exact version as `{uagJsVersion}`:
 
 ```html
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@formio/js@5/dist/formio.full.min.css">
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@formio/uag-js@2/uag-js.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@formio/uag-js@{uagJsVersion}/uag-js.css">
 <script src="https://cdn.jsdelivr.net/npm/@formio/js@5/dist/formio.full.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/@formio/uag-js@2/index.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@formio/uag-js@{uagJsVersion}/index.js"></script>
 
 <div id="chat"></div>
 <script>

@@ -27,6 +27,11 @@ The library SHALL contain `plugin/skills/formio-uag/SKILL.md` with frontmatter `
 - **WHEN** an agent reaches the step that adds "Agent: Run task"
 - **THEN** the skill tells it not to call `action_create` and offers a template, a connected portal stage, a module template, or Form.io's action API run by the user
 
+#### Scenario: UAG 2.0 is still a release candidate
+
+- **WHEN** the skill writes an `@formio/uag*` package, a `formio/uag` image or a jsDelivr URL and npm's `latest` dist-tag for that package is not a 2.x release
+- **THEN** it pins the exact `2.0.0-rc.N` version the `rc` dist-tag names, never a range or an untagged image
+
 #### Scenario: A first build carries agents
 
 - **WHEN** the user wants a new application whose forms carry agents and the target project has no content

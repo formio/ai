@@ -1,6 +1,6 @@
 # Deploying the UAG
 
-The UAG runs as the Docker image `formio/uag` (which includes every official engine), as `npx uag`, or embedded in a Node.js server. Write the deployment files into the user's working directory with every secret as a placeholder (`CHANGEME`, or `${VAR}` read from an `.env` the user fills from their secret store); never invent or reuse a real key.
+The UAG runs as the Docker image `formio/uag` (which includes every official engine), as `npx uag`, or embedded in a Node.js server. Pin the image and every package to the exact version resolved as [patterns-and-licensing.md](./patterns-and-licensing.md#versions) describes; `{uagVersion}` below is that version of `@formio/uag`, which the image is tagged with too. An unpinned `formio/uag` is `latest`, which is UAG 1.x until 2.0.0 is released. Write the deployment files into the user's working directory with every secret as a placeholder (`CHANGEME`, or `${VAR}` read from an `.env` the user fills from their secret store); never invent or reuse a real key.
 
 ## Contents
 
@@ -43,7 +43,7 @@ services:
       retries: 40
 
   formio-uag:
-    image: formio/uag
+    image: formio/uag:{uagVersion}
     restart: always
     depends_on:
       formio: { condition: service_healthy }
@@ -176,7 +176,7 @@ module.exports = {
 
 ```yaml
   formio-uag:
-    image: formio/uag
+    image: formio/uag:{uagVersion}
     volumes:
       - ./module:/app/module
 ```
@@ -198,7 +198,7 @@ app.use(await server.router());
 app.listen(process.env.PORT || 3200);
 ```
 
-Node 22 or newer, started with `--no-node-snapshot` (isolated-vm, which runs form logic, needs it), with the engines it enables installed beside it (`npm install @formio/uag @formio/uag-claude`).
+Node 22 or newer, started with `--no-node-snapshot` (isolated-vm, which runs form logic, needs it), with the engines it enables installed beside it (`npm install @formio/uag@{uagVersion} @formio/uag-claude@{engineVersion}`, each version resolved on its own, since engines are versioned independently of the UAG).
 
 ## Production checklist
 

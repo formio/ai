@@ -101,6 +101,16 @@ Unlicensed Agentic Formflow requests are refused with `403` and `{ "code": "lice
 | `@formio/uag-sdk` | The Engine SDK, for writing an engine of your own. |
 | `@formio/uag-engines`, image `formio/uag-engines` | The engine server, which keeps model keys and model traffic out of the UAG. |
 
+## Versions
+
+This skill describes UAG 2.0. Until `2.0.0` is released, 2.0 ships as release candidates, `2.0.0-rc.N`, under the npm dist-tag `rc`, while `latest` can still name a 1.x release that this skill does not describe — for a while `@formio/uag`, `@formio/uag-claude` and the `formio/uag` image all were. Resolve every package's version before writing it into a file or a command:
+
+1. Run `npm view <package> dist-tags --json` for each package the work installs or references: `@formio/uag`, `@formio/uag-js`, and each engine, which is versioned independently of the UAG.
+2. Use the version `latest` names when it is `2.0.0` or a later 2.x release that is not a prerelease. Otherwise use the version `rc` names, a `2.0.0-rc.N`. When neither is a 2.x version, tell the user that UAG 2.0 is not published for that package and write nothing for it.
+3. Write that exact version everywhere: `npm install @formio/uag-js@2.0.0-rc.3`, the image tag `formio/uag:2.0.0-rc.3` (the `formio/uag` and `formio/uag-engines` images carry their packages' version tags, `rc` included), and jsDelivr URLs such as `https://cdn.jsdelivr.net/npm/@formio/uag-js@2.0.0-rc.3/index.js`. The references write these as `{uagVersion}` (`@formio/uag` and its image), `{uagJsVersion}` (`@formio/uag-js`) and `{engineVersion}` (an engine).
+
+Never write a range or a bare name instead. A range such as `@2`, `^2.0.0` or `~2.0.0` matches no prerelease, so `npm install` fails on it and jsDelivr answers `404`; `npm install` with a package name and no version, and an image with no tag, take `latest`. When the registry cannot be queried, write the dist-tag itself — `@formio/uag-js@rc`, `formio/uag:rc` — and tell the user to pin the version it resolves to. When the version written is a release candidate, tell the user so, and that moving to `2.0.0` once it is released is a version bump in these same places.
+
 ## Coming from UAG 1.x
 
 Personas are now **tasks**: a form's `uag` property names its task, and the Agent API and `@formio/uag-js` take `task` (the MCP tools still accept `persona`). `/agent/provide` and its webhook pattern are replaced by "Agent: Run task" after the save; the root-level `/agent/extract`, `/agent/decide` and `/agent/generate` moved under each form (`{form}/agent/...`); `MONGO` is now the UAG's own database rather than a submission store; remote MCP sign-in is off unless `MCP_OAUTH=true` with that database. The UAG repository's `MIGRATING-2.0.md` lists every change.

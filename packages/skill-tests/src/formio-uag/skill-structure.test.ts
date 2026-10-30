@@ -243,6 +243,29 @@ describe('formio-uag build-time rules', () => {
     }
   });
 
+  // Until 2.0.0 is released, 2.0 ships as 2.0.0-rc.N under the npm `rc` dist-tag while
+  // `latest` can still be 1.x, and a semver range never matches a prerelease.
+  it('resolves each package version from its dist-tags, falling back to rc', () => {
+    const versions =
+      reference('patterns-and-licensing.md').match(/^## Versions\n([\s\S]*?)(?=^## )/m)?.[1] ?? '';
+    expect(versions).toMatch(/npm view [^`]*dist-tags/);
+    expect(versions).toMatch(/`latest`[^.]*`2\.0\.0`/);
+    expect(versions).toMatch(/`rc`[^.]*`2\.0\.0-rc\.N`|`2\.0\.0-rc\.N`[^.]*`rc`/);
+    expect(skill).toMatch(/patterns-and-licensing\.md#versions/);
+  });
+
+  it('pins every UAG package and image it writes', () => {
+    for (const path of allSkillDocs()) {
+      const text = read(path);
+      expect(text.match(/image:\s*formio\/uag(-engines)?\s*(#.*)?$/gm) ?? [], path).toEqual([]);
+      expect(text.match(/@formio\/uag[a-z-]*@\d+\//g) ?? [], path).toEqual([]);
+      expect(
+        text.match(/npm install[^`\n]*@formio\/uag[a-z-]*(?![a-z-]*@)(?=[\s`])/g) ?? [],
+        path
+      ).toEqual([]);
+    }
+  });
+
   it('never recommends the deprecated UAG_LICENSE variable', () => {
     for (const path of allSkillDocs()) {
       const text = read(path);

@@ -21,7 +21,7 @@ Tagging a form `uag` is then all it takes to move it onto the UAG; the applicati
 
 ## Install and register
 
-`npm install @formio/uag-js`. It has no dependencies and a peer dependency on `@formio/js` 5. It ships as an ES module, a CommonJS module, the browser global `FormioUAG`, TypeScript types (`index.d.ts`) and a stylesheet, `@formio/uag-js/uag-js.css`, for Agent Input's notes and the chat.
+`npm install @formio/uag-js@{uagJsVersion}`, with the exact version resolved as [patterns-and-licensing.md](./patterns-and-licensing.md#versions) describes — a release candidate until 2.0.0 is released. It has no dependencies and a peer dependency on `@formio/js` 5. It ships as an ES module, a CommonJS module, the browser global `FormioUAG`, TypeScript types (`index.d.ts`) and a stylesheet, `@formio/uag-js/uag-js.css`, for Agent Input's notes and the chat.
 
 ```js
 import { Formio } from '@formio/js';
@@ -35,13 +35,15 @@ Formio.use(UAG(config.uagUrl));                   // the UAG URL, from the app's
 Formio.createForm(document.getElementById('claim'), `${config.formioProjectUrl}/claim`);
 ```
 
-`config` stands for wherever the application keeps its settings (Vite's `import.meta.env`, an Angular environment file, a server-rendered config object). The Project URL and Base URL come from `project_get`; the UAG URL from the user. With script tags:
+`config` stands for wherever the application keeps its settings (Vite's `import.meta.env`, an Angular environment file, a server-rendered config object). The Project URL and Base URL come from `project_get`; the UAG URL from the user.
+
+With script tags, where `{uagJsVersion}` is the same exact version (a range such as `@2` never reaches a release candidate, so jsDelivr answers it with `404` until 2.0.0 is released):
 
 ```html
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@formio/js@5/dist/formio.full.min.css">
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@formio/uag-js@2/uag-js.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@formio/uag-js@{uagJsVersion}/uag-js.css">
 <script src="https://cdn.jsdelivr.net/npm/@formio/js@5/dist/formio.full.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/@formio/uag-js@2/index.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@formio/uag-js@{uagJsVersion}/index.js"></script>
 <script>
   Formio.use(FormioUAG.UAG('https://uag.example.com'));
 </script>
