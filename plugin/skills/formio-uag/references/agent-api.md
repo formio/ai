@@ -53,18 +53,18 @@ The operations take the same credentials as the form's submissions; the credenti
 - **No credential is refused (`401`)** unless the form sets `uagAnonymous: "true"`. With it, visitors are answered as the Anonymous role when that role may create the form's submissions, and refused with `403` "Anonymous visitors may not submit this form." when it may not; anonymous requests are rate-limited ([form-properties.md](./form-properties.md#uaganonymous)).
 - **Scoped tokens** (the UAG's research tokens for remote engines) are refused (`401` "Scoped tokens can only be used on /mcp.").
 
-Every response after authentication carries an `X-Request-Id` header and a `requestId` in the body; send your own `X-Request-Id` to set it, and search the UAG's log for it when a request fails.
+Every operation's response carries an `X-Request-Id` header (exposed to browsers through CORS), and its errors a `requestId` in the body; send your own `X-Request-Id` to set it, and search the UAG's log for it when a request fails.
 
 ## Request fields
 
 | Field | Endpoints | Meaning |
 | --- | --- | --- |
-| `task` | All | The task (its `uag` value). Without it: `decide` and `generate` run every task; `extract` every task with an input, or every task when `text` is given. |
+| `task` | extract, decide, generate | The task (its `uag` value). Chat ignores it. Without it: `decide` and `generate` run every task; `extract` every task with an input, or every task when `text` is given. |
 | `data` | extract, decide, generate, chat | The submission data, nested as in a Form.io submission (`{ "customer": { "name": "..." } }`). |
 | `overwrite` | extract, decide, generate | Default `false`: only empty fields are answered, and filled ones are `excluded` as `already has a value`. |
 | `text` | extract | Source text; replaces the task's input for this call. |
 
-Bodies are limited to 5 MB (`413`). `persona` is not accepted: send `task`.
+Bodies are limited to 5 MB (`413`). Send `task`, never 1.x's `persona`: a body that names `persona` and no `task` is refused with `400`.
 
 ## The result object
 
@@ -142,7 +142,7 @@ export async function extract({ formUrl, token, task, data, onResult }) {
   });
   if (!response.ok) {
     const body = await response.json().catch(() => ({}));
-    throw new Error(`${response.status}: ${body.error || body.detail || response.statusText}`);
+    throw Object.assign(new Error(body.error || response.statusText), { status: response.status, code: body.code, requestId: body.requestId });
   }
   const reader = response.body.pipeThrough(new TextDecoderStream()).getReader();
   let buffer = '';
@@ -179,32 +179,38 @@ export async function extract({ formUrl, token, task, data, onResult }) {
 
 | Field | Required | Meaning |
 | --- | --- | --- |
-| `messages` | Yes | 1 to 40 `{ "role": "user" \| "assistant", "content": "..." }`, each at most 2000 characters, ending with the person's. |
+| `messages` | Yes | 1 to 40 `{ "role": "user" \| "assistant", "content": "..." }`, each at most 2000 characters, ending with the person's. The limits are `agentApi.chat.maxMessages` and `maxMessageLength`; the engine is sent the newest `maxTranscriptChars` (24,000) characters. |
 | `data` | No | The form's current data. |
 | `locked` | No | Paths the person set in the form itself (at most 500); the turn neither asks for nor changes them. |
 
 The response carries `reply` (the next message), `patch` (values accepted this turn — write them into the form), `data`, `fields` (each value given this turn: `suggested`, or `invalid` with the form's `error`), `errors`, `remaining` (`required`, `optional` and `unsupported` fields still to fill), `complete` (no required field empty and no errors), `confirmed` (the person confirmed a complete form; the client may submit — the UAG never does), and `engine` (`name`, `model`, `latencyMs`, `toolCalls`, token `usage`).
 
-A turn only ever sets the form's visible input fields a person may enter: never a task's decision or value fields, `uagAuthoritative`, hidden, disabled or calculated fields. Grids, nested forms, files, signatures, addresses, URL- or resource-fed selects and similar are reported in `remaining.unsupported` for the person to fill in the form. Chat answers `503` with no agent engine, `502` when every engine failed, `403` when the form sets `uagChat: "false"` or the caller cannot create submissions.
+A turn only ever sets the form's visible input fields a person may enter: never a task's decision or value fields, `uagAuthoritative`, hidden, disabled or calculated fields. Grids, nested forms, files, signatures, addresses, URL- or resource-fed selects and similar are reported in `remaining.unsupported` for the person to fill in the form. Chat answers `400` for a malformed turn, `503` with no agent engine, `502` when every engine failed, `429` (with `Retry-After`) when every engine is over its rate limit, and `403` when the form sets `uagChat: "false"` or the caller cannot create submissions.
 
 ## Errors
 
-Error bodies are `{ requestId, error }`, with `code` and `edition` when the license is missing. Credential refusals are `{ detail }` (or plain text for an expired Form.io token).
+Every error from a form's agent operations and `/agent/capabilities` is JSON `{ requestId, error, code }` (plus `edition` for `license_required`), with the same id in `X-Request-Id`, whatever refused the request. Branch on `code`, which is stable; show `error` to people; log `requestId`. A `500`'s `error` never carries details. A Run task refusal on a submission keeps Form.io's shape — see [workflows.md](./workflows.md#before-or-after-the-save).
 
-| Status | Cause |
-| --- | --- |
-| `400` | Unknown task (the message lists the form's tasks); a form with no tasks; extract with no `text` for a task with no input; `submissionId` sent to decide; a write or unknown tool in `uagTools`; a malformed chat turn. |
-| `401` | No valid credential; a server key from a browser; a scoped token; a portal member below `team_write`; no credential on a form without `uagAnonymous`. |
-| `403` | Agentic Formflow is not licensed (`code: "license_required"`) — checked before the form is read, so it answers for every form; the caller lacks create/update access; chat turned off by `uagChat: "false"`. |
-| `404` | The form does not exist or is not tagged `uag`. |
-| `413` | Body over 5 MB. |
-| `429` | The caller, an anonymous visitor, or every engine is over its rate limit. `Retry-After` when the caller is limited. |
-| `502` | Chat: every engine failed. |
-| `503` | No enabled engine can serve the operation. |
+| Status | `code` | Cause |
+| --- | --- | --- |
+| `400` | `invalid_request` | Unknown task (the message lists the form's tasks); a form with no tasks; extract with no `text` for a task with no input; `persona` with no `task`; `submissionId` sent to decide; a write or unknown tool in `uagTools`; a body that is not JSON; a malformed chat turn. |
+| `401` | `unauthorized` | No valid credential: an invalid or expired token, a wrong key, a server key from a browser, a scoped token, a portal member below `team_write`. |
+| `401` | `sign_in_required` | No credential, on a form without `uagAnonymous`. |
+| `403` | `license_required` | Agentic Formflow is not licensed — checked before the form is read, so it answers for every form. |
+| `403` | `forbidden` | The caller lacks create/update access (an anonymous visitor: the Anonymous role may not create). |
+| `403` | `chat_disabled` | Chat turned off by `uagChat: "false"`. |
+| `404` | `form_not_found` | The form does not exist or is not tagged `uag`. |
+| `413` | `payload_too_large` | Body over 5 MB. |
+| `429` | `rate_limited` | The caller, an anonymous visitor, or every engine is over its rate limit. `Retry-After` when the caller is limited. |
+| `500` | `internal_error` | See the UAG's log under the request id. |
+| `502` | `engines_failed` | Chat: every engine failed. |
+| `503` | `no_engine` | No enabled engine can serve the operation. |
 
 ## Rate limits
 
-Set in the UAG's configuration (a module's `config`, or `new UAGServer(config)`), not in environment variables:
+Anonymous visitors (forms with `uagAnonymous: "true"`) are limited per address and in total, per process: `AGENT_ANONYMOUS_RATE_LIMIT` (default `10` a minute) and `AGENT_ANONYMOUS_TOTAL_RATE_LIMIT` (default `100`), or `agentApi.anonymous.rateLimit` / `totalRateLimit` in configuration, which win. `0` turns anonymous use off. Behind a proxy, set `TRUST_PROXY`, or every visitor shares the proxy's address and one allowance.
+
+Limits for signed-in callers and engines are set in the UAG's configuration (a module's `config`, or `new UAGServer(config)`), not in environment variables:
 
 ```js
 module.exports = {

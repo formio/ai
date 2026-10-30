@@ -5,6 +5,9 @@ The UAG runs as the Docker image `formio/uag` (which includes every official eng
 ## Contents
 
 - [Compose stacks](#compose-stacks)
+- [Health checks](#health-checks)
+- [Behind a reverse proxy](#behind-a-reverse-proxy)
+- [Kubernetes](#kubernetes)
 - [The three URLs](#the-three-urls)
 - [Environment variables](#environment-variables)
 - [Engines](#engines)
@@ -12,6 +15,7 @@ The UAG runs as the Docker image `formio/uag` (which includes every official eng
 - [Connecting the Enterprise portal](#connecting-the-enterprise-portal)
 - [Modules](#modules)
 - [Embedding in a Node.js server](#embedding-in-a-nodejs-server)
+- [Running more than one instance](#running-more-than-one-instance)
 - [Production checklist](#production-checklist)
 
 ## Compose stacks
@@ -67,17 +71,165 @@ volumes:
 Agentic Formflow is allowed with no license (`reason: "hosted"`). Create a project API key under **Project Settings → API Keys**. Leave `LICENSE_KEY` unset unless you add the UAG's database (`MONGO`), which needs one: with a key set, the project must be on that key's endpoint allowlist, or the UAG does not load it.
 
 ```bash
-docker run -d --name formio-uag -p 3200:3200 \
+docker run -d --name formio-uag --restart unless-stopped -p 3200:3200 \
   -e PROJECT="https://<project>.form.io" \
   -e PROJECT_KEY="$PROJECT_KEY" \
   -e JWT_SECRET="$UAG_JWT_SECRET" \
+  -e CORS="$APP_ORIGIN" \
   -e UAG_ENGINES="jev,claude" -e TYPESAFE_API_KEY="$TYPESAFE_API_KEY" -e CLAUDE_API_KEY="$CLAUDE_API_KEY" \
-  formio/uag
+  -e CLAUDE_MODEL="claude-sonnet-5-5" -e PROJECT_TTL=300 \
+  formio/uag:{uagVersion}
 ```
 
 ### Self-hosted Form.io Enterprise
 
 `PROJECT` is the project endpoint (`http://formio-enterprise:3000/myproject`), with `PROJECT_KEY` and a `LICENSE_KEY` that includes the UAG and whose endpoint allowlist includes `PROJECT`'s host. Set `JWT_SECRET` to the Enterprise server's own when Run task actions act with an agent role ([workflows.md](./workflows.md#who-a-run-acts-as)), and `PORTAL_SECRET` to connect a portal stage.
+
+```yaml
+services:
+  formio-enterprise:                   # already deployed; shown for the variables the UAG shares with it
+    image: formio/formio-enterprise:<pinned>
+    environment:
+      PORT: 3000
+      LICENSE_KEY: ${LICENSE_KEY}
+      JWT_SECRET: ${FORMIO_JWT_SECRET}
+      # ...MONGO, DB_SECRET, admin account and portal settings as for any Enterprise deployment
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://localhost:3000/').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"]
+      interval: 5s
+      retries: 60
+
+  formio-uag:
+    image: formio/uag:{uagVersion}
+    restart: always
+    depends_on:
+      formio-enterprise: { condition: service_healthy }
+    ports: ["3200:3200"]
+    environment:
+      PROJECT: http://formio-enterprise:3000/myproject
+      PROJECT_KEY: ${PROJECT_KEY}          # must already exist on the project (Project Settings -> API Keys)
+      LICENSE_KEY: ${LICENSE_KEY}          # the same Form.io license; it must include the UAG
+      JWT_SECRET: ${FORMIO_JWT_SECRET}     # Form.io's own, only when an agent role acts for users
+      PORTAL_SECRET: ${UAG_PORTAL_SECRET}  # only to connect a portal stage
+      UAG_ENGINES: jev,claude
+      TYPESAFE_API_KEY: ${TYPESAFE_API_KEY}
+      CLAUDE_API_KEY: ${CLAUDE_API_KEY}
+      CLAUDE_MODEL: claude-sonnet-5-5
+      CORS: ${APP_ORIGIN}
+      PROJECT_TTL: 300
+```
+
+The project and its API key must exist before the UAG starts, or it exits with "No Form.io project could be loaded". In a brand-new stack, create them first (in the portal, or with a one-off setup job that `depends_on` Form.io's health and that the UAG `depends_on` with `condition: service_completed_successfully`, as the UAG repository's `demo/docker-compose.enterprise.yml` does).
+
+### An `.env.example`
+
+Write one beside every stack, with each secret as a placeholder and a note on how to generate it:
+
+```bash
+# Form.io
+PROJECT_KEY=CHANGEME            # Project Settings -> API Keys (Enterprise, hosted)
+ADMIN_KEY=CHANGEME              # Open Source only; the same value on Form.io and the UAG
+LICENSE_KEY=CHANGEME            # self-hosted Enterprise, Agentic Formflow off the hosted service, or MONGO
+# The UAG
+UAG_JWT_SECRET=CHANGEME         # openssl rand -hex 32; the same on every instance
+APP_ORIGIN=https://app.example.com
+# Engines
+TYPESAFE_API_KEY=CHANGEME
+CLAUDE_API_KEY=CHANGEME
+```
+
+## Health checks
+
+`GET {uagUrl}/status` needs no credential and answers `200` with a small JSON object of package versions. The UAG opens its port only after the project is loaded, the engines are enabled and the database (if any) is checked, so a `200` from `/status` means it is serving. Use it for Compose healthchecks, load-balancer checks and Kubernetes probes; it calls no model and does not touch Form.io. For a deeper check from a server, `GET /agent/capabilities` with the key reports engines and license state. The `formio/uag` image declares a `HEALTHCHECK` on it.
+
+```yaml
+  formio-uag:
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://localhost:3200/status').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"]
+      interval: 10s
+      retries: 30
+```
+
+## Behind a reverse proxy
+
+Anything public goes through TLS in front of the UAG. What the proxy must do:
+
+- **Forward `Host` and `X-Forwarded-Proto`** (and `X-Forwarded-For`), and set `TRUST_PROXY` on the UAG to the number of proxy hops (`1`) or the proxy's addresses. The UAG then names its public `https` URL in the OAuth documents, and counts anonymous limits per visitor rather than per proxy. When the proxy cannot forward them correctly, set `BASE_URL` to the public URL instead.
+- **Not buffer streams.** Agent Input's `extract` is a Server-Sent Events stream. The UAG sends `X-Accel-Buffering: no`, which nginx honours; for other proxies and load balancers, turn response buffering off for `text/event-stream`.
+- **Allow long requests.** A Run task before the save holds the submission until the engines answer, and research may take up to `agentApi.research.timeout` (120 seconds). Set read timeouts to at least 180 seconds.
+- **Allow the body sizes the forms need.** nginx's default `client_max_body_size` is `1m`; submissions with base64 files and agent operations (up to 5 MB) need more. The UAG's own limit is `MAX_BODY_SIZE` (default `16mb`, as Form.io's).
+- **Publish only what is used.** Remote MCP clients need `{uagUrl}/mcp`, `/auth` and `/.well-known`. Browsers using `@formio/uag-js` or the chat need the project's form, submission and `agent` paths too. `/status` reveals only package versions.
+
+```nginx
+server {
+    listen 443 ssl;
+    server_name uag.example.com;
+    # ssl_certificate ... ;
+    client_max_body_size 20m;
+
+    location / {
+        proxy_pass http://formio-uag:3200;
+        proxy_http_version 1.1;
+        proxy_set_header Host $http_host;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_read_timeout 180s;
+    }
+}
+```
+
+The UAG repository's `demo/samples/custom-module` is a tested layout that puts Form.io and the UAG behind one nginx origin, routing only the UAG's MCP endpoint, `/auth` and `/.well-known` to it.
+
+## Kubernetes
+
+The UAG is a stateless Deployment behind a Service. Keep secrets in a Secret (or an external secret store), pin the image, and probe `/status`. Give the startup probe time for `PROJECT_RETRIES` × `PROJECT_RETRY_DELAY` while Form.io starts. Run one replica unless the UAG has its database and a shared `JWT_SECRET` ([Running more than one instance](#running-more-than-one-instance)).
+
+```yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata: { name: formio-uag }
+spec:
+  replicas: 1
+  selector: { matchLabels: { app: formio-uag } }
+  template:
+    metadata: { labels: { app: formio-uag } }
+    spec:
+      containers:
+        - name: uag
+          image: formio/uag:{uagVersion}
+          ports: [{ containerPort: 3200 }]
+          env:
+            - { name: PROJECT, value: "http://formio.formio.svc.cluster.local:3000/myproject" }
+            - { name: UAG_ENGINES, value: "jev,claude" }
+            - { name: CLAUDE_MODEL, value: "claude-sonnet-5-5" }
+            - { name: CORS, value: "https://app.example.com" }
+            - { name: TRUST_PROXY, value: "1" }
+            - { name: PROJECT_TTL, value: "300" }
+          envFrom:
+            - secretRef: { name: formio-uag }   # PROJECT_KEY, JWT_SECRET, LICENSE_KEY, TYPESAFE_API_KEY, CLAUDE_API_KEY, MONGO
+          startupProbe:
+            httpGet: { path: /status, port: 3200 }
+            periodSeconds: 5
+            failureThreshold: 60
+          readinessProbe:
+            httpGet: { path: /status, port: 3200 }
+            periodSeconds: 10
+          livenessProbe:
+            httpGet: { path: /status, port: 3200 }
+            periodSeconds: 30
+          resources:
+            requests: { cpu: 250m, memory: 512Mi }
+            limits: { memory: 1Gi }
+---
+apiVersion: v1
+kind: Service
+metadata: { name: formio-uag }
+spec:
+  selector: { app: formio-uag }
+  ports: [{ port: 3200, targetPort: 3200 }]
+```
+
+The resource figures are a starting point, not a measurement: form logic runs in `isolated-vm`, and memory grows with the number and size of forms. Expose the Service through the cluster's Ingress with the proxy rules above (buffering off for event streams, a long read timeout, a large enough body size). A module is mounted at `/app/module` from a ConfigMap or a volume; an engine server is a second Deployment whose Service is reachable only from the UAG.
 
 ## The three URLs
 
@@ -93,13 +245,15 @@ docker run -d --name formio-uag -p 3200:3200 \
 | --- | --- | --- |
 | `PROJECT` | **required** | The Open Source server's root, or the Enterprise or hosted project endpoint. |
 | `ADMIN_KEY` / `PROJECT_KEY` | **one required** | `ADMIN_KEY` for Open Source; a project API key for Enterprise and hosted (setting it is what marks the project as Enterprise). Also accepted from callers as `x-admin-key` / `x-token`. |
-| `JWT_SECRET` | random per start | **Set it, the same on every instance**, or tokens break on restart. Equal to Form.io Enterprise's for agent roles, and then equivalent to administrator access. |
-| `JWT_EXPIRE_TIME` | `3600` | Minutes the UAG's access tokens last; refresh tokens twice as long. Keep it short in production. |
+| `JWT_SECRET` | random per start, with a startup warning | **Set it, the same on every instance**, or tokens break on restart. Equal to Form.io Enterprise's for agent roles, and then equivalent to administrator access. |
+| `JWT_EXPIRE_TIME` | `60` | Minutes the UAG's access tokens last (an upper bound: a token signed in through `MCP_OAUTH` ends with the user's Form.io login token, 240 minutes by default). Refresh tokens cannot outlive it. Keep it short in production. |
 | `LICENSE_KEY` | none | A Form.io license that includes the UAG. `UAG_LICENSE` is deprecated, still read until UAG 3.0. |
+| `LICENSE_REMOTE`, `LICENSE_SERVER` | unset, `https://license.form.io` | `true` for an offline license; the server online licenses are validated with (the UAG needs egress to it). |
+| `LOGIN_FORM` | `{PROJECT}/user/login` | With `MCP_OAUTH`: the login form JSON URL the user's browser loads. |
 | `UAG_ENGINES` | none | Engine instances to enable (below). Unset: no engines; MCP still works. |
 | `PROJECT_TTL` | `900` | Seconds between project refreshes. `60` or more outside development; `0` disables them. |
 | `TEMPLATE_SYNC` | `boot` | When a module's template is installed: `boot`, `refresh` or `off` (use `off` when stage deployments manage the project). |
-| `CORS` | `true` (every origin) | `true` allows every origin, `false` turns CORS off, any other value is the **one** allowed origin (a comma-separated list is read as one literal origin). For several origins, set a `cors` options object in a module's `config` or `new UAGServer(config)`. |
+| `CORS` | `true` (every origin) | `true` allows every origin, `false` turns CORS off, any other value is the allowed origin, or several separated by commas (`https://app.example.com,https://admin.example.com`). |
 | `TRUST_PROXY` | unset | Behind a reverse proxy: `true`, a hop count, or addresses. Also makes anonymous rate limits see visitors' addresses. |
 | `MCP_OAUTH` | `false` | `true` turns on remote MCP sign-in. Needs `MONGO`. |
 | `MONGO`, `UAG_DATABASE`, `MONGO_CONFIG` | none, `uag`, none | The UAG's own database (below). |
@@ -107,6 +261,8 @@ docker run -d --name formio-uag -p 3200:3200 \
 | `PORTAL_SECRET` | none | Lets a Form.io Enterprise portal stage connect to the UAG. |
 | `AGENT_ANONYMOUS_RATE_LIMIT`, `AGENT_ANONYMOUS_TOTAL_RATE_LIMIT` | `10`, `100` | Anonymous agent requests a minute, per address and in total, per process. `0` turns anonymous use off. |
 | `PROJECT_RETRIES`, `PROJECT_RETRY_DELAY` | `5`, `5000` | Retries while Form.io is still starting. |
+| `MAX_BODY_SIZE` | `16mb` | Largest JSON body, as Form.io's; bodies are parsed before authentication, so raise it only as far as the forms need. A form's agent operations take at most 5 MB whatever it is. |
+| `NODE_TLS_REJECT_UNAUTHORIZED` | unset | `0` accepts a self-signed `PROJECT` certificate. Never on a reachable deployment; it also turns off the hosted-service exemption. Prefer adding the CA (which turns the exemption off too). |
 | `UAG_MODULE` | none | For `npx uag` only: a module's path. The image loads `/app/module`. |
 | `DEBUG` | unset | `formio:*`, `formio:uag*`, `formio:uag:runner`. |
 | `PORT` | `3200` | |
@@ -118,8 +274,10 @@ An **engine** connects the UAG to a model provider. None runs until `UAG_ENGINES
 | Kind | Answers | Official engines |
 | --- | --- | --- |
 | Decision | Closed-set fields within its option limit, with a calibrated confidence. Fast (Jev: 70–500 ms). | `jev` (`TYPESAFE_API_KEY`, `TYPESAFE_MODEL` — pin a dated model such as `jev-1.13.0`); `openai` with `kind: decision` |
-| Agent | Open values, and closed-set fields as an uncalibrated fallback; may research with `uagTools`; serves the chat | `claude` (`CLAUDE_API_KEY`, `CLAUDE_MODEL`, default `claude-opus-5-5`), `openai` (`OPENAI_API_KEY`, `OPENAI_MODEL`, `OPENAI_BASE_URL` for Ollama or vLLM), `grok` (`XAI_API_KEY`, `XAI_MODEL`), `gemini` (`GEMINI_API_KEY`, `GEMINI_MODEL`) |
+| Agent | Open values, and closed-set fields as an uncalibrated fallback; may research with `uagTools`; serves the chat | `claude` (`CLAUDE_API_KEY`, `CLAUDE_MODEL`, default `claude-opus-5-5`), `openai` (`OPENAI_API_KEY`, `OPENAI_MODEL`, `OPENAI_BASE_URL` for Ollama, vLLM or another OpenAI-compatible server — which never receives `OPENAI_API_KEY`: give it its own key as `UAG_ENGINE_<NAME>_API_KEY`), `grok` (`XAI_API_KEY`, `XAI_MODEL`), `gemini` (`GEMINI_API_KEY`, `GEMINI_MODEL`) |
 | Built in | `stub-decision`, `stub-agent` (placeholders, no keys, no license), `remote` (an engine on an engine server) | |
+
+`OPENAI_MODEL`, `XAI_MODEL` and `GEMINI_MODEL` have no default, and startup stops without them. `openai` answers decisions with `OPENAI_KIND=decision` (or `UAG_ENGINE_<NAME>_KIND`).
 
 `UAG_ENGINES` lists instances as `<type>` or `<name>:<type>`, so one type can run twice with different settings; `UAG_ENGINE_<NAME>_<SETTING>` configures one instance and wins over the type's own variables:
 
@@ -198,16 +356,40 @@ app.use(await server.router());
 app.listen(process.env.PORT || 3200);
 ```
 
-Node 22 or newer, started with `--no-node-snapshot` (isolated-vm, which runs form logic, needs it), with the engines it enables installed beside it (`npm install @formio/uag@{uagVersion} @formio/uag-claude@{engineVersion}`, each version resolved on its own, since engines are versioned independently of the UAG).
+Node 22 or newer, started with `--no-node-snapshot` (isolated-vm, which runs form logic, can crash the process without it; or `NODE_OPTIONS=--no-node-snapshot` — the constructor refuses to start without it), with the engines it enables installed beside it (`npm install @formio/uag@{uagVersion} @formio/uag-claude@{engineVersion} express`, each version resolved on its own, since engines are versioned independently of the UAG).
+
+What breaks an embedded UAG:
+
+- **Remote MCP sign-in needs a host's root.** The UAG can be mounted under a path (`app.use('/uag', await server.router())`, with `https://app.example.com/uag` as the UAG URL): the Agent API, the chat, submissions, `/status` and the MCP endpoint with `client_credentials` all work there. With `MCP_OAUTH`, MCP clients look for the OAuth discovery documents at the root of the host, so give the UAG a host name of its own.
+- **Register the application's own routes first** when the UAG is mounted at the root. Requests the UAG does not serve fall through to later routes, except those with an admin credential (`x-admin-key`, `x-token`), which it forwards to Form.io.
+- **Load `.env` yourself.** `new UAGServer()` reads `process.env`; only the `uag` command and the image load a `.env` file (`require('dotenv/config')` first).
+- **Build tools in the image.** `isolated-vm` compiles on install: `make`, `python3` and `g++` (`apk add make python3 g++` on Alpine) in the build stage.
+- **One Form.io server package.** `@formio/uag` depends only on `@formio/appserver` (2.25.1 or later), which brings `@formio/appserver-core`. Do not add `appserver-core` yourself or pin an older `@formio/appserver`; the constructor throws "@formio/uag needs @formio/appserver-core 2.25.1 or later, through @formio/appserver" when the lockfile resolves an older one.
+- **Configuration precedence.** A module's `config`, then the constructor's, then the environment. `config.engines` replaces `UAG_ENGINES` when set.
+- **`router()` rejects** when the project cannot be loaded, an engine is misconfigured or the database may not be used. Exit on it, as the example does, so the process manager restarts it.
+
+To ship fewer engines than the official image, build an image of your own: `npm install --omit=dev @formio/uag@{uagVersion}` plus only the engine packages it enables, `ENV NODE_OPTIONS=--no-node-snapshot`, and `ENTRYPOINT ["node_modules/.bin/uag"]` (`UAG_MODULE` names a module). Naming an engine that is not installed stops startup.
+
+## Running more than one instance
+
+The UAG holds no conversation state and its MCP endpoint is stateless, so instances can sit behind a load balancer, with no sticky sessions:
+
+- The same `JWT_SECRET` on every instance, or each refuses the others' tokens.
+- The same `MONGO` and `UAG_DATABASE`, for remote MCP sign-in (an authorization code issued by one instance is exchanged at another) and for run records. A run after the save survives an instance stopping only with the database and an action that names an agent role; any other run lives in the instance that received the submission.
+- Rate limits, anonymous limits included, are per process: the total allowance is replicas × the limit.
+- Each instance refreshes the project on its own `PROJECT_TTL` timer, so instances can briefly serve different versions of a form.
+- With `TEMPLATE_SYNC=boot` every instance installs missing template items at startup; instances starting together install nothing twice. For large fleets, set `off` and provision once.
 
 ## Production checklist
 
 - Replace every placeholder secret: `ADMIN_KEY` / `PROJECT_KEY`, `JWT_SECRET`, `PORTAL_SECRET`, engine keys, database credentials. Keep them in a secret store, not in Compose files or images.
 - Set `JWT_SECRET` explicitly and identically on every instance; choose a `JWT_EXPIRE_TIME` matching the session policy.
 - Keep the UAG on a private network unless remote MCP clients must connect; then terminate TLS in front of it, publish only `{uagUrl}/mcp`, `/auth` and `/.well-known` — unless browsers also use the chat widget or Agent Input, which need the form routes (`{form}/agent/*` and submissions) too — and set `TRUST_PROXY` or `BASE_URL`.
-- Restrict `CORS` to the application's origin (one origin; several need a `cors` object in configuration). Never set `NODE_TLS_REJECT_UNAUTHORIZED=0` on a reachable deployment.
+- Restrict `CORS` to the applications' origins (comma-separated). Never set `NODE_TLS_REJECT_UNAUTHORIZED=0` on a reachable deployment.
 - Authenticate each person with their own token; reserve keys for server-side automation.
 - Raise `PROJECT_TTL`; pin `formio/uag`, engine package versions and model names.
 - Rate-limit callers and set anonymous limits and provider spend limits for public forms.
 - Measure decision thresholds with `uag-eval` before relying on them.
 - Run more than one instance only with the database (durable runs) and a shared `JWT_SECRET`; rate-limit counters are per process.
+- On an online license, allow egress to the license server and add the database, which gives a 12-hour grace period when the license server is unreachable; without it, licensed features stop at once.
+- Health-check `/status`, and let the orchestrator restart the UAG when it exits: it exits rather than serve half-configured.

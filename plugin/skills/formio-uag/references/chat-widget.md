@@ -2,7 +2,7 @@
 
 The chat widget turns any form tagged `uag` into a conversation. A person describes what they need; the chat asks only for what is still missing, maps the answers onto the form's own fields and options, refuses what the form would refuse, and, once they confirm a summary, submits the form through the UAG. The UAG is the only backend: each turn is the form's `{form}/agent/chat`, answered by one of the UAG's agent engines. There is no model code, no prompt and no server of the application's own.
 
-Chat is part of conversation forms: it needs an agent engine on the UAG and **no Agentic Formflow license**, on Form.io Open Source or the hosted service (a self-hosted Enterprise project needs a license that includes the UAG to be served at all). Task fields are left to the server on purpose: when the chat's submission is saved, the form's Run task actions decide them.
+Chat is part of conversation forms: it needs an agent engine on the UAG and **no Agentic Formflow license**, on Form.io Open Source or the hosted service (a self-hosted Enterprise project needs a license that includes the UAG to be served at all). Task fields are left to the server on purpose: when the chat's submission is saved, the form's Run task actions decide them — and Run task is Agentic Formflow, so on an unlicensed Open Source UAG those fields stay empty.
 
 ## Contents
 
@@ -93,9 +93,12 @@ Nothing is submitted without the person's confirmation, and the UAG never submit
 
 ## Setting up the form
 
+`uagAnonymous`, `uagChat` and `uagChatInstructions` are custom properties of the **form** (`form.properties`), not of a component.
+
 | Setting | Why |
 | --- | --- |
 | The `uag` tag | Without it the chat says "This form is not available for chat." |
+| An agent engine on the UAG | Without one each turn answers `503`. `GET /agent/capabilities` reports `operations.chat.available`, which a page can check before it shows the chat. |
 | Create access for the people who chat | A turn needs create access to the form's submissions, as the save does. |
 | `uagAnonymous: "true"` | Only for visitors who do not sign in. |
 | `uagChat: "false"` | Turns chat off for the form. |
@@ -103,7 +106,7 @@ Nothing is submitted without the person's confirmation, and the UAG never submit
 
 Labels, descriptions, tooltips, placeholders, validation messages and option labels are what the chat works from; write them for a person.
 
-**Collected**: text, text areas, email, phone, number, currency, checkboxes, radios, select boxes, selects with static values, tags, date and time, day, URL, surveys, and fields inside containers, fieldsets, panels, columns and layout tables. **Never set**: a task's decision and value fields (a task's input is asked like any field), `uagAuthoritative` fields, hidden, disabled and calculated fields, fields in hidden panels, non-persisted fields. **Finished in the form**: data grids, edit grids, data tables, dynamic wizards, nested forms, data maps, addresses, file uploads, signatures, sketch pads, data sources, passwords, CAPTCHAs, selects fed by a URL or a resource. A form whose required fields are mostly in the last group is a poor fit for chat.
+**Collected**: text, text areas, email, phone, number, currency, checkboxes, radios, select boxes, selects with static values, tags, date and time, day, URL, surveys, and fields inside containers, fieldsets, panels, columns and layout tables. **Never set**: a task's decision and value fields (a task's input is asked like any field), `uagAuthoritative` fields, hidden, disabled and conditionally hidden fields, calculated fields without `allowCalculateOverride`, fields in hidden panels, non-persisted fields. **Finished in the form**: data grids, edit grids, data tables, dynamic wizards, nested forms, data maps, trees and other components whose value is rows or a nested object (containers excepted), addresses, file uploads, signatures, sketch pads, tag pads, data sources, passwords, CAPTCHAs, selects fed by a URL or a resource. A form whose required fields are mostly in the last group is a poor fit for chat.
 
 ## Options
 
@@ -143,7 +146,7 @@ Every formio.js form option applies too: `templates`, `i18n`, `language`, `readO
 
 ## Templates, translations and styles
 
-The chat renders through formio.js templates: `uagChat`, `uagChatMessage`, `uagChatTyping`, `uagChatSuggestions`, `uagChatComposer`, `uagChatSummary`, `uagChatNotice` (the built-ins are exported as `CHAT_TEMPLATES`). Replace one for a chat with `options.templates`, or for every chat with `Formio.use({ templates: { bootstrap5: { ... } } })`. Keep the `ref` attributes the replaced template held (`uagChat`, `uagChatLog`, `uagChatComposer`, `uagChatForm`, `uagChatOpen`, `uagChatClose`, `uagChatReset`, `uagChatInput`, `uagChatSend`, `uagChatSuggestion`, `uagChatSubmit`, `uagChatEdit`). In a string template, insert a message with `{{ ctx.html }}` (escaped, or sanitized markdown) — never `{{ ctx.text }}`, which `{{ }}` inserts as is. A notice is the one template with no `html`: its `text` may carry a server's error message, so the example below relies on the chat sanitizing every template's output before it is inserted; a function template should escape it, as the built-in one does.
+The chat renders through formio.js templates: `uagChat`, `uagChatMessage`, `uagChatTyping`, `uagChatSuggestions`, `uagChatComposer`, `uagChatSummary`, `uagChatNotice` (the built-ins are exported as `CHAT_TEMPLATES`). Replace one for a chat with `options.templates`, or for every chat with `Formio.use({ templates: { [Formio.Templates.framework || 'bootstrap']: { ... } } })`. Key it by the framework the application actually renders with: on a default `@formio/js` 5 install that is `bootstrap` (Bootstrap 5 is registered under that name), so an override keyed `bootstrap5` creates an unused template set and is ignored without an error. Keep the `ref` attributes the replaced template held (`uagChat`, `uagChatLog`, `uagChatComposer`, `uagChatForm`, `uagChatOpen`, `uagChatClose`, `uagChatReset`, `uagChatInput`, `uagChatSend`, `uagChatSuggestion`, `uagChatSubmit`, `uagChatEdit`). In a string template, insert a message with `{{ ctx.html }}` (escaped, or sanitized markdown) — never `{{ ctx.text }}`, which `{{ }}` inserts as is. A notice is the one template with no `html`: its `text` may carry a server's error message, so the example below relies on the chat sanitizing every template's output before it is inserted; a function template should escape it, as the built-in one does.
 
 ```js
 Formio.createChat(element, formUrl, {
@@ -164,4 +167,4 @@ Every fixed string goes through formio.js translation with its English text as t
 
 ## Limits
 
-A turn carries at most 40 messages of at most 2000 characters, and the UAG sends the engine the newest 24,000 characters (`agentApi.chat`). Callers are rate-limited per operation with `agentApi.rateLimits.caller.chat`. The engines tried are `agentApi.chat.engines` (default: every agent engine, in order); to give the chat a faster model than value fields, enable a second instance (`UAG_ENGINES=jev,deep:claude,chat:claude` with `UAG_ENGINE_CHAT_MODEL=claude-haiku-5-5`) and name it in both lists in a module's `config`: `routing: { value: ['deep'] }` (so the chat instance is not also a fallback for value and decision fields) and `agentApi: { chat: { engines: ['chat', 'deep'] } }`.
+A turn carries at most 40 messages of at most 2000 characters, and the UAG sends the engine the newest 24,000 characters (`agentApi.chat`). Callers are rate-limited per operation with `agentApi.rateLimits.caller.chat`. The engines tried are `agentApi.chat.engines` (default: every agent engine, in order); to give the chat a faster model than value fields, enable a second instance (`UAG_ENGINES=jev,deep:claude,chat:claude` with `UAG_ENGINE_CHAT_MODEL=claude-haiku-5-5`) and name it in a module's `config`: `routing: { decision: ['decision', 'deep'], value: ['deep'] }` (so the chat instance is not also a fallback for value or decision fields; the decision default, `['decision', 'agent']`, includes every agent engine) and `agentApi: { chat: { engines: ['chat', 'deep'] } }`.

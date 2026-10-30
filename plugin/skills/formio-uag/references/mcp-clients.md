@@ -1,6 +1,6 @@
 # Conversation forms over MCP
 
-The UAG serves the Model Context Protocol at `{uagUrl}/mcp`. Any MCP client can connect — Claude Desktop, claude.ai connectors, Claude Code, or an application written with an MCP SDK — and use the project's `uag` forms: list them, learn their fields, validate answers, submit, search and update, always as the signed-in caller. The model runs in the client; the UAG supplies context and performs every write through the form's validation and the caller's permissions. No license is needed on Form.io Open Source or the hosted service.
+The UAG serves the Model Context Protocol at `{uagUrl}/mcp`. Any MCP client can connect — Claude Desktop, claude.ai connectors, Claude Code, or an application written with an MCP SDK — and use the project's `uag` forms: list them, learn their fields, validate answers, submit, search and update, always as the signed-in caller. The model runs in the client; the UAG supplies context and performs every write through the form's validation and the caller's permissions. No license is needed on Form.io Open Source or the hosted service, except for the two Agentic Formflow tools, `agent_provide` and `agent_decide`, which answer `license_required` without one (or a hosted project).
 
 This MCP server is the user's runtime surface, distinct from the Form.io MCP server this skill library uses at build time. Write configuration and client code for it; do not connect to it from this session.
 
@@ -46,12 +46,14 @@ Content-Type: application/json
 ```
 
 ```json
-{ "access_token": "eyJ...", "token_type": "Bearer", "expires_in": 216000, "refresh_token": "eyJ...", "scope": "formio" }
+{ "access_token": "eyJ...", "token_type": "Bearer", "expires_in": 3600, "scope": "formio" }
 ```
 
-`expires_in` is `JWT_EXPIRE_TIME` minutes times 60. Cache the token and renew it shortly before it expires, or exchange the `refresh_token` (valid twice as long) with `grant_type: "refresh_token"`. A wrong `client_id` prefix or secret answers `400`. **A `client_credentials` token acts as the project administrator**: every tool call may read and write anything in the project. Use it for trusted automation only; anything acting for a person should present that person's own token.
+`expires_in` is `JWT_EXPIRE_TIME` minutes times 60. Cache the token and request a new one with `client_credentials` shortly before it expires; this grant returns no refresh token. Refusals are OAuth errors (RFC 6749), `400` with `{ "error": "invalid_client", "error_description": "..." }` for a wrong `client_id` prefix or secret (`invalid_request`, `invalid_grant` and `unsupported_grant_type` for the other cases). A `401` from `{uagUrl}/mcp` is RFC 6750's: `WWW-Authenticate` names `error="invalid_token"` when a token was sent, and the body is `{ error, error_description }`. **A `client_credentials` token acts as the project administrator**: every tool call may read and write anything in the project. Use it for trusted automation only; anything acting for a person should present that person's own token.
 
 ### Remote clients: OAuth with PKCE
+
+A signed-in session lasts as long as the user's Form.io login token, whatever `JWT_EXPIRE_TIME` says: Form.io's `jwt.expireTime` (240 minutes by default), after which `mcp-remote` or the connector asks the user to sign in again. Raise Form.io's setting, not the UAG's, for longer sessions.
 
 The client discovers everything itself: `401` with `resource_metadata` → `/.well-known/oauth-protected-resource` → `/.well-known/oauth-authorization-server` → dynamic registration at `/auth/register` → the browser opens `/auth/authorize`, which loads the project's login form from `LOGIN_FORM` → the code is exchanged at `/auth/token` with the `code_verifier`. Every later tool call runs as that user.
 

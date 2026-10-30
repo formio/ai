@@ -24,7 +24,7 @@ An agentic workflow runs a form's task on a submission with no person in the loo
 | A form tagged `uag` with at least one task | The criteria, and the fields the task fills ([tasks.md](./tasks.md)). |
 | An engine on the UAG | For example `UAG_ENGINES=claude` with `CLAUDE_API_KEY` ([deployment.md](./deployment.md)). |
 | A license, or a hosted project | Without one, a run before the save refuses the submission with `403` (`code: "license_required"`) and a run after the save fails and is logged. |
-| Submissions sent to the UAG | Run task runs only for submissions the UAG receives: through its submission API, its MCP tools, or `@formio/uag-js`. A submission sent straight to Form.io runs no task. |
+| Submissions sent to the UAG | Run task runs only for submissions the UAG receives: through its submission API (`{form}/submission` on the UAG — the application's project URL pointed at the UAG), its MCP tools, or `@formio/uag-js`. A submission sent straight to Form.io runs no task. |
 
 ## How a submission flows through the UAG
 
@@ -100,7 +100,11 @@ Failures:
 | --- | --- | --- |
 | Before, decisions only | Some decision fields (every engine failed, timed out, was over its rate limit, or none is enabled) | The submission is refused with `503` (`429` when every engine was over its limit) and nothing is stored. An outage fails closed. |
 | Before, whole task | Some field groups | The save is forwarded without those answers. |
+| Before, either | Agentic Formflow is not licensed | `403` with `code: "license_required"`; nothing is stored. |
+| Before or after | A value the run wrote fails the form's validation | That field is left out, as if unanswered: reported `missing` with `reason: "failed validation: ..."`, cleared when `uagAuthoritative`, otherwise left as it was. The rest of the run is saved, so an engine's mistake never refuses the person's submission. A run after the save logs `[formio-uag] Run task "<task>" left out answers the form refused ...` and, with the database, names the fields in its Action Logs. |
 | After | Anything | The submitter's response is unaffected. A whole-task run saves what it obtained; a decisions-only run saves nothing. The failure is logged as `[formio-uag] Run task "<task>" failed for submission <id> of "<form>": ...`, and recorded with the database. |
+
+A refusal before the save answers in Form.io's shape, `{ name, message, code }` (plus `edition` for `license_required`), so formio.js shows it as it shows Form.io's errors; application code that submits shows `message` and branches on `code` (`license_required`, `decision_unavailable`, `rate_limited`, `forbidden`, `invalid_request`, `configuration_error`).
 
 A run after the save loads the stored submission, runs the task, saves nothing if nothing changed (a changed confidence alone does not count), and otherwise saves only the task's fields and their provenance as an update. If a person saved the submission meanwhile, the run starts once more on the new version; a second change fails it with `409`. Each UAG instance runs up to four runs at a time.
 
@@ -138,7 +142,7 @@ Every save after the save is an update, so it runs the update actions again. Thr
 2. **A run that changes nothing saves nothing.** Value fields are generated only while empty.
 3. **Confidence changes are not saves.**
 
-As a last guard the UAG stops a chain after 5 runs in a row that were each started by the save of the one before. Check condition operators: a clause with an operator the UAG does not know always holds. "An agent that runs continuously and burns credits" is almost always a Run task on update whose condition stays true, often with `uagAgentDecides` on a field the agent answers differently each time.
+As a last guard the UAG stops a chain after 5 runs in a row that were each started by the save of the one before. An action whose condition names an operator Form.io does not know is never run, and the log says so once. "An agent that runs continuously and burns credits" is almost always a Run task on update whose condition stays true, often with `uagAgentDecides` on a field the agent answers differently each time.
 
 ## Closed-set fields with only an agent engine
 
@@ -172,7 +176,7 @@ Mark those fields `uagAuthoritative: "true"`: confident answers are written, fie
 | | No agent role | With an agent role |
 | --- | --- | --- |
 | Acts at Form.io as | The caller, with the credential the submission arrived with | The agent role, on the caller's behalf, with a 5-minute token the UAG signs |
-| The caller must be allowed to | Create the submission, and update it for a run after the save | Create the submission, or hold one of the action's submitter roles |
+| The caller must be allowed to | Create the submission; for a run after the save, also read and update it (without read access the run fails with `404` "Submission ... was not found", which looks like a missing record) | Create the submission, or hold one of the action's submitter roles |
 | Keeps users off the agent's fields | Only for requests sent to the UAG | Everywhere, including requests straight to Form.io |
 | A run after the save | Keeps the caller's token in memory only; fails if it expires or the user logs out first | Survives a restart, with the UAG's database |
 | Available on | Every edition | Self-hosted Form.io Enterprise, with the UAG's `JWT_SECRET` equal to Form.io's |
@@ -207,5 +211,5 @@ A task that must look something up lists read-only tools on its criteria (`"uagT
 - Hide the criteria and agent panels (`hidden: true`).
 - Fix the permissions: a user resource with login, submission access scoped to owners, and on self-hosted Enterprise an agent role.
 - Send every submission to the UAG; give users no create or update at Form.io when the agent's fields must be trusted.
-- Add the UAG's database for run records, Action Logs, durable runs and several instances. It needs a license that includes the UAG, even on a hosted project, whose endpoint must then be on that license's allowlist.
+- Add the UAG's database (`MONGO`, `UAG_DATABASE`, `TASK_RUN_RETENTION_DAYS`) for run records, Action Logs, durable runs and several instances. It needs a license that includes the UAG, even on a hosted project, whose endpoint must then be on that license's allowlist; only a project and database both on development hosts are exempt. Without a usable license the UAG does not fail: it logs why, leaves the database untouched, and keeps runs in memory.
 - Raise `PROJECT_TTL` from development values; pin images and engine models; measure thresholds with `uag-eval`.

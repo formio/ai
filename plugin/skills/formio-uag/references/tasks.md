@@ -39,9 +39,11 @@ A task is the set of components that carry the same value in their `uag` propert
 | --- | --- | --- |
 | **Criteria** | A content component with `uag: "<task>"` and `uagField: "criteria"`. Its HTML, converted to Markdown, is the task's instructions. | Always add one. The `agent_provide` MCP tool refuses a task without it, and the Agent API runs one with no instructions. |
 | **Agent fields** | Any input component with `uag: "<task>"` and no `uagField`; or a Panel, Fieldset, Well or Container with `uag: "<task>"`, which makes every input inside it an agent field. | Yes |
-| **Input** | A field or container with `uag: "<task>"` and `uagField: "input"`. Its value is the text the task reads. | No. Without one, the task reads every filled value in the submission except its own fields, and `extract` needs a `text` in the request. |
+| **Input** | A field or container with `uag: "<task>"` and `uagField: "input"`. Its value is the text the task reads. | No. Without one, the task reads every filled value in the submission except the fields being answered in this run, and `extract` needs a `text` in the request. |
 
-Fields inside a Data Grid or Edit Grid are never answered (`excluded`: `inside repeating rows`).
+Fields inside a Data Grid or Edit Grid are never answered (`excluded`: `inside repeating rows`). `uag` on a Panel, Fieldset, Well, Tabs, Columns, Table or Container makes every input inside it one of the task's fields.
+
+Write every `uag*` value as a **string**, as the portal saves custom properties: `"true"`, `"false"`, `"0.7"`. The switches (`uagAuthoritative`, `uagAgentDecides`, `uagScale`, `uagOrderCheck`, `uagAnonymous`, `uagChat`) also accept JSON booleans in 2.0.0.
 
 A task fills only its own fields: values an engine returns for any other path are discarded. That is the guard that keeps text in a submission from making a model write somewhere else.
 
@@ -76,7 +78,7 @@ Engines are deliberately given little, because unrelated detail lowers decision 
 | `context` | The values at the paths listed in the criteria's `uagContext`, keyed by label. |
 | `today` | Today's date, such as `Friday, October 23, 2026 (2026-10-23)`. |
 
-Agent engines also receive each target field's label, type, description, validation, format and options, and a JSON schema for the answer. Use `uagContext` for the one or two facts a decision depends on that are not in the input, such as a policy number or a customer tier.
+Agent engines also receive each target field's path, label, type, description, rule, format and options, and a JSON schema for the answer. The rule states the field's validation: lengths, word counts, the pattern, the range, the input mask and fixed date limits. It leaves out `required` (so an engine is not pushed to invent a value) and custom or JSONLogic validation, which cannot be stated; put a rule like that in the field's `description` or the criteria. The form still validates every answer: the Agent API keeps a failing suggestion with `reason: "failed validation: ..."`, and Run task leaves it out ([workflows.md](./workflows.md#before-or-after-the-save)). Use `uagContext` for the one or two facts a decision depends on that are not in the input, such as a policy number or a customer tier.
 
 ## Decision fields and value fields
 
@@ -84,8 +86,8 @@ The UAG sorts every target field into one of two kinds and sends each kind to a 
 
 | Kind | Components | Answered by | Statuses |
 | --- | --- | --- | --- |
-| **Decision** | Radio and select with static values; checkbox; select boxes; survey; single-value resource selects whose whole resource fits the decision engine's option limit (255 for Jev) | A decision engine (`jev`, or `openai` with `kind: decision`), with a calibrated confidence. If none answers, an agent engine as an uncalibrated fallback. | `confident`, `uncertain`, `missing` (`suggested` from the fallback) |
-| **Value** | Everything else: text, text areas, dates, numbers, currency, email, multi-value selects, selects fed by a URL, resource selects too large to decide | An agent engine (`claude`, `openai`, `grok`, `gemini`) | `suggested`, `missing` |
+| **Decision** | Radio and select with static values, single or multiple (a multi-value select is asked as one yes/no pair per option and answered as an array); checkbox; select boxes; survey; single-value resource selects whose whole resource fits the decision engine's option limit (255 for Jev) | A decision engine (`jev`, or `openai` with `kind: decision`), with a calibrated confidence. If none answers, an agent engine as an uncalibrated fallback. | `confident`, `uncertain`, `missing` (`suggested` from the fallback) |
+| **Value** | Everything else: text, text areas, dates, numbers, currency, email, multi-value resource selects, selects fed by a URL, resource selects too large to decide, and radios or selects with more options than the decision engine's limit | An agent engine (`claude`, `openai`, `grok`, `gemini`) | `suggested`, `missing` |
 
 `uagEngine` on a field, or on the criteria for the whole task, overrides the routing.
 
@@ -103,7 +105,7 @@ Decision engines are asked closed questions compiled from the component, with ch
 - **Choice** (radio, select, a survey row): one question over the option labels, asked again with the options reversed; a changed answer makes the field `uncertain`. `uagOrderCheck: "false"` drops the second question.
 - **Score** (an ordered radio or select with `uagScale: "true"` and a description for every option in `uagOptionDescriptions`, 2 to 10 levels): one question over the described levels.
 - **Mention check**: every choice and score is paired with "does the input address this at all?". Below the uncertain band the field is left empty, inside it the field is `uncertain`. This is how "nobody was hurt" is told apart from not mentioning injuries.
-- **Yes/no** (a checkbox, each select-box option): "does the input affirm this?" and "does it deny it?". True needs a clear affirmation and no denial, false the reverse.
+- **Yes/no** (a checkbox, each select-box option, each option of a multi-value select): "does the input affirm this?" and "does it deny it?". True needs a clear affirmation and no denial, false the reverse.
 - **Resource match** (a resource select): a choice over every record. A record named in the input but not on file gives `missing` with `noMatch: true`, and `newRecordName` when an agent engine is enabled.
 
 Thresholds: `uagThreshold` (choice and score, default `0.5`) and `uagUncertainBand` (yes/no and mention checks, default `0.2-0.8`). Measure them with `uag-eval` on labelled examples of the user's own data before relying on the defaults.

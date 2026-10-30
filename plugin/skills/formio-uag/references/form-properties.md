@@ -167,7 +167,7 @@ A JSON object (as a string) mapping each option value to the situation it covers
 
 ### `uagOrderCheck`
 
-On by default: every choice is asked again with its options reversed, because decision models favour the first option they see; a changed answer makes the field `uncertain`. `"false"` halves the questions for a field whose options are unambiguous.
+On by default: every choice is asked again with its options reversed, because decision models favour the first option they see; a changed answer makes the field `uncertain`. `"false"` drops the reversed question (two questions instead of three, with the mention check) for a field whose options are unambiguous.
 
 ### `uagConfidenceField`
 

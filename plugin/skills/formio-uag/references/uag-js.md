@@ -72,7 +72,7 @@ Mounting the form itself — lifecycle, teardown, change detection — stays wit
 | The form's definition, files, resources and select data | Form.io, as before |
 | Everything for a form without the tag | Form.io, as before |
 
-Each request to the UAG carries the credential formio.js already sends to Form.io: the signed-in user's `x-jwt-token`, or none for a visitor. When the UAG cannot be reached, the submission fails with formio.js's normal error; it is never sent to Form.io instead, which would skip the form's tasks. A form rendered from a definition object rather than its URL has no URL to route from: its submissions are not rerouted, and Agent Input is attached only when the definition carries its `_id` (and `project` on Enterprise).
+Each request to the UAG carries the credential formio.js already sends to Form.io: the signed-in user's `x-jwt-token`, or none for a visitor. When the UAG cannot be reached, the submission fails with formio.js's normal error; it is never sent to Form.io instead, which would skip the form's tasks. A form rendered from a definition object rather than its URL has no URL to route from: its submissions are not rerouted, and Agent Input is attached only when the definition carries its `_id` (and `project` on Enterprise). React's `<Form form={definition}>` and Angular's `[form]` input are this case: render `uag` forms with `src` (the form's URL), or attach by hand with `formUrl` and submit through the UAG yourself. A form loaded at a revision URL (`{form}/v/{n}`) saves to the form itself.
 
 **This is not a security boundary.** Routing happens in the browser, and a client can always post straight to Form.io. Keep an agent's fields safe on the server: `uagAuthoritative` on them, a Run task before the save that re-decides them, and on self-hosted Enterprise an agent role with form permissions that refuse users' direct writes ([workflows.md](./workflows.md)).
 
@@ -87,6 +87,7 @@ Each request to the UAG carries the credential formio.js already sends to Form.i
 | `trigger` | `next` for wizards, `blur` otherwise | When to extract: `blur`, `pause`, `next` or `button`. |
 | `pauseMs` | `800` | With `pause`: the pause in typing that triggers a request. |
 | `nextTimeoutMs` | `1500` | With `next`: the longest the wizard waits for decisions before moving on. |
+| `requireReview` | `false` | Stop wizard **Next** and **Submit** until the user ticks "Yes, this looks right" on each uncertain value, or changes it. |
 | `fetch` | the global `fetch` | The `fetch` Agent Input uses. |
 | `onStart`, `onResult`, `onError`, `onDone` | | Callbacks for every form; see below. |
 
@@ -152,7 +153,7 @@ agent.detach();
 - **Uncertain means check.** Confident values show their confidence; uncertain ones are prefilled with a "Please check this." note and a button per alternative; agent-engine values are marked as suggestions.
 - **The form keeps working.** On a failure the user sees a short message under the input and carries on by hand.
 
-Styles: `uag-chip uag-confident`, `uag-chip uag-uncertain`, `uag-alternative`, `uag-chip uag-suggested`, and `uag-error` (with `role="status"`).
+Styles: `uag-chip uag-confident`, `uag-chip uag-uncertain`, `uag-alternative`, `uag-chip uag-suggested`, and `uag-error` (with `role="status"`); with `requireReview`, `uag-review` (the checkbox's label), `uag-review-needed` (an unticked note after Next or Submit was stopped) and `uag-reviewed`.
 
 Values Agent Input writes are values the user submits. To trust a decision that drives routing, re-decide it on the server with a Run task before the save ([workflows.md](./workflows.md#re-deciding-on-the-server)).
 
