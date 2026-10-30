@@ -1,7 +1,7 @@
 // The release job's wait for npm to surface the version it just published.
 //
 // Every downstream publish — the MCP Registry, the .mcpb bundle, the GitHub
-// release, Smithery, and the Docker image — is gated on this step finding the
+// release, and the Docker image — is gated on this step finding the
 // version on npm. npm now accepts a publish and reports "Your package is being
 // processed and may take a few minutes to become available": 0.14.0 was accepted
 // at 20:45:06 and listed at 20:47:25, while the step gave up after 60 seconds.
