@@ -95,7 +95,7 @@ jobs:
           # On a push with no changesets that published nothing, the pushed
           # package.json names a version npm already has and the first lookup
           # succeeds. So a version that never appears is a release that was dropped, and the job must fail rather
-          # than go green with the registry, bundle, release, Smithery and image
+          # than go green with the registry, bundle, release and image
           # steps all silently skipped. Re-running the job publishes them: the
           # changesets step skips versions already on npm.
           DEADLINE_SECONDS=600
@@ -114,7 +114,7 @@ jobs:
             sleep 15
           done
 
-          echo "::error::npm still does not have @formio/mcp@${VERSION} after ${DEADLINE_SECONDS}s. The MCP Registry, .mcpb bundle, GitHub release, Smithery and Docker publishes did not run. Re-run this job once npm lists the version."
+          echo "::error::npm still does not have @formio/mcp@${VERSION} after ${DEADLINE_SECONDS}s. The MCP Registry, .mcpb bundle, GitHub release and Docker publishes did not run. Re-run this job once npm lists the version."
           exit 1
 
       # Asked as "does the registry already have THIS version?", by exact query.
@@ -124,7 +124,7 @@ jobs:
       # 0.10.0 onward every push to main concluded the current version was
       # unpublished, tried to publish it, and failed on the registry's own
       # "cannot publish duplicate version" — which failed the whole job and took
-      # the .mcpb bundle, the GitHub release, the Smithery publish and the image
+      # the .mcpb bundle, the GitHub release and the image
       # decision down with it, on a push that had released nothing at all.
       #
       # An exact query is also immune to the pagination this search will hit as
@@ -174,9 +174,7 @@ jobs:
 
       ### Publish the desktop bundle (.mcpb) and the GitHub release that carries it.
       # An .mcpb is the one-click install path for desktop hosts such as Claude
-      # Desktop: no npm, no CLI, no hand-edited JSON. It is also the artifact the
-      # Smithery CLI can publish, since that accepts a URL or a bundle but not a
-      # stdio npm package.
+      # Desktop: no npm, no CLI, no hand-edited JSON.
       #
       # This repo has no tags or GitHub releases — `pnpm release` is a custom
       # publish, so changesets/action never creates them — hence the release is
@@ -203,27 +201,6 @@ jobs:
               --target "${GITHUB_SHA}"
           fi
 
-      # Smithery lists the bundle under the formio namespace. Skips cleanly when the
-      # token is absent, matching the Docker Hub step, so forks and unconfigured
-      # repos still release successfully.
-      #
-      # Publishes the .smithery.mcpb variant, not the one attached to the GitHub
-      # release: Smithery validates manifest.tools against the MCP Tool type and
-      # rejects entries with no inputSchema, which is more than the MCPB schema
-      # permits. See scripts/build-mcpb.ts.
-      - name: Publish the bundle to Smithery
-        if: steps.pkg.outputs.version != ''
-        env:
-          SMITHERY_API_KEY: ${{ secrets.SMITHERY_API_KEY }}
-          VERSION: ${{ steps.pkg.outputs.version }}
-        run: |
-          set -euo pipefail
-          if [ -z "${SMITHERY_API_KEY:-}" ]; then
-            echo "SMITHERY_API_KEY is not configured — skipping the Smithery publish."
-            exit 0
-          fi
-          npx -y @smithery/cli@latest mcp publish ./dist/formio-mcp.smithery.mcpb -n formio/mcp
-
       ### Decide whether the container image needs publishing.
       # Same idempotent shape as the registry publish: only when npm already has
       # the version and Docker Hub does not. Skips cleanly when credentials are absent
@@ -232,9 +209,9 @@ jobs:
       # The decision lives here, in the job that knows the released version; the
       # build itself runs in docker-image below, on one runner per architecture.
       # Keeping it a separate job is what stops an image failure from touching the
-      # npm, registry, bundle and Smithery publishes above — it used to sit in this
-      # job, where a single QEMU crash silently withheld the .mcpb, the GitHub
-      # release and the Smithery publish. Each channel is independent, so an image
+      # npm, registry and bundle publishes above — it used to sit in this
+      # job, where a single QEMU crash silently withheld the .mcpb and the GitHub
+      # release. Each channel is independent, so an image
       # failure now costs only the image.
       - name: Decide whether to publish to Docker Hub
         id: dockerhub
