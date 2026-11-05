@@ -64,7 +64,7 @@ Every operation's response carries an `X-Request-Id` header (exposed to browsers
 | `overwrite` | extract, decide, generate | Default `false`: only empty fields are answered, and filled ones are `excluded` as `already has a value`. |
 | `text` | extract | Source text; replaces the task's input for this call. |
 
-Bodies are limited to 5 MB (`413`). Send `task`, never 1.x's `persona`: a body that names `persona` and no `task` is refused with `400`.
+Bodies are limited to 5 MB by default (`413` `payload_too_large`, naming the limit); an operator raises it with `AGENT_BODY_LIMIT` (bytes) or `agentApi.bodyLimit` in a module, within `MAX_BODY_SIZE`, for a document sent inline as a base64 file a task reads. Send `task`, never 1.x's `persona`: a body that names `persona` and no `task` is refused with `400`.
 
 ## The result object
 
@@ -200,7 +200,7 @@ Every error from a form's agent operations and `/agent/capabilities` is JSON `{ 
 | `403` | `forbidden` | The caller lacks create/update access (an anonymous visitor: the Anonymous role may not create). |
 | `403` | `chat_disabled` | Chat turned off by `uagChat: "false"`. |
 | `404` | `form_not_found` | The form does not exist or is not tagged `uag`. |
-| `413` | `payload_too_large` | Body over 5 MB. |
+| `413` | `payload_too_large` | Body over the agent operations' limit (5 MB by default; `AGENT_BODY_LIMIT`). |
 | `429` | `rate_limited` | The caller, an anonymous visitor, or every engine is over its rate limit. `Retry-After` when the caller is limited. |
 | `500` | `internal_error` | See the UAG's log under the request id. |
 | `502` | `engines_failed` | Chat: every engine failed. |

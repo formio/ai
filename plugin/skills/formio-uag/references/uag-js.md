@@ -11,6 +11,7 @@ Tagging a form `uag` is then all it takes to move it onto the UAG; the applicati
 ## Contents
 
 - [Install and register](#install-and-register)
+- [Loading it from the UAG](#loading-it-from-the-uag)
 - [What it changes, and what it does not](#what-it-changes-and-what-it-does-not)
 - [Options](#options)
 - [Setting up the form](#setting-up-the-form)
@@ -63,6 +64,21 @@ Registering also adds the `chat` display and `Formio.createChat` (exported as `c
 
 Mounting the form itself — lifecycle, teardown, change detection — stays with `formio-form`, `formio-react` or `formio-angular`; this module changes only where `uag` forms save and what they can do.
 
+## Loading it from the UAG
+
+Every UAG serves the `@formio/uag-js` it was installed with (the `formio/uag` image includes it), so a page without a bundler can load it from the UAG itself, at the UAG's own version, after formio.js:
+
+```html
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@formio/js@5/dist/formio.full.min.css">
+<link rel="stylesheet" href="https://uag.example.com/uag-js/uag-js.css">
+<script src="https://cdn.jsdelivr.net/npm/@formio/js@5/dist/formio.full.min.js"></script>
+<script src="https://uag.example.com/uag-js/uag.use.js"></script>
+```
+
+`uag.use.js` registers itself: it takes the UAG URL from its own `src`, carries the UAG's plugin manifest, and includes the formio.js component of every module the UAG uses (AI Document's, for one); `uag-js.css` carries their stylesheets. Do not call `Formio.use(UAG(...))` on top of it — the page would register the module twice. To pass options, load `index.js` instead (from jsDelivr or npm, as above) and register it yourself with `Formio.use(FormioUAG.UAG('https://uag.example.com', options))`; the modules' components are then at `{uagUrl}/uag-js/components/<type>.js` (and `<type>.css`), loaded after that registration.
+
+These files are public (`Access-Control-Allow-Origin: *`) and revalidated on every load (`Cache-Control: no-cache` with an `ETag`), so a page always gets the copy that matches the UAG. A UAG installed without `@formio/uag-js` answers `404` "@formio/uag-js is not installed with this UAG.".
+
 ## What it changes, and what it does not
 
 | Request | Goes to |
@@ -90,6 +106,10 @@ Each request to the UAG carries the credential formio.js already sends to Form.i
 | `requireReview` | `false` | Stop wizard **Next** and **Submit** until the user ticks "Yes, this looks right" on each uncertain value, or changes it. |
 | `fetch` | the global `fetch` | The `fetch` Agent Input uses. |
 | `onStart`, `onResult`, `onError`, `onDone` | | Callbacks for every form; see below. |
+| `manifest` | fetched from `{uagUrl}/plugins` at registration, with the user's token | The installed plugins, which modules' components read. `uag.use.js` passes it embedded. |
+| `portal` | `false` | Used by the UAG's portal script: registers only the client and the manifest, for modules' components in the form builder. Not for applications. |
+
+Besides `UAG`, `attach` and `createChat`, the package exports `client` (also `UAG.client` and, once registered, `Formio.uagClient`): the browser API that modules' components build on — the UAG's URL, the user's token and headers, a form's URL on the UAG, the installed plugins, and `stream()` for a module's routes. `UAG.ready` resolves once the installed plugins are known; an application with its own form builder awaits it before offering modules' components. `renderMarkdown(markdown)` (also `UAG.renderMarkdown`) renders Markdown as the AI Document does, with all text escaped.
 
 ## Setting up the form
 
