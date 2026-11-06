@@ -14,7 +14,7 @@ The UAG runs as the Docker image `formio/uag` (which includes every official eng
 - [The UAG's database](#the-uags-database)
 - [Connecting the Enterprise portal](#connecting-the-enterprise-portal)
 - [Modules](#modules)
-- [Plugins files](#plugins-files)
+- [Plugins and add-ons](#plugins-and-add-ons)
 - [AI Document](#ai-document)
 - [Embedding in a Node.js server](#embedding-in-a-nodejs-server)
 - [Running more than one instance](#running-more-than-one-instance)
@@ -269,8 +269,9 @@ The resource figures are a starting point, not a measurement: form logic runs in
 | `DOCUMENTS_MAX_IMAGE_PIXELS` | `50000000` | Largest PNG, in pixels, the built-in `image-pdf` converter takes (`config.plugins.settings.converter['image-pdf'].maxPixels` wins). |
 | `NODE_TLS_REJECT_UNAUTHORIZED` | unset | `0` accepts a self-signed `PROJECT` certificate. Never on a reachable deployment; it also turns off the hosted-service exemption. Prefer adding the CA (which turns the exemption off too). |
 | `UAG_MODULE` | none | For `npx uag` only: a module's path. The image loads `/app/module`. |
-| `UAG_PLUGINS` | `/app/plugins/index.mjs` when it exists | A plugins file for `npx uag` and the image ([Plugins files](#plugins-files)); `off` loads none. |
-| `MODULES_DISABLED` | none | Modules to leave out, by name, comma-separated (`ai-document`), such as one an image includes. |
+| `UAG_PLUGINS` | the folder `/app/plugins` when it exists | A plugins file or folder for `npx uag` and the image ([Plugins and add-ons](#plugins-and-add-ons)); `off` loads none. |
+| `MODULES_DISABLED` | none | Modules to leave out, by name, comma-separated (`ai-document`), such as one an add-on loads. |
+| `PLUGINS_DISABLED` | none | Plugins to leave out, as `<type>:<name>`, comma-separated (`document:translate`). |
 | `DEBUG` | unset | `formio:*`, `formio:uag*`, `formio:uag:runner`. |
 | `PORT` | `3200` | |
 
@@ -352,22 +353,116 @@ A module can also bring a whole capability (experimental in 2.0). With a `name`,
 
 `server.use()` takes a module, a list of them, or an ES module namespace (used by its default export). A module given twice (by `name`) is used once; two versions of one, or an MCP tool, engine type, route or component type that two modules define, stop startup. `MODULES_DISABLED` leaves modules out by name, and `GET` on the project's URL on the UAG plus `/plugins` lists each one used (`type: "module"`). `close` runs when the server is destroyed: the `uag` command and the image do it on `SIGTERM` or `SIGINT` — they stop taking connections, close each module and plugin, and exit `0`, or `1` when that fails or takes more than 10 seconds — and an embedding server calls `server.destroy()` itself. `@formio/uag/testing` (`createTestModuleApi`, `mountModuleRoutes`, `testForm`, `testAuth`) tests a module without a project. The whole contract is at `https://ai.form.io/developers/modules`.
 
-## Plugins files
+## Plugins and add-ons
 
-A plugins file adds plugins — converters, document plugins — and modules without a module folder. The image and `npx uag` load `/app/plugins/index.mjs` when it exists, or the file `UAG_PLUGINS` names (`off` loads none), after the module. Its default export is a plugin, a module, or a list mixing them. Plugins are trusted code: they run in the UAG's process. A plugin's settings come from `config.plugins.settings.<type>.<name>` in a module, or its own environment variables. The built-in converters read PDF (its text layer), text, Markdown, CSV, JSON, HTML and XML, and turn a PNG or JPEG image into a one-page PDF (`image-pdf`). See `https://ai.form.io/developers/plugins`.
+A plugins file adds plugins — converters, document plugins — and modules without a module folder: an `index.mjs` whose default export is a plugin, a module, or a list mixing them, in a folder with its own `node_modules` for what it imports. Plugins are trusted code: they run in the UAG's process. A plugin's settings come from `config.plugins.settings.<type>.<name>` in a module, or its own environment variables. The built-in converters read PDF (its text layer), text, Markdown, CSV, JSON, HTML and XML, and turn a PNG or JPEG image into a one-page PDF (`image-pdf`). See `https://ai.form.io/developers/plugins`.
+
+The image and `npx uag` load plugins files after the module, from what `UAG_PLUGINS` names (a file, a folder, or `off` for none), or else from the folder `/app/plugins` when it exists:
+
+- **A file:** that file alone.
+- **A folder with an `index.mjs`:** that file alone (one plugins folder, mounted at `/app/plugins` itself).
+- **Any other folder:** the `index.mjs` of each folder directly in it, one per add-on, in name order, skipping `node_modules` and names that start with `.`. Each file is named by its path in messages, and the startup log has one line per file: `[formio-uag] Plugins and modules loaded from /app/plugins/documents/index.mjs.`
+
+Folders under `/app/plugins` need `formio/uag` 2.0.0-rc.8 or later; 2.0.0-rc.7 loads only `/app/plugins/index.mjs`. Beside add-ons, never mount a folder with an `index.mjs` at `/app/plugins` itself: it is then loaded alone, and the add-ons' folders are not. Several files merge as several modules do:
+
+- A module two of them bring, at the same `name` and `version`, is used once; two versions of it stop startup: "Two versions of the module X are used: A from <file>, and B from <file>. Use one."
+- The same plugin (`type:name`), plugin type, form route or component type from two files stops startup, naming both: "Plugin converter:same is registered twice: by <file> and by <file>". Leave one out with `PLUGINS_DISABLED`, or give your own another `name`.
+- A plugin may use a plugin type another file's module defines: types are registered before plugins, so name order does not matter. A document plugin of your own uses the `document` type the AI Document module defines.
+- Each folder's bare imports resolve from its own `node_modules` first, then upward to the UAG's `/app/node_modules` (`@formio/uag`, `zod`), so add-ons' dependencies do not clash.
+- `PLUGINS_DISABLED` (`<type>:<name>`) and `MODULES_DISABLED` (a module's name) leave parts of any of them out.
+
+Your own plugins need no image: mount their folder (the `index.mjs` and its `node_modules`) in a folder of its own under `/app/plugins`, beside any add-ons:
 
 ```yaml
   formio-uag:
     image: formio/uag:{uagVersion}
     volumes:
-      - ./plugins:/app/plugins          # ./plugins/index.mjs: export default [ ... ]
+      - ./my-plugins:/app/plugins/my-plugins:ro    # ./my-plugins/index.mjs: export default [ ... ]
 ```
+
+### Add-ons
+
+An add-on is an image whose command copies a plugins folder (an `index.mjs` and its `node_modules`) into the volume mounted at `/out`, replacing what it held, and exits `0`. It does not contain the UAG; `formio/uag-documents` ([AI Document](#ai-document)) is one. Each add-on gets its own service, its own volume, its own `depends_on` entry (`condition: service_completed_successfully`, `restart: true`), and a read-only mount of its volume in its own folder under `/app/plugins`, named in the Compose file (by convention the add-on's short name). Two add-ons and your own plugins (`example/uag-crm:1` and its folder `crm` are an example, not a published image):
+
+```yaml
+services:
+  uag-documents:
+    image: formio/uag-documents:{extrasVersion}
+    volumes:
+      - uag-documents:/out
+
+  uag-crm:                                 # an example add-on
+    image: example/uag-crm:1
+    volumes:
+      - uag-crm:/out
+
+  formio-uag:
+    image: formio/uag:{uagVersion}
+    depends_on:
+      uag-documents:
+        condition: service_completed_successfully
+        restart: true
+      uag-crm:
+        condition: service_completed_successfully
+        restart: true
+    volumes:
+      - uag-documents:/app/plugins/documents:ro
+      - uag-crm:/app/plugins/crm:ro
+      - ./my-plugins:/app/plugins/my-plugins:ro
+    environment:
+      # ...the UAG's settings, as in the stacks above
+
+volumes:
+  uag-documents:
+  uag-crm:
+```
+
+- An add-on runs once at each `up`, copies its folder and exits: never give it `restart: always`. `condition: service_completed_successfully` keeps the UAG from starting before the files are there; the volume is how they reach it.
+- To upgrade: `docker compose pull && docker compose up -d`. With `restart: true`, when Compose recreates an add-on (a newer image was pulled), it stops the UAG, runs the add-on again, then starts the UAG on the new files.
+- To remove one: delete its service, its `depends_on` entry, its mount and its volume (`docker volume rm <project>_<volume>`); nothing of it stays in the UAG.
+- In Kubernetes, run one initContainer per add-on, each writing to its own `emptyDir` mounted at `/out`; the UAG container mounts each `emptyDir` read-only at `/app/plugins/<name>`.
+- Every add-on installs software that runs in the UAG's process, with its environment and its secrets: add only ones the user has chosen, pinned to a version.
+- To ship your own plugins the same way, build your own add-on image from the plugins folder:
+
+  ```dockerfile
+  FROM alpine:3
+  COPY my-plugins /plugins
+  CMD ["sh", "-c", "find /out -mindepth 1 -delete && cp -a /plugins/. /out/"]
+  ```
+
+- A plugin that needs system packages (an OCR engine) needs them in the UAG's container: build `FROM formio/uag:{uagVersion}` with `apk add`, and mount its folder under `/app/plugins`.
 
 ## AI Document
 
 The AI Document component (`uagdocument`) turns files people upload to a form, and the form designer's instructions, into content they review before submitting: an exact extraction, a summary, an assessment. It is a module of `@formio/uag-extras` (repository `github.com/formio/uag-extras`, versioned on its own, for UAG 2.0.0-rc.7 or later): the module brings the component, the `document` plugin type and `POST {form}/document/process`, and the document plugins it runs (`extract`, `analyze`, `translate`) and extra converters come from the same package.
 
-- **Run it** with the image `formio/uag-documents:rc`, which is `formio/uag` with the module, the document plugins and the converters loaded from its `/app/plugins/index.mjs`. Embedded: `npm install @formio/uag-extras@{extrasVersion}`, then `server.use([UAGDocument, Extract, Analyze])` with `import { UAGDocument } from '@formio/uag-extras/modules/ai-document'`, `import Extract from '@formio/uag-extras/documents/extract'` and `import Analyze from '@formio/uag-extras/documents/analyze'`.
+- **Run it** as an add-on beside the UAG: the image `formio/uag-documents` is not a UAG and does not replace `formio/uag`. It holds a plugins folder: an `index.mjs` that loads the module, the `extract`, `analyze` and `translate` document plugins and the office-text converter, and a `node_modules` with `@formio/uag-extras` and the converter's libraries (the extras use the UAG's own `@formio/uag` and `zod`). It copies that folder into its own volume, mounted at `/out`, replacing what was there, and exits `0`; the UAG mounts that volume read-only at `/app/plugins/documents` and loads it at startup with any other add-ons ([Plugins and add-ons](#plugins-and-add-ons)). Use this folder form even for one add-on; it needs `formio/uag` 2.0.0-rc.8 or later:
+
+  ```yaml
+  services:
+    uag-documents:                       # the add-on: copies the plugins into its volume, then exits
+      image: formio/uag-documents:{extrasVersion}
+      volumes:
+        - uag-documents:/out
+
+    formio-uag:
+      image: formio/uag:{uagVersion}
+      depends_on:
+        uag-documents:
+          condition: service_completed_successfully
+          restart: true
+      volumes:
+        - uag-documents:/app/plugins/documents:ro
+      environment:
+        # ...the UAG's settings, as in the stacks above
+
+  volumes:
+    uag-documents:
+  ```
+
+  `condition: service_completed_successfully` keeps the UAG from starting before the files are in the volume. The add-on runs once at each `up`: never give it `restart: always`. To upgrade, run `docker compose pull && docker compose up -d`: with `restart: true`, Compose stops the UAG, runs the newer add-on, then starts the UAG on its files. Without Compose: `docker volume create uag-documents`, `docker run --rm -v uag-documents:/out formio/uag-documents:{extrasVersion}`, then run `formio/uag` with `-v uag-documents:/app/plugins/documents:ro`. In Kubernetes the add-on is an initContainer writing to an `emptyDir` mounted at `/out`, which the UAG container mounts read-only at `/app/plugins/documents`. `MODULES_DISABLED=ai-document` turns the module off, and `PLUGINS_DISABLED=document:translate` one of its plugins.
+- **Your own plugins beside it** go in a folder of their own under `/app/plugins`: mount it (`./my-plugins:/app/plugins/my-plugins:ro`), or ship it as your own add-on image ([Add-ons](#add-ons)). A document plugin of your own uses the `document` type the add-on's module defines, so its `index.mjs` does not list `UAGDocument`; if it does, the same version is used once, and a different one stops startup.
+- **Embedded** (no Docker): `npm install @formio/uag-extras@{extrasVersion}`, then `server.use([UAGDocument, Extract, Analyze])` with `import { UAGDocument } from '@formio/uag-extras/modules/ai-document'`, `import Extract from '@formio/uag-extras/documents/extract'` and `import Analyze from '@formio/uag-extras/documents/analyze'`.
 - **Licensing and engines.** The process route is Agentic Formflow (`403` `license_required` without a license or a hosted project), and it needs an agent engine that generates over documents, such as `claude`.
 - **In the Enterprise portal**, on a stage connected to the UAG, set the project's custom JavaScript to `{uagUrl}/uag-js/portal.js` and its CSS to `{uagUrl}/uag-js/portal.css` (keep an existing one with `?chain=<url-encoded URL>`; a chained script loads only over `https`), and the builder offers **AI Document** beside **File**.
 - **In an application**, load `{uagUrl}/uag-js/uag.use.js`, which carries the component ([uag-js.md](./uag-js.md#loading-it-from-the-uag)), or with a bundler `Formio.use(UAG(uagUrl))` then `Formio.use(aiDocument)` from `@formio/uag-extras/modules/ai-document/client`.
@@ -385,7 +480,7 @@ import { UAGServer, trustProxySetting, usePluginFiles } from '@formio/uag';
 
 const server = new UAGServer();             // configured by the environment variables above
 // server.use(myModule);                    // before router(); a list, or an ES module namespace, works too
-// await usePluginFiles(server);            // the plugins file UAG_PLUGINS names, as `npx uag` loads it
+// await usePluginFiles(server);            // the plugins files UAG_PLUGINS names (a file or a folder), as `npx uag` loads them
 const app = Express();
 const trust = trustProxySetting(process.env.TRUST_PROXY);   // the image and `npx uag` do this themselves
 if (trust !== undefined) app.set('trust proxy', trust);
@@ -394,6 +489,8 @@ app.listen(process.env.PORT || 3200);
 ```
 
 Node 22 or newer, started with `--no-node-snapshot` (isolated-vm, which runs form logic, can crash the process without it; or `NODE_OPTIONS=--no-node-snapshot` — the constructor refuses to start without it), with the engines it enables installed beside it (`npm install @formio/uag@{uagVersion} @formio/uag-claude@{engineVersion} express`, each version resolved from its own dist-tags as [patterns-and-licensing.md](./patterns-and-licensing.md#versions) describes).
+
+`usePluginFiles(server, env?)` loads plugins files as [Plugins and add-ons](#plugins-and-add-ons) describes and returns the files it loaded (`string[]`); `pluginFiles(env?)` lists them without loading, `pluginFilesIn(path)` lists those a file or folder holds, and `DEFAULT_PLUGINS_DIR` is `'/app/plugins'`. From 2.0.0-rc.8 they replace 2.0.0-rc.7's `pluginsFile` and `DEFAULT_PLUGINS_FILE`.
 
 What breaks an embedded UAG:
 
