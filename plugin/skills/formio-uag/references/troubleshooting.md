@@ -29,9 +29,9 @@ Most UAG problems are configuration, and they surface far from their cause: a mi
 | Exits with "No Form.io project could be loaded" | `PROJECT` is unreachable from inside the UAG container (a browser address instead of a container one), or paired with the wrong credential: `ADMIN_KEY` for Open Source, `PROJECT_KEY` (plus `LICENSE_KEY` when self-hosted Enterprise) for a project. |
 | Exits on first boot, works after a restart | Form.io was not answering yet: add a healthcheck and `depends_on: condition: service_healthy`, or raise `PROJECT_RETRIES`. |
 | Restart-loops with "Endpoint ... is not allowed for this license" | The license's endpoint allowlist does not include `PROJECT`'s host. |
-| "License is not configured" for a `*.form.io` project | TLS checks are weakened (`NODE_TLS_REJECT_UNAUTHORIZED=0`, `NODE_EXTRA_CA_CERTS`, `NODE_USE_SYSTEM_CA`), which turns the hosted exemption off. |
+| "License is not configured" for a `*.form.io` project | A hosted project needs a license while `NODE_TLS_REJECT_UNAUTHORIZED=0`, `NODE_EXTRA_CA_CERTS` or `NODE_USE_SYSTEM_CA` is set. |
 | Startup stops naming an engine | Its package is not installed, the name is duplicated, a required setting (API key, model) is missing, or a `remote` instance's engine server refused its key. |
-| "The database (MONGO) is not used: ... needs a license" | No license that includes the UAG, and the project and database are not both on development hosts. The UAG runs without database features. |
+| "The database (MONGO) is not used: ... needs a license" | No license that includes the UAG, and the UAG, project and database do not all run on one machine. The UAG runs without database features. |
 | "MCP_OAUTH is set, but remote MCP sign-in is off" | Sign-in needs a usable database. |
 | Startup stops: "Could not connect to MONGO", "The MONGO user may not use the database", "MONGO_CONFIG is not valid JSON" | `MONGO` unreachable or its credentials wrong; grant the user `readWrite` on `UAG_DATABASE`; fix the driver options. |
 | Startup stops: the database "holds uag-* collections that the UAG did not create", or "was created by a newer UAG" | Choose another `UAG_DATABASE`, or upgrade the UAG. Nothing was changed. |
@@ -40,7 +40,7 @@ Most UAG problems are configuration, and they surface far from their cause: a mi
 | The log warns "MCP_OAUTH is on, but LOGIN_FORM is not set" | The sign-in page would load the login form from a container address. Set `LOGIN_FORM` to its public URL. |
 | "@formio/uag needs @formio/appserver-core 2.26.0 or later, through @formio/appserver" | An embedding application installs an older `@formio/appserver`, or its lockfile resolves an older core. Upgrade `@formio/appserver`; do not add `@formio/appserver-core` directly. |
 | "UAG server limit reached" | The online license's count of UAG servers is used up: each project endpoint served counts once. |
-| Licensed features turn off when the license server is unreachable | No database, so no grace period; with it, the last confirmed license holds for 12 hours. Allow egress to `LICENSE_SERVER`. |
+| Licensed features turn off when the license server is unreachable | The last confirmed license holds for 12 hours from that confirmation, while the UAG runs; a restarted UAG, and a key never confirmed, have none. Allow egress to `LICENSE_SERVER` (only `https://*.form.io`). Online keys are not validated while `NODE_EXTRA_CA_CERTS` or `NODE_TLS_REJECT_UNAUTHORIZED=0` is set; use an offline license there. |
 | `401` errors in the log right after starting | `PROJECT_KEY` or `ADMIN_KEY` is empty or does not belong to `PROJECT`. |
 | Startup stops: "The MCP tool ... is defined by both ..." (or an engine type, form route or component type) | Two modules, or a module and the server's configuration, define the same thing. Remove one, or rename it in your own module. |
 | Startup stops: "Two versions of the module ... are used" | The module is used twice at different versions (a module folder and a plugins file, or two add-ons, say); the message names both files. Use one. |

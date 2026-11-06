@@ -59,7 +59,7 @@ The client discovers everything itself: `401` with `resource_metadata` → `/.we
 
 What the UAG needs for it:
 
-- `MCP_OAUTH=true` and `MONGO` (with a license that includes the UAG, unless both the project and the database are on development hosts such as `formio.local` and `mongo.local`). Without a usable database the UAG starts with sign-in off and says why; `/.well-known/*` and `/auth/authorize` answer `404`.
+- `MCP_OAUTH=true` and `MONGO` (with a license that includes the UAG, unless the UAG, the project and the database all run on one machine (`localhost`, `*.localhost`, `lvh.me`)). Without a usable database the UAG starts with sign-in off and says why; `/.well-known/*` and `/auth/authorize` answer `404`.
 - `LOGIN_FORM` set to a login form JSON URL the user's **browser** can load, such as `https://forms.example.com/user/login` (Open Source) or `https://forms.example.com/myproject/user/login` (Enterprise). The default, `{PROJECT}/user/login`, is usually a container address.
 - A public URL the discovery documents name correctly: behind a reverse proxy set `TRUST_PROXY` and forward `Host` and `X-Forwarded-Proto`; when TLS ends in front of that proxy, set `BASE_URL` to the public `https` URL. Check with `curl https://uag.example.com/.well-known/oauth-protected-resource`.
 - For connectors, publish only `{uagUrl}/mcp`, `/auth` and `/.well-known` publicly, unless browsers also use the chat widget or Agent Input, which need the form routes as well.

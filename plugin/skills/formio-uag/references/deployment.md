@@ -250,7 +250,7 @@ The resource figures are a starting point, not a measurement: form logic runs in
 | `JWT_SECRET` | random per start, with a startup warning | **Set it, the same on every instance**, or tokens break on restart. Equal to Form.io Enterprise's for agent roles, and then equivalent to administrator access. |
 | `JWT_EXPIRE_TIME` | `60` | Minutes the UAG's access tokens last (an upper bound: a token signed in through `MCP_OAUTH` ends with the user's Form.io login token, 240 minutes by default). Refresh tokens cannot outlive it. Keep it short in production. |
 | `LICENSE_KEY` | none | A Form.io license that includes the UAG. `UAG_LICENSE` is deprecated, still read until UAG 3.0. |
-| `LICENSE_REMOTE`, `LICENSE_SERVER` | unset, `https://license.form.io` | `true` for an offline license; the server online licenses are validated with (the UAG needs egress to it). |
+| `LICENSE_REMOTE`, `LICENSE_SERVER` | unset, `https://license.form.io` | `true` for an offline license; the server online licenses are validated with, one of Form.io's (`https://*.form.io`; the UAG needs egress to it). |
 | `LOGIN_FORM` | `{PROJECT}/user/login` | With `MCP_OAUTH`: the login form JSON URL the user's browser loads. |
 | `UAG_ENGINES` | none | Engine instances to enable (below). Unset: no engines; MCP still works. |
 | `PROJECT_TTL` | `900` | Seconds between project refreshes. `60` or more outside development; `0` disables them. |
@@ -267,7 +267,7 @@ The resource figures are a starting point, not a measurement: form logic runs in
 | `AGENT_BODY_LIMIT` | 5 MB | Largest body, in bytes, of a form's agent operations and modules' form routes (`agentApi.bodyLimit` in a module wins); `413` `payload_too_large` above it. `MAX_BODY_SIZE` still applies first. |
 | `DOCUMENTS_MAX_FILE_BYTES` | 25 MB | Largest file, in bytes, the `read_document` MCP tool (and AI Document) reads (`documents.maxFileBytes` in a module wins). |
 | `DOCUMENTS_MAX_IMAGE_PIXELS` | `50000000` | Largest PNG, in pixels, the built-in `image-pdf` converter takes (`config.plugins.settings.converter['image-pdf'].maxPixels` wins). |
-| `NODE_TLS_REJECT_UNAUTHORIZED` | unset | `0` accepts a self-signed `PROJECT` certificate. Never on a reachable deployment; it also turns off the hosted-service exemption. Prefer adding the CA (which turns the exemption off too). |
+| `NODE_TLS_REJECT_UNAUTHORIZED` | unset | `0` accepts a self-signed `PROJECT` certificate. Never on a reachable deployment; a hosted project then needs a license. Prefer adding the CA (which turns the exemption off too). |
 | `UAG_MODULE` | none | For `npx uag` only: a module's path. The image loads `/app/module`. |
 | `UAG_PLUGINS` | the folder `/app/plugins` when it exists | A plugins file or folder for `npx uag` and the image ([Plugins and add-ons](#plugins-and-add-ons)); `off` loads none. |
 | `MODULES_DISABLED` | none | Modules to leave out, by name, comma-separated (`ai-document`), such as one an add-on loads. |
@@ -307,16 +307,15 @@ A misconfigured engine (not installed, a duplicate name, a missing key) stops st
 
 ## The UAG's database
 
-Optional. `MONGO` (it may be the server Form.io uses; `UAG_DATABASE`, default `uag`, selects the database) holds only `uag-*` collections — sign-in codes, run records, the license outage marker — never submissions. It turns on:
+Optional. `MONGO` (it may be the server Form.io uses; `UAG_DATABASE`, default `uag`, selects the database) holds only `uag-*` collections — sign-in codes and run records — never submissions. It turns on:
 
 | Feature | Without it |
 | --- | --- |
 | Remote MCP sign-in (`MCP_OAUTH`) | Off. Local clients still use `/auth/token`. |
 | Run records, shown in a connected portal stage's Action Logs | Failures are only logged. |
 | Runs after the save that survive a restart (actions with an agent role), shared safely across replicas | Kept in memory by the instance that received the submission. |
-| A 12-hour license grace period when the license server is unreachable | None. |
 
-It needs a license that includes the UAG on every edition, unless the project and the database are both on development hosts. Without one the UAG starts with these features off and says why. Give the `MONGO` user `readWrite` on `UAG_DATABASE` only.
+It needs a license that includes the UAG on every edition, unless the UAG, the project and the database all run on one machine (`localhost`, `*.localhost`, `lvh.me`). Without one the UAG starts with these features off and says why. Give the `MONGO` user `readWrite` on `UAG_DATABASE` only.
 
 ## Connecting the Enterprise portal
 
@@ -526,5 +525,5 @@ The UAG holds no conversation state and its MCP endpoint is stateless, so instan
 - Rate-limit callers and set anonymous limits and provider spend limits for public forms.
 - Measure decision thresholds with `uag-eval` before relying on them.
 - Run more than one instance only with the database (durable runs) and a shared `JWT_SECRET`; rate-limit counters are per process.
-- On an online license, allow egress to the license server and add the database, which gives a 12-hour grace period when the license server is unreachable; without it, licensed features stop at once.
+- On an online license, allow egress to the license server: the terms it last confirmed hold for 12 hours while the UAG runs, and a restarted UAG has no grace period.
 - Health-check `/status`, and let the orchestrator restart the UAG when it exits: it exits rather than serve half-configured.
