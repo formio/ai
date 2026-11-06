@@ -39,7 +39,7 @@ A task is the set of components that carry the same value in their `uag` propert
 | --- | --- | --- |
 | **Criteria** | A content component with `uag: "<task>"` and `uagField: "criteria"`. Its HTML, converted to Markdown, is the task's instructions. | Always add one. The `agent_provide` MCP tool refuses a task without it, and the Agent API runs one with no instructions. |
 | **Agent fields** | Any input component with `uag: "<task>"` and no `uagField`; or a Panel, Fieldset, Well or Container with `uag: "<task>"`, which makes every input inside it an agent field. | Yes |
-| **Input** | A field or container with `uag: "<task>"` and `uagField: "input"`. Its value is the text the task reads. | No. Without one, the task reads every filled value in the submission except the fields being answered in this run, and `extract` needs a `text` in the request. |
+| **Input** | A field or container with `uag: "<task>"` and `uagField: "input"`. Its value is the text the task reads; on a file component, the uploaded document's text ([Documents as input](#documents-as-input)). | No. Without one, the task reads every filled value in the submission except the fields being answered in this run, and `extract` needs a `text` in the request. |
 
 Fields inside a Data Grid or Edit Grid are never answered (`excluded`: `inside repeating rows`). `uag` on a Panel, Fieldset, Well, Tabs, Columns, Table or Container makes every input inside it one of the task's fields.
 
@@ -79,6 +79,21 @@ Engines are deliberately given little, because unrelated detail lowers decision 
 | `today` | Today's date, such as `Friday, October 23, 2026 (2026-10-23)`. |
 
 Agent engines also receive each target field's path, label, type, description, rule, format and options, and a JSON schema for the answer. The rule states the field's validation: lengths, word counts, the pattern, the range, the input mask and fixed date limits. It leaves out `required` (so an engine is not pushed to invent a value) and custom or JSONLogic validation, which cannot be stated; put a rule like that in the field's `description` or the criteria. The form still validates every answer: the Agent API keeps a failing suggestion with `reason: "failed validation: ..."`, and Run task leaves it out ([workflows.md](./workflows.md#before-or-after-the-save)). Use `uagContext` for the one or two facts a decision depends on that are not in the input, such as a policy number or a customer tier.
+
+### Documents as input
+
+A **file** component can be a task's input, or be listed in its `uagContext`. Engines then get the uploaded document's text instead of the file, for the Agent API and Run task alike:
+
+```json
+{ "type": "file", "key": "contract", "label": "Contract", "input": true, "storage": "s3",
+  "properties": { "uag": "review", "uagField": "input" } }
+```
+
+The file's type is identified from its bytes and read through the UAG's converters: the built-in ones read PDF (its text layer), text, Markdown, CSV, JSON, HTML and XML, and converter plugins add formats ([deployment.md](./deployment.md#plugins-and-add-ons)). An image, or a PDF with no text layer, reaches the engine as its name and the reason, never as its bytes. The file is loaded where Form.io keeps it — base64 from the submission, S3 and Azure through Form.io's storage endpoints with the caller's credentials, `url` storage only from the project's own origin or the component's upload URL — and `agentApi.files.maxBytes` (10 MB) and `agentApi.files.maxChars` (200000) bound what is read. Files that are not a task's input or context are never sent to engines: they are described by name, type and size, and signatures as `(signed)`. To let an MCP client read an uploaded file, it calls `read_document` ([mcp-clients.md](./mcp-clients.md#the-tools)). For content a person reviews before submitting, generated from uploaded files on the form itself, use the AI Document component instead ([deployment.md](./deployment.md#ai-document)).
+
+### Rich text fields
+
+A textarea with the CKEditor or Quill editor is a rich text field: its value is HTML. Agent engines are told which elements they may write, and the HTML an engine or an MCP client writes is sanitized before it is validated, returned or saved: elements the editors do not keep, `style` and `class`, event handlers, scripts, frames and links other than `http`, `https` and `mailto` are removed. The criteria need not list the allowed tags. A long value, such as a transcribed document, may need the Claude engine's `CLAUDE_MAX_TOKENS` raised ([deployment.md](./deployment.md#engines)).
 
 ## Decision fields and value fields
 
@@ -201,7 +216,7 @@ One task, `triage`, with an input, a criteria that adds one context value, two d
 
 - The form is tagged `uag`, and has a `properties.description`.
 - Each task has exactly one criteria, and every field it should fill carries the task's exact `uag` value (directly or from a container).
-- Extract and Agent Input have an input field (`uagField: "input"`), or the caller sends `text`.
+- Extract and Agent Input have an input field (`uagField: "input"`), or the caller sends `text`. A file input holds documents with a text layer.
 - Decision fields that conditionals can hide have `clearOnHide: false`.
 - Fields that drive routing, scores or approvals are `uagAuthoritative: "true"`, and a Run task action runs their task ([workflows.md](./workflows.md)).
 - With an agent engine and no decision engine, closed-set fields a workflow must save carry `uagAgentDecides: "true"` together with `uagAuthoritative: "true"`.

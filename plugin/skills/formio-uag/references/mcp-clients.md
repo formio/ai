@@ -22,7 +22,7 @@ This MCP server is the user's runtime surface, distinct from the Form.io MCP ser
 | Transport | Streamable HTTP: `POST` for JSON-RPC, `GET` for the server stream. Stateless: no session id to keep, requests can run concurrently. |
 | Server name | `formio-uag` |
 | Authentication | `Authorization: Bearer <UAG access token>` on every request; otherwise `401` with `WWW-Authenticate: Bearer realm="uag-server"` (and `resource_metadata` when remote sign-in is on). |
-| Tools | Built per request from the forms registered now, plus a module's custom tools. Every tool's `form_name` argument is an enum of the registered form names. |
+| Tools | Built per request from the forms registered now, plus a module's custom tools. The `form_name` argument of every built-in tool except `read_document` is an enum of the registered form names; `read_document` takes a string, and an unknown form is an `isError` result. |
 
 ## How a client gets a token
 
@@ -59,7 +59,7 @@ The client discovers everything itself: `401` with `resource_metadata` → `/.we
 
 What the UAG needs for it:
 
-- `MCP_OAUTH=true` and `MONGO` (with a license that includes the UAG, unless both the project and the database are on development hosts such as `formio.local` and `mongo.local`). Without a usable database the UAG starts with sign-in off and says why; `/.well-known/*` and `/auth/authorize` answer `404`.
+- `MCP_OAUTH=true` and `MONGO` (with a license that includes the UAG, unless the UAG, the project and the database all run on one machine (`localhost`, `*.localhost`, `lvh.me`)). Without a usable database the UAG starts with sign-in off and says why; `/.well-known/*` and `/auth/authorize` answer `404`.
 - `LOGIN_FORM` set to a login form JSON URL the user's **browser** can load, such as `https://forms.example.com/user/login` (Open Source) or `https://forms.example.com/myproject/user/login` (Enterprise). The default, `{PROJECT}/user/login`, is usually a container address.
 - A public URL the discovery documents name correctly: behind a reverse proxy set `TRUST_PROXY` and forward `Host` and `X-Forwarded-Proto`; when TLS ends in front of that proxy, set `BASE_URL` to the public `https` URL. Check with `curl https://uag.example.com/.well-known/oauth-protected-resource`.
 - For connectors, publish only `{uagUrl}/mcp`, `/auth` and `/.well-known` publicly, unless browsers also use the chat widget or Agent Input, which need the form routes as well.
@@ -100,6 +100,7 @@ What the UAG needs for it:
 | `agent_provide` | Reads | A task's criteria, a submission's values and the task's fields, as instructions for the client's own model, which then writes with `submission_update`. Agentic Formflow. |
 | `agent_decide` | Reads | A task's decision questions as JSON, for the client's own decision model. Agentic Formflow. |
 | `fetch_external_data` | Reads | Options for a URL- or resource-fed select, or a Data Source value. |
+| `read_document` | Reads | The text of a file uploaded to a submission (a file field, or an AI Document's files): `form_name`, `submission_id` (from `find_submissions`) and `data_path` (`contract`, `rows[0].attachment`; `contract[1]` for another file than the first). Returns JSON `{ file_name, type, pages, text, truncated }`, read through the UAG's converters with the caller's identity; the text is cut at `agentApi.files.maxChars` (200000), and files over `DOCUMENTS_MAX_FILE_BYTES` (25 MB) are refused. A file no installed converter reads as text, or one with no text to read (an image, a scanned PDF), is an `isError` result naming the reason. |
 
 `form_data` is the conversation's state, kept by the client and sent on every call: a flat object of data path to value (`{ "customer.firstName": "Joe", "children[0].age": 5 }`). Results are Markdown text rendered from response templates a module can override; a problem sets `isError: true`.
 
@@ -197,7 +198,7 @@ Before exposing anything like it: authenticate each user and give them their own
 
 ## Shaping the agent with a module
 
-A UAG module can change what the built-in tools tell the model (`config.toolOverrides`, `config.responseTemplates`), add custom tools (`config.tools`), and install the forms and roles a use case needs (`config.template`). For example, to make an agent check permissions before collecting fields:
+A UAG module can change what the built-in tools tell the model (`config.toolOverrides`, `config.responseTemplates`), add custom tools (`config.tools`), and install the forms and roles a use case needs (`config.template`). A custom tool's `execute(args, extra)` gets the caller as `extra.authInfo` and the project as `extra.project`, and a tool whose schema depends on the project gives `bind(project)`, which returns its `inputSchema`, `annotations` and `execute`; a named module's tools get its module API as `extra.module`. Mark read-only tools `readOnlyHint: true`: a task's `uagTools` and scoped tokens use only those. For example, to make an agent check permissions before collecting fields:
 
 ```js
 module.exports = {
@@ -211,4 +212,4 @@ module.exports = {
 };
 ```
 
-See [deployment.md](./deployment.md#modules) for mounting a module.
+See [deployment.md](./deployment.md#modules) for mounting a module, and `https://ai.form.io/developers/modules` for the whole contract.

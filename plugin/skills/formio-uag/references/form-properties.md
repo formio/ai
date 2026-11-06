@@ -90,7 +90,7 @@ The task's name, such as `triage`. Every component with the same value belongs t
 ### `uagField`
 
 - `criteria` on a **content** component makes its HTML, converted to Markdown, the task's instructions; its other custom properties are the task's settings.
-- `input` on a field or container makes its value the task's source text. A task can have several inputs.
+- `input` on a field or container makes its value the task's source text. A task can have several inputs. On a **file** component, the uploaded document is read as text for the engines ([tasks.md](./tasks.md#documents-as-input)).
 
 A component with `uag` and no `uagField` is an agent field.
 
@@ -115,7 +115,7 @@ Comma-separated data paths whose values (or the values inside them, for a contai
 
 Comma-separated read-only MCP tools an agent engine may call to research the task's **value** fields before it answers, in `{form}/agent/generate` and in a Run task that answers the whole task. Extract, decide and decisions-only runs never research. The tools run as the caller (for Run task, the user who submitted, never the action's agent role); a caller with a server key researches as administrator.
 
-Qualifying tools are those annotated read-only: `get_forms`, `get_form_fields`, `get_field_info`, `collect_field_data`, `confirm_form_submission`, `find_submissions`, `agent_provide`, `agent_decide`, `fetch_external_data`, and custom tools with `readOnlyHint: true`. A tool that may write, or does not exist, makes `generate` answer `400` and a Run task run fail. Agent engines without tool use are passed over for such a task.
+Qualifying tools are those annotated read-only: `get_forms`, `get_form_fields`, `get_field_info`, `collect_field_data`, `confirm_form_submission`, `find_submissions`, `read_document`, `agent_provide`, `agent_decide`, `fetch_external_data`, and custom tools with `readOnlyHint: true`. A tool that may write, or does not exist, makes `generate` answer `400` and a Run task run fail. Agent engines without tool use are passed over for such a task.
 
 ```json
 "properties": { "uag": "admissions", "uagField": "criteria", "uagTools": "find_submissions" }
