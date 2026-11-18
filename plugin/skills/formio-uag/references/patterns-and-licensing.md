@@ -53,6 +53,10 @@ Common combinations: Agent Input in the browser plus a Run task before the save 
 
 Setting `PROJECT_KEY` is what makes the UAG treat `PROJECT` as an Enterprise or hosted project.
 
+Form.io's hosted service (`portal.form.io`) is offered as a 30-day trial for trying the UAG; for production, the UAG's own documentation points to a self-hosted Form.io Enterprise project. The licensing below is the same either way.
+
+**This library's Form.io MCP tools do not reach an Open Source server.** They address a project under a deployment, and `project_set` refuses an Open Source URL, so on Open Source this skill cannot save the forms it designs or install a Run task action. The UAG itself serves Open Source fully. Write the Form JSON and the actions as files in the working directory instead, and give the user the routes that need no tool from this session: pasting each component's JSON into the Open Source form builder, or a UAG module whose project template the UAG installs at startup ([deployment.md](./deployment.md#modules)) — which adds only the forms and actions the project lacks and never changes one it has. Say so when the edition is first known, before designing anything.
+
 ## Licensing
 
 | You run | You need |
@@ -95,28 +99,38 @@ What an operator needs to know about the license itself:
 }
 ```
 
-`formflow.reason` is `licensed`, `hosted`, `stub-engines` or `unlicensed`. `durableRuns` and `mcpOAuth` are `true` only when the UAG uses its own database. The startup log says the same in words: `[formio-uag] Open Source edition. Agentic Formflow requires a license ...`.
+| Key | Meaning |
+| --- | --- |
+| `engines` | Each instance: `name` (as in `UAG_ENGINES`), `kind` (`decision` or `agent`), `model`, and the `type`, `package` and `version` it came from. Never its settings. |
+| `operations` | Per operation, `available` (licensed or allowed, and at least one engine can do the work) and the `engines` that would serve it. Agent engines appear under `decide` as the fallback for decision fields. `chat` needs no Agentic Formflow license: it is available whenever an agent engine is enabled. |
+| `edition` | `enterprise` when a license verified or the project is on Form.io's hosted service, otherwise `open-source`. |
+| `formflow` | `licensed` (a license allows Agentic Formflow), `allowed` (it may run now), and `reason`: `licensed`, `hosted`, `stub-engines` or `unlicensed`. |
+| `durableRuns` | `true` when the UAG's database is in use: runs are recorded, and runs after the save that act with an agent role survive a restart. `false`: runs after the save are kept in memory, best effort. |
+| `mcpOAuth` | `true` when remote MCP clients can sign in: `MCP_OAUTH=true` and the UAG's database is in use. |
+
+An application can gate a feature on it from its server — hide Agent Input when `operations.extract.available` is `false`, say — but never from a page, since the call takes a UAG token or a server key. The startup log says the same in words: `[formio-uag] Open Source edition. Agentic Formflow requires a license ...`.
 
 ## Packages
 
 | Package | What it is |
 | --- | --- |
-| `@formio/uag`, image `formio/uag` | The UAG. The image includes every official engine and `@formio/uag-js`. Node 22 or newer, run with `--no-node-snapshot` when embedded. Its only Form.io server dependency is `@formio/appserver` (2.26.0 or later), which brings `@formio/appserver-core` (which must be 2.26.0 or later too); do not add `appserver-core` to an embedding application yourself. |
+| `@formio/uag`, image `formio/uag` | The UAG. The image includes every official engine and `@formio/uag-js`. Node 22 or newer, run with `--no-node-snapshot` when embedded. Its only Form.io server dependency is `@formio/appserver` (2.26.4 or later), which brings `@formio/appserver-core` (which must be 2.26.4 or later too); do not add `appserver-core` to an embedding application yourself. |
 | `@formio/uag-jev`, `@formio/uag-claude`, `@formio/uag-openai`, `@formio/uag-grok`, `@formio/uag-gemini` | The engines, released with the UAG at the same version. `@formio/uag-claude` 2.x is the Claude engine; 1.x was the retired Claude integration. |
 | `@formio/uag-js` | The formio.js module: saves `uag` forms through the UAG, adds Agent Input, and renders forms as a chat. Runs in the browser, peer of `@formio/js` 5. Every UAG also serves the copy it was installed with, at `{uagUrl}/uag-js/uag.use.js` (it registers itself with that UAG) and `{uagUrl}/uag-js/uag-js.css` ([uag-js.md](./uag-js.md#loading-it-from-the-uag)). |
-| `@formio/uag-extras`, image `formio/uag-documents` | Extras for the UAG, versioned on its own (for UAG 2.0.0-rc.7 or later): the AI Document module, document plugins and converters (npm: `npmjs.com/package/@formio/uag-extras`). The image, at the same version, is an add-on run beside `formio/uag`, not a UAG: it copies the AI Document module, the document plugins and the converters into its own volume, which the UAG mounts at `/app/plugins/documents` (`formio/uag` 2.0.0-rc.8 or later; [deployment.md](./deployment.md#ai-document)). |
+| `@formio/uag-extras`, image `formio/uag-documents` | Extras for the UAG: the AI Document module, document plugins and converters (npm: `npmjs.com/package/@formio/uag-extras`). Its major version is the UAG's — 2.x is for UAG 2.x — and its minor and patch are its own. It needs `@formio/uag` 2.0.0 or later and, embedded, Node.js 24 or later. The image, at the same version (`formio/uag-documents:2` for the newest 2.x), is an add-on run beside `formio/uag`, not a UAG: it copies the AI Document module, the document plugins and the converters into its own volume, which the UAG mounts at `/app/plugins/documents` ([deployment.md](./deployment.md#ai-document)). Its `1` tag is the 1.0.0 built for the UAG's release candidates; never use it with UAG 2.x. |
 | `@formio/uag-sdk` | The Engine SDK, for writing an engine of your own. |
 | `@formio/uag-engines`, image `formio/uag-engines` | The engine server, which keeps model keys and model traffic out of the UAG. |
 
 ## Versions
 
-This skill describes UAG 2.0. Until `2.0.0` is released, 2.0 ships as release candidates, `2.0.0-rc.N`, under the npm dist-tag `rc`, and `latest` is not a safe default: on `@formio/uag`, `@formio/uag-claude` and the `formio/uag` image it names a 1.x release this skill does not describe, and on the packages that are new in 2.0 (`@formio/uag-js`, `@formio/uag-sdk`, `@formio/uag-engines` and the other engines) it can name an older release candidate. The `formio/uag-engines` image has no `latest` tag at all. Resolve every package's version before writing it into a file or a command:
+This skill describes UAG 2.x. Since `2.0.0`, the npm dist-tag `latest` names the newest 2.x release on every `@formio/uag*` package, and the `formio/uag` and `formio/uag-engines` images carry the same `latest` tag beside each exact version. UAG 1.x stays available as `@formio/uag@1` and `formio/uag:1.13.2`, and is not what this skill describes. Resolve every package's version before writing it into a file or a command:
 
-1. Run `npm view <package> dist-tags --json` for each package the work installs or references: `@formio/uag`, `@formio/uag-js`, each engine, `@formio/uag-engines` for an engine server, `@formio/uag-sdk` for a custom engine, and `@formio/uag-extras` for AI Document. Every UAG package and image is released at one version (all but `@formio/uag-extras` and its add-on image `formio/uag-documents`, which share a version of their own), but each package's `latest` names something different until 2.0.0, so resolve each one.
-2. Use the version `latest` names when it is `2.0.0` or a later 2.x release that is not a prerelease. Otherwise use the version `rc` names, a `2.0.0-rc.N`. When neither is a 2.x version, tell the user that UAG 2.0 is not published for that package and write nothing for it. `@formio/uag-extras` has its own version numbers, 1.x: use the version `latest` names; when the package is not published, say so and write nothing for it. Its add-on image carries the same version: write `formio/uag-documents:{extrasVersion}`, or its major, `formio/uag-documents:1`. That image has no `rc` tag; never write `formio/uag-documents:rc`.
-3. Write that exact version everywhere: `npm install @formio/uag-js@2.0.0-rc.N`, the image tag `formio/uag:2.0.0-rc.N` (the `formio/uag` and `formio/uag-engines` images carry their packages' version tags, `rc` included), and jsDelivr URLs such as `https://cdn.jsdelivr.net/npm/@formio/uag-js@2.0.0-rc.N/index.js`, with `N` the release candidate resolved. The references write these as `{uagVersion}` (`@formio/uag` and its image), `{uagJsVersion}` (`@formio/uag-js`), `{engineVersion}` (an engine) and `{extrasVersion}` (`@formio/uag-extras` and the `formio/uag-documents` image).
+1. Run `npm view <package> dist-tags --json` for each package the work installs or references: `@formio/uag`, `@formio/uag-js`, each engine, `@formio/uag-engines` for an engine server, `@formio/uag-sdk` for a custom engine, and `@formio/uag-extras` for AI Document.
+2. Use the version `latest` names when it is a 2.x release that is not a prerelease. When `latest` is a later major, which this skill does not describe, use the highest 2.x (`npm view <package>@2 version`) and tell the user a newer major exists. When the package has no 2.x release, say so and write nothing for it.
+3. Every UAG package and the `formio/uag` and `formio/uag-engines` images are released together at one version. `@formio/uag-extras` and its add-on image `formio/uag-documents` share a version of their own whose major is the UAG's: write `formio/uag-documents:{extrasVersion}`, or its major, `formio/uag-documents:2`.
+4. Write that exact version everywhere: `npm install @formio/uag-js@{uagJsVersion}`, the image tags `formio/uag:{uagVersion}` and `formio/uag-engines:{uagVersion}`, and jsDelivr URLs such as `https://cdn.jsdelivr.net/npm/@formio/uag-js@{uagJsVersion}/index.js`. The references write these as `{uagVersion}` (`@formio/uag` and its images), `{uagJsVersion}` (`@formio/uag-js`), `{engineVersion}` (an engine) and `{extrasVersion}` (`@formio/uag-extras` and the `formio/uag-documents` image).
 
-Never write a range or a bare name instead. A range such as `@2`, `^2.0.0` or `~2.0.0` matches no prerelease, so `npm install` fails on it and jsDelivr answers `404`; `npm install` with a package name and no version, and an image with no tag, take `latest`. When the registry cannot be queried, write the dist-tag itself — `@formio/uag-js@rc`, `formio/uag:rc`, and for the add-on its major, `formio/uag-documents:1` — and tell the user to pin the version it resolves to. When the version written is a release candidate, tell the user so, and that moving to `2.0.0` once it is released is a version bump in these same places.
+Never leave an image untagged or a package unversioned in a deployment file, a `package.json` or a script tag: `latest` moves with each release, so a deployment that worked changes under the user on its next pull. When the registry cannot be queried, write the major for npm and jsDelivr (`@formio/uag-js@^2` in `package.json`) and `formio/uag-documents:2` for the add-on, write `latest` for the `formio/uag` and `formio/uag-engines` images, which have no major tag, and tell the user to pin the version each resolves to. Only the latest published version of each package and image receives security fixes, so tell the user that upgrading is the same version bump in these same places.
 
 ## Coming from UAG 1.x
 

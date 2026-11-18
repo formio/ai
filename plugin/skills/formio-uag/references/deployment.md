@@ -1,6 +1,6 @@
 # Deploying the UAG
 
-The UAG runs as the Docker image `formio/uag` (which includes every official engine), as `npx uag`, or embedded in a Node.js server. Pin the image and every package to the exact version resolved as [patterns-and-licensing.md](./patterns-and-licensing.md#versions) describes; `{uagVersion}` below is that version of `@formio/uag`, which the image is tagged with too. An unpinned `formio/uag` is `latest`, which is UAG 1.x until 2.0.0 is released. Write the deployment files into the user's working directory with every secret as a placeholder (`CHANGEME`, or `${VAR}` read from an `.env` the user fills from their secret store); never invent or reuse a real key.
+The UAG runs as the Docker image `formio/uag` (which includes every official engine), as `npx uag`, or embedded in a Node.js server. Pin the image and every package to the exact version resolved as [patterns-and-licensing.md](./patterns-and-licensing.md#versions) describes; `{uagVersion}` below is that version of `@formio/uag`, which the image is tagged with too. An unpinned `formio/uag` is `latest`, the newest 2.x release, which changes under the deployment on its next pull; UAG 1.x is `formio/uag:1.13.2`. Write the deployment files into the user's working directory with every secret as a placeholder (`CHANGEME`, or `${VAR}` read from an `.env` the user fills from their secret store); never invent or reuse a real key.
 
 ## Contents
 
@@ -184,7 +184,7 @@ The UAG repository's `demo/samples/custom-module` is a tested layout that puts F
 
 ## Kubernetes
 
-The UAG is a stateless Deployment behind a Service. Keep secrets in a Secret (or an external secret store), pin the image, and probe `/status`. Give the startup probe time for `PROJECT_RETRIES` × `PROJECT_RETRY_DELAY` while Form.io starts. Run one replica unless the UAG has its database and a shared `JWT_SECRET` ([Running more than one instance](#running-more-than-one-instance)).
+The UAG is a stateless Deployment behind a Service. Keep secrets in a Secret (or an external secret store), pin the image, and probe `/status`. Give the startup probe time for the project retries while Form.io starts: the delay starts at `PROJECT_RETRY_DELAY` and doubles each time up to 60 seconds, so the defaults (`5` retries from `5000`) take about 135 seconds. Run one replica unless the UAG has its database and a shared `JWT_SECRET` ([Running more than one instance](#running-more-than-one-instance)).
 
 ```yaml
 apiVersion: apps/v1
@@ -252,6 +252,7 @@ The resource figures are a starting point, not a measurement: form logic runs in
 | `LICENSE_KEY` | none | A Form.io license that includes the UAG. `UAG_LICENSE` is deprecated, still read until UAG 3.0. |
 | `LICENSE_REMOTE`, `LICENSE_SERVER` | unset, `https://license.form.io` | `true` for an offline license; the server online licenses are validated with, one of Form.io's (`https://*.form.io`; the UAG needs egress to it). |
 | `LOGIN_FORM` | `{PROJECT}/user/login` | With `MCP_OAUTH`: the login form JSON URL the user's browser loads. |
+| `AUTHORIZE_HTML` | the built-in page | With `MCP_OAUTH`: the HTML of the `/auth/authorize` sign-in page itself (not a path), read once at startup, to brand it or replace it ([mcp-clients.md](./mcp-clients.md#remote-clients-oauth-with-pkce)). A module's `config.auth.authAppHtml` wins. |
 | `UAG_ENGINES` | none | Engine instances to enable (below). Unset: no engines; MCP still works. |
 | `PROJECT_TTL` | `900` | Seconds between project refreshes. `60` or more outside development; `0` disables them. |
 | `TEMPLATE_SYNC` | `boot` | When a module's template is installed: `boot`, `refresh` or `off` (use `off` when stage deployments manage the project). |
@@ -260,9 +261,9 @@ The resource figures are a starting point, not a measurement: form logic runs in
 | `MCP_OAUTH` | `false` | `true` turns on remote MCP sign-in. Needs `MONGO`. |
 | `MONGO`, `UAG_DATABASE`, `MONGO_CONFIG` | none, `uag`, none | The UAG's own database (below). |
 | `TASK_RUN_RETENTION_DAYS` | `90` | Days run records are kept; `0` keeps them forever. |
-| `PORTAL_SECRET` | none | Lets a Form.io Enterprise portal stage connect to the UAG. |
+| `PORTAL_SECRET` | none | Lets a Form.io Enterprise portal stage connect to the UAG. It signs the portal's tokens, so whoever holds it acts as a team administrator: a long random value, a different one for each UAG. |
 | `AGENT_ANONYMOUS_RATE_LIMIT`, `AGENT_ANONYMOUS_TOTAL_RATE_LIMIT` | `10`, `100` | Anonymous agent requests a minute, per address and in total, per process. `0` turns anonymous use off. |
-| `PROJECT_RETRIES`, `PROJECT_RETRY_DELAY` | `5`, `5000` | Retries while Form.io is still starting. |
+| `PROJECT_RETRIES`, `PROJECT_RETRY_DELAY` | `5`, `5000` | Retries while Form.io is still starting; the delay, in milliseconds, doubles each time up to 60 seconds. |
 | `MAX_BODY_SIZE` | `16mb` | Largest JSON body, as Form.io's; bodies are parsed before authentication, so raise it only as far as the forms need. |
 | `AGENT_BODY_LIMIT` | 5 MB | Largest body, in bytes, of a form's agent operations and modules' form routes (`agentApi.bodyLimit` in a module wins); `413` `payload_too_large` above it. `MAX_BODY_SIZE` still applies first. |
 | `DOCUMENTS_MAX_FILE_BYTES` | 25 MB | Largest file, in bytes, the `read_document` MCP tool (and AI Document) reads (`documents.maxFileBytes` in a module wins). |
@@ -282,10 +283,12 @@ An **engine** connects the UAG to a model provider. None runs until `UAG_ENGINES
 | Kind | Answers | Official engines |
 | --- | --- | --- |
 | Decision | Closed-set fields within its option limit, with a calibrated confidence. Fast (Jev: 70–500 ms). | `jev` (`TYPESAFE_API_KEY`, `TYPESAFE_MODEL` — pin a dated model such as `jev-1.13.0`); `openai` with `kind: decision` |
-| Agent | Open values, and closed-set fields as an uncalibrated fallback; may research with `uagTools`; serves the chat | `claude` (`CLAUDE_API_KEY`, `CLAUDE_MODEL`, default `claude-opus-5-5`; `CLAUDE_MAX_TOKENS`, the most output tokens per request, default `16000`, up to `128000`, for long values such as a transcribed document), `openai` (`OPENAI_API_KEY`, `OPENAI_MODEL`, `OPENAI_BASE_URL` for Ollama, vLLM or another OpenAI-compatible server — which never receives `OPENAI_API_KEY`: give it its own key as `UAG_ENGINE_<NAME>_API_KEY`), `grok` (`XAI_API_KEY`, `XAI_MODEL`), `gemini` (`GEMINI_API_KEY`, `GEMINI_MODEL`) |
+| Agent | Open values, and closed-set fields as an uncalibrated fallback; may research with `uagTools`; serves the chat | `claude` (`CLAUDE_API_KEY` or `ANTHROPIC_API_KEY`, `CLAUDE_MODEL`, default `claude-opus-5-5`; `CLAUDE_EFFORT` and `CLAUDE_RESEARCH_EFFORT`, `low` and `medium` by default, of `low`, `medium`, `high`, `xhigh` and `max`; `CLAUDE_FALLBACKS`, `default` or `off`, re-runs a refused request on a fallback model; `CLAUDE_MAX_TOKENS`, the most output tokens per request, default `16000`, up to `128000`, for long values such as a transcribed document), `openai` (`OPENAI_API_KEY`, `OPENAI_MODEL`, `OPENAI_BASE_URL` for Ollama, vLLM or another OpenAI-compatible server — which never receives `OPENAI_API_KEY`: give it its own key as `UAG_ENGINE_<NAME>_API_KEY`), `grok` (`XAI_API_KEY`, `XAI_MODEL`), `gemini` (`GEMINI_API_KEY` or `GOOGLE_API_KEY`, `GEMINI_MODEL`, `GEMINI_REASONING_EFFORT`) |
 | Built in | `stub-decision`, `stub-agent` (placeholders, no keys, no license), `remote` (an engine on an engine server) | |
 
-`OPENAI_MODEL`, `XAI_MODEL` and `GEMINI_MODEL` have no default, and startup stops without them. `openai` answers decisions with `OPENAI_KIND=decision` (or `UAG_ENGINE_<NAME>_KIND`).
+`OPENAI_MODEL`, `XAI_MODEL` and `GEMINI_MODEL` have no default, and startup stops without them. `openai` answers decisions with `OPENAI_KIND=decision` (or `UAG_ENGINE_<NAME>_KIND`); its other settings are `OPENAI_API` (`responses` for OpenAI itself, `chat` for any other server), `OPENAI_STRUCTURED_OUTPUT` (`json_schema`, `json_object` or `prompt`, for a server that lacks JSON schemas) and `OPENAI_REASONING_EFFORT`. `jev` defaults `TYPESAFE_MODEL` to `jev-1.13.0`.
+
+**Pin each model.** A new engine release may change a default model, so write `CLAUDE_MODEL` (and every other `_MODEL`) as a dated model ID. Every Claude request sends `effort`: the current Claude models take all five levels, Claude Opus 4.6 and Sonnet 4.6 all but `xhigh`, and Claude Haiku 4.5 and Sonnet 4.5 refuse it, so they cannot be used.
 
 `UAG_ENGINES` lists instances as `<type>` or `<name>:<type>`, so one type can run twice with different settings; `UAG_ENGINE_<NAME>_<SETTING>` configures one instance and wins over the type's own variables:
 
@@ -303,7 +306,9 @@ A misconfigured engine (not installed, a duplicate name, a missing key) stops st
 
 **Which engines to enable** for each pattern: MCP needs none; the chat widget needs an agent engine; Agentic Formflow and Run task want a decision engine for closed-set fields plus an agent engine for open values (with only an agent engine, closed-set fields that a workflow must save need `uagAgentDecides`).
 
-**Where data goes.** An engine sends a task's criteria, input, `uagContext` values and today's date to its provider (TypeSafe for `jev`, Anthropic for `claude`, OpenAI or the server it points at, xAI, Google). For data that must stay in the network, point `openai` at a local OpenAI-compatible server. To keep model keys and model traffic out of the UAG, run engines on an engine server (`formio/uag-engines`, with `UAG_ENGINE_SERVER_KEY`) and name them on the UAG as `remote` instances (`UAG_ENGINES=claude:remote`, `UAG_ENGINE_CLAUDE_URL`, `UAG_ENGINE_CLAUDE_KEY` of at least 32 characters). Custom engines are npm packages named `uag-engine-<type>`, built with `@formio/uag-sdk`.
+**Where data goes.** An engine sends a task's criteria, input, `uagContext` values and today's date to its provider (TypeSafe for `jev`, Anthropic for `claude`, OpenAI or the server it points at, xAI, Google). For data that must stay in the network, point `openai` at a local OpenAI-compatible server. To keep model keys and model traffic out of the UAG, run engines on an engine server (`formio/uag-engines`, with `UAG_ENGINE_SERVER_KEY`) and name them on the UAG as `remote` instances (`UAG_ENGINES=claude:remote`, `UAG_ENGINE_CLAUDE_URL`, `UAG_ENGINE_CLAUDE_KEY` of at least 32 characters). Custom engines are built with `@formio/uag-sdk`: an engine type `<type>` is looked up as a module's `engineTypes`, then the built-in engines, then the packages `@formio/uag-<type>` and `uag-engine-<type>` (or any package name given as the type), with `UAG_ENGINE_PATH` adding absolute directories to search.
+
+An engine server (`formio/uag-engines:{uagVersion}`, or `npx uag-engines` from `@formio/uag-engines`) listens on `PORT` (`3300`) and `HOST` (`127.0.0.1`; the image sets `0.0.0.0`), and needs `UAG_SERVER` set to the UAG's URL for tasks that research, which it otherwise refuses. Keep its port off the public network: only the UAG calls it.
 
 ## The UAG's database
 
@@ -350,11 +355,11 @@ A template only adds what the project lacks, matched by key, and never changes a
 
 A module can also bring a whole capability (experimental in 2.0). With a `name`, a `version` and `apiVersion: 1` (and `host: 'uag'` when it runs only in the UAG), it may have `settings` (a function of the configuration and the environment, checked at startup), `routes.form` (routes on every form, such as `'POST /document/process'` at `{form}/document/process`), formio.js `components` (served in `/uag-js/uag.use.js` and the portal script), `plugins` and `pluginTypes`, `initialize`, and `close`. Its routes run behind what the Agent API runs behind: the caller check, the form access check (`create` or `update` by default; a route's `access` changes it), the body limit, rate limits by the route's name, the request id and the error shape. Its routes and its MCP tools (as `extra.module`) get a versioned module API — access and license checks, file reads with the caller's credentials, converters, an engine whose `generate` checks the license, `stream()` for server-sent progress — never the project or an engine's credentials. On a form with `uagAnonymous: "true"` whose Anonymous role may create submissions, visitors who are not signed in reach a module's routes, under the anonymous rate limits, as they reach the agent operations. A route that must not be public declares `access: ['update']` (anonymous callers can only create) or checks `req.auth.user`; anonymous callers share one `agentApi.rateLimits.caller` key, and `api.callerKey(req)` gives `anonymous:<ip>` for limits per address.
 
-`server.use()` takes a module, a list of them, or an ES module namespace (used by its default export). A module given twice (by `name`) is used once; two versions of one, or an MCP tool, engine type, route or component type that two modules define, stop startup. `MODULES_DISABLED` leaves modules out by name, and `GET` on the project's URL on the UAG plus `/plugins` lists each one used (`type: "module"`). `close` runs when the server is destroyed: the `uag` command and the image do it on `SIGTERM` or `SIGINT` — they stop taking connections, close each module and plugin, and exit `0`, or `1` when that fails or takes more than 10 seconds — and an embedding server calls `server.destroy()` itself. `@formio/uag/testing` (`createTestModuleApi`, `mountModuleRoutes`, `testForm`, `testAuth`) tests a module without a project. The whole contract is at `https://ai.form.io/developers/modules`.
+`server.use()` takes a module, a list of them, or an ES module namespace (used by its default export). A module given twice (by `name`) is used once; two versions of one, or an MCP tool, engine type, route or component type that two modules define, stop startup. `MODULES_DISABLED` leaves modules out by name, and `GET` on the project's URL on the UAG plus `/plugins` lists each one used (`type: "module"`). `close` runs when the server is destroyed: the `uag` command and the image do it on `SIGTERM` or `SIGINT` — they stop taking connections, close each module and plugin, and exit `0`, or `1` when that fails or takes more than 10 seconds — and an embedding server calls `server.destroy()` itself. `@formio/uag/testing` (`createTestModuleApi`, `mountModuleRoutes`, `testForm`, `testAuth`) tests a module without a project. The whole contract is at `https://github.com/formio/uag/blob/main/demo/content/developers/modules.md`.
 
 ## Plugins and add-ons
 
-A plugins file adds plugins — converters, document plugins — and modules without a module folder: an `index.mjs` whose default export is a plugin, a module, or a list mixing them, in a folder with its own `node_modules` for what it imports. Plugins are trusted code: they run in the UAG's process. A plugin's settings come from `config.plugins.settings.<type>.<name>` in a module, or its own environment variables. The built-in converters read PDF (its text layer), text, Markdown, CSV, JSON, HTML and XML, and turn a PNG or JPEG image into a one-page PDF (`image-pdf`). See `https://ai.form.io/developers/plugins`.
+A plugins file adds plugins — converters, document plugins — and modules without a module folder: an `index.mjs` whose default export is a plugin, a module, or a list mixing them, in a folder with its own `node_modules` for what it imports. Plugins are trusted code: they run in the UAG's process. A plugin's settings come from `config.plugins.settings.<type>.<name>` in a module, or its own environment variables. The built-in converters read PDF (its text layer), text, Markdown, CSV, JSON, HTML and XML, and turn a PNG or JPEG image into a one-page PDF (`image-pdf`). See `https://github.com/formio/uag/blob/main/demo/content/developers/plugins.md`.
 
 The image and `npx uag` load plugins files after the module, from what `UAG_PLUGINS` names (a file, a folder, or `off` for none), or else from the folder `/app/plugins` when it exists:
 
@@ -362,7 +367,7 @@ The image and `npx uag` load plugins files after the module, from what `UAG_PLUG
 - **A folder with an `index.mjs`:** that file alone (one plugins folder, mounted at `/app/plugins` itself).
 - **Any other folder:** the `index.mjs` of each folder directly in it, one per add-on, in name order, skipping `node_modules` and names that start with `.`. Each file is named by its path in messages, and the startup log has one line per file: `[formio-uag] Plugins and modules loaded from /app/plugins/documents/index.mjs.`
 
-Folders under `/app/plugins` need `formio/uag` 2.0.0-rc.8 or later; 2.0.0-rc.7 loads only `/app/plugins/index.mjs`. Beside add-ons, never mount a folder with an `index.mjs` at `/app/plugins` itself: it is then loaded alone, and the add-ons' folders are not. Several files merge as several modules do:
+Beside add-ons, never mount a folder with an `index.mjs` at `/app/plugins` itself: it is then loaded alone, and the add-ons' folders are not. Several files merge as several modules do:
 
 - A module two of them bring, at the same `name` and `version`, is used once; two versions of it stop startup: "Two versions of the module X are used: A from <file>, and B from <file>. Use one."
 - The same plugin (`type:name`), plugin type, form route or component type from two files stops startup, naming both: "Plugin converter:same is registered twice: by <file> and by <file>". Leave one out with `PLUGINS_DISABLED`, or give your own another `name`.
@@ -433,9 +438,9 @@ volumes:
 
 ## AI Document
 
-The AI Document component (`uagdocument`) turns files people upload to a form, and the form designer's instructions, into content they review before submitting: an exact extraction, a summary, an assessment. It is a module of `@formio/uag-extras` (versioned on its own, for UAG 2.0.0-rc.7 or later): the module brings the component, the `document` plugin type and `POST {form}/document/process`, and the document plugins it runs (`extract`, `analyze`, `translate`) and extra converters come from the same package.
+The AI Document component (`uagdocument`) turns files people upload to a form, and the form designer's instructions, into content they review before submitting: an exact extraction, a summary, an assessment. It is a module of `@formio/uag-extras` (2.x, whose major is the UAG's; it needs `@formio/uag` 2.0.0 or later, and Node.js 24 or later when embedded): the module brings the component, the `document` plugin type and `POST {form}/document/process`, and the document plugins it runs (`extract`, `analyze`, `translate`) and extra converters come from the same package.
 
-- **Run it** as an add-on beside the UAG: the image `formio/uag-documents` is not a UAG and does not replace `formio/uag`. It holds a plugins folder: an `index.mjs` that loads the module, the `extract`, `analyze` and `translate` document plugins and the office-text converter, and a `node_modules` with `@formio/uag-extras` and the converter's libraries (the extras use the UAG's own `@formio/uag` and `zod`). It copies that folder into its own volume, mounted at `/out`, replacing what was there, and exits `0`; the UAG mounts that volume read-only at `/app/plugins/documents` and loads it at startup with any other add-ons ([Plugins and add-ons](#plugins-and-add-ons)). Use this folder form even for one add-on; it needs `formio/uag` 2.0.0-rc.8 or later:
+- **Run it** as an add-on beside the UAG: the image `formio/uag-documents` is not a UAG and does not replace `formio/uag`. It holds a plugins folder: an `index.mjs` that loads the module, the `extract`, `analyze` and `translate` document plugins and the office-text converter, and a `node_modules` with `@formio/uag-extras` and the converter's libraries (the extras use the UAG's own `@formio/uag` and `zod`). It copies that folder into its own volume, mounted at `/out`, replacing what was there, and exits `0`; the UAG mounts that volume read-only at `/app/plugins/documents` and loads it at startup with any other add-ons ([Plugins and add-ons](#plugins-and-add-ons)). Use this folder form even for one add-on. For a ready-made stack of both, with an optional database, `@formio/uag-extras` ships a deployment kit: `https://cdn.jsdelivr.net/npm/@formio/uag-extras@{extrasVersion}/deploy/docker-compose.yml` and `.env.example` beside it. Written by hand:
 
   ```yaml
   services:
@@ -469,7 +474,7 @@ The AI Document component (`uagdocument`) turns files people upload to a form, a
 - **Proxies** must allow one streaming request as long as `timeoutMs` (`proxy_read_timeout 660s`) and must not buffer `text/event-stream`.
 - **Results are not checked on save.** Anyone who can submit the form can submit any `content`, `status`, `issues` or `meta`; the person's review is the control.
 
-See `https://ai.form.io/developers/ai-document`.
+Authoring the component, its target field and its events, and the process route: [ai-document.md](./ai-document.md).
 
 ## Embedding in a Node.js server
 
@@ -487,9 +492,9 @@ app.use(await server.router());
 app.listen(process.env.PORT || 3200);
 ```
 
-Node 22 or newer, started with `--no-node-snapshot` (isolated-vm, which runs form logic, can crash the process without it; or `NODE_OPTIONS=--no-node-snapshot` — the constructor refuses to start without it), with the engines it enables installed beside it (`npm install @formio/uag@{uagVersion} @formio/uag-claude@{engineVersion} express`, each version resolved from its own dist-tags as [patterns-and-licensing.md](./patterns-and-licensing.md#versions) describes).
+Node 22 or newer (Node.js 24 or later when it also uses `@formio/uag-extras`, AI Document's package), started with `--no-node-snapshot` (isolated-vm, which runs form logic, can crash the process without it; or `NODE_OPTIONS=--no-node-snapshot` — the constructor refuses to start without it), with the engines it enables installed beside it (`npm install @formio/uag@{uagVersion} @formio/uag-claude@{engineVersion} express`, each version resolved from its own dist-tags as [patterns-and-licensing.md](./patterns-and-licensing.md#versions) describes).
 
-`usePluginFiles(server, env?)` loads plugins files as [Plugins and add-ons](#plugins-and-add-ons) describes and returns the files it loaded (`string[]`); `pluginFiles(env?)` lists them without loading, `pluginFilesIn(path)` lists those a file or folder holds, and `DEFAULT_PLUGINS_DIR` is `'/app/plugins'`. From 2.0.0-rc.8 they replace 2.0.0-rc.7's `pluginsFile` and `DEFAULT_PLUGINS_FILE`.
+`usePluginFiles(server, env?)` loads plugins files as [Plugins and add-ons](#plugins-and-add-ons) describes and returns the files it loaded (`string[]`); `pluginFiles(env?)` lists them without loading, `pluginFilesIn(path)` lists those a file or folder holds, and `DEFAULT_PLUGINS_DIR` is `'/app/plugins'`.
 
 What breaks an embedded UAG:
 
@@ -497,12 +502,31 @@ What breaks an embedded UAG:
 - **Register the application's own routes first** when the UAG is mounted at the root. Requests the UAG does not serve fall through to later routes, except those with an admin credential (`x-admin-key`, `x-token`), which it forwards to Form.io.
 - **Load `.env` yourself.** `new UAGServer()` reads `process.env`; only the `uag` command and the image load a `.env` file (`require('dotenv/config')` first).
 - **Build tools in the image.** `isolated-vm` compiles on install: `make`, `python3` and `g++` (`apk add make python3 g++` on Alpine) in the build stage.
-- **One Form.io server package.** `@formio/uag` depends only on `@formio/appserver` (2.26.0 or later), which brings `@formio/appserver-core`. Do not add `appserver-core` yourself or pin an older `@formio/appserver`; the constructor throws "@formio/uag needs @formio/appserver-core 2.26.0 or later, through @formio/appserver" when the lockfile resolves an older one.
+- **One Form.io server package.** `@formio/uag` depends only on `@formio/appserver` (2.26.4 or later), which brings `@formio/appserver-core`. Do not add `appserver-core` yourself or pin an older `@formio/appserver`; the constructor throws "@formio/uag needs @formio/appserver-core 2.26.4 or later, through @formio/appserver" when the lockfile resolves an older one.
 - **Configuration precedence.** A module's `config`, then the constructor's, then the environment. `config.engines` replaces `UAG_ENGINES` when set.
 - **`router()` rejects** when the project cannot be loaded, an engine is misconfigured or the database may not be used. Exit on it, as the example does, so the process manager restarts it.
-- **Shut down with `server.destroy()`.** It runs each module's and plugin's `close`; the `uag` command and the image call it on `SIGTERM` and `SIGINT`, an embedding server must call it itself.
+- **Shut down with `server.destroy()`.** It runs each module's and plugin's `close`; the `uag` command and the image call it on `SIGTERM` and `SIGINT`, an embedding server must call it itself. Modules and plugins get 10 seconds to close, which is also Docker's default stop grace period: raise `stop_grace_period` (or `docker stop -t`) when a module's `close` takes longer.
 
-To ship fewer engines than the official image, build an image of your own: `npm install --omit=dev @formio/uag@{uagVersion}` plus only the engine packages it enables, `ENV NODE_OPTIONS=--no-node-snapshot`, and `ENTRYPOINT ["node_modules/.bin/uag"]` (`UAG_MODULE` names a module). Naming an engine that is not installed stops startup.
+To ship fewer engines than the official image, build an image of your own with only the engine packages it enables. Keep `@formio/uag-js` in it: it is what the UAG serves at `/uag-js/` (`uag.use.js`, the portal script, the modules' components), which answer `404` without it.
+
+```dockerfile
+FROM node:24-alpine AS build
+WORKDIR /app
+RUN apk add --no-cache make python3 g++      # isolated-vm, which runs form logic, compiles on install
+RUN npm install --omit=dev @formio/uag@{uagVersion} @formio/uag-claude@{uagVersion} @formio/uag-js@{uagVersion}
+
+FROM node:24-alpine
+WORKDIR /app
+COPY --from=build /app/node_modules ./node_modules
+# COPY module ./module                     # optional: a module
+# ENV UAG_MODULE=./module
+ENV NODE_OPTIONS=--no-node-snapshot
+HEALTHCHECK --interval=15s --timeout=3s --start-period=60s --retries=3 \
+  CMD node -e "fetch('http://127.0.0.1:'+(process.env.PORT||3200)+'/status').then(r=>process.exit(r.ok?0:1),()=>process.exit(1))"
+ENTRYPOINT ["node_modules/.bin/uag"]
+```
+
+Naming an engine that is not installed stops startup.
 
 ## Running more than one instance
 

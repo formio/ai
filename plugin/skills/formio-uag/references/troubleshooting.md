@@ -29,7 +29,7 @@ Most UAG problems are configuration, and they surface far from their cause: a mi
 | Exits with "No Form.io project could be loaded" | `PROJECT` is unreachable from inside the UAG container (a browser address instead of a container one), or paired with the wrong credential: `ADMIN_KEY` for Open Source, `PROJECT_KEY` (plus `LICENSE_KEY` when self-hosted Enterprise) for a project. |
 | Exits on first boot, works after a restart | Form.io was not answering yet: add a healthcheck and `depends_on: condition: service_healthy`, or raise `PROJECT_RETRIES`. |
 | Restart-loops with "Endpoint ... is not allowed for this license" | The license's endpoint allowlist does not include `PROJECT`'s host. |
-| "License is not configured" for a `*.form.io` project | A hosted project needs a license while `NODE_TLS_REJECT_UNAUTHORIZED=0`, `NODE_EXTRA_CA_CERTS` or `NODE_USE_SYSTEM_CA` is set. |
+| "License is not configured" for a `*.form.io` project | The UAG could not reach Form.io's hosted service for the project (the message names the cause), or a hosted project needs a license because `NODE_TLS_REJECT_UNAUTHORIZED=0`, `NODE_EXTRA_CA_CERTS` or `NODE_USE_SYSTEM_CA` is set. |
 | Startup stops naming an engine | Its package is not installed, the name is duplicated, a required setting (API key, model) is missing, or a `remote` instance's engine server refused its key. |
 | "The database (MONGO) is not used: ... needs a license" | No license that includes the UAG, and the UAG, project and database do not all run on one machine. The UAG runs without database features. |
 | "MCP_OAUTH is set, but remote MCP sign-in is off" | Sign-in needs a usable database. |
@@ -38,14 +38,15 @@ Most UAG problems are configuration, and they surface far from their cause: a mi
 | "@formio/uag needs Node started with --no-node-snapshot" | An embedding server started Node without the flag: `node --no-node-snapshot`, or `NODE_OPTIONS=--no-node-snapshot`. |
 | The log warns "JWT_SECRET is not set" | Tokens last only as long as the process. Set `JWT_SECRET`, the same on every instance. |
 | The log warns "MCP_OAUTH is on, but LOGIN_FORM is not set" | The sign-in page would load the login form from a container address. Set `LOGIN_FORM` to its public URL. |
-| "@formio/uag needs @formio/appserver-core 2.26.0 or later, through @formio/appserver" | An embedding application installs an older `@formio/appserver`, or its lockfile resolves an older core. Upgrade `@formio/appserver`; do not add `@formio/appserver-core` directly. |
+| "@formio/uag needs @formio/appserver-core 2.26.4 or later, through @formio/appserver" | An embedding application installs an older `@formio/appserver`, or its lockfile resolves an older core. Upgrade `@formio/appserver`; do not add `@formio/appserver-core` directly. |
 | "UAG server limit reached" | The online license's count of UAG servers is used up: each project endpoint served counts once. |
 | Licensed features turn off when the license server is unreachable | The last confirmed license holds for 12 hours from that confirmation, while the UAG runs; a restarted UAG, and a key never confirmed, have none. Allow egress to `LICENSE_SERVER` (only `https://*.form.io`). Online keys are not validated while `NODE_EXTRA_CA_CERTS` or `NODE_TLS_REJECT_UNAUTHORIZED=0` is set; use an offline license there. |
 | `401` errors in the log right after starting | `PROJECT_KEY` or `ADMIN_KEY` is empty or does not belong to `PROJECT`. |
 | Startup stops: "The MCP tool ... is defined by both ..." (or an engine type, form route or component type) | Two modules, or a module and the server's configuration, define the same thing. Remove one, or rename it in your own module. |
+| Startup stops: "The MCP tool ... has the name of a built-in UAG tool", or "is defined more than once in config.tools (or its modules)" | A custom tool reuses a built-in tool's name (rename it, or change the built-in one with `toolOverrides.<name>`), or two custom tools share a name. |
 | Startup stops: "Two versions of the module ... are used" | The module is used twice at different versions (a module folder and a plugins file, or two add-ons, say); the message names both files. Use one. |
 | Startup stops: "Plugin ... is registered twice: by ... and by ..." (or a plugin type, form route or component type) | Two plugins files (two add-ons, or your own plugins and an add-on) register the same thing. Leave one out with `PLUGINS_DISABLED`, or give your own another `name`. |
-| An add-on's plugins or module are not loaded; the startup log has no "loaded from /app/plugins/<name>/index.mjs" line | `formio/uag` is older than 2.0.0-rc.8, which loads only `/app/plugins/index.mjs`; or a folder with an `index.mjs` is mounted at `/app/plugins` itself, which is then loaded alone; or the add-on's volume is not mounted in a folder under `/app/plugins`, or `UAG_PLUGINS` names something else. |
+| An add-on's plugins or module are not loaded; the startup log has no "loaded from /app/plugins/<name>/index.mjs" line | A folder with an `index.mjs` is mounted at `/app/plugins` itself, which is then loaded alone; or the add-on's volume is not mounted in a folder under `/app/plugins`, or `UAG_PLUGINS` names something else. |
 | Startup stops: a module "needs a `name` and an `apiVersion`", "needs module API ...", or "needs the uag host" | A module with `settings`, `routes`, `components`, `initialize` or `close` lacks `name` or `apiVersion: 1`, or was written for another module API or host. |
 | Startup stops: "the script of component ... is not a browser script" | A module's component script is an ES module or does not parse. Build it as a classic browser script (an IIFE or UMD bundle). |
 | Startup stops: "Module ... has invalid settings", or its `settings` "returned a promise" | The module's `settings` function threw on the configuration or environment, or is `async`; it must return a plain object. |
@@ -78,7 +79,7 @@ Most UAG problems are configuration, and they surface far from their cause: a mi
 | `401` "Scoped tokens can only be used on /mcp." | A research token from a remote engine was used to start new work. |
 | Tokens stop working after a restart or on another instance | `JWT_SECRET` is unset or differs between instances. |
 | A browser call with a key returns `401` | Keys are refused from browsers. Send the user's `x-jwt-token`, or use a relay. |
-| `401` "Sign in to use this form's agent operations." | No credential and the form does not allow anonymous use (`uagAnonymous`, and anonymous limits not `0`). |
+| `401` "Sign in to use this form's agent operations and routes." (`code: "sign_in_required"`) | No credential and the form does not allow anonymous use (`uagAnonymous`, and anonymous limits not `0`). |
 | `403` "Anonymous visitors may not submit this form." | `uagAnonymous` is on but the Anonymous role may not create submissions. |
 | `429` for anonymous visitors | Over `AGENT_ANONYMOUS_RATE_LIMIT` or the total. Behind a proxy without `TRUST_PROXY`, every visitor shares the proxy's address and one allowance. |
 
@@ -97,7 +98,7 @@ Most UAG problems are configuration, and they surface far from their cause: a mi
 | Agent Input does nothing | The form has no task with an input, the form was rendered from a definition without `_id`, `agentInput` is `false`, or the module was registered on another copy of `@formio/js`. |
 | CORS errors in the browser | Allow the application's origin in the UAG's `CORS` (several separated by commas). |
 | Agent Input's results arrive all at once, or the request times out behind a proxy | The proxy buffers the event stream or cuts long requests: turn buffering off for `text/event-stream` and raise read timeouts ([deployment.md](./deployment.md#behind-a-reverse-proxy)). |
-| `413` | The body is over the agent operations' limit (5 MB unless `AGENT_BODY_LIMIT` or `agentApi.bodyLimit` raises it) for an agent operation or a module's route, over `MAX_BODY_SIZE` for anything else, or over the proxy's own limit (nginx: `client_max_body_size`). |
+| `413` (`code: "payload_too_large"`) | The body is over `MAX_BODY_SIZE` (16 MB, checked first on every request), over the agent operations' limit (5 MB unless `AGENT_BODY_LIMIT` or `agentApi.bodyLimit` raises it) for an agent operation or a module's route — measured as inflated, so a compressed body small on the wire can still exceed it — or over the proxy's own limit (nginx: `client_max_body_size`). |
 | Template overrides for the chat have no effect | They were keyed `bootstrap5`; key them by `Formio.Templates.framework` (`bootstrap` on a default install). |
 | "This form is not available for chat." | Not tagged `uag`, or rendered from a definition without its `_id`. |
 | The chat never offers to submit | A required field is one the chat cannot collect (it opens the form for it), or a value fails validation. |
@@ -114,12 +115,15 @@ Most UAG problems are configuration, and they surface far from their cause: a mi
 | A submission is refused with `503` or `429` | A decisions-only run before the save could not decide some fields. Nothing was stored. |
 | A run fails: the token is not accepted | No agent role, and the submitter's token expired or was logged out before the run. |
 | A run after the save fails with `404` "Submission ... was not found" | No agent role, and the submitter may not read the submission: grant Read Own. |
-| "JWT_SECRET must be the same as Form.io Enterprise's" | The action names an agent role and the secrets differ. |
+| `500` `agent_identity`: "Form.io refused the token the UAG signed to act on the user's behalf: JWT_SECRET must be the same as Form.io Enterprise's." | The action names an agent role and the secrets differ (Form.io answered the signed token `400` "Bad Token"), or `JWT_SECRET` is not set on the UAG. |
 | `403` "You may not submit this form." | The user's roles may not create, and they hold no submitter role, or the agent role lacks Create All. |
 | "... its Run task actions name different agent roles." | Several Run task actions on create name different agent roles. |
 | "An agent cannot act with an admin role." | The agent role is an admin role. |
 | Closed-set fields are never saved | Only an agent engine is enabled: add `uagAgentDecides: "true"`, or a decision engine. |
 | An agent runs continuously | A Run task on update whose condition stays true after its own save. The UAG stops such a chain after 5 runs. |
+| A chained Run task never runs | It is set to run before the save; the UAG's own saves skip those. Set **When** to after the save. |
+| A run fails with `409` "The submission changed while its task was running, and again on the second try." | A person saved the submission twice while the run worked; nothing was saved. Run it again, or run the task before the save. |
+| A submission is refused because a required field is empty | The field is `uagAuthoritative` and a run before the save was not confident, so it cleared it. Do not make an authoritative field required. |
 | A Run task never runs, and the log says its conditions use an operator Form.io does not know | Fix the operator; the log line lists the accepted ones. An unknown operator never runs the action. |
 | A value the client sent is not stored | The field is `uagAuthoritative` in a task a Run task runs: only the task sets it. |
 | Some task fields are filled, others not | The others lack the task's exact `uag` value, already had a value, or are hidden by conditionals. |

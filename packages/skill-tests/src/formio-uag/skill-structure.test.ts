@@ -25,6 +25,7 @@ const REFERENCES = [
   'uag-js.md',
   'chat-widget.md',
   'mcp-clients.md',
+  'ai-document.md',
   'deployment.md',
   'troubleshooting.md',
 ] as const;
@@ -243,15 +244,67 @@ describe('formio-uag build-time rules', () => {
     }
   });
 
-  // Until 2.0.0 is released, 2.0 ships as 2.0.0-rc.N under the npm `rc` dist-tag while
-  // `latest` can still be 1.x, and a semver range never matches a prerelease.
-  it('resolves each package version from its dist-tags, falling back to rc', () => {
+  // UAG 2.0.0 is released: `latest` names the newest 2.x on every package and on the
+  // formio/uag and formio/uag-engines images, so the release-candidate channel is gone.
+  it('resolves each package version from latest, checking it is 2.x', () => {
     const versions =
       reference('patterns-and-licensing.md').match(/^## Versions\n([\s\S]*?)(?=^## )/m)?.[1] ?? '';
     expect(versions).toMatch(/npm view [^`]*dist-tags/);
-    expect(versions).toMatch(/`latest`[^.]*`2\.0\.0`/);
-    expect(versions).toMatch(/`rc`[^.]*`2\.0\.0-rc\.N`|`2\.0\.0-rc\.N`[^.]*`rc`/);
+    expect(versions).toMatch(/`latest`[^.]*2\.x/);
     expect(skill).toMatch(/patterns-and-licensing\.md#versions/);
+  });
+
+  it('never points at the 2.0 release-candidate channel', () => {
+    for (const path of allSkillDocs()) {
+      const text = read(path);
+      expect(text.match(/@formio\/uag[a-z-]*@rc\b|formio\/uag[a-z-]*:rc\b/g) ?? [], path).toEqual(
+        []
+      );
+      expect(
+        text.match(/2\.0\.0-rc\.\d+ or later|until 2\.0\.0 is released/gi) ?? [],
+        path
+      ).toEqual([]);
+    }
+  });
+
+  // UAG 2.0.0 needs @formio/appserver-core 2.26.4 (src/index.ts in formio/uag).
+  it('names the appserver minimum UAG 2.0.0 checks for', () => {
+    for (const path of allSkillDocs()) {
+      expect(read(path).match(/2\.26\.[0-3]\b/g) ?? [], path).toEqual([]);
+    }
+    expect(reference('deployment.md')).toContain('2.26.4');
+  });
+
+  // @formio/uag-extras 2.x takes the UAG's major; formio/uag-documents:1 is the
+  // release candidates' 1.0.0 (CHANGELOG 2.0.1 in formio/uag).
+  it('runs AI Document from formio/uag-documents 2.x, never the rc-era :1', () => {
+    for (const path of allSkillDocs()) {
+      expect(read(path).match(/formio\/uag-documents:1\b/g) ?? [], path).toEqual([]);
+    }
+    expect(reference('patterns-and-licensing.md')).toMatch(/formio\/uag-documents:2/);
+  });
+
+  // ai.form.io is the demo's UAG, not a documentation site (CHANGELOG 2.0.1).
+  it('links the UAG documentation where it is published', () => {
+    for (const path of allSkillDocs()) {
+      expect(read(path).match(/ai\.form\.io\/(developers|examples)/g) ?? [], path).toEqual([]);
+    }
+    expect(skill).toContain(
+      'https://github.com/formio/uag/blob/main/demo/content/developers/index.md'
+    );
+  });
+
+  it('runs a chained Run task after the save', () => {
+    const chaining =
+      reference('workflows.md').match(/^## Chaining tasks\n([\s\S]*?)(?=^## )/m)?.[1] ?? '';
+    expect(chaining).toMatch(/must run \*\*after the save\*\*/i);
+  });
+
+  // Only `uag` applies to what is inside a container; the other settings go on each field.
+  it('sets every property but uag on each field, not on a container', () => {
+    expect(reference('form-properties.md')).toMatch(
+      /Only `uag` applies to what is inside a container/
+    );
   });
 
   it('pins every UAG package and image it writes', () => {
