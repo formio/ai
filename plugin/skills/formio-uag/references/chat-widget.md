@@ -86,10 +86,10 @@ In Angular, create it in `ngAfterViewInit` against a `@ViewChild` element and ca
 1. The chat shows a greeting and any `suggestions`.
 2. The person sends a message. The chat posts the conversation, the form's current data, and the fields the person set in the form itself (`locked`) to `agent/chat`.
 3. The UAG answers with the next message (`reply`) and the values it took (`patch`). The chat shows the reply and writes each value into the form's own component, so conditionals react at once. A refused value is not in `patch`; the reply asks again.
-4. When the form is `complete`, the chat shows a summary with **Submit** and **Edit in the form**; the person can also confirm by typing, which the UAG reports as `confirmed`.
+4. When the form is `complete`, the chat shows a summary with **Submit** and **Edit in the form**; the person can also confirm by typing, which the UAG reports as `confirmed`, and the chat then submits at once, as if **Submit** were pressed.
 5. On submit, the chat calls the form's own `submit()`: formio.js validates and sends the submission to the UAG, which runs the form's actions and saves it in Form.io.
 
-Nothing is submitted without the person's confirmation, and the UAG never submits. **Review form** shows the form behind the chat; a value the person changes there is theirs and is sent as `locked`. When a required field is one the chat cannot collect, the chat names it and opens the form. **Start over** clears the conversation and the values the chat wrote.
+Nothing is submitted without the person's confirmation, and the UAG never submits. **Review form** shows the form behind the chat; a value the person changes there is theirs and is sent as `locked`. When a required field is one the chat cannot collect, the chat names it and opens the form. **Start over** clears the conversation and the values the chat wrote. After a submission the chat takes no more messages (`send()` resolves `null`) until it starts over, which begins a new, empty submission rather than an update of the saved one.
 
 ## Setting up the form
 
@@ -98,7 +98,7 @@ Nothing is submitted without the person's confirmation, and the UAG never submit
 | Setting | Why |
 | --- | --- |
 | The `uag` tag | Without it the chat says "This form is not available for chat." |
-| An agent engine on the UAG | Without one each turn answers `503`. `GET /agent/capabilities` reports `operations.chat.available`, which a page can check before it shows the chat. |
+| An agent engine on the UAG | Without one each turn answers `503`. `GET /agent/capabilities` reports `operations.chat.available`; it takes a UAG token or a server key, never a browser's Form.io token, so check it from the application's server, not the page. |
 | Create access for the people who chat | A turn needs create access to the form's submissions, as the save does. |
 | `uagAnonymous: "true"` | Only for visitors who do not sign in. |
 | `uagChat: "false"` | Turns chat off for the form. |
@@ -161,6 +161,8 @@ Every fixed string goes through formio.js translation with its English text as t
 `uag-js.css` themes the chat with CSS custom properties set on the container or an ancestor: `--uag-chat-font`, `--uag-chat-bg`, `--uag-chat-surface`, `--uag-chat-text`, `--uag-chat-muted`, `--uag-chat-border`, `--uag-chat-accent`, `--uag-chat-accent-text`, `--uag-chat-user-bg`, `--uag-chat-user-text`, `--uag-chat-radius`, `--uag-chat-height` (default `560px`; `100%` fills the container).
 
 ## Public forms
+
+A visitor who is not signed in has no Form.io token. Either let visitors register (a self-registration form that saves to a user resource and logs them in, posted through the UAG or to Form.io, after which formio.js holds their token and the per-caller limits apply), or use one of these:
 
 - **Anonymous use**: `uagAnonymous: "true"` on the form and create access for the Anonymous role. Anonymous turns count against `AGENT_ANONYMOUS_RATE_LIMIT` (10 a minute per address) and `AGENT_ANONYMOUS_TOTAL_RATE_LIMIT` (100 a minute), per UAG process. Every turn spends model budget: set the limits for what the owner will pay, and a spend limit at the model provider.
 - **A relay of your own**, for a CAPTCHA, a daily budget or your own sessions: either point only the turns at it with `chatUrl`, or register the relay's base URL as the UAG's (`Formio.use(UAG(relayUrl))`) and have it serve the UAG's paths for the form — the form (`{relay}/{formPath}`), its turns (`{relay}[/project/{id}]/form/{id}/agent/chat`) and its save (`{relay}[/project/{id}]/form/{id}/submission`). Each turn's `engine.usage` reports token use, for a relay that keeps a budget.

@@ -24,7 +24,7 @@ An agentic workflow runs a form's task on a submission with no person in the loo
 | A form tagged `uag` with at least one task | The criteria, and the fields the task fills ([tasks.md](./tasks.md)). |
 | An engine on the UAG | For example `UAG_ENGINES=claude` with `CLAUDE_API_KEY` ([deployment.md](./deployment.md)). |
 | A license, or a hosted project | Without one, a run before the save refuses the submission with `403` (`code: "license_required"`) and a run after the save fails and is logged. |
-| Submissions sent to the UAG | Run task runs only for submissions the UAG receives: through its submission API (`{form}/submission` on the UAG — the application's project URL pointed at the UAG), its MCP tools, or `@formio/uag-js`. A submission sent straight to Form.io runs no task. |
+| Submissions sent to the UAG | Run task runs only for submissions the UAG receives: through its submission API (`{form}/submission` on the UAG), its MCP tools, or `@formio/uag-js`. A client other than formio.js points its project URL at the UAG for the forms it saves: the UAG's root for Open Source, `{uagUrl}/{projectName}` for an Enterprise or hosted project. A formio.js application keeps its project URL on Form.io and lets `@formio/uag-js` route the `uag` forms ([uag-js.md](./uag-js.md#what-goes-where)). A submission sent straight to Form.io runs no task. |
 
 ## How a submission flows through the UAG
 
@@ -53,7 +53,7 @@ For each create or update it receives, the UAG runs, in order:
 | Setting | Values | Meaning |
 | --- | --- | --- |
 | `settings.task` (**Task**) | One of the form's tasks | The task to run. Required: a saving operation never guesses which stage to run. |
-| `settings.answer` (**Answer**) | `task` (default), `decisions` | `task`: its decision fields, and its empty, visible value fields, researching with `uagTools` when the task lists any. `decisions`: re-decide its decision fields only, filled and hidden ones too. |
+| `settings.answer` (**Answer**) | `task` (default), `decisions` | `task`: re-decide every decision field, filled and hidden ones too, and fill its empty, visible value fields, researching with `uagTools` when the task lists any. `decisions`: re-decide its decision fields only. |
 | `settings.when` (**When**) | `after` (default), `before` | After the save, in the background; or before the save, while the submitter waits. |
 | `settings.agentRole` (**Agent role**) | A project role that is not an admin role | Optional, self-hosted Enterprise only. Act at Form.io with this role, on the caller's behalf. See [Who a run acts as](#who-a-run-acts-as). |
 | `settings.submitterRoles` (**Submitter roles**) | Project role ids | With an agent role: who may submit through the agent when the form does not let their roles create submissions. |
@@ -104,13 +104,13 @@ Failures:
 | Before or after | A value the run wrote fails the form's validation | That field is left out, as if unanswered: reported `missing` with `reason: "failed validation: ..."`, cleared when `uagAuthoritative`, otherwise left as it was. The rest of the run is saved, so an engine's mistake never refuses the person's submission. A run after the save logs `[formio-uag] Run task "<task>" left out answers the form refused ...` and, with the database, names the fields in its Action Logs. |
 | After | Anything | The submitter's response is unaffected. A whole-task run saves what it obtained; a decisions-only run saves nothing. The failure is logged as `[formio-uag] Run task "<task>" failed for submission <id> of "<form>": ...`, and recorded with the database. |
 
-A refusal before the save answers in Form.io's shape, `{ name, message, code }` (plus `edition` for `license_required`), so formio.js shows it as it shows Form.io's errors; application code that submits shows `message` and branches on `code` (`license_required`, `decision_unavailable`, `rate_limited`, `forbidden`, `invalid_request`, `configuration_error`).
+A refusal before the save answers in Form.io's shape, `{ name, message, code }` (plus `edition` for `license_required`), so formio.js shows it as it shows Form.io's errors; application code that submits shows `message` and branches on `code` (`license_required`, `decision_unavailable`, `rate_limited`, `forbidden`, `invalid_request`, `configuration_error`, and `agent_identity` when an action with an agent role cannot act: `JWT_SECRET` unset or not Form.io Enterprise's, or an admin role chosen).
 
 A run after the save loads the stored submission, runs the task, saves nothing if nothing changed (a changed confidence alone does not count), and otherwise saves only the task's fields and their provenance as an update. If a person saved the submission meanwhile, the run starts once more on the new version; a second change fails it with `409`. Each UAG instance runs up to four runs at a time.
 
 ## Chaining tasks
 
-A second task is started by the first task's save. The demo's finance task runs on update, only for the applicants admissions put on the scholarship track:
+A second task is started by the first task's save, which is an update through the UAG, so it runs the form's update actions. A chained action must run **after the save**: Run task actions set to run before the save skip the UAG's own saves, so another task never starts them. The demo's finance task runs on update, only for the applicants admissions put on the scholarship track:
 
 ```json
 {
@@ -171,6 +171,11 @@ Values decided in the browser by Agent Input can be changed by the user before s
 
 Mark those fields `uagAuthoritative: "true"`: confident answers are written, fields the server cannot confirm are cleared for a person, and an engine outage refuses the save rather than clearing them.
 
+Two kinds of field must not be authoritative:
+
+- **A required field.** A run before the save that is not confident clears it, and Form.io's required rule then refuses the submission.
+- **A field a person is meant to confirm.** The UAG removes an authoritative field's value from every client save, so a person's confirmation never arrives. The demo's claim form keeps `claimType` — required, and confirmed on a page of its own when its confidence is low — as a plain decision field, and marks only the hidden `fraudSignals`, which no person sets, `uagAuthoritative`.
+
 ## Who a run acts as
 
 | | No agent role | With an agent role |
@@ -182,6 +187,8 @@ Mark those fields `uagAuthoritative: "true"`: confident answers are written, fie
 | Available on | Every edition | Self-hosted Form.io Enterprise, with the UAG's `JWT_SECRET` equal to Form.io's |
 
 Either way a run never uses the UAG's own project key, and engines research as the user who submitted, never as the agent role. A caller that submits with a server key has its tasks run as administrator.
+
+**On Form.io's hosted service** (and anywhere without a shared `JWT_SECRET`), actions name no agent role. Save each submission from the browser as the signed-in user, so its runs act as that user; let users create and update their own submissions (Create Own, Read Own, Update Own — a run after the save reads and updates as them); and make the task's fields `uagAuthoritative`, so only the run sets them through the UAG. Users can still write those fields by calling Form.io directly, so a decision that must hold against them needs self-hosted Enterprise and an agent role.
 
 ### Setting up an agent role (self-hosted Enterprise)
 
@@ -204,6 +211,7 @@ A task that must look something up lists read-only tools on its criteria (`"uagT
 - **Provenance** in the submission's `metadata.uag`: which engine decided or generated each field, with what confidence, and when.
 - **The UAG's log.** Failures are logged with task, submission and error; `DEBUG=formio:uag:runner` logs every run with the number of fields it saved, or `nothing changed`.
 - **Action Logs**, with the UAG's database, in a classic-portal stage connected to the UAG: one entry per run beside Form.io's own.
+- **In the application**, after a run after the save: the save's response is Form.io's, before the run, so a page that shows the run's result reads the submission back as its owner (`GET {form}/submission/{id}` on the UAG, with the user's token; the user needs Read Own) every few seconds until the task's fields are filled, and gives up after a limit with a message that the agent is still working — the run continues in the background either way. Without a license or an agent engine the fields never arrive, so say that in development.
 - **The stateless Agent API**: post the submission's data to `{form}/agent/decide` or `{form}/agent/generate` with the task and `overwrite: true` to see each field's `status` and `reason`, saving nothing.
 
 ## Taking a workflow to production

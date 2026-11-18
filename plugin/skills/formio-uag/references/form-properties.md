@@ -80,7 +80,9 @@ Text added to the chat's instructions under a heading of its own: the order to a
 
 ### `uag`
 
-The task's name, such as `triage`. Every component with the same value belongs to the same task. On a Panel, Fieldset, Well or Container, every input inside it belongs to the task, which is the usual way to give a task a whole "For office use only" section. Fields inside a Data Grid or Edit Grid are not filled.
+The task's name, such as `triage`. Every component with the same value belongs to the same task. On a Panel, Fieldset, Well, Tabs, Columns, Table or Container, every input inside it belongs to the task, which is the usual way to give a task a whole "For office use only" section. Fields inside a Data Grid or Edit Grid are not filled.
+
+Only `uag` applies to what is inside a container. Set `uagAuthoritative`, `uagAgentDecides`, `uagEngine` and the decision settings on each field: on a container they are ignored, so a panel marked `uagAuthoritative` leaves every field in it open to clients.
 
 ```json
 { "type": "panel", "key": "officeUse", "title": "For office use only", "properties": { "uag": "admissions" },
@@ -182,7 +184,7 @@ A wizard page conditioned on `claimTypeConfidence` below `0.6` then appears only
 
 ### `uagAuthoritative`
 
-`"true"` on a decision or value field a task fills: only the task sets it.
+`"true"` on a decision or value field a task fills: only the task sets it. Set it on each field, never on its panel, and never on a field that is required or that a person is meant to confirm ([workflows.md](./workflows.md#re-deciding-on-the-server)).
 
 - **Clients cannot set it.** When the form has a Run task action for the field's task, the UAG removes the value a client sends for the field and its `uagConfidenceField`, on every create and update, before any action runs, whatever the action's method, conditions or timing. On a create the field starts empty; on an update it keeps its stored value. A generated value field keeps its value and is never generated again.
 - **The server's decision wins.** In reconciliation a confident decision is written; any other answered result clears the field so a person decides. An engine outage clears nothing: a decisions-only run before the save refuses the save with `503` (or `429`), and any other run leaves the field as it was.

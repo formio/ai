@@ -127,7 +127,7 @@ Send `Accept: text/event-stream` to get each engine group as it finishes; decisi
 | Event | Data |
 | --- | --- |
 | `result` | `{ kind, task, engine, model, latencyMs, attempts, fields, patch, toolCalls?, error? }` per engine group. `patch` holds the values to apply, confidence companions included. |
-| `error` | `{ kind, task, error, attempts }` after the `result` of a group whose engines all failed; or `{ requestId, error }`, with no `kind`, for a failure that ends the stream. |
+| `error` | `{ kind, task, error, attempts }` after the `result` of a group whose engines all failed; or `{ requestId, error, code }` (plus `edition` for `license_required`), with no `kind`, for a failure that ends the stream. |
 | `done` | The full result object, last. |
 
 The stream opens only once the request is planned, so refusals (credentials, unknown form or task, no engine, no license) are ordinary JSON errors. `EventSource` cannot send a POST body; read the stream with `fetch`:
@@ -173,6 +173,26 @@ export async function extract({ formUrl, token, task, data, onResult }) {
 
 `POST {form}/agent/generate` — a task's open values from in-flight data, with an agent engine. Decision fields are `excluded` as `not requested`. When the criteria lists `uagTools`, the engine may research first, as the caller; a tool that may write or does not exist is refused with `400`. To get decisions and values for the same data, call `decide` and `generate` at the same time.
 
+From a formio.js page, a button can ask for a draft the person then edits — a reply, a summary — with the signed-in user's token. Give the form a button with `"action": "event"` and `"event": "draftReply"`, a task `reply` whose criteria says what to write, and the field to fill flagged `uag: "reply"`:
+
+```js
+import { uagFormUrl } from '@formio/uag-js';
+
+form.on('draftReply', async () => {
+  const response = await fetch(`${uagFormUrl(config.uagUrl, form.form)}/agent/generate`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'x-jwt-token': Formio.getToken() },
+    body: JSON.stringify({ task: 'reply', data: form.submission.data, overwrite: true }),
+  });
+  if (!response.ok) return showError((await response.json()).error);
+  const { fields } = await response.json();
+  // Only the field the task wrote; the person's own values stay as they are.
+  if (fields?.reply?.value) form.getComponent('reply').setValue(fields.reply.value);
+});
+```
+
+Nothing is saved: the draft is a value in the form until the person submits. `overwrite: true` lets a second press replace the first draft. `uagFormUrl` needs the definition's `_id`, which a form loaded from its Form.io URL has.
+
 ## Chat
 
 `POST {form}/agent/chat` — one turn of a conversation that fills the form in. The client keeps the conversation and the data; one agent engine reads them with the form's fields, rules and options, and the UAG checks every value against the form. Nothing is stored or saved; the client submits the form itself, through the UAG, once the person confirms. The chat widget does all of this ([chat-widget.md](./chat-widget.md)); call it directly only for a chat UI of your own.
@@ -205,6 +225,7 @@ Every error from a form's agent operations and `/agent/capabilities` is JSON `{ 
 | `500` | `internal_error` | See the UAG's log under the request id. |
 | `502` | `engines_failed` | Chat: every engine failed. |
 | `503` | `no_engine` | No enabled engine can serve the operation. |
+| `404`, `409`, `503`, `504` | `not_found`, `conflict`, `unavailable`, `timeout` | Any refusal that names no code of its own gets the code of its status; give client code a default branch for codes it does not know. |
 
 ## Rate limits
 

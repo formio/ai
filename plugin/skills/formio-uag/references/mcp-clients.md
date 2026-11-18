@@ -29,7 +29,8 @@ This MCP server is the user's runtime surface, distinct from the Form.io MCP ser
 | Connection | Who runs the client | Public URL needed | Authentication |
 | --- | --- | --- | --- |
 | **Local** | The user's own server, script or engine server, next to the UAG | No: `localhost` or a private address | `client_credentials` at `/auth/token` with a server key. Always on. |
-| **Remote** | claude.ai and Claude Desktop custom connectors, the Anthropic MCP connector, `mcp-remote` | For connectors, yes: `{uagUrl}/mcp`, `/auth/*` and `/.well-known/*` over HTTPS. `mcp-remote` runs on the user's machine, so a local URL works. | OAuth 2.0 authorization code with PKCE (`S256`), in the browser, with the project's own login form. Needs `MCP_OAUTH=true` and the UAG's database (`MONGO`, licensed unless the project and the database are both on development hosts). |
+| **Remote** | claude.ai and Claude Desktop custom connectors, `mcp-remote` | For connectors, yes: `{uagUrl}/mcp`, `/auth/*` and `/.well-known/*` over HTTPS. `mcp-remote` runs on the user's machine, so a local URL works. | OAuth 2.0 authorization code with PKCE (`S256`), in the browser, with the project's own login form. Needs `MCP_OAUTH=true` and the UAG's database (`MONGO`, licensed unless the UAG, the project and the database all run on one machine). |
+| **Anthropic MCP connector** (the Messages API) | Anthropic's servers, with a token the user's application gives them | Yes: `{uagUrl}/mcp` over HTTPS. | A UAG access token passed as the connector's `authorization_token`: a `client_credentials` token, or a user's token from the application's own sign-in. Needs no `MCP_OAUTH`. |
 
 ### Local clients: `client_credentials`
 
@@ -53,14 +54,15 @@ Content-Type: application/json
 
 ### Remote clients: OAuth with PKCE
 
-A signed-in session lasts as long as the user's Form.io login token, whatever `JWT_EXPIRE_TIME` says: Form.io's `jwt.expireTime` (240 minutes by default), after which `mcp-remote` or the connector asks the user to sign in again. Raise Form.io's setting, not the UAG's, for longer sessions.
+A signed-in session lasts at most as long as the user's Form.io login token: Form.io's `jwt.expireTime` (240 minutes by default), and a token's `expires_in` is the shorter of that and `JWT_EXPIRE_TIME`. A client that does not refresh within twice `JWT_EXPIRE_TIME` (120 minutes by default) must sign in again too. After either, `mcp-remote` or the connector asks the user to sign in again; raise Form.io's setting for longer sessions.
 
 The client discovers everything itself: `401` with `resource_metadata` → `/.well-known/oauth-protected-resource` → `/.well-known/oauth-authorization-server` → dynamic registration at `/auth/register` → the browser opens `/auth/authorize`, which loads the project's login form from `LOGIN_FORM` → the code is exchanged at `/auth/token` with the `code_verifier`. Every later tool call runs as that user.
 
 What the UAG needs for it:
 
-- `MCP_OAUTH=true` and `MONGO` (with a license that includes the UAG, unless the UAG, the project and the database all run on one machine (`localhost`, `*.localhost`, `lvh.me`)). Without a usable database the UAG starts with sign-in off and says why; `/.well-known/*` and `/auth/authorize` answer `404`.
+- `MCP_OAUTH=true` and `MONGO` (with a license that includes the UAG, unless the UAG, the project and the database all run on one machine (`localhost`, `*.localhost`, `lvh.me`)). Without a usable database the UAG starts with sign-in off and says why; every OAuth endpoint but `POST /auth/token` (`/.well-known/*`, `/auth/authorize`, `/auth/register`) answers `404`, and `/agent/capabilities` reports `mcpOAuth: false`.
 - `LOGIN_FORM` set to a login form JSON URL the user's **browser** can load, such as `https://forms.example.com/user/login` (Open Source) or `https://forms.example.com/myproject/user/login` (Enterprise). The default, `{PROJECT}/user/login`, is usually a container address.
+- Optionally, a sign-in page of the user's own: `AUTHORIZE_HTML` holds the page's HTML itself (a module's `config.auth.authAppHtml` wins). It must post the sign-in to `/auth/authorize` and follow the `{ redirect }` it answers.
 - A public URL the discovery documents name correctly: behind a reverse proxy set `TRUST_PROXY` and forward `Host` and `X-Forwarded-Proto`; when TLS ends in front of that proxy, set `BASE_URL` to the public `https` URL. Check with `curl https://uag.example.com/.well-known/oauth-protected-resource`.
 - For connectors, publish only `{uagUrl}/mcp`, `/auth` and `/.well-known` publicly, unless browsers also use the chat widget or Agent Input, which need the form routes as well.
 
@@ -90,7 +92,7 @@ What the UAG needs for it:
 | Tool | Annotation | What it does |
 | --- | --- | --- |
 | `get_forms` | Reads | Lists the tagged forms with the caller's create, read and update permissions on each. Call it first. |
-| `get_form_fields` | Reads | Fields with label, `data_path`, type, description and value rule (`criteria`: `required`, `optional`, `all`; `parent_path` for nested forms and grids). |
+| `get_form_fields` | Reads | Fields with label, `data_path`, type, description and validation; `criteria` chooses which to list (`required`, the default, `optional` or `all`), and `parent_path` lists those inside a nested form or grid. |
 | `get_field_info` | Reads | Full detail for chosen `field_paths`: required, format, options, validation. |
 | `collect_field_data` | Reads | Applies `updates` (`{ data_path, new_value }[]`) to `form_data`, validates, and reports errors or what is still missing. Saves nothing. |
 | `confirm_form_submission` | Reads | A summary of `form_data` for the user to approve. |
@@ -102,7 +104,7 @@ What the UAG needs for it:
 | `fetch_external_data` | Reads | Options for a URL- or resource-fed select, or a Data Source value. |
 | `read_document` | Reads | The text of a file uploaded to a submission (a file field, or an AI Document's files): `form_name`, `submission_id` (from `find_submissions`) and `data_path` (`contract`, `rows[0].attachment`; `contract[1]` for another file than the first). Returns JSON `{ file_name, type, pages, text, truncated }`, read through the UAG's converters with the caller's identity; the text is cut at `agentApi.files.maxChars` (200000), and files over `DOCUMENTS_MAX_FILE_BYTES` (25 MB) are refused. A file no installed converter reads as text, or one with no text to read (an image, a scanned PDF), is an `isError` result naming the reason. |
 
-`form_data` is the conversation's state, kept by the client and sent on every call: a flat object of data path to value (`{ "customer.firstName": "Joe", "children[0].age": 5 }`). Results are Markdown text rendered from response templates a module can override; a problem sets `isError: true`.
+`form_data` is the conversation's state, kept by the client and sent on every call: a flat object of data path to value (`{ "customer.firstName": "Joe", "children[0].age": 5 }`). Results are Markdown text rendered from response templates a module can override. A failure sets `isError: true` — an unknown form, a save validation refuses, a missing submission, a refused search, a document `read_document` cannot read — but validation errors from `collect_field_data` and `confirm_form_submission` are ordinary results, because the agent is meant to ask again. MCP clients read the tool list when they connect: after tagging a new form, restart Claude Desktop or reconnect the connector.
 
 ## The conversation sequence
 
@@ -212,4 +214,4 @@ module.exports = {
 };
 ```
 
-See [deployment.md](./deployment.md#modules) for mounting a module, and `https://ai.form.io/developers/modules` for the whole contract.
+See [deployment.md](./deployment.md#modules) for mounting a module, and `https://github.com/formio/uag/blob/main/demo/content/developers/modules.md` for the whole contract.

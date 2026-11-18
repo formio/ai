@@ -38,12 +38,12 @@ A task is the set of components that carry the same value in their `uag` propert
 | Role | How it is flagged | Required |
 | --- | --- | --- |
 | **Criteria** | A content component with `uag: "<task>"` and `uagField: "criteria"`. Its HTML, converted to Markdown, is the task's instructions. | Always add one. The `agent_provide` MCP tool refuses a task without it, and the Agent API runs one with no instructions. |
-| **Agent fields** | Any input component with `uag: "<task>"` and no `uagField`; or a Panel, Fieldset, Well or Container with `uag: "<task>"`, which makes every input inside it an agent field. | Yes |
+| **Agent fields** | Any input component with `uag: "<task>"` and no `uagField`; or a Panel, Fieldset, Well, Tabs, Columns, Table or Container with `uag: "<task>"`, which makes every input inside it an agent field. | Yes |
 | **Input** | A field or container with `uag: "<task>"` and `uagField: "input"`. Its value is the text the task reads; on a file component, the uploaded document's text ([Documents as input](#documents-as-input)). | No. Without one, the task reads every filled value in the submission except the fields being answered in this run, and `extract` needs a `text` in the request. |
 
-Fields inside a Data Grid or Edit Grid are never answered (`excluded`: `inside repeating rows`). `uag` on a Panel, Fieldset, Well, Tabs, Columns, Table or Container makes every input inside it one of the task's fields.
+Fields inside a Data Grid or Edit Grid are never answered (`excluded`: `inside repeating rows`). `uag` on a Panel, Fieldset, Well, Tabs, Columns, Table or Container makes every input inside it one of the task's fields. Only `uag` reaches inside: `uagAuthoritative`, `uagAgentDecides`, `uagEngine`, `uagThreshold` and the other decision settings are ignored on a container and go on each field.
 
-Write every `uag*` value as a **string**, as the portal saves custom properties: `"true"`, `"false"`, `"0.7"`. The switches (`uagAuthoritative`, `uagAgentDecides`, `uagScale`, `uagOrderCheck`, `uagAnonymous`, `uagChat`) also accept JSON booleans in 2.0.0.
+Write every `uag*` value as a **string**, as the portal saves custom properties: `"true"`, `"false"`, `"0.7"`. The switches (`uagAuthoritative`, `uagAgentDecides`, `uagScale`, `uagOrderCheck`, `uagAnonymous`, `uagChat`) also accept JSON booleans.
 
 A task fills only its own fields: values an engine returns for any other path are discarded. That is the guard that keeps text in a submission from making a model write somewhere else.
 
@@ -89,7 +89,7 @@ A **file** component can be a task's input, or be listed in its `uagContext`. En
   "properties": { "uag": "review", "uagField": "input" } }
 ```
 
-The file's type is identified from its bytes and read through the UAG's converters: the built-in ones read PDF (its text layer), text, Markdown, CSV, JSON, HTML and XML, and converter plugins add formats ([deployment.md](./deployment.md#plugins-and-add-ons)). An image, or a PDF with no text layer, reaches the engine as its name and the reason, never as its bytes. The file is loaded where Form.io keeps it — base64 from the submission, S3 and Azure through Form.io's storage endpoints with the caller's credentials, `url` storage only from the project's own origin or the component's upload URL — and `agentApi.files.maxBytes` (10 MB) and `agentApi.files.maxChars` (200000) bound what is read. Files that are not a task's input or context are never sent to engines: they are described by name, type and size, and signatures as `(signed)`. To let an MCP client read an uploaded file, it calls `read_document` ([mcp-clients.md](./mcp-clients.md#the-tools)). For content a person reviews before submitting, generated from uploaded files on the form itself, use the AI Document component instead ([deployment.md](./deployment.md#ai-document)).
+The file's type is identified from its bytes and read through the UAG's converters: the built-in ones read PDF (its text layer), text, Markdown, CSV, JSON, HTML and XML, and converter plugins add formats ([deployment.md](./deployment.md#plugins-and-add-ons)). An image, or a PDF with no text layer, reaches the engine as its name and the reason, never as its bytes. For scans and photos, put an AI Document in front of the task: it reads the image into a text field that is the task's input ([ai-document.md](./ai-document.md#filling-a-form-from-a-scanned-paper-form)). The file is loaded where Form.io keeps it — base64 from the submission, S3 and Azure through Form.io's storage endpoints with the caller's credentials, `url` storage only from the project's own origin or the component's upload URL — and `agentApi.files.maxBytes` (10 MB) and `agentApi.files.maxChars` (200000) bound what is read. Files that are not a task's input or context are never sent to engines: they are described by name, type and size, and signatures as `(signed)`. To let an MCP client read an uploaded file, it calls `read_document` ([mcp-clients.md](./mcp-clients.md#the-tools)). For content a person reviews before submitting, generated from uploaded files on the form itself, use the AI Document component instead ([deployment.md](./deployment.md#ai-document)).
 
 ### Rich text fields
 
@@ -119,7 +119,7 @@ Decision engines are asked closed questions compiled from the component, with ch
 
 - **Choice** (radio, select, a survey row): one question over the option labels, asked again with the options reversed; a changed answer makes the field `uncertain`. `uagOrderCheck: "false"` drops the second question.
 - **Score** (an ordered radio or select with `uagScale: "true"` and a description for every option in `uagOptionDescriptions`, 2 to 10 levels): one question over the described levels.
-- **Mention check**: every choice and score is paired with "does the input address this at all?". Below the uncertain band the field is left empty, inside it the field is `uncertain`. This is how "nobody was hurt" is told apart from not mentioning injuries.
+- **Mention check**: every choice and score is paired with "does the input address this at all?". Below the uncertain band the field is left empty, inside it the field is `uncertain`. This is how "nobody was hurt" is told apart from not mentioning injuries. The check asks the field's label of the text, so phrase a decision field's label as the question the text answers ("What is it about?", not "Which team should handle it?"); a label about the business's next step finds nothing in the text to decide.
 - **Yes/no** (a checkbox, each select-box option, each option of a multi-value select): "does the input affirm this?" and "does it deny it?". True needs a clear affirmation and no denial, false the reverse.
 - **Resource match** (a resource select): a choice over every record. A record named in the input but not on file gives `missing` with `noMatch: true`, and `newRecordName` when an agent engine is enabled.
 
@@ -218,7 +218,7 @@ One task, `triage`, with an input, a criteria that adds one context value, two d
 - Each task has exactly one criteria, and every field it should fill carries the task's exact `uag` value (directly or from a container).
 - Extract and Agent Input have an input field (`uagField: "input"`), or the caller sends `text`. A file input holds documents with a text layer.
 - Decision fields that conditionals can hide have `clearOnHide: false`.
-- Fields that drive routing, scores or approvals are `uagAuthoritative: "true"`, and a Run task action runs their task ([workflows.md](./workflows.md)).
+- Fields that drive routing, scores or approvals are `uagAuthoritative: "true"`, and a Run task action runs their task ([workflows.md](./workflows.md)) — set on each field, not on their panel, and never on a field that is required or that a person is meant to confirm ([workflows.md](./workflows.md#re-deciding-on-the-server)).
 - With an agent engine and no decision engine, closed-set fields a workflow must save carry `uagAgentDecides: "true"` together with `uagAuthoritative: "true"`.
 - `uagTools` lists only the read-only tools a task needs, or nothing.
 - The criteria contains no secrets, and is `hidden: true` if users should not see the rubric.
