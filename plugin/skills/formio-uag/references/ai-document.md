@@ -118,7 +118,7 @@ The component's browser code comes from the UAG's modules, not from `@formio/uag
   Formio.use(aiDocument);
   ```
 
-Rendering a form with an AI Document then needs nothing else, except against UAG 2.0.1 and earlier in front of an Enterprise or hosted project: `UAG()` fetches the plugin list from `{uagUrl}/plugins`, which those versions answer only under the project's name, so the list comes back empty and the person cannot edit the result. There, load `{uagUrl}/uag-js/uag.use.js` instead, which carries the list, or upgrade the UAG once a release answers `/plugins` at its root. An application with its own form builder awaits `UAG.ready` before offering the component. The person needs create or update access to the form, as for the Agent API; on a `uagAnonymous` form, visitors who are not signed in may process documents too, under the anonymous limits.
+Rendering a form with an AI Document then needs nothing else, except against UAG 2.0.1 and earlier in front of an Enterprise or hosted project: `UAG()` fetches the plugin list from `{uagUrl}/plugins`, which those versions answer only under the project's name, so the list comes back empty and the person cannot edit the result. Upgrade the UAG to 2.0.2 or later, which answers `/plugins` at its root, or load `{uagUrl}/uag-js/uag.use.js` instead, which carries the list. An application with its own form builder awaits `UAG.ready` before offering the component. The person needs create or update access to the form, as for the Agent API; on a `uagAnonymous` form, visitors who are not signed in may process documents too, under the anonymous limits.
 
 The component emits events on its form, for a page that reacts to processing:
 

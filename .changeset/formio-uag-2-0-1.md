@@ -2,7 +2,7 @@
 '@formio/ai': patch
 ---
 
-Bring the `formio-uag` skill to UAG 2.0.1, audited against the UAG's source, its developer docs and its demo applications. Where the rc.7 notes in this release differ, these supersede them.
+Bring the `formio-uag` skill to UAG 2.0.2, audited against the UAG's source, its developer docs and its demo applications. Where the rc.7 notes in this release differ, these supersede them.
 
 - Versions: UAG 2.0 is released, so every package and image resolves from `latest` (2.x) and is pinned to the exact version; the `rc` fallback is gone. `@formio/uag-extras` and `formio/uag-documents` take the UAG's major (`:2`; `:1` is the 1.0.0 built for the release candidates). `@formio/appserver` 2.26.4 or later. The documentation links point at the UAG repository and the public examples catalog instead of `ai.form.io`.
 - AI Document: a new `references/ai-document.md` with the component JSON (its settings in a top-level `uag` object, with `files` and `result` children), the `extract`, `analyze` and `translate` processes and their settings, the target field, the browser events, the result, the process route, and filling a form from a scanned paper form.
